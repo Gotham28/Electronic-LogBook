@@ -184,11 +184,7 @@ function App() {
       }}
     >
       {activeRole === "Professor" && (
-        <Switch>
-          <Route path="/mentees" component={() => <ProfessorPortal activeTab="mentees" />} />
-          <Route path="/assessments" component={() => <ProfessorPortal activeTab="assessments" />} />
-          <Route component={() => <ProfessorPortal activeTab="review-queue" />} />
-        </Switch>
+        <ProfessorPortal />
       )}
       {activeRole === "HOD" && (
         <Switch>
@@ -203,7 +199,7 @@ function App() {
           {/* Legacy routes — redirect to merged Requirements tab */}
           <Route path="/procedures" component={() => <HODPortal activeTab="requirements" />} />
           <Route path="/settings" component={() => <HODPortal activeTab="requirements" />} />
-          <Route component={() => <HODPortal activeTab="gap-dashboard" />} />
+          <Route component={() => <HODPortal activeTab="roster" />} />
         </Switch>
       )}
       {activeRole === "Student" && (

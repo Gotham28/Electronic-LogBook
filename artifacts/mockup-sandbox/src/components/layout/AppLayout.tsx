@@ -18,6 +18,7 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarTrigger,
+  SidebarRail,
   SidebarInset,
 } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -79,20 +80,19 @@ function navigationForRole(role: RoleType, dashboardData?: any, loadingBadges?: 
   if (role === "Professor") {
     return [
       { title: "Evaluation Queue", icon: FileText, href: "/" },
-      { title: "All Students", icon: UserCheck, href: "/mentees" },
-      { title: "Assessments", icon: ClipboardCheck, href: "/appraisals" },
+      { title: "Student Progress", icon: UserCheck, href: "/mentees" },
+      { title: "Assessments", icon: ClipboardCheck, href: "/assessments" },
     ];
   }
 
   if (role === "HOD") {
     return [
-      { title: "Overview", icon: AlertTriangle, href: "/" },
+      { title: "Overview", icon: Users, href: "/" },
       { title: "Review Queue", icon: FileText, href: "/review-queue" },
       { title: "All Students", icon: GraduationCap, href: "/mentees" },
       { title: "Add Assessment", icon: ClipboardCheck, href: "/assessments" },
-      { title: "Students & Professors", icon: Users, href: "/roster" },
       { title: "Pending Students", icon: UserPlus, href: "/student-access" },
-      { title: "Add Professor", icon: UserCheck, href: "/professors" },
+      { title: "Add Faculty", icon: UserCheck, href: "/professors" },
       { title: "Leave Approvals", icon: CheckCircle2, href: "/leave-approvals" },
       { title: "Requirements", icon: ClipboardCheck, href: "/requirements" },
     ];
@@ -186,17 +186,15 @@ export function AppLayout({
     <SidebarProvider defaultOpen>
       <div className="medical-grid h-screen w-full overflow-hidden p-0 text-slate-900 md:p-3 lg:p-4">
         <div className="glass-panel mx-auto flex h-[100dvh] w-full max-w-[1600px] overflow-hidden rounded-none border-white/70 md:h-[calc(100vh-24px)] md:rounded-[30px] lg:h-[calc(100vh-32px)]">
-          <Sidebar className="print-hidden border-r border-white/70 bg-white/60 shadow-[0_24px_80px_rgba(15,23,42,0.06)] backdrop-blur-xl">
-            <SidebarHeader className="border-b border-white/70 p-4">
+          <Sidebar collapsible="icon" className="print-hidden border-r border-slate-200/80 bg-white/95 shadow-[0_24px_80px_rgba(15,23,42,0.06)] backdrop-blur-xl">
+            <SidebarHeader className="border-b border-slate-100 p-4 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-2">
               <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-500 via-teal-500 to-cyan-500 text-white shadow-[0_16px_34px_rgba(13,148,136,0.22)]">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-600 text-white shadow-[0_12px_28px_rgba(13,148,136,0.2)]">
                   <BookOpenCheck className="h-6 w-6" />
                 </div>
-                <div>
+                <div className="group-data-[collapsible=icon]:hidden">
                   <p className="font-display text-lg font-bold leading-tight text-slate-900">Pediatrics E-Logbook</p>
-                  <p className="mt-0.5 flex items-center gap-1 text-[11px] font-semibold text-teal-700">
-                    <ShieldCheck className="h-3 w-3" /> MCI-aligned training record
-                  </p>
+                  <p className="mt-0.5 text-[11px] font-medium text-slate-500">Clinical training records</p>
                 </div>
               </div>
             </SidebarHeader>
@@ -218,22 +216,23 @@ export function AppLayout({
                           <SidebarMenuButton
                             asChild
                             isActive={isActive}
+                            tooltip={item.title}
                             className={`h-11 w-full rounded-xl px-3 transition-all duration-200 ${
                               isActive
                                 ? "border border-white/60 bg-gradient-to-r from-teal-600 to-cyan-500 font-semibold text-white shadow-[0_16px_36px_rgba(13,148,136,0.22)] hover:text-white"
                                 : "text-slate-600 hover:border hover:border-white/70 hover:bg-white/80 hover:text-teal-900"
                             }`}
                           >
-                            <Link href={item.href} className="flex w-full items-center gap-3">
+                            <Link href={item.href} className="flex w-full items-center gap-3 group-data-[collapsible=icon]:justify-center">
                               <Icon className={`h-4 w-4 ${isActive ? "text-white" : "text-teal-600"}`} />
-                              <span className="flex-1 truncate text-[13px]">{item.title}</span>
+                              <span className="flex-1 truncate text-[13px] group-data-[collapsible=icon]:hidden">{item.title}</span>
                               
                               {item.badgeLoading ? (
-                                <Skeleton className="h-4 w-12 rounded-full bg-teal-100/50" />
+                                <Skeleton className="h-4 w-12 rounded-full bg-teal-100/50 group-data-[collapsible=icon]:hidden" />
                               ) : item.badge ? (
                                 <Badge
                                   variant="outline"
-                                  className={`rounded-full px-1.5 py-0 text-[9px] ${
+                                  className={`rounded-full px-1.5 py-0 text-[9px] group-data-[collapsible=icon]:hidden ${
                                     isActive
                                       ? "border-white/25 bg-white/15 text-white"
                                       : item.badgeColor || "border-teal-100 bg-teal-50 text-teal-700"
@@ -261,11 +260,11 @@ export function AppLayout({
                         {initials}
                       </AvatarFallback>
                     </Avatar>
-                    <div className="min-w-0 flex-1">
+                    <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
                       <p className="truncate text-xs font-bold text-slate-900">{displayName}</p>
                       <p className="truncate text-[10px] font-semibold text-teal-700">{activeRole} portal</p>
                     </div>
-                    <ChevronDown className="h-4 w-4 text-teal-700/50" />
+                    <ChevronDown className="h-4 w-4 text-teal-700/50 group-data-[collapsible=icon]:hidden" />
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-72 rounded-2xl border-white/70 bg-white/92 p-1 shadow-[0_24px_60px_rgba(15,23,42,0.12)] backdrop-blur-xl">
@@ -281,6 +280,7 @@ export function AppLayout({
                 </DropdownMenuContent>
               </DropdownMenu>
             </SidebarFooter>
+            <SidebarRail />
           </Sidebar>
 
           <SidebarInset className="flex min-w-0 flex-1 flex-col bg-transparent overflow-y-auto">
@@ -293,7 +293,7 @@ export function AppLayout({
                     Department of Pediatrics
                   </p>
                   <p className="truncate text-[11px] font-medium text-slate-500">
-                    Postgraduate training • {activeRole} view
+                    {activeRole} workspace
                   </p>
                 </div>
               </div>
@@ -346,7 +346,7 @@ export function AppLayout({
             <main className="mx-auto w-full max-w-[1380px] flex-1 p-4 md:p-6 lg:p-8">
               <div className="print-only mb-6 border-b border-slate-300 pb-4">
                 <p className="page-eyebrow">Department of Pediatrics</p>
-                <h1 className="mt-1 text-2xl font-bold">Postgraduate Electronic Logbook</h1>
+                <h1 className="mt-1 text-2xl font-bold">Resident Training Record</h1>
               </div>
               {children}
             </main>

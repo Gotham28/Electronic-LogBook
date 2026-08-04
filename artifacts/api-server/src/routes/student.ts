@@ -4,7 +4,7 @@ import {
   academicLogsTable, usersTable, departmentsTable, departmentConfigsTable,
   postingsTable, leaveRecordsTable, appraisalsTable, researchTable, assessmentsTable
 } from "@workspace/db";
-import { eq, desc, count, sql } from "drizzle-orm";
+import { eq, and, desc, count, sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/auth.js";
 
 const router: IRouter = Router();
@@ -43,9 +43,9 @@ async function validateSupervisor(supervisorId: number) {
 // NEW REAL DATABASE ROUTES
 // ---------------------------------------------------------
 
-router.get("/:studentId/dashboard", async (req, res) => {
+router.get("/:studentId/dashboard", requireAuth, async (req, res) => {
   try {
-    const studentId = parseInt(req.params.studentId, 10);
+    const studentId = parseInt(String(req.params.studentId), 10);
     if (isNaN(studentId)) {
       res.status(400).json({ message: "Invalid studentId" });
       return;
@@ -53,6 +53,7 @@ router.get("/:studentId/dashboard", async (req, res) => {
 
     const studentMatch = await db.select({
       id: studentsTable.id,
+      userId: studentsTable.userId,
       name: usersTable.fullName,
       registrationNumber: studentsTable.registrationNumber,
       dateOfJoining: studentsTable.dateOfJoining,
@@ -71,6 +72,16 @@ router.get("/:studentId/dashboard", async (req, res) => {
       return;
     }
     const student = studentMatch[0];
+
+    const caller = req.user!;
+    if (caller.role === "student" && caller.id !== student.userId) {
+      res.status(403).json({ message: "You may only view your own dashboard" });
+      return;
+    }
+    if (["professor", "hod"].includes(caller.role) && caller.departmentId !== student.departmentId) {
+      res.status(403).json({ message: "This student is outside your department" });
+      return;
+    }
 
     // Counts
     const caseLogsCounts = await db.select({ status: caseLogsTable.status, count: count() }).from(caseLogsTable).where(eq(caseLogsTable.studentId, studentId)).groupBy(caseLogsTable.status);
@@ -121,9 +132,9 @@ router.get("/:studentId/dashboard", async (req, res) => {
 });
 
 // Logs (Cases, Procedures, Academics) are fetched in one go by the frontend using /:studentId/logs
-router.get("/:studentId/logs", async (req, res) => {
+router.get("/:studentId/logs", requireAuth, async (req, res) => {
   try {
-    const studentId = parseInt(req.params.studentId, 10);
+    const studentId = parseInt(String(req.params.studentId), 10);
     if (isNaN(studentId)) {
       res.status(400).json({ message: "Invalid studentId format" });
       return;
@@ -132,10 +143,12 @@ router.get("/:studentId/logs", async (req, res) => {
     // Fetch profile
     const studentMatch = await db.select({
       id: studentsTable.id,
+      userId: studentsTable.userId,
       registrationNumber: studentsTable.registrationNumber,
       dateOfJoining: studentsTable.dateOfJoining,
       batch: studentsTable.batch,
       department: departmentsTable.name,
+      departmentId: usersTable.departmentId,
     })
     .from(studentsTable)
     .innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
@@ -148,16 +161,38 @@ router.get("/:studentId/logs", async (req, res) => {
       return;
     }
 
+    const caller = req.user!;
+    const student = studentMatch[0];
+    if (caller.role === "student" && caller.id !== student.userId) {
+      res.status(403).json({ message: "You may only view your own logbook" });
+      return;
+    }
+    if (["professor", "hod"].includes(caller.role) && caller.departmentId !== student.departmentId) {
+      res.status(403).json({ message: "This student is outside your department" });
+      return;
+    }
+
+    // Faculty inspection is assignment-scoped. HODs retain department-wide oversight.
+    const caseFilter = caller.role === "professor"
+      ? and(eq(caseLogsTable.studentId, studentId), eq(caseLogsTable.supervisorId, caller.id))
+      : eq(caseLogsTable.studentId, studentId);
+    const procedureFilter = caller.role === "professor"
+      ? and(eq(procedureLogsTable.studentId, studentId), eq(procedureLogsTable.supervisorId, caller.id))
+      : eq(procedureLogsTable.studentId, studentId);
+    const academicFilter = caller.role === "professor"
+      ? and(eq(academicLogsTable.studentId, studentId), eq(academicLogsTable.supervisorId, caller.id))
+      : eq(academicLogsTable.studentId, studentId);
+
     const [caseLogsRaw, procedureLogsRaw, academicLogsRaw] = await Promise.all([
       db.select({ log: caseLogsTable, supervisorName: usersTable.fullName })
         .from(caseLogsTable).leftJoin(usersTable, eq(caseLogsTable.supervisorId, usersTable.id))
-        .where(eq(caseLogsTable.studentId, studentId)).orderBy(desc(caseLogsTable.createdAt)),
+        .where(caseFilter).orderBy(desc(caseLogsTable.createdAt)),
       db.select({ log: procedureLogsTable, supervisorName: usersTable.fullName })
         .from(procedureLogsTable).leftJoin(usersTable, eq(procedureLogsTable.supervisorId, usersTable.id))
-        .where(eq(procedureLogsTable.studentId, studentId)).orderBy(desc(procedureLogsTable.createdAt)),
+        .where(procedureFilter).orderBy(desc(procedureLogsTable.createdAt)),
       db.select({ log: academicLogsTable, supervisorName: usersTable.fullName })
         .from(academicLogsTable).leftJoin(usersTable, eq(academicLogsTable.supervisorId, usersTable.id))
-        .where(eq(academicLogsTable.studentId, studentId)).orderBy(desc(academicLogsTable.createdAt)),
+        .where(academicFilter).orderBy(desc(academicLogsTable.createdAt)),
     ]);
 
     res.json({
@@ -180,7 +215,7 @@ router.get("/:studentId/logs", async (req, res) => {
 // Postings
 router.get("/:studentId/postings", async (req, res) => {
   try {
-    const studentId = parseInt(req.params.studentId, 10);
+    const studentId = parseInt(String(req.params.studentId), 10);
     const data = await db
       .select({
         id: postingsTable.id,
@@ -204,7 +239,7 @@ router.get("/:studentId/postings", async (req, res) => {
 
 router.post("/:studentId/postings", async (req, res) => {
   try {
-    const studentId = parseInt(req.params.studentId, 10);
+    const studentId = parseInt(String(req.params.studentId), 10);
     const { ward, postingName, startDate, endDate, supervisorId } = req.body;
     
     const [inserted] = await db.insert(postingsTable).values({
@@ -224,7 +259,7 @@ router.post("/:studentId/postings", async (req, res) => {
 // Leave Records
 router.get("/:studentId/leave-balance", requireAuth, async (req, res) => {
   try {
-    const studentId = parseInt(req.params.studentId, 10);
+    const studentId = parseInt(String(req.params.studentId), 10);
     const caller = req.user!;
 
     if (caller.role === "student") {
@@ -292,7 +327,7 @@ router.get("/:studentId/leave-balance", requireAuth, async (req, res) => {
 
 router.get("/:studentId/leave-records", async (req, res) => {
   try {
-    const studentId = parseInt(req.params.studentId, 10);
+    const studentId = parseInt(String(req.params.studentId), 10);
     const data = await db.select().from(leaveRecordsTable).where(eq(leaveRecordsTable.studentId, studentId)).orderBy(desc(leaveRecordsTable.createdAt));
     res.json({ data: data.map(d => ({ ...d, number: d.id })) }); // Map id to number for frontend compat
   } catch (error) {
@@ -302,10 +337,10 @@ router.get("/:studentId/leave-records", async (req, res) => {
 
 router.post("/:studentId/leave-records", async (req, res) => {
   try {
-    const studentId = parseInt(req.params.studentId, 10);
+    const studentId = parseInt(String(req.params.studentId), 10);
     const { fromDate, toDate, leaveType, reason, startDate, endDate } = req.body;
     
-    let type = "casual";
+    let type: "casual" | "academic" | "medical" | "maternity_paternity" = "casual";
     const rawType = leaveType?.toLowerCase();
     if (rawType === "academic") type = "academic";
     else if (rawType === "medical") type = "medical";
@@ -329,7 +364,7 @@ router.post("/:studentId/leave-records", async (req, res) => {
 // Assessments — GET is auth-required with ownership/department check
 router.get("/:studentId/assessments", requireAuth, async (req, res) => {
   try {
-    const studentId = parseInt(req.params.studentId, 10);
+    const studentId = parseInt(String(req.params.studentId), 10);
     const caller = req.user!;
 
     if (caller.role === "student") {
@@ -390,7 +425,7 @@ router.post("/:studentId/assessments", requireAuth, requireRole(["professor", "h
   try {
     const professorId = req.user!.id;
     const professorDeptId = req.user!.departmentId;
-    const studentId = parseInt(req.params.studentId, 10);
+    const studentId = parseInt(String(req.params.studentId), 10);
 
     // Validate the student belongs to the professor's department
     const [student] = await db
@@ -437,7 +472,7 @@ router.post("/:studentId/assessments", requireAuth, requireRole(["professor", "h
 
 router.get("/:studentId/thesis", async (req, res) => {
   try {
-    const studentId = parseInt(req.params.studentId, 10);
+    const studentId = parseInt(String(req.params.studentId), 10);
     const match = await db.select().from(researchTable).where(eq(researchTable.studentId, studentId)).limit(1);
     res.json({ data: match.length > 0 ? match[0] : null });
   } catch (error) {
@@ -452,7 +487,7 @@ router.get("/:studentId/thesis", async (req, res) => {
 
 router.post("/:studentId/case-logs", async (req, res) => {
   try {
-    const studentId = parseInt(req.params.studentId, 10);
+    const studentId = parseInt(String(req.params.studentId), 10);
     const { supervisorId, date, patientAge, patientGender, diagnosisFinal } = req.body;
     const supervisorIdNum = parseInt(supervisorId, 10);
     if (!(await validateSupervisor(supervisorIdNum))) {
@@ -479,7 +514,7 @@ router.post("/:studentId/case-logs", async (req, res) => {
 
 router.post("/:studentId/procedure-logs", async (req, res) => {
   try {
-    const studentId = parseInt(req.params.studentId, 10);
+    const studentId = parseInt(String(req.params.studentId), 10);
     const { supervisorId, procedureGroup, procedureName, date, patientUhid, patientAge, competencyLevel } = req.body;
     const supervisorIdNum = parseInt(supervisorId, 10);
     if (!(await validateSupervisor(supervisorIdNum))) {
@@ -499,7 +534,7 @@ router.post("/:studentId/procedure-logs", async (req, res) => {
 
 router.post("/:studentId/academic-logs", async (req, res) => {
   try {
-    const studentId = parseInt(req.params.studentId, 10);
+    const studentId = parseInt(String(req.params.studentId), 10);
     const { supervisorId, activityType, topic, date } = req.body;
     const supervisorIdNum = parseInt(supervisorId, 10);
     if (!(await validateSupervisor(supervisorIdNum))) {

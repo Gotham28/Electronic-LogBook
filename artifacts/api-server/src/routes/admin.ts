@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { db, usersTable, studentsTable, departmentConfigsTable, procedureTypesTable } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { db, usersTable, studentsTable, departmentsTable, departmentConfigsTable, procedureTypesTable, caseLogsTable, procedureLogsTable, academicLogsTable } from "@workspace/db";
+import { eq, and, count } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { requireAuth, requireRole } from "../middlewares/auth.js";
 
@@ -29,10 +29,15 @@ router.get("/students/pending", async (req, res) => {
         email: usersTable.email,
         registrationNumber: studentsTable.registrationNumber,
         batch: studentsTable.batch,
+        dateOfJoining: studentsTable.dateOfJoining,
+        kuhsId: studentsTable.kuhsId,
+        specialty: studentsTable.specialty,
+        department: departmentsTable.name,
         createdAt: usersTable.createdAt
       })
       .from(usersTable)
       .innerJoin(studentsTable, eq(usersTable.id, studentsTable.userId))
+      .leftJoin(departmentsTable, eq(usersTable.departmentId, departmentsTable.id))
       .where(and(...conditions));
 
     res.json(pendingUsers);
@@ -52,9 +57,22 @@ router.post("/students/:id/approve", async (req, res) => {
       return;
     }
 
+    const departmentId = req.user?.departmentId;
+    const [target] = await db.select().from(usersTable)
+      .where(and(eq(usersTable.id, userId), eq(usersTable.role, "student"), eq(usersTable.status, "pending")))
+      .limit(1);
+    if (!target) {
+      res.status(404).json({ message: "Pending student not found" });
+      return;
+    }
+    if (departmentId && target.departmentId !== departmentId) {
+      res.status(403).json({ message: "Cannot approve a student outside your department" });
+      return;
+    }
+
     await db.update(usersTable)
       .set({ status: "approved" })
-      .where(and(eq(usersTable.id, userId), eq(usersTable.role, "student")));
+      .where(eq(usersTable.id, userId));
 
     res.json({ message: "Student approved successfully" });
   } catch (error) {
@@ -144,7 +162,7 @@ router.delete("/users/:id", async (req, res) => {
 // Create a new professor account
 router.post("/professors", async (req, res) => {
   try {
-    const { fullName, email, password, departmentId } = req.body;
+    const { fullName, email, password } = req.body;
 
     if (!fullName || !email || !password) {
       res.status(400).json({ message: "Full name, email, and password are required" });
@@ -165,7 +183,7 @@ router.post("/professors", async (req, res) => {
       passwordHash,
       role: "professor",
       status: "approved", // Professors created by HOD are auto-approved
-      departmentId: departmentId || null
+      departmentId: req.user?.departmentId || null
     }).returning();
 
     res.status(201).json({ 
@@ -365,6 +383,7 @@ router.get("/roster", async (req, res) => {
     const students = await db
       .select({
         id: usersTable.id,
+        studentProfileId: studentsTable.id,
         fullName: usersTable.fullName,
         email: usersTable.email,
         status: usersTable.status,
@@ -376,6 +395,40 @@ router.get("/roster", async (req, res) => {
       .innerJoin(studentsTable, eq(studentsTable.userId, usersTable.id))
       .where(and(eq(usersTable.role, "student"), eq(usersTable.departmentId, departmentId)))
       .orderBy(usersTable.fullName);
+
+    const [caseCountRows, procedureCountRows, academicCountRows, configs] = await Promise.all([
+      db.select({ studentId: caseLogsTable.studentId, value: count() }).from(caseLogsTable)
+        .where(eq(caseLogsTable.status, "verified")).groupBy(caseLogsTable.studentId),
+      db.select({ studentId: procedureLogsTable.studentId, value: count() }).from(procedureLogsTable)
+        .where(eq(procedureLogsTable.status, "verified")).groupBy(procedureLogsTable.studentId),
+      db.select({ studentId: academicLogsTable.studentId, value: count() }).from(academicLogsTable)
+        .where(eq(academicLogsTable.status, "verified")).groupBy(academicLogsTable.studentId),
+      db.select().from(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, departmentId)),
+    ]);
+    const toMap = (rows: Array<{ studentId: number; value: number }>) =>
+      new Map(rows.map((row) => [row.studentId, Number(row.value)]));
+    const caseCounts = toMap(caseCountRows as any);
+    const procedureCounts = toMap(procedureCountRows as any);
+    const academicCounts = toMap(academicCountRows as any);
+    const config = configs[0];
+    const targets = {
+      cases: config?.requiredCases || 50,
+      procedures: config?.requiredProcedures || 101,
+      academics: config?.requiredAcademic || 50,
+    };
+    const studentsWithProgress = students.map((student) => {
+      const verified = {
+        cases: caseCounts.get(student.studentProfileId) || 0,
+        procedures: procedureCounts.get(student.studentProfileId) || 0,
+        academics: academicCounts.get(student.studentProfileId) || 0,
+      };
+      const completion = Math.round((
+        Math.min(verified.cases / targets.cases, 1) +
+        Math.min(verified.procedures / targets.procedures, 1) +
+        Math.min(verified.academics / targets.academics, 1)
+      ) / 3 * 100);
+      return { ...student, verified, targets, completion };
+    });
 
     const professors = await db
       .select({
@@ -389,7 +442,7 @@ router.get("/roster", async (req, res) => {
       .where(and(eq(usersTable.role, "professor"), eq(usersTable.departmentId, departmentId)))
       .orderBy(usersTable.fullName);
 
-    res.json({ students, professors });
+    res.json({ students: studentsWithProgress, professors });
   } catch (error) {
     req.log.error(error, "Error fetching department roster");
     res.status(500).json({ message: "Internal server error" });

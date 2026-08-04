@@ -163,10 +163,10 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
               </div>
               <p className="mt-12 text-xs font-bold uppercase tracking-[0.2em] text-teal-50">Department of Pediatrics</p>
               <h1 className="mt-3 max-w-xl text-4xl font-bold leading-[1.05] md:text-5xl">
-                A complete postgraduate training record, in one place.
+                Clinical training, clearly organised.
               </h1>
               <p className="mt-5 max-w-xl text-sm leading-6 text-teal-50/85">
-                Record clinical exposure, procedures, academic work, assessments, thesis progress and leave in an MCI-aligned electronic logbook.
+                Keep cases, procedures, academic work, assessments and milestones together.
               </p>
               {getLeftPanelContent()}
             </div>

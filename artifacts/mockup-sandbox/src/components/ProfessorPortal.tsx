@@ -183,13 +183,10 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
     if (!currentItem || isSubmitting) return;
     
     setIsSubmitting(true);
-    const user = getCurrentUser();
-    
     try {
       await apiPatch(`/api/logs/${currentItem.logType}/${currentItem.dbId}/review`, {
         status,
-        comments: remarks || defaultRemarks,
-        reviewerId: user?.id
+        comments: remarks || defaultRemarks
       });
       
       // Optimistic update for evaluatedLogs mapping
@@ -224,7 +221,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
             </Badge>
             <h2 className="text-2xl font-black">Welcome, {data?.faculty?.name || "Dr. Mohammed"}</h2>
             <p className="text-xs text-slate-300">
-              {data?.faculty?.role} • All Departments • Full access: <strong>{allStudents.length} Students</strong>
+              Department faculty • <strong>{allStudents.length} approved students</strong>
             </p>
           </div>
 
@@ -242,7 +239,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
       <Tabs value={currentTab} onValueChange={handleTabChange} className="w-full">
         {/* Inner tab bar — hidden when embedded in HOD portal (HOD sidebar handles navigation) */}
         {!embedded && (
-          <TabsList className="bg-slate-200/70 p-1 rounded-xl">
+          <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-white p-1 shadow-sm sm:w-auto">
             <TabsTrigger value="review-queue" className="gap-2 text-xs font-semibold">
               <FileCheck className="h-4 w-4" /> Sequential Review Queue ({reviews.length - Object.keys(evaluatedLogs).length})
             </TabsTrigger>
@@ -423,8 +420,12 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
           <Card className="border-cyan-100 bg-cyan-50/60">
             <CardContent className="flex flex-col justify-between gap-4 p-5 sm:flex-row sm:items-center">
               <div>
-                <p className="font-bold text-slate-900">Professor-wide student access</p>
-                <p className="mt-1 text-xs text-slate-600">You can inspect and review every student's complete work in your department.</p>
+                <p className="font-bold text-slate-900">Privacy-protected student access</p>
+                <p className="mt-1 text-xs text-slate-600">
+                  {data?.faculty?.role === "hod"
+                    ? "As HOD, you can inspect progress and complete logbooks for every approved student in your department."
+                    : "Progress is visible department-wide; detailed entries are limited to logs explicitly sent to you."}
+                </p>
               </div>
             </CardContent>
           </Card>

@@ -2,12 +2,22 @@ import * as React from "react";
 import { getCurrentUser } from "@/lib/session";
 import { apiGet } from "@/lib/apiClient";
 import { formatLogbookDate } from "@/lib/logbook-config";
-import { Printer } from "lucide-react";
+import { Printer, X } from "lucide-react";
 
 export function PrintableLogbook() {
-  const user = getCurrentUser();
+  const user = React.useMemo(() => getCurrentUser(), []);
   const [data, setData] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
+  const printStarted = React.useRef(false);
+
+  const closePrintView = React.useCallback(() => {
+    if (window.opener && !window.opener.closed) {
+      window.close();
+      return;
+    }
+    if (window.history.length > 1) window.history.back();
+    else window.location.assign("/");
+  }, []);
 
   React.useEffect(() => {
     if (!user?.studentProfileId) return;
@@ -42,14 +52,16 @@ export function PrintableLogbook() {
         console.error("Failed to load consolidated print data", err);
       } finally {
         setLoading(false);
-        setTimeout(() => {
-          window.print();
-        }, 1000);
+        if (!printStarted.current) {
+          printStarted.current = true;
+          window.addEventListener("afterprint", closePrintView, { once: true });
+          setTimeout(() => window.print(), 500);
+        }
       }
     };
 
     fetchAll();
-  }, [user]);
+  }, [user, closePrintView]);
 
   if (loading) return <div className="p-12 text-center text-slate-500">Preparing consolidated PDF...</div>;
 
@@ -220,9 +232,12 @@ export function PrintableLogbook() {
         </div>
       </div>
 
-      <div className="mt-8 flex justify-center print:hidden">
+      <div className="mt-8 flex justify-center gap-3 print:hidden">
         <button onClick={() => window.print()} className="flex items-center gap-2 rounded bg-teal-600 px-4 py-2 text-white">
-          <Printer className="h-4 w-4" /> Print Document
+          <Printer className="h-4 w-4" /> Print again
+        </button>
+        <button onClick={closePrintView} className="flex items-center gap-2 rounded border border-slate-300 bg-white px-4 py-2 text-slate-700">
+          <X className="h-4 w-4" /> Cancel
         </button>
       </div>
     </div>

@@ -39,6 +39,10 @@ type Registration = {
   email: string;
   registrationNumber: string;
   batch: string;
+  dateOfJoining: string;
+  kuhsId: string;
+  specialty: string;
+  department: string;
   createdAt: string;
 };
 
@@ -61,21 +65,20 @@ type LeaveRequest = {
 };
 
 const paths: Record<string, string> = {
-  "gap-dashboard": "/",
+  "roster": "/",
   "review-queue": "/review-queue",
   "mentees": "/mentees",
   "assessments": "/assessments",
   "student-access": "/student-access",
   "leave-approvals": "/leave-approvals",
   "professors": "/professors",
-  "roster": "/roster",
   "requirements": "/requirements",
   // Legacy aliases so old links still resolve to the merged tab
   "settings": "/requirements",
   "procedures": "/requirements",
 };
 
-export function HODPortal({ activeTab = "gap-dashboard" }: { activeTab?: string }) {
+export function HODPortal({ activeTab = "roster" }: { activeTab?: string }) {
   const [, setLocation] = useLocation();
   const [analyticsData, setAnalyticsData] = React.useState<AnalyticsData | null>(null);
   const [pendingStudents, setPendingStudents] = React.useState<Registration[]>([]);
@@ -228,10 +231,10 @@ export function HODPortal({ activeTab = "gap-dashboard" }: { activeTab?: string 
         ...profForm,
         departmentId: getCurrentUser()?.departmentId
       });
-      toast.success("Professor created successfully");
+      toast.success("Faculty account created successfully");
       setProfForm({ fullName: "", email: "", password: "" });
     } catch (err: any) {
-      toast.error(err.message || "Failed to create professor");
+      toast.error(err.message || "Failed to create faculty account");
     } finally {
       setCreatingProf(false);
     }
@@ -304,19 +307,6 @@ export function HODPortal({ activeTab = "gap-dashboard" }: { activeTab?: string 
 
       <Tabs value={activeTab} onValueChange={(value) => setLocation(paths[value] ?? "/")}>
 
-        <TabsContent value="gap-dashboard" className="space-y-4 pt-4">
-          {analyticsError && (
-            <div className="p-4 bg-rose-50 text-rose-700 rounded-md border border-rose-200">
-              {analyticsError}
-            </div>
-          )}
-          <div className="grid gap-4 md:grid-cols-3">
-            <Overview label="Procedure target" value={String(deptConfig.requiredProcedures)} note="Total procedures required" icon={UserCheck} />
-            <Overview label="Case discussions" value={String(deptConfig.requiredCases)} note="Total cases required" icon={CheckCircle2} />
-            <Overview label="Academic target" value={String(deptConfig.requiredAcademic)} note="Seminars, journals, etc." icon={TrendingUp} />
-          </div>
-        </TabsContent>
-
         {/* Review Queue tab — reuses ProfessorPortal which accepts HOD role */}
         <TabsContent value="review-queue" className="pt-4">
           <ProfessorPortal activeTab="review-queue" embedded />
@@ -336,6 +326,12 @@ export function HODPortal({ activeTab = "gap-dashboard" }: { activeTab?: string 
             <div className="flex h-40 items-center justify-center"><div className="animate-spin rounded-full border-4 border-slate-300 border-t-teal-600 h-8 w-8" /></div>
           ) : (
             <>
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <SummaryCard label="Approved students" value={roster?.students.filter((student) => student.status === "approved").length ?? 0} />
+                <SummaryCard label="Average progress" value={`${Math.round((roster?.students.reduce((sum, student) => sum + (student.completion || 0), 0) ?? 0) / Math.max(roster?.students.length ?? 0, 1))}%`} />
+                <SummaryCard label="Faculty" value={roster?.professors.length ?? 0} />
+                <SummaryCard label="Awaiting approval" value={pendingStudents.length} />
+              </div>
               <Card>
                 <CardHeader className="border-b border-teal-100">
                   <CardTitle className="text-lg flex items-center gap-2">
@@ -354,6 +350,7 @@ export function HODPortal({ activeTab = "gap-dashboard" }: { activeTab?: string 
                           <TableHead>Full Name</TableHead>
                           <TableHead>Email</TableHead>
                           <TableHead>Batch</TableHead>
+                          <TableHead>Progress</TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead className="text-right">Action</TableHead>
                         </TableRow>
@@ -365,6 +362,16 @@ export function HODPortal({ activeTab = "gap-dashboard" }: { activeTab?: string 
                             <TableCell className="font-semibold">{s.fullName}</TableCell>
                             <TableCell className="text-xs text-slate-500">{s.email}</TableCell>
                             <TableCell>{s.batch ?? "—"}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-3">
+                                <CompletionRing value={s.completion ?? 0} />
+                                <div className="text-[11px] leading-5 text-slate-500">
+                                  <p>{s.verified?.cases ?? 0}/{s.targets?.cases ?? 0} cases</p>
+                                  <p>{s.verified?.procedures ?? 0}/{s.targets?.procedures ?? 0} procedures</p>
+                                  <p>{s.verified?.academics ?? 0}/{s.targets?.academics ?? 0} academics</p>
+                                </div>
+                              </div>
+                            </TableCell>
                             <TableCell>
                               <Badge variant={s.status === "approved" ? "default" : "secondary"} className="capitalize text-xs">{s.status}</Badge>
                             </TableCell>
@@ -390,7 +397,7 @@ export function HODPortal({ activeTab = "gap-dashboard" }: { activeTab?: string 
                 </CardHeader>
                 <CardContent className="p-0">
                   {!roster?.professors.length ? (
-                    <p className="p-6 text-center text-sm text-slate-500">No professors in this department.</p>
+                    <p className="p-6 text-center text-sm text-slate-500">No faculty in this department.</p>
                   ) : (
                     <Table>
                       <TableHeader className="bg-slate-50">
@@ -442,7 +449,9 @@ export function HODPortal({ activeTab = "gap-dashboard" }: { activeTab?: string 
                       <TableHead>Registration No.</TableHead>
                       <TableHead>Student</TableHead>
                       <TableHead>Email</TableHead>
-                      <TableHead>Batch</TableHead>
+                      <TableHead>Department / Batch</TableHead>
+                      <TableHead>Joining date</TableHead>
+                      <TableHead>KUHS ID</TableHead>
                       <TableHead className="text-right">Action</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -452,7 +461,9 @@ export function HODPortal({ activeTab = "gap-dashboard" }: { activeTab?: string 
                         <TableCell className="font-bold">{student.registrationNumber}</TableCell>
                         <TableCell className="font-semibold">{student.fullName}</TableCell>
                         <TableCell>{student.email}</TableCell>
-                        <TableCell>{student.batch}</TableCell>
+                        <TableCell><span className="font-medium">{student.department || student.specialty}</span><p className="text-xs text-slate-500">Batch {student.batch}</p></TableCell>
+                        <TableCell>{formatLogbookDate(student.dateOfJoining)}</TableCell>
+                        <TableCell className="font-mono text-xs">{student.kuhsId}</TableCell>
                         <TableCell className="text-right">
                             <div className="flex justify-end gap-2">
                               <Button size="sm" onClick={() => approveStudent(student.id)}>
@@ -475,7 +486,7 @@ export function HODPortal({ activeTab = "gap-dashboard" }: { activeTab?: string 
         <TabsContent value="professors" className="space-y-4 pt-4">
           <Card className="max-w-xl">
             <CardHeader className="border-b border-teal-100">
-              <CardTitle className="text-xl">Create Professor Account</CardTitle>
+              <CardTitle className="text-xl">Add Faculty</CardTitle>
             </CardHeader>
             <CardContent className="p-5">
               <form onSubmit={handleCreateProfessor} className="space-y-4">
@@ -492,7 +503,7 @@ export function HODPortal({ activeTab = "gap-dashboard" }: { activeTab?: string 
                   <Input id="prof-pass" type="password" value={profForm.password} onChange={(e) => setProfForm({...profForm, password: e.target.value})} minLength={8} required />
                 </div>
                 <Button type="submit" disabled={creatingProf} className="w-full">
-                  <UserPlus className="h-4 w-4 mr-2" /> {creatingProf ? "Creating..." : "Create Professor Account"}
+                  <UserPlus className="h-4 w-4 mr-2" /> {creatingProf ? "Creating..." : "Create Faculty Account"}
                 </Button>
               </form>
             </CardContent>
@@ -627,6 +638,15 @@ export function HODPortal({ activeTab = "gap-dashboard" }: { activeTab?: string 
   );
 }
 
-function Overview({ label, value, note, icon: Icon }: any) {
-  return <Card><CardContent className="p-5"><Icon className="h-5 w-5 text-teal-600" /><p className="mt-4 text-[11px] font-bold uppercase tracking-wider text-slate-500">{label}</p><p className="mt-2 text-3xl font-bold text-teal-700">{value}</p><p className="mt-1 text-xs text-slate-500">{note}</p></CardContent></Card>;
+function SummaryCard({ label, value }: { label: string; value: string | number }) {
+  return <Card className="border-slate-200 bg-white"><CardContent className="p-5"><p className="text-[10px] font-bold uppercase tracking-[.14em] text-slate-500">{label}</p><p className="mt-2 text-3xl font-semibold text-slate-950">{value}</p></CardContent></Card>;
+}
+
+function CompletionRing({ value }: { value: number }) {
+  const safeValue = Math.max(0, Math.min(value, 100));
+  return (
+    <div className="relative grid h-14 w-14 shrink-0 place-items-center rounded-full" style={{ background: `conic-gradient(#0d9488 ${safeValue * 3.6}deg, #e2e8f0 0deg)` }}>
+      <div className="grid h-10 w-10 place-items-center rounded-full bg-white text-[11px] font-bold text-slate-900">{safeValue}%</div>
+    </div>
+  );
 }
