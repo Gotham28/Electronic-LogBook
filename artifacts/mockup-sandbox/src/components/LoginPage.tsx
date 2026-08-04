@@ -30,7 +30,7 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
     if (role === "student") {
       setUsername("aravind@elogbook.com");
     } else if (role === "professor") {
-      setUsername("prof@elogbook.com");
+      setUsername("radhamani@elogbook.com");
     } else if (role === "hod") {
       setUsername("hod@elogbook.com");
     }
