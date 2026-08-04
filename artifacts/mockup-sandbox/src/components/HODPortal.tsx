@@ -317,7 +317,7 @@ export function HODPortal({ activeTab = "gap-dashboard" }: { activeTab?: string 
 
         {/* Review Queue tab — reuses ProfessorPortal which accepts HOD role */}
         <TabsContent value="review-queue" className="pt-4">
-          <ProfessorPortal activeTab="review-queue" />
+          <ProfessorPortal activeTab="review-queue" embedded />
         </TabsContent>
 
         {/* Roster tab */}

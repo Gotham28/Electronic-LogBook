@@ -57,7 +57,7 @@ import { DEPARTMENTS, formatLogbookDate } from "@/lib/logbook-config";
 import { apiGet, apiPatch, apiPost } from "@/lib/apiClient";
 import { getCurrentUser } from "@/lib/session";
 
-export function ProfessorPortal({ activeTab }: { activeTab?: string }) {
+export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; embedded?: boolean }) {
   const [location, setLocation] = useLocation();
   const [data, setData] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
@@ -192,40 +192,45 @@ export function ProfessorPortal({ activeTab }: { activeTab?: string }) {
 
   return (
     <div className="space-y-6 pb-12">
-      {/* Top Banner: Professor Profile */}
-      <div className="rounded-2xl bg-gradient-to-r from-teal-900 via-slate-900 to-teal-950 p-6 text-white shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <Badge className="bg-teal-500/20 text-teal-300 border-teal-500/30 text-xs font-semibold mb-2">
-            Faculty &amp; Evaluator Portal
-          </Badge>
-          <h2 className="text-2xl font-black">Welcome, {data?.faculty?.name || "Dr. Mohammed"}</h2>
-          <p className="text-xs text-slate-300">
-            {data?.faculty?.role} • All Departments • Full access: <strong>{allStudents.length} Students</strong>
-          </p>
-        </div>
+      {/* Top Banner: Professor Profile — hidden when embedded in HOD portal */}
+      {!embedded && (
+        <div className="rounded-2xl bg-gradient-to-r from-teal-900 via-slate-900 to-teal-950 p-6 text-white shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <Badge className="bg-teal-500/20 text-teal-300 border-teal-500/30 text-xs font-semibold mb-2">
+              Faculty &amp; Evaluator Portal
+            </Badge>
+            <h2 className="text-2xl font-black">Welcome, {data?.faculty?.name || "Dr. Mohammed"}</h2>
+            <p className="text-xs text-slate-300">
+              {data?.faculty?.role} • All Departments • Full access: <strong>{allStudents.length} Students</strong>
+            </p>
+          </div>
 
-        <div className="flex items-center gap-3">
-          <div className="bg-teal-500/10 border border-teal-500/30 px-4 py-2 rounded-xl text-right">
-            <p className="text-xl font-extrabold text-teal-300">{reviews.length - Object.keys(evaluatedLogs).length}</p>
-            <p className="text-[11px] text-slate-300 font-medium">Pending Review Items</p>
+          <div className="flex items-center gap-3">
+            <div className="bg-teal-500/10 border border-teal-500/30 px-4 py-2 rounded-xl text-right">
+              <p className="text-xl font-extrabold text-teal-300">{reviews.length - Object.keys(evaluatedLogs).length}</p>
+              <p className="text-[11px] text-slate-300 font-medium">Pending Review Items</p>
+            </div>
           </div>
         </div>
-      </div>
-      
+      )}
+
 
 
       <Tabs value={currentTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="bg-slate-200/70 p-1 rounded-xl">
-          <TabsTrigger value="review-queue" className="gap-2 text-xs font-semibold">
-            <FileCheck className="h-4 w-4" /> Sequential Review Queue ({reviews.length - Object.keys(evaluatedLogs).length})
-          </TabsTrigger>
-          <TabsTrigger value="mentees" className="gap-2 text-xs font-semibold">
-            <UserCheck className="h-4 w-4" /> All Students ({allStudents.length})
-          </TabsTrigger>
-          <TabsTrigger value="assessments" className="gap-2 text-xs font-semibold">
-            <Award className="h-4 w-4" /> Add Assessment
-          </TabsTrigger>
-        </TabsList>
+        {/* Inner tab bar — hidden when embedded in HOD portal (HOD sidebar handles navigation) */}
+        {!embedded && (
+          <TabsList className="bg-slate-200/70 p-1 rounded-xl">
+            <TabsTrigger value="review-queue" className="gap-2 text-xs font-semibold">
+              <FileCheck className="h-4 w-4" /> Sequential Review Queue ({reviews.length - Object.keys(evaluatedLogs).length})
+            </TabsTrigger>
+            <TabsTrigger value="mentees" className="gap-2 text-xs font-semibold">
+              <UserCheck className="h-4 w-4" /> All Students ({allStudents.length})
+            </TabsTrigger>
+            <TabsTrigger value="assessments" className="gap-2 text-xs font-semibold">
+              <Award className="h-4 w-4" /> Add Assessment
+            </TabsTrigger>
+          </TabsList>
+        )}
 
         {/* Tab 1: Sequential Fast Review Queue */}
         <TabsContent value="review-queue" className="pt-4 space-y-6">
