@@ -29,7 +29,7 @@ import {
   formatLogbookDate,
   REQUIRED_PROCEDURE_COUNT,
 } from "@/lib/logbook-config";
-import { apiGet, apiPost } from "@/lib/apiClient";
+import { apiGet, apiPost, apiDelete } from "@/lib/apiClient";
 import { getCurrentUser } from "@/lib/session";
 import { ProfessorPortal } from "@/components/ProfessorPortal";
 
@@ -189,6 +189,35 @@ export function HODPortal({ activeTab = "gap-dashboard" }: { activeTab?: string 
     }
   };
 
+  const rejectStudent = async (id: number) => {
+    if (!window.confirm("Reject and permanently remove this student registration?")) return;
+    try {
+      await apiPost(`/api/admin/students/${id}/reject`, {});
+      toast.success("Student registration rejected");
+      setPendingStudents((current) => current.filter((s) => s.id !== id));
+    } catch (err: any) {
+      toast.error(err.message || "Failed to reject student");
+    }
+  };
+
+  const removeUser = async (id: number, name: string) => {
+    if (!window.confirm(`Remove ${name} from the department? This cannot be undone.`)) return;
+    try {
+      await apiDelete(`/api/admin/users/${id}`);
+      toast.success(`${name} removed from department`);
+      setRoster((current) =>
+        current
+          ? {
+              students: current.students.filter((s) => s.id !== id),
+              professors: current.professors.filter((p) => p.id !== id),
+            }
+          : null
+      );
+    } catch (err: any) {
+      toast.error(err.message || "Failed to remove user");
+    }
+  };
+
   const handleCreateProfessor = async (e: React.FormEvent) => {
     e.preventDefault();
     setCreatingProf(true);
@@ -316,6 +345,7 @@ export function HODPortal({ activeTab = "gap-dashboard" }: { activeTab?: string 
                           <TableHead>Email</TableHead>
                           <TableHead>Batch</TableHead>
                           <TableHead>Status</TableHead>
+                          <TableHead className="text-right">Action</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -327,6 +357,11 @@ export function HODPortal({ activeTab = "gap-dashboard" }: { activeTab?: string 
                             <TableCell>{s.batch ?? "—"}</TableCell>
                             <TableCell>
                               <Badge variant={s.status === "approved" ? "default" : "secondary"} className="capitalize text-xs">{s.status}</Badge>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button size="sm" variant="outline" onClick={() => removeUser(s.id, s.fullName)} className="text-rose-700 border-rose-200 hover:bg-rose-50">
+                                <XCircle className="h-4 w-4 mr-1" /> Remove
+                              </Button>
                             </TableCell>
                           </TableRow>
                         ))}
@@ -353,6 +388,7 @@ export function HODPortal({ activeTab = "gap-dashboard" }: { activeTab?: string 
                           <TableHead>Full Name</TableHead>
                           <TableHead>Email</TableHead>
                           <TableHead>Status</TableHead>
+                          <TableHead className="text-right">Action</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -362,6 +398,11 @@ export function HODPortal({ activeTab = "gap-dashboard" }: { activeTab?: string 
                             <TableCell className="text-xs text-slate-500">{p.email}</TableCell>
                             <TableCell>
                               <Badge variant={p.status === "approved" ? "default" : "secondary"} className="capitalize text-xs">{p.status}</Badge>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button size="sm" variant="outline" onClick={() => removeUser(p.id, p.fullName)} className="text-rose-700 border-rose-200 hover:bg-rose-50">
+                                <XCircle className="h-4 w-4 mr-1" /> Remove
+                              </Button>
                             </TableCell>
                           </TableRow>
                         ))}
@@ -403,10 +444,15 @@ export function HODPortal({ activeTab = "gap-dashboard" }: { activeTab?: string 
                         <TableCell>{student.email}</TableCell>
                         <TableCell>{student.batch}</TableCell>
                         <TableCell className="text-right">
-                          <Button size="sm" onClick={() => approveStudent(student.id)}>
-                            <CheckCircle2 className="h-4 w-4 mr-2" /> Approve
-                          </Button>
-                        </TableCell>
+                            <div className="flex justify-end gap-2">
+                              <Button size="sm" onClick={() => approveStudent(student.id)}>
+                                <CheckCircle2 className="h-4 w-4 mr-2" /> Approve
+                              </Button>
+                              <Button size="sm" variant="outline" onClick={() => rejectStudent(student.id)} className="text-rose-700 border-rose-200 hover:bg-rose-50">
+                                <XCircle className="h-4 w-4 mr-2" /> Reject
+                              </Button>
+                            </div>
+                          </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

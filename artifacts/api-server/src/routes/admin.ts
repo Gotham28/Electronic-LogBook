@@ -63,6 +63,83 @@ router.post("/students/:id/approve", async (req, res) => {
   }
 });
 
+// POST /api/admin/students/:id/reject
+// Reject (delete) a pending student account
+router.post("/students/:id/reject", async (req, res) => {
+  try {
+    const userId = parseInt(req.params.id);
+    if (isNaN(userId)) {
+      res.status(400).json({ message: "Invalid user ID" });
+      return;
+    }
+
+    // Only allow rejecting pending students in HOD's own department
+    const departmentId = req.user?.departmentId;
+    const [target] = await db.select().from(usersTable)
+      .where(and(eq(usersTable.id, userId), eq(usersTable.role, "student"), eq(usersTable.status, "pending")))
+      .limit(1);
+
+    if (!target) {
+      res.status(404).json({ message: "Pending student not found" });
+      return;
+    }
+    if (departmentId && target.departmentId !== departmentId) {
+      res.status(403).json({ message: "Cannot reject a student outside your department" });
+      return;
+    }
+
+    // Delete student profile first (FK), then the user row
+    await db.delete(studentsTable).where(eq(studentsTable.userId, userId));
+    await db.delete(usersTable).where(eq(usersTable.id, userId));
+
+    res.json({ message: "Student registration rejected and removed" });
+  } catch (error) {
+    req.log.error(error, "Error rejecting student");
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// DELETE /api/admin/users/:id
+// Remove a student or professor from the department roster
+router.delete("/users/:id", async (req, res) => {
+  try {
+    const userId = parseInt(req.params.id);
+    if (isNaN(userId)) {
+      res.status(400).json({ message: "Invalid user ID" });
+      return;
+    }
+
+    const departmentId = req.user?.departmentId;
+    const [target] = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+
+    if (!target) {
+      res.status(404).json({ message: "User not found" });
+      return;
+    }
+    if (departmentId && target.departmentId !== departmentId) {
+      res.status(403).json({ message: "Cannot remove a user outside your department" });
+      return;
+    }
+    // Prevent removing yourself
+    if (target.id === req.user?.id) {
+      res.status(400).json({ message: "Cannot remove your own account" });
+      return;
+    }
+
+    // If student, remove student profile row first (FK constraint)
+    if (target.role === "student") {
+      await db.delete(studentsTable).where(eq(studentsTable.userId, userId));
+    }
+    await db.delete(usersTable).where(eq(usersTable.id, userId));
+
+    res.json({ message: "User removed from department" });
+  } catch (error) {
+    req.log.error(error, "Error removing user");
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+
 // POST /api/admin/professors
 // Create a new professor account
 router.post("/professors", async (req, res) => {
