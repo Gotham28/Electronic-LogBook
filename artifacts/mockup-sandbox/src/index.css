@@ -170,6 +170,7 @@
   }
   html {
     background: #dff8f6;
+    scrollbar-gutter: stable;
   }
   body {
     @apply font-sans antialiased bg-background text-foreground;
@@ -289,6 +290,10 @@
 
   .animate-pulse-soft {
     animation: pulse-soft 1.8s ease-in-out infinite;
+  }
+
+  [data-slot="sidebar-inset"] {
+    scrollbar-gutter: stable;
   }
 
   [role="tabpanel"][data-state="active"] {

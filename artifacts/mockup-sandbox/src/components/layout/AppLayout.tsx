@@ -36,11 +36,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  AlertTriangle,
   Award,
   Bell,
   BookOpenCheck,
-  Building,
   CalendarDays,
   CheckCircle2,
   ChevronDown,
@@ -51,13 +49,10 @@ import {
   LayoutDashboard,
   LogOut,
   Printer,
-  ShieldCheck,
   Stethoscope,
   UserCheck,
   UserPlus,
-  Users,
 } from "lucide-react";
-import { formatLogbookDate } from "@/lib/logbook-config";
 
 export type RoleType = "Student" | "Professor" | "HOD";
 
@@ -87,9 +82,8 @@ function navigationForRole(role: RoleType, dashboardData?: any, loadingBadges?: 
 
   if (role === "HOD") {
     return [
-      { title: "Overview", icon: Users, href: "/" },
+      { title: "Students", icon: GraduationCap, href: "/" },
       { title: "Review Queue", icon: FileText, href: "/review-queue" },
-      { title: "All Students", icon: GraduationCap, href: "/mentees" },
       { title: "Add Assessment", icon: ClipboardCheck, href: "/assessments" },
       { title: "Pending Students", icon: UserPlus, href: "/student-access" },
       { title: "Add Faculty", icon: UserCheck, href: "/professors" },
@@ -149,17 +143,6 @@ export function AppLayout({
 
   const navigationItems = navigationForRole(activeRole, dashboardData, loadingBadges);
 
-  const printCurrentView = () => {
-    const label = activeRole === "Student" ? "DRAFT" : "OFFICIAL COPY";
-    document.body.dataset.printLabel = `${label} • ${formatLogbookDate(new Date())}`;
-    const clearLabel = () => {
-      delete document.body.dataset.printLabel;
-      window.removeEventListener("afterprint", clearLabel);
-    };
-    window.addEventListener("afterprint", clearLabel);
-    window.print();
-  };
-
   const handleChangePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (cpForm.newPassword !== cpForm.confirmPassword) {
@@ -183,17 +166,17 @@ export function AppLayout({
   };
 
   return (
-    <SidebarProvider defaultOpen>
+    <SidebarProvider defaultOpen style={{ "--sidebar-width": "17rem", "--sidebar-width-icon": "5rem" } as React.CSSProperties}>
       <div className="medical-grid h-screen w-full overflow-hidden p-0 text-slate-900 md:p-3 lg:p-4">
         <div className="glass-panel mx-auto flex h-[100dvh] w-full max-w-[1600px] overflow-hidden rounded-none border-white/70 md:h-[calc(100vh-24px)] md:rounded-[30px] lg:h-[calc(100vh-32px)]">
           <Sidebar collapsible="icon" className="print-hidden border-r border-slate-200/80 bg-white/95 shadow-[0_24px_80px_rgba(15,23,42,0.06)] backdrop-blur-xl">
-            <SidebarHeader className="border-b border-slate-100 p-4 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-2">
-              <div className="flex items-center gap-3">
+            <SidebarHeader className="h-[74px] overflow-hidden border-b border-slate-100 p-4 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-2">
+              <div className="relative flex h-full w-full items-center overflow-hidden group-data-[collapsible=icon]:justify-center">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-600 text-white shadow-[0_12px_28px_rgba(13,148,136,0.2)]">
                   <BookOpenCheck className="h-6 w-6" />
                 </div>
-                <div className="group-data-[collapsible=icon]:hidden">
-                  <p className="font-display text-lg font-bold leading-tight text-slate-900">Pediatrics E-Logbook</p>
+                <div className="absolute left-[52px] top-1/2 w-[180px] -translate-y-1/2 whitespace-nowrap transition-opacity duration-150 group-data-[collapsible=icon]:pointer-events-none group-data-[collapsible=icon]:opacity-0">
+                  <p className="font-display text-lg font-bold leading-tight text-slate-900">E-Logbook</p>
                   <p className="mt-0.5 text-[11px] font-medium text-slate-500">Clinical training records</p>
                 </div>
               </div>
@@ -201,7 +184,7 @@ export function AppLayout({
 
             <SidebarContent className="p-2">
               <SidebarGroup>
-                <SidebarGroupLabel className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-teal-900/45">
+                <SidebarGroupLabel className="mb-2 h-8! px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-teal-900/45 group-data-[collapsible=icon]:mt-0! group-data-[collapsible=icon]:opacity-0">
                   {activeRole} workspace
                 </SidebarGroupLabel>
                 <SidebarGroupContent>
@@ -217,7 +200,7 @@ export function AppLayout({
                             asChild
                             isActive={isActive}
                             tooltip={item.title}
-                            className={`h-11 w-full rounded-xl px-3 transition-all duration-200 ${
+                            className={`h-11 w-full rounded-xl px-3 transition-all duration-200 group-data-[collapsible=icon]:mx-auto! group-data-[collapsible=icon]:h-11! group-data-[collapsible=icon]:w-11! group-data-[collapsible=icon]:p-0! ${
                               isActive
                                 ? "border border-white/60 bg-gradient-to-r from-teal-600 to-cyan-500 font-semibold text-white shadow-[0_16px_36px_rgba(13,148,136,0.22)] hover:text-white"
                                 : "text-slate-600 hover:border hover:border-white/70 hover:bg-white/80 hover:text-teal-900"
@@ -283,7 +266,7 @@ export function AppLayout({
             <SidebarRail />
           </Sidebar>
 
-          <SidebarInset className="flex min-w-0 flex-1 flex-col bg-transparent overflow-y-auto">
+          <SidebarInset className="flex min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto bg-transparent">
             <header className="print-hidden sticky top-0 z-20 flex h-[72px] items-center justify-between border-b border-white/70 bg-white/62 px-4 backdrop-blur-xl md:px-6">
               <div className="flex min-w-0 items-center gap-3">
                 <SidebarTrigger className="rounded-xl text-teal-800 hover:bg-white" />

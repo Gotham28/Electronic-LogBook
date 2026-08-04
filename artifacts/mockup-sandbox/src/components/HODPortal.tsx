@@ -65,9 +65,9 @@ type LeaveRequest = {
 };
 
 const paths: Record<string, string> = {
-  "roster": "/",
+  "roster": "/roster",
   "review-queue": "/review-queue",
-  "mentees": "/mentees",
+  "mentees": "/",
   "assessments": "/assessments",
   "student-access": "/student-access",
   "leave-approvals": "/leave-approvals",
@@ -78,8 +78,19 @@ const paths: Record<string, string> = {
   "procedures": "/requirements",
 };
 
-export function HODPortal({ activeTab = "roster" }: { activeTab?: string }) {
-  const [, setLocation] = useLocation();
+export function HODPortal({ activeTab }: { activeTab?: string }) {
+  const [location, setLocation] = useLocation();
+  const currentTab = React.useMemo(() => {
+    if (activeTab) return activeTab;
+    if (location === "/" || location === "/mentees") return "mentees";
+    if (location === "/review-queue") return "review-queue";
+    if (location === "/assessments") return "assessments";
+    if (location === "/roster") return "roster";
+    if (location === "/student-access") return "student-access";
+    if (location === "/professors") return "professors";
+    if (location === "/leave-approvals") return "leave-approvals";
+    return "requirements";
+  }, [activeTab, location]);
   const [analyticsData, setAnalyticsData] = React.useState<AnalyticsData | null>(null);
   const [pendingStudents, setPendingStudents] = React.useState<Registration[]>([]);
   const [loading, setLoading] = React.useState(false);
@@ -181,8 +192,8 @@ export function HODPortal({ activeTab = "roster" }: { activeTab?: string }) {
 
   // Lazy-load roster only when that tab is active
   React.useEffect(() => {
-    if (activeTab === "roster" && !roster) fetchRoster();
-  }, [activeTab, roster, fetchRoster]);
+    if (currentTab === "roster" && !roster) fetchRoster();
+  }, [currentTab, roster, fetchRoster]);
 
   const approveStudent = async (id: number) => {
     try {
@@ -305,7 +316,7 @@ export function HODPortal({ activeTab = "roster" }: { activeTab?: string }) {
         </CardContent>
       </Card>
 
-      <Tabs value={activeTab} onValueChange={(value) => setLocation(paths[value] ?? "/")}>
+      <Tabs value={currentTab} onValueChange={(value) => setLocation(paths[value] ?? "/")}>
 
         {/* Review Queue tab — reuses ProfessorPortal which accepts HOD role */}
         <TabsContent value="review-queue" className="pt-4">
