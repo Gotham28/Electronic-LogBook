@@ -86,9 +86,13 @@ function navigationForRole(role: RoleType, dashboardData?: any, loadingBadges?: 
 
   if (role === "HOD") {
     return [
-      { title: "Department Overview", icon: AlertTriangle, href: "/" },
-      { title: "Student Registrations", icon: UserPlus, href: "/student-access" },
+      { title: "Overview", icon: AlertTriangle, href: "/" },
+      { title: "Review Queue", icon: FileText, href: "/review-queue" },
+      { title: "Students & Professors", icon: GraduationCap, href: "/roster" },
+      { title: "Pending Students", icon: UserPlus, href: "/student-access" },
+      { title: "Add Professor", icon: UserCheck, href: "/professors" },
       { title: "Leave Approvals", icon: CheckCircle2, href: "/leave-approvals" },
+      { title: "Requirements", icon: ClipboardCheck, href: "/requirements" },
     ];
   }
 

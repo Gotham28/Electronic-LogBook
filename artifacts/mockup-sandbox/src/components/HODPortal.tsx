@@ -2,15 +2,13 @@ import * as React from "react";
 import { useLocation } from "wouter";
 import {
   CheckCircle2,
-  Clock3,
-  ShieldCheck,
+  Clock,
+  AlertTriangle,
   UserCheck,
   Users,
   XCircle,
   TrendingUp,
   FileCheck,
-  Clock,
-  AlertTriangle,
   UserPlus,
   Settings,
   Syringe,
@@ -22,7 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -274,15 +272,6 @@ export function HODPortal({ activeTab = "gap-dashboard" }: { activeTab?: string 
       </Card>
 
       <Tabs value={activeTab} onValueChange={(value) => setLocation(paths[value] ?? "/")}>
-        <TabsList className="h-auto flex-wrap">
-          <TabsTrigger value="gap-dashboard"><ShieldCheck className="h-4 w-4 mr-2" /> Overview</TabsTrigger>
-          <TabsTrigger value="review-queue"><FileCheck className="h-4 w-4 mr-2" /> Review Queue</TabsTrigger>
-          <TabsTrigger value="roster"><GraduationCap className="h-4 w-4 mr-2" /> Students & Professors</TabsTrigger>
-          <TabsTrigger value="student-access"><Users className="h-4 w-4 mr-2" /> Pending Students</TabsTrigger>
-          <TabsTrigger value="professors"><UserPlus className="h-4 w-4 mr-2" /> Add Professor</TabsTrigger>
-          <TabsTrigger value="leave-approvals"><Clock3 className="h-4 w-4 mr-2" /> Leave approvals</TabsTrigger>
-          <TabsTrigger value="requirements"><Settings className="h-4 w-4 mr-2" /> Requirements</TabsTrigger>
-        </TabsList>
 
         <TabsContent value="gap-dashboard" className="space-y-4 pt-4">
           {analyticsError && (
@@ -468,9 +457,9 @@ export function HODPortal({ activeTab = "gap-dashboard" }: { activeTab?: string 
                 <Table>
                   <TableHeader><TableRow><TableHead>Number</TableHead><TableHead>Resident</TableHead><TableHead>Type</TableHead><TableHead>Reason</TableHead><TableHead className="text-right">Decision</TableHead></TableRow></TableHeader>
                   <TableBody>
-                    {leaves.map((leave) => (
+                    {leaves.map((leave, idx) => (
                       <TableRow key={leave.id}>
-                        <TableCell className="font-bold">{leave.number}</TableCell>
+                        <TableCell className="font-bold">{idx + 1}</TableCell>
                         <TableCell className="font-semibold">{leave.residentName}</TableCell>
                         <TableCell>{leave.type}</TableCell>
                         <TableCell>{leave.reason}</TableCell>

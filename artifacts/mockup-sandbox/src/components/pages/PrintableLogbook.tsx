@@ -34,8 +34,8 @@ export function PrintableLogbook() {
           procs: logsBundle.procedureLogs || [],
           academics: logsBundle.academicLogs || [],
           postings: postings.data || [],
-          leaves: leaves || [],
-          assessments: assessments || [],
+          leaves: Array.isArray(leaves) ? leaves : leaves?.data || [],
+          assessments: Array.isArray(assessments) ? assessments : assessments?.data || [],
           thesis: thesisRes.data || null,
         });
       } catch (err) {
