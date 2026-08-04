@@ -88,7 +88,9 @@ function navigationForRole(role: RoleType, dashboardData?: any, loadingBadges?: 
     return [
       { title: "Overview", icon: AlertTriangle, href: "/" },
       { title: "Review Queue", icon: FileText, href: "/review-queue" },
-      { title: "Students & Professors", icon: GraduationCap, href: "/roster" },
+      { title: "All Students", icon: GraduationCap, href: "/mentees" },
+      { title: "Add Assessment", icon: ClipboardCheck, href: "/assessments" },
+      { title: "Students & Professors", icon: Users, href: "/roster" },
       { title: "Pending Students", icon: UserPlus, href: "/student-access" },
       { title: "Add Professor", icon: UserCheck, href: "/professors" },
       { title: "Leave Approvals", icon: CheckCircle2, href: "/leave-approvals" },

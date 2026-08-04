@@ -63,6 +63,8 @@ type LeaveRequest = {
 const paths: Record<string, string> = {
   "gap-dashboard": "/",
   "review-queue": "/review-queue",
+  "mentees": "/mentees",
+  "assessments": "/assessments",
   "student-access": "/student-access",
   "leave-approvals": "/leave-approvals",
   "professors": "/professors",
@@ -318,6 +320,14 @@ export function HODPortal({ activeTab = "gap-dashboard" }: { activeTab?: string 
         {/* Review Queue tab — reuses ProfessorPortal which accepts HOD role */}
         <TabsContent value="review-queue" className="pt-4">
           <ProfessorPortal activeTab="review-queue" embedded />
+        </TabsContent>
+
+        <TabsContent value="mentees" className="pt-4">
+          <ProfessorPortal activeTab="mentees" embedded />
+        </TabsContent>
+
+        <TabsContent value="assessments" className="pt-4">
+          <ProfessorPortal activeTab="assessments" embedded />
         </TabsContent>
 
         {/* Roster tab */}
