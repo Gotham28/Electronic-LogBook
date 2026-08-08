@@ -14,6 +14,7 @@ import {
   Syringe,
   BookOpen,
   GraduationCap,
+  Search,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -101,6 +102,11 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
 
   const [roster, setRoster] = React.useState<{ students: any[]; professors: any[] } | null>(null);
   const [rosterLoading, setRosterLoading] = React.useState(false);
+
+  // Roster Filters
+  const [searchQuery, setSearchQuery] = React.useState("");
+  const [filterBatch, setFilterBatch] = React.useState("all");
+  const [filterStatus, setFilterStatus] = React.useState("all");
 
   // Settings State
   const [deptConfig, setDeptConfig] = React.useState({ requiredCases: 50, requiredProcedures: 101, requiredAcademic: 15 });
@@ -290,6 +296,17 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
     }
   };
 
+  // Compute Roster Filter (MUST BE BEFORE EARLY RETURN)
+  const batches = React.useMemo(() => Array.from(new Set(roster?.students.map(s => s.batch).filter(Boolean))).sort(), [roster?.students]);
+  const filteredStudents = React.useMemo(() => {
+    return (roster?.students || []).filter((s) => {
+      const matchesSearch = s.fullName?.toLowerCase().includes(searchQuery.toLowerCase()) || s.registrationNumber?.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesBatch = filterBatch === "all" || s.batch === filterBatch;
+      const matchesStatus = filterStatus === "all" || s.status === filterStatus;
+      return matchesSearch && matchesBatch && matchesStatus;
+    });
+  }, [roster?.students, searchQuery, filterBatch, filterStatus]);
+
   if (loading && !analyticsData) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -344,11 +361,39 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
                 <SummaryCard label="Awaiting approval" value={pendingStudents.length} />
               </div>
               <Card>
-                <CardHeader className="border-b border-teal-100">
+                <CardHeader className="border-b border-teal-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <CardTitle className="text-lg flex items-center gap-2">
                     <GraduationCap className="h-5 w-5 text-teal-600" />
-                    PG Residents ({roster?.students.length ?? 0})
+                    PG Residents ({filteredStudents.length})
                   </CardTitle>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <div className="relative">
+                      <Search className="absolute left-2 top-2.5 h-4 w-4 text-slate-500" />
+                      <Input
+                        placeholder="Search name or reg no..."
+                        className="pl-8 h-9 w-full sm:w-64"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                      />
+                    </div>
+                    <select
+                      className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      value={filterBatch}
+                      onChange={(e) => setFilterBatch(e.target.value)}
+                    >
+                      <option value="all">All Batches</option>
+                      {batches.map(b => <option key={b as string} value={b as string}>{b}</option>)}
+                    </select>
+                    <select
+                      className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      value={filterStatus}
+                      onChange={(e) => setFilterStatus(e.target.value)}
+                    >
+                      <option value="all">All Status</option>
+                      <option value="approved">Approved</option>
+                      <option value="pending">Pending</option>
+                    </select>
+                  </div>
                 </CardHeader>
                 <CardContent className="p-0">
                   {!roster?.students.length ? (
@@ -367,7 +412,7 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {roster.students.map((s) => (
+                        {filteredStudents.map((s) => (
                           <TableRow key={s.id}>
                             <TableCell className="font-mono text-xs font-semibold">{s.registrationNumber}</TableCell>
                             <TableCell className="font-semibold">{s.fullName}</TableCell>

@@ -4,7 +4,7 @@ import {
   academicLogsTable, usersTable, departmentsTable, departmentConfigsTable,
   postingsTable, leaveRecordsTable, appraisalsTable, researchTable, assessmentsTable
 } from "@workspace/db";
-import { eq, and, desc, count, sql } from "drizzle-orm";
+import { eq, and, desc, count, sql, isNull } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/auth.js";
 
 const router: IRouter = Router();
@@ -174,11 +174,11 @@ router.get("/:studentId/logs", requireAuth, async (req, res) => {
 
     // Faculty inspection is assignment-scoped. HODs retain department-wide oversight.
     const caseFilter = caller.role === "professor"
-      ? and(eq(caseLogsTable.studentId, studentId), eq(caseLogsTable.supervisorId, caller.id))
-      : eq(caseLogsTable.studentId, studentId);
+      ? and(eq(caseLogsTable.studentId, studentId), eq(caseLogsTable.supervisorId, caller.id), isNull(caseLogsTable.deletedAt))
+      : and(eq(caseLogsTable.studentId, studentId), isNull(caseLogsTable.deletedAt));
     const procedureFilter = caller.role === "professor"
-      ? and(eq(procedureLogsTable.studentId, studentId), eq(procedureLogsTable.supervisorId, caller.id))
-      : eq(procedureLogsTable.studentId, studentId);
+      ? and(eq(procedureLogsTable.studentId, studentId), eq(procedureLogsTable.supervisorId, caller.id), isNull(procedureLogsTable.deletedAt))
+      : and(eq(procedureLogsTable.studentId, studentId), isNull(procedureLogsTable.deletedAt));
     const academicFilter = caller.role === "professor"
       ? and(eq(academicLogsTable.studentId, studentId), eq(academicLogsTable.supervisorId, caller.id))
       : eq(academicLogsTable.studentId, studentId);
@@ -548,6 +548,80 @@ router.post("/:studentId/academic-logs", async (req, res) => {
     }).returning();
     res.status(201).json(inserted);
   } catch (error) {
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// DELETE Case Log
+router.delete("/:studentId/case-logs/:logId", requireAuth, async (req, res) => {
+  try {
+    const studentId = parseInt(String(req.params.studentId), 10);
+    const logId = parseInt(String(req.params.logId), 10);
+    const caller = req.user!;
+
+    if (caller.role !== "student") {
+      res.status(403).json({ message: "Only students can delete their own logs" });
+      return;
+    }
+    
+    const [ownProfile] = await db.select({ id: studentsTable.id }).from(studentsTable).where(eq(studentsTable.userId, caller.id));
+    if (!ownProfile || ownProfile.id !== studentId) {
+      res.status(403).json({ message: "Forbidden: you can only delete your own logs" });
+      return;
+    }
+
+    const [log] = await db.select().from(caseLogsTable).where(and(eq(caseLogsTable.id, logId), eq(caseLogsTable.studentId, studentId)));
+    if (!log) {
+      res.status(404).json({ message: "Log not found" });
+      return;
+    }
+
+    if (log.status !== "pending") {
+      res.status(400).json({ message: "Only pending logs can be deleted" });
+      return;
+    }
+
+    await db.update(caseLogsTable).set({ deletedAt: new Date() }).where(eq(caseLogsTable.id, logId));
+    res.json({ message: "Log deleted successfully" });
+  } catch (error) {
+    req.log.error(error, "Error deleting case log");
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// DELETE Procedure Log
+router.delete("/:studentId/procedure-logs/:logId", requireAuth, async (req, res) => {
+  try {
+    const studentId = parseInt(String(req.params.studentId), 10);
+    const logId = parseInt(String(req.params.logId), 10);
+    const caller = req.user!;
+
+    if (caller.role !== "student") {
+      res.status(403).json({ message: "Only students can delete their own logs" });
+      return;
+    }
+    
+    const [ownProfile] = await db.select({ id: studentsTable.id }).from(studentsTable).where(eq(studentsTable.userId, caller.id));
+    if (!ownProfile || ownProfile.id !== studentId) {
+      res.status(403).json({ message: "Forbidden: you can only delete your own logs" });
+      return;
+    }
+
+    const [log] = await db.select().from(procedureLogsTable).where(and(eq(procedureLogsTable.id, logId), eq(procedureLogsTable.studentId, studentId)));
+    if (!log) {
+      res.status(404).json({ message: "Log not found" });
+      return;
+    }
+
+    if (log.status !== "pending") {
+      res.status(400).json({ message: "Only pending logs can be deleted" });
+      return;
+    }
+
+    await db.update(procedureLogsTable).set({ deletedAt: new Date() }).where(eq(procedureLogsTable.id, logId));
+    res.json({ message: "Log deleted successfully" });
+  } catch (error) {
+    req.log.error(error, "Error deleting procedure log");
     res.status(500).json({ message: "Internal server error" });
   }
 });

@@ -151,7 +151,11 @@ router.delete("/users/:id", async (req, res) => {
     await db.delete(usersTable).where(eq(usersTable.id, userId));
 
     res.json({ message: "User removed from department" });
-  } catch (error) {
+  } catch (error: any) {
+    if (error.code === "23503") {
+      res.status(409).json({ message: "This student has existing logs or records and cannot be removed. Please contact an administrator if removal is required." });
+      return;
+    }
     req.log.error(error, "Error removing user");
     res.status(500).json({ message: "Internal server error" });
   }
