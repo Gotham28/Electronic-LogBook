@@ -18,6 +18,7 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarTrigger,
+  SidebarRail,
   SidebarInset,
 } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -35,11 +36,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  AlertTriangle,
   Award,
   Bell,
   BookOpenCheck,
-  Building,
   CalendarDays,
   CheckCircle2,
   ChevronDown,
@@ -50,13 +49,10 @@ import {
   LayoutDashboard,
   LogOut,
   Printer,
-  ShieldCheck,
   Stethoscope,
   UserCheck,
   UserPlus,
-  Users,
 } from "lucide-react";
-import { formatLogbookDate } from "@/lib/logbook-config";
 
 export type RoleType = "Student" | "Professor" | "HOD";
 
@@ -79,16 +75,20 @@ function navigationForRole(role: RoleType, dashboardData?: any, loadingBadges?: 
   if (role === "Professor") {
     return [
       { title: "Evaluation Queue", icon: FileText, href: "/" },
-      { title: "All Students", icon: UserCheck, href: "/mentees" },
-      { title: "Assessments", icon: ClipboardCheck, href: "/appraisals" },
+      { title: "Student Progress", icon: UserCheck, href: "/mentees" },
+      { title: "Assessments", icon: ClipboardCheck, href: "/assessments" },
     ];
   }
 
   if (role === "HOD") {
     return [
-      { title: "Department Overview", icon: AlertTriangle, href: "/" },
-      { title: "Student Registrations", icon: UserPlus, href: "/student-access" },
+      { title: "Students", icon: GraduationCap, href: "/roster" },
+      { title: "Review Queue", icon: FileText, href: "/review-queue" },
+      { title: "Add Assessment", icon: ClipboardCheck, href: "/assessments" },
+      { title: "Pending Students", icon: UserPlus, href: "/student-access" },
+      { title: "Add Faculty", icon: UserCheck, href: "/professors" },
       { title: "Leave Approvals", icon: CheckCircle2, href: "/leave-approvals" },
+      { title: "Requirements", icon: ClipboardCheck, href: "/requirements" },
     ];
   }
 
@@ -143,17 +143,6 @@ export function AppLayout({
 
   const navigationItems = navigationForRole(activeRole, dashboardData, loadingBadges);
 
-  const printCurrentView = () => {
-    const label = activeRole === "Student" ? "DRAFT" : "OFFICIAL COPY";
-    document.body.dataset.printLabel = `${label} • ${formatLogbookDate(new Date())}`;
-    const clearLabel = () => {
-      delete document.body.dataset.printLabel;
-      window.removeEventListener("afterprint", clearLabel);
-    };
-    window.addEventListener("afterprint", clearLabel);
-    window.print();
-  };
-
   const handleChangePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (cpForm.newPassword !== cpForm.confirmPassword) {
@@ -177,27 +166,25 @@ export function AppLayout({
   };
 
   return (
-    <SidebarProvider defaultOpen>
+    <SidebarProvider defaultOpen style={{ "--sidebar-width": "17rem", "--sidebar-width-icon": "5rem" } as React.CSSProperties}>
       <div className="medical-grid h-screen w-full overflow-hidden p-0 text-slate-900 md:p-3 lg:p-4">
         <div className="glass-panel mx-auto flex h-[100dvh] w-full max-w-[1600px] overflow-hidden rounded-none border-white/70 md:h-[calc(100vh-24px)] md:rounded-[30px] lg:h-[calc(100vh-32px)]">
-          <Sidebar className="print-hidden border-r border-white/70 bg-white/60 shadow-[0_24px_80px_rgba(15,23,42,0.06)] backdrop-blur-xl">
-            <SidebarHeader className="border-b border-white/70 p-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-500 via-teal-500 to-cyan-500 text-white shadow-[0_16px_34px_rgba(13,148,136,0.22)]">
+          <Sidebar collapsible="icon" className="print-hidden border-r border-slate-200/80 bg-white/95 shadow-[0_24px_80px_rgba(15,23,42,0.06)] backdrop-blur-xl">
+            <SidebarHeader className="h-[74px] overflow-hidden border-b border-slate-100 p-4 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-2">
+              <div className="relative flex h-full w-full items-center overflow-hidden group-data-[collapsible=icon]:justify-center">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-600 text-white shadow-[0_12px_28px_rgba(13,148,136,0.2)]">
                   <BookOpenCheck className="h-6 w-6" />
                 </div>
-                <div>
-                  <p className="font-display text-lg font-bold leading-tight text-slate-900">Pediatrics E-Logbook</p>
-                  <p className="mt-0.5 flex items-center gap-1 text-[11px] font-semibold text-teal-700">
-                    <ShieldCheck className="h-3 w-3" /> MCI-aligned training record
-                  </p>
+                <div className="absolute left-[52px] top-1/2 w-[180px] -translate-y-1/2 whitespace-nowrap transition-opacity duration-150 group-data-[collapsible=icon]:pointer-events-none group-data-[collapsible=icon]:opacity-0">
+                  <p className="font-display text-lg font-bold leading-tight text-slate-900">E-Logbook</p>
+                  <p className="mt-0.5 text-[11px] font-medium text-slate-500">Clinical training records</p>
                 </div>
               </div>
             </SidebarHeader>
 
             <SidebarContent className="p-2">
               <SidebarGroup>
-                <SidebarGroupLabel className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-teal-900/45">
+                <SidebarGroupLabel className="mb-2 h-8! px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-teal-900/45 group-data-[collapsible=icon]:mt-0! group-data-[collapsible=icon]:opacity-0">
                   {activeRole} workspace
                 </SidebarGroupLabel>
                 <SidebarGroupContent>
@@ -212,22 +199,23 @@ export function AppLayout({
                           <SidebarMenuButton
                             asChild
                             isActive={isActive}
-                            className={`h-11 w-full rounded-xl px-3 transition-all duration-200 ${
+                            tooltip={item.title}
+                            className={`h-11 w-full rounded-xl px-3 transition-all duration-200 group-data-[collapsible=icon]:mx-auto! group-data-[collapsible=icon]:h-11! group-data-[collapsible=icon]:w-11! group-data-[collapsible=icon]:p-0! ${
                               isActive
                                 ? "border border-white/60 bg-gradient-to-r from-teal-600 to-cyan-500 font-semibold text-white shadow-[0_16px_36px_rgba(13,148,136,0.22)] hover:text-white"
                                 : "text-slate-600 hover:border hover:border-white/70 hover:bg-white/80 hover:text-teal-900"
                             }`}
                           >
-                            <Link href={item.href} className="flex w-full items-center gap-3">
+                            <Link href={item.href} className="flex w-full items-center gap-3 group-data-[collapsible=icon]:justify-center">
                               <Icon className={`h-4 w-4 ${isActive ? "text-white" : "text-teal-600"}`} />
-                              <span className="flex-1 truncate text-[13px]">{item.title}</span>
+                              <span className="flex-1 truncate text-[13px] group-data-[collapsible=icon]:hidden">{item.title}</span>
                               
                               {item.badgeLoading ? (
-                                <Skeleton className="h-4 w-12 rounded-full bg-teal-100/50" />
+                                <Skeleton className="h-4 w-12 rounded-full bg-teal-100/50 group-data-[collapsible=icon]:hidden" />
                               ) : item.badge ? (
                                 <Badge
                                   variant="outline"
-                                  className={`rounded-full px-1.5 py-0 text-[9px] ${
+                                  className={`rounded-full px-1.5 py-0 text-[9px] group-data-[collapsible=icon]:hidden ${
                                     isActive
                                       ? "border-white/25 bg-white/15 text-white"
                                       : item.badgeColor || "border-teal-100 bg-teal-50 text-teal-700"
@@ -255,11 +243,11 @@ export function AppLayout({
                         {initials}
                       </AvatarFallback>
                     </Avatar>
-                    <div className="min-w-0 flex-1">
+                    <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
                       <p className="truncate text-xs font-bold text-slate-900">{displayName}</p>
                       <p className="truncate text-[10px] font-semibold text-teal-700">{activeRole} portal</p>
                     </div>
-                    <ChevronDown className="h-4 w-4 text-teal-700/50" />
+                    <ChevronDown className="h-4 w-4 text-teal-700/50 group-data-[collapsible=icon]:hidden" />
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-72 rounded-2xl border-white/70 bg-white/92 p-1 shadow-[0_24px_60px_rgba(15,23,42,0.12)] backdrop-blur-xl">
@@ -275,9 +263,10 @@ export function AppLayout({
                 </DropdownMenuContent>
               </DropdownMenu>
             </SidebarFooter>
+            <SidebarRail />
           </Sidebar>
 
-          <SidebarInset className="flex min-w-0 flex-1 flex-col bg-transparent overflow-y-auto">
+          <SidebarInset className="flex min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto bg-transparent">
             <header className="print-hidden sticky top-0 z-20 flex h-[72px] items-center justify-between border-b border-white/70 bg-white/62 px-4 backdrop-blur-xl md:px-6">
               <div className="flex min-w-0 items-center gap-3">
                 <SidebarTrigger className="rounded-xl text-teal-800 hover:bg-white" />
@@ -287,7 +276,7 @@ export function AppLayout({
                     Department of Pediatrics
                   </p>
                   <p className="truncate text-[11px] font-medium text-slate-500">
-                    Postgraduate training • {activeRole} view
+                    {activeRole} workspace
                   </p>
                 </div>
               </div>
@@ -340,7 +329,7 @@ export function AppLayout({
             <main className="mx-auto w-full max-w-[1380px] flex-1 p-4 md:p-6 lg:p-8">
               <div className="print-only mb-6 border-b border-slate-300 pb-4">
                 <p className="page-eyebrow">Department of Pediatrics</p>
-                <h1 className="mt-1 text-2xl font-bold">Postgraduate Electronic Logbook</h1>
+                <h1 className="mt-1 text-2xl font-bold">Resident Training Record</h1>
               </div>
               {children}
             </main>

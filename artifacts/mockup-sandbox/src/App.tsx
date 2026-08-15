@@ -184,25 +184,10 @@ function App() {
       }}
     >
       {activeRole === "Professor" && (
-        <Switch>
-          <Route path="/mentees" component={() => <ProfessorPortal activeTab="mentees" />} />
-          <Route path="/assessments" component={() => <ProfessorPortal activeTab="assessments" />} />
-          <Route component={() => <ProfessorPortal activeTab="review-queue" />} />
-        </Switch>
+        <ProfessorPortal />
       )}
       {activeRole === "HOD" && (
-        <Switch>
-          <Route path="/review-queue" component={() => <HODPortal activeTab="review-queue" />} />
-          <Route path="/roster" component={() => <HODPortal activeTab="roster" />} />
-          <Route path="/student-access" component={() => <HODPortal activeTab="student-access" />} />
-          <Route path="/professors" component={() => <HODPortal activeTab="professors" />} />
-          <Route path="/leave-approvals" component={() => <HODPortal activeTab="leave-approvals" />} />
-          <Route path="/requirements" component={() => <HODPortal activeTab="requirements" />} />
-          {/* Legacy routes — redirect to merged Requirements tab */}
-          <Route path="/procedures" component={() => <HODPortal activeTab="requirements" />} />
-          <Route path="/settings" component={() => <HODPortal activeTab="requirements" />} />
-          <Route component={() => <HODPortal activeTab="gap-dashboard" />} />
-        </Switch>
+        <HODPortal />
       )}
       {activeRole === "Student" && (
         <Switch>

@@ -1,7 +1,7 @@
 import * as React from "react";
-import { AlertCircle, CheckCircle2, Clock, Eye, FileText, PlusCircle, Search, Loader2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, Clock, Eye, FileText, PlusCircle, Search, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { apiGet, apiPost } from "@/lib/apiClient";
+import { apiGet, apiPost, apiDelete } from "@/lib/apiClient";
 import { getCurrentUser } from "@/lib/session";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -139,6 +139,18 @@ export function CaseLogsPage() {
     }
   };
 
+  async function handleDeleteCaseLog(logId: number) {
+    if (!window.confirm("Delete this log? This cannot be undone.")) return;
+    
+    try {
+      await apiDelete(`/api/students/${user!.studentProfileId}/case-logs/${logId}`);
+      setCaseLogs(prev => prev.filter(log => log.id !== logId));
+      toast.success("Log deleted successfully");
+    } catch (error: any) {
+      toast.error(error.message || "An error occurred");
+    }
+  }
+
   const search = searchTerm.toLowerCase();
   const filteredLogs = caseLogs.filter((log) =>
     [log.number, log.diagnosis, log.patientUhid, log.chiefComplaints]
@@ -267,7 +279,14 @@ export function CaseLogsPage() {
                     <TableCell><p className="max-w-sm font-semibold text-slate-900">{log.diagnosisProvisional || log.diagnosis}</p></TableCell>
                     <TableCell>{statusBadge(log.status)}</TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="sm" onClick={() => setSelectedLog(log)}><Eye className="h-4 w-4" /> Details</Button>
+                      <div className="flex items-center justify-end gap-2">
+                        {log.status === "pending" && (
+                          <Button variant="ghost" size="sm" className="text-rose-500 hover:text-rose-700 hover:bg-rose-50" onClick={() => handleDeleteCaseLog(log.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                        <Button variant="ghost" size="sm" onClick={() => setSelectedLog(log)}><Eye className="h-4 w-4" /> Details</Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
