@@ -1,109 +1,116 @@
 # Current Task
 
 ## Feature
-Serve the API from the same origin as the frontend via a Vercel rewrite, so the `token`
-cookie is first-party and is no longer dropped by browsers that block third-party cookies.
+Read JWT_SECRET from one shared module with no fallback default, so the server fails at
+boot instead of silently signing tokens with a publicly-known string.
 
 ## Plan reference
-MASTER_PLAN.md — does not exist yet (carried forward from the previous CURRENT_TASK.md).
-STATUS.md state at time of scoping: STATUS.md is NOT attached to the planning Project —
-sequence against the roadmap could not be checked. Confirm before starting.
+MASTER_PLAN.md and STATUS.md no longer exist — dropped by developer decision on 2026-08-19
+in favour of TASK_LOG.md. TASK_LOG.md state at time of scoping: empty, no entries yet.
+This task supersedes the earlier CURRENT_TASK.md that scoped middlewares/auth.ts line 4
+only; that scope missed the second fallback in routes/auth.ts.
 
 ## MASTER_PLAN.md update
-- [ ] None — MASTER_PLAN.md does not exist yet. Do not create it as part of this task.
+- [ ] None — MASTER_PLAN.md does not exist and is not being created.
 
 ## Files/areas in scope
-- `vercel.json` (repo root) — add one rewrite rule mapping `/api/:path*` to
-  `https://elogbook-api.onrender.com/api/:path*`, placed BEFORE the existing
-  `/(.*)` → `/index.html` catch-all. Vercel matches rewrites in order; if the catch-all
-  comes first, every API call returns the HTML page instead.
-- `artifacts/mockup-sandbox/vercel.json` — apply the identical rule, in the identical
-  order. Both files exist and it is not known which one Vercel reads.
+- `artifacts/api-server/src/lib/env.ts` — NEW file. Reads `process.env.JWT_SECRET` with no
+  default. Throws a clear error at module load if the value is missing or empty. Exports
+  the secret as a named export.
+- `artifacts/api-server/src/middlewares/auth.ts` — line 4 only: delete the local
+  `const JWT_SECRET = process.env.JWT_SECRET || "fallback-secret-for-dev-only";` and import
+  from `lib/env.ts` instead. Line 33's `jwt.verify(token, JWT_SECRET)` keeps working
+  unchanged.
+- `artifacts/api-server/src/routes/auth.ts` — line 10 only: same deletion and same import.
+  Lines 386 and 443 keep working unchanged.
 
 ## Explicitly out of scope
-- `artifacts/mockup-sandbox/src/lib/apiClient.ts` — no code change needed. With
-  `VITE_API_URL` empty, `API_BASE_URL` becomes `""` and calls go to `/api/...` on the
-  same origin, which is exactly what this task wants. The `console.error` guard will
-  print a now-inaccurate warning; that is cosmetic and gets its own task.
-- Deleting or consolidating the duplicate `vercel.json`. Separate cleanup task.
-- The hardcoded `FRONTEND_URL` fallback in `app.ts`. Separate task.
-- Cookie flags in `auth.ts` — `NODE_ENV=production` is confirmed set on Render, so the
-  cookie already goes out as `SameSite=None; Secure`. Nothing to change.
-- The `sessionStorage`-based `isAuthenticated` flag in `App.tsx`. Separate task.
-- The unauthenticated routes in `student.ts` and `department.ts`. Separate task.
+- Rotating or choosing the secret value — developer action, already done on Render.
+- Token expiry, refresh tokens, cookie flags, `sameSite`, `secure`.
+- The vercel.json same-origin rewrite (cookie fix). Next task, its own diff.
+- The unauthenticated routes in `student.ts` and `department.ts`.
+- The `sessionStorage` `isAuthenticated` flag in `App.tsx`.
+- Moving `CURRENT_TASK.md` / `TASK_LOG.md` into `.agents/`, and updating `AGENTS.md` §4 to
+  match. Separate chore task.
+- Any other environment variable. `lib/env.ts` handles `JWT_SECRET` only in this task.
 
 ## Do NOT touch
-- Any file under `artifacts/api-server/`.
-- Any file under `lib/db/`.
-- `FRONTEND_URL` on Render — leave it exactly as it is.
-- The existing `/(.*)` → `/index.html` rewrite rule. Add above it; do not edit or remove it.
-- Any `.env` file.
+- Any logic in `middlewares/auth.ts` other than the constant on line 4 and the new import
+  line. `requireAuth` and `requireRole` bodies stay byte-identical.
+- Any logic in `routes/auth.ts` other than the constant on line 10 and the new import line.
+  Login, register, OTP and password-reset behaviour stays byte-identical.
+- `app.ts`, CORS, `FRONTEND_URL`.
+- Anything under `lib/db/src/schema/`.
+- Any `.env` file — do not read secrets out of it, do not write values into it, do not
+  print its contents. The developer sets local values by hand.
+- Any `vercel.json`.
 
 ## Manual (developer does)
-- [ ] Confirm the Vercel project's Root Directory setting and report it, so we know which
-      `vercel.json` is live.
-- [ ] Copy the exact current value of `VITE_API_URL` from Vercel's env vars and paste it
-      here verbatim, before Antigravity writes the rewrite destination.
-- [ ] After the branch deploys as a Vercel Preview: set `VITE_API_URL` to empty for the
-      **Preview environment only**, redeploy the preview, and test there first.
-- [ ] Set up a keep-warm ping to `GET /api/healthz` every 10 minutes, OR move Render off
-      the free tier, BEFORE switching Production over. Vercel's rewrite proxy times out
-      around 30s; Render free-tier cold start is 30–90s.
-- [ ] Only after the preview test passes: clear `VITE_API_URL` for Production and redeploy.
-- [ ] Do not merge to main until the preview test evidence below is collected.
+- [x] Set `JWT_SECRET` on Render — done 2026-08-19.
+- [ ] Confirm the Render service restarted cleanly after that change: `GET /api/healthz`
+      returns 200. Paste the status code.
+- [ ] Set a `JWT_SECRET` in the local `.env` with a DIFFERENT random value from Render's,
+      before Antigravity starts any server.
+- [ ] Read the local `.env`'s `DATABASE_URL` and tell Antigravity, in words, whether it
+      points at the production Neon database or somewhere else. Do not paste the string.
+- [ ] Deploy this change only after the two boot tests below have passed locally.
+- [ ] Approve the TASK_LOG.md entry wording before it is written.
 
 ## Antigravity (does on its own, once scope is confirmed)
-- [ ] Add the `/api/:path*` rewrite as the FIRST entry in `vercel.json` at the repo root.
-- [ ] Add the identical entry, in the identical position, to
-      `artifacts/mockup-sandbox/vercel.json`.
-- [ ] Paste the full before-and-after contents of both files in the task report.
-- [ ] Confirm by `grep -rn "vercel.json" .` that no third `vercel.json` exists anywhere in
-      the repo. Paste the output.
-- [ ] Nothing else. No TypeScript file is touched by this task.
-- [ ] Draft the .agents/TASK_LOG.md entry for this task using the format at the top of that
-      file. Draft only — do not write it to the file until I approve the wording.
+- [ ] Create `artifacts/api-server/src/lib/env.ts` with no fallback default and a
+      module-load guard that throws when `JWT_SECRET` is missing or empty. The error message
+      must name the variable and must NOT print its value.
+- [ ] Replace the local constant in `middlewares/auth.ts` with an import from `lib/env.ts`.
+- [ ] Replace the local constant in `routes/auth.ts` with an import from `lib/env.ts`.
+- [ ] Run `git grep -n "fallback-secret-for-dev-only"` and confirm zero results.
+- [ ] Run `git grep -n "JWT_SECRET" artifacts lib` and confirm the only occurrences are in
+      `lib/env.ts` plus the two import sites and their existing usages.
+- [ ] Draft the TASK_LOG.md entry for this task. Draft only — do not write it to the file
+      until the developer approves the wording.
 
 ## Blocked on developer input
-- [ ] The rewrite destination URL — waiting on: the exact `VITE_API_URL` string copied from
-      the Vercel dashboard. `https://elogbook-api.onrender.com` is unconfirmed and must not
-      be assumed.
-- [ ] Permission to overwrite this file — waiting on: confirmation that the previous
-      CURRENT_TASK.md (JWT_SECRET fallback removal) has shipped or been parked.
-- [ ] Writing the TASK_LOG.md entry — waiting on: my explicit approval of the drafted
-      wording, after the verification evidence has been reviewed.
+- [ ] Starting the server for the boot and login tests — waiting on: the developer's stated
+      answer about what local `DATABASE_URL` points at. If it points at production,
+      Antigravity must not perform the login test; the developer performs it with their own
+      account and pastes the result.
+- [ ] Writing the TASK_LOG.md entry — waiting on: explicit approval of the drafted wording.
 
 ## Verification required before this is considered done
-- [ ] On the Preview URL, browser DevTools → Network: the login request's URL is the
-      Vercel origin `/api/auth/login`, NOT the onrender.com host. Paste the request URL.
-- [ ] Same request: response carries `Set-Cookie: token=...` and Application → Cookies now
-      lists `token` under the Vercel origin. Paste the cookie's domain and SameSite value.
-- [ ] A protected route called immediately after login returns 200, not 401. Name the route
-      and paste the status code.
-- [ ] On Android Chrome with third-party cookies set to **Blocked**: log in, then open a
-      page that previously showed the auth error. Paste what happened.
-- [ ] SPA routing not broken: hard-refresh a deep link on the preview (not the root path)
-      and confirm the app loads rather than 404ing. Name the path used.
-- [ ] Rewrite ordering correct: request a nonexistent API path such as
-      `/api/zzz-does-not-exist` and confirm the API's JSON 404 comes back, not the HTML of
-      `index.html`. Paste the first 100 characters of the response body.
+- [ ] Paste `git grep -n "fallback-secret-for-dev-only"` output showing zero results.
+- [ ] Paste `git grep -n "JWT_SECRET" artifacts lib` output in full.
+- [ ] Start the server with `JWT_SECRET` unset. Paste the actual terminal output showing it
+      refuses to boot, and the error message text.
+- [ ] Start the server with `JWT_SECRET` set. Paste the output showing it boots normally.
+- [ ] Login still works: paste the response status code from a login request. Who runs this
+      depends on the DATABASE_URL answer above.
+- [ ] Old-secret rejection — this is the proof the hole is closed. Sign a token by hand using
+      the string "fallback-secret-for-dev-only", send it to any route carrying requireAuth,
+      and paste the status code. It must be 401.
+- [ ] Same route with a token issued by the running server: paste the status code. It must
+      not be 401.
+- [ ] Confirm no file outside the three listed in "Files/areas in scope" was modified. Paste
+      `git status --short`.
 
 ## Flags (AGENTS.md rule triggers)
-- §5.4 — this is a deployment-configuration change on a live pilot with no staging. Nothing
-  is pushed to production until the preview evidence above is collected.
-- §5.3 — two `vercel.json` files exist. Both are being edited; neither is being removed.
-  The duplication itself is flagged, not fixed, in this task.
-- §9 — this task touches a non-local environment (Vercel). Antigravity edits files only;
-  every dashboard and deploy action is in the Manual bucket.
-- §6.4 — this file overwrites a previous CURRENT_TASK.md whose blocked item is still open.
-- §10 Opus trigger — "touches CORS, FRONTEND_URL, DATABASE_URL, or any deployment
-  configuration".
+- §5.3 — this restructures: a new module, and a constant moved out of two existing files.
+  Chosen deliberately by the developer on 2026-08-19 so a third copy of the secret cannot
+  quietly appear later. Recorded so it is not a silent restructure.
+- §5.6 — the guard's error message must never print the secret value. Neither may any log
+  line added by this task.
+- §9 — verification needs a running server, and local `DATABASE_URL` may point at the
+  production database. Gated in the Blocked bucket above.
+- §10 Opus trigger — edits `middlewares/auth.ts`; also touches JWT handling and moves code
+  between modules.
+- Context: `JWT_SECRET` was confirmed MISSING on Render on 2026-08-19, meaning production
+  was signing and accepting tokens with the hardcoded string until it was set that day.
+  This code change prevents that state from ever recurring silently; it is not what closed
+  the hole.
 
 ## Suggested review tier (set at scoping time)
-- Opus 5, high effort — §10 trigger: deployment configuration. Not escalated to xhigh: only
-  one Opus trigger fires and the diff contains no code. If `apiClient.ts` or `auth.ts` ends
-  up in the diff, that is scope creep and the tier becomes xhigh.
+- Opus 5, xhigh effort — §10 escalation: the diff edits `middlewares/auth.ts`, and three
+  Opus triggers fire together (auth middleware, JWT handling, code moved between modules).
 
 ## Suggested Antigravity model
-- The most deliberate model in your selector — this is an Opus-tier task where a wrong
-  rewrite order takes the live pilot down. Pick the nearest equivalent if the exact name
-  isn't listed.
+- The most deliberate model in your selector. This diff sits directly under every
+  authorization check in the system; a wrong import path takes the whole API down at boot.
+  Pick the nearest equivalent if the exact name isn't listed.
