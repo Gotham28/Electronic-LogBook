@@ -68,7 +68,7 @@ function MiniDashboard({ phase }: { phase: number }) {
         <div className="grid grid-cols-[.82fr_1.18fr] gap-2 p-2">
           <div className="flex min-h-[76px] flex-col justify-center rounded-[10px] bg-gradient-to-br from-teal-950 via-teal-800 to-cyan-700 p-2.5 text-white">
             <p className="text-[4.5px] font-bold uppercase tracking-[.18em] text-teal-100">Pediatrics</p>
-            <p className="mt-1.5 text-[12px] font-semibold leading-tight">Welcome back,<br />Aravind</p>
+            <p className="mt-1.5 text-[12px] font-semibold leading-tight">Welcome back!</p>
             <p className="mt-2 text-[4.5px] leading-2 text-teal-50/75">Your clinical record and verification status are summarised here.</p>
             <div className="mt-2 flex items-center gap-1 text-[4.5px] text-teal-50/70"><span className="h-px w-3 bg-teal-200/60" /> Batch 2024</div>
           </div>
@@ -76,7 +76,7 @@ function MiniDashboard({ phase }: { phase: number }) {
           <div className="overflow-hidden rounded-[10px] border border-slate-100 bg-white shadow-sm">
             <div className="flex items-center gap-2 border-b border-slate-100 p-2">
               <div className="grid h-7 w-7 place-items-center rounded-lg bg-gradient-to-br from-teal-500 to-cyan-500 text-[7px] font-bold text-white">AP</div>
-              <div><p className="text-[4px] font-bold uppercase tracking-[.15em] text-teal-700">Resident profile</p><p className="mt-0.5 text-[8px] font-bold text-slate-900">Aravind P</p></div>
+              <p className="text-[4px] font-bold uppercase tracking-[.15em] text-teal-700">Resident profile</p>
             </div>
             <div className="grid grid-cols-2 gap-px bg-slate-100">
               {[
@@ -183,7 +183,7 @@ export function LoginProductPreview() {
                   </div>
                 ))}
               </div>
-              <div className="absolute bottom-2 left-2 flex items-center gap-1.5"><div className="grid h-5 w-5 place-items-center rounded-full bg-teal-100 text-[5px] font-bold text-teal-800">AP</div><div><p className="text-[4px] font-bold text-slate-800">Aravind P</p><p className="text-[3.5px] text-teal-700">Student portal</p></div></div>
+              <div className="absolute bottom-2 left-2 flex items-center gap-1.5"><div className="grid h-5 w-5 place-items-center rounded-full bg-teal-100 text-[5px] font-bold text-teal-800">AP</div><p className="text-[3.5px] text-teal-700">Student portal</p></div>
             </aside>
 
             <div className="min-w-0 flex-1">
