@@ -27,6 +27,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiGet, apiPost } from "@/lib/apiClient";
 import { getCurrentUser } from "@/lib/session";
+import { GuidedTour, type TourStep } from "@/components/GuidedTour";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -69,6 +70,26 @@ type NavigationItem = {
   badge?: string;
   badgeColor?: string;
   badgeLoading?: boolean;
+};
+
+const navigationDescriptions: Record<string, string> = {
+  Dashboard: "See your overall training progress, recent activity, and the requirements that need your attention.",
+  "Postings & Rotations": "Review your clinical rotations, posting dates, and current department assignment.",
+  "Case Logs": "Record and review the clinical cases you have observed, assisted with, or managed.",
+  "Procedure Logs": "Track procedures, supervision levels, verification status, and required totals.",
+  "Academic Activities": "Document seminars, journal clubs, presentations, teaching sessions, and other academic work.",
+  Assessments: "View assessment records and feedback entered during your training.",
+  "Thesis & Certifications": "Keep thesis milestones, certifications, and supporting academic requirements together.",
+  "Leave Records": "Check your leave balance, previous requests, and approval status.",
+  "Evaluation Queue": "Open student log entries that are waiting for your review and verification.",
+  "Student Progress": "Follow the training progress and completion status of the students assigned to you.",
+  Students: "View every student in the department and open their detailed training progress.",
+  "Review Queue": "Review pending case and procedure entries submitted across the department.",
+  "Add Assessment": "Create and manage assessments for postgraduate trainees.",
+  "Pending Students": "Review new student registrations before granting access to the logbook.",
+  "Add Faculty": "Add faculty accounts and manage their department access.",
+  "Leave Approvals": "Review leave requests and record approval decisions.",
+  Requirements: "Configure the case, procedure, and academic requirements used to measure progress.",
 };
 
 function navigationForRole(role: RoleType, dashboardData?: any, loadingBadges?: boolean): NavigationItem[] {
@@ -123,6 +144,8 @@ export function AppLayout({
   const [isChangePasswordOpen, setIsChangePasswordOpen] = React.useState(false);
   const [cpForm, setCpForm] = React.useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
   const [changingPassword, setChangingPassword] = React.useState(false);
+  const [isTourOpen, setIsTourOpen] = React.useState(false);
+  const tourButtonRef = React.useRef<HTMLButtonElement>(null);
 
   // Fix: Get actual user from session for the sidebar profile
   const currentUser = getCurrentUser();
@@ -141,7 +164,42 @@ export function AppLayout({
       .finally(() => setLoadingBadges(false));
   }, [activeRole, currentUser?.studentProfileId]);
 
-  const navigationItems = navigationForRole(activeRole, dashboardData, loadingBadges);
+  const navigationItems = React.useMemo(
+    () => navigationForRole(activeRole, dashboardData, loadingBadges),
+    [activeRole, dashboardData, loadingBadges],
+  );
+  const closeTour = React.useCallback(() => {
+    setIsTourOpen(false);
+    window.requestAnimationFrame(() => tourButtonRef.current?.focus());
+  }, []);
+  const tourSteps = React.useMemo<TourStep[]>(() => {
+    const navigationSteps = navigationItems.map((item, index) => ({
+      target: `navigation-${index}`,
+      title: item.title,
+      description: navigationDescriptions[item.title] || `Open ${item.title} from the sidebar.`,
+    }));
+
+    return [
+      ...navigationSteps,
+      ...(activeRole === "Student"
+        ? [{
+            target: "print-logbook",
+            title: "Print your logbook",
+            description: "Open a consolidated, print-ready version of your training record for review or PDF export.",
+          }]
+        : []),
+      {
+        target: "notifications",
+        title: "Notifications",
+        description: "Check reminders, pending reviews, due requirements, and other important updates.",
+      },
+      {
+        target: "account-menu",
+        title: "Account menu",
+        description: "Open your profile menu to change your password or securely sign out.",
+      },
+    ];
+  }, [activeRole, navigationItems]);
 
   const handleChangePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -189,7 +247,7 @@ export function AppLayout({
                 </SidebarGroupLabel>
                 <SidebarGroupContent>
                   <SidebarMenu className="gap-1">
-                    {navigationItems.map((item) => {
+                    {navigationItems.map((item, index) => {
                       const isActive =
                         location === item.href ||
                         (item.href !== "/" && location.startsWith(item.href));
@@ -197,6 +255,7 @@ export function AppLayout({
                       return (
                         <SidebarMenuItem key={item.href}>
                           <SidebarMenuButton
+                            data-tour-id={`navigation-${index}`}
                             asChild
                             isActive={isActive}
                             tooltip={item.title}
@@ -237,7 +296,7 @@ export function AppLayout({
             <SidebarFooter className="sticky bottom-0 z-20 mt-auto border-t border-white/70 bg-white/92 p-3 backdrop-blur-md">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="flex w-full items-center gap-3 rounded-2xl border border-white/70 bg-white/75 p-2.5 text-left shadow-[0_14px_30px_rgba(15,23,42,0.05)] transition hover:-translate-y-0.5 hover:bg-white">
+                  <button data-tour-id="account-menu" className="flex w-full items-center gap-3 rounded-2xl border border-white/70 bg-white/75 p-2.5 text-left shadow-[0_14px_30px_rgba(15,23,42,0.05)] transition hover:-translate-y-0.5 hover:bg-white">
                     <Avatar className="h-10 w-10 border border-teal-100">
                       <AvatarFallback className="bg-gradient-to-br from-teal-100 to-cyan-100 text-xs font-bold text-teal-800">
                         {initials}
@@ -284,6 +343,7 @@ export function AppLayout({
               <div className="flex items-center gap-2">
                 {activeRole === "Student" && (
                   <Button
+                    data-tour-id="print-logbook"
                     variant="outline"
                     size="sm"
                     onClick={() => window.open('/print', '_blank')}
@@ -293,9 +353,21 @@ export function AppLayout({
                     <Printer className="h-4 w-4 mr-2" /> Print PDF
                   </Button>
                 )}
+                <Button
+                  ref={tourButtonRef}
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsTourOpen(true)}
+                  aria-label="Take a guided tour"
+                  title="Take a guided tour"
+                  className="h-8 w-8 border-white/70 bg-white/75 px-0 text-sm font-bold text-teal-800 shadow-[0_12px_24px_rgba(15,23,42,0.05)]"
+                >
+                  ?
+                </Button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <button className="relative rounded-xl border border-white/70 bg-white/72 p-2 text-teal-800 shadow-[0_12px_24px_rgba(15,23,42,0.05)] transition hover:-translate-y-0.5 hover:bg-white">
+                    <button data-tour-id="notifications" aria-label="Open notifications" className="relative rounded-xl border border-white/70 bg-white/72 p-2 text-teal-800 shadow-[0_12px_24px_rgba(15,23,42,0.05)] transition hover:-translate-y-0.5 hover:bg-white">
                       <Bell className="h-4 w-4" />
                       <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-rose-500 ring-2 ring-white" />
                     </button>
@@ -362,6 +434,7 @@ export function AppLayout({
               </form>
             </DialogContent>
           </Dialog>
+          <GuidedTour open={isTourOpen} steps={tourSteps} onClose={closeTour} />
         </div>
       </div>
     </SidebarProvider>
