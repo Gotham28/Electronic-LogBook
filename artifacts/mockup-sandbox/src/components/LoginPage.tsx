@@ -8,6 +8,7 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp
 import { toast } from "sonner";
 import { apiPost } from "@/lib/apiClient";
 import { LoginProductPreview } from "@/components/LoginProductPreview";
+import { saveToken } from "@/lib/session";
 
 export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRegister: () => void }) {
   const [role, setRole] = React.useState<"student" | "professor" | "hod">("student");
@@ -56,6 +57,12 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
       if (user.role !== role) {
          // Optionally warn or just let it proceed since the AppLayout routes based on actual role
          console.warn(`Logged in as ${user.role} but ${role} tab was selected.`);
+      }
+
+      // Persist the JWT as a Bearer token — this ensures auth works in all browsers
+      // (Samsung Browser, Safari, Firefox strict mode) regardless of cross-site cookie policies
+      if (user.token) {
+        saveToken(user.token);
       }
 
       window.sessionStorage.setItem('elogbook-user', JSON.stringify(user));
