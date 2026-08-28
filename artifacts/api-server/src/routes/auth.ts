@@ -413,6 +413,7 @@ router.post("/login", async (req, res) => {
       role: userRow.role,
       departmentId: userRow.departmentId,
       studentProfileId,
+      token, // returned so clients that can't use cross-site cookies (Samsung, Safari) can send it as a Bearer token
     });
   } catch (error) {
     req.log.error(error, "Login error");
