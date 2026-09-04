@@ -12,7 +12,6 @@ import {
   Stethoscope,
   Loader2,
   RefreshCcw,
-  Sparkles,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -117,58 +116,41 @@ export function Dashboard() {
     .slice(0, 5);
 
   const overallRemaining = categories.reduce((sum, item) => sum + Math.max(item.required - item.logged, 0), 0);
-  const nextDeadlineDays = 18;
+  const pendingCount = [...(logs.caseLogs || []), ...(logs.procedureLogs || []), ...(logs.academicLogs || [])]
+    .filter((entry: any) => entry.status === "pending").length;
+  const progressLabel = completion >= 75 ? "On track" : completion >= 40 ? "Needs attention" : "Getting started";
 
   return (
     <div className="section-spacing pb-12">
       <Card className="overflow-hidden border-white/70 bg-white/72 layer-2 animate-float-up">
         <div className="h-1.5 bg-gradient-to-r from-teal-500 via-cyan-400 to-emerald-400" />
-        <CardContent className="p-7 md:p-10 lg:p-14">
-          <div className="flex flex-col gap-8 xl:flex-row xl:items-start xl:justify-between">
-            <div className="max-w-3xl space-y-6">
-              <div className="flex flex-wrap items-center gap-3">
-                <Badge className="border-0 bg-teal-50/80 text-[10px] font-bold uppercase tracking-[.18em] text-teal-800">MCI logbook guidelines</Badge>
-                <div className="flex items-center gap-2 rounded-full border border-white/70 bg-white/80 px-3 py-1 text-[11px] font-semibold text-teal-900 shadow-[0_10px_24px_rgba(15,23,42,0.05)]">
-                  <Sparkles className="h-3.5 w-3.5 text-teal-600" />
-                  <span>Personal dashboard</span>
-                </div>
-              </div>
-              <div>
-                <p className="page-eyebrow">{logs.profile?.department || "Department Unassigned"}</p>
-                <h1 className="mt-2 text-5xl font-semibold leading-[1.02] tracking-tight text-slate-950 md:text-6xl">Postgraduate Electronic Logbook</h1>
-                <p className="mt-5 max-w-2xl text-base leading-7 text-slate-600 md:text-lg">
-                  Maintain complete, dated clinical and academic records using patient UHID only. Submit entries regularly for professor verification.
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-3">
-                <Button asChild className="bg-gradient-to-r from-teal-600 via-teal-500 to-cyan-500 text-white shadow-[0_16px_36px_rgba(13,148,136,0.20)] hover:shadow-[0_20px_48px_rgba(13,148,136,0.25)]">
-                  <Link href="/cases"><FileText className="h-4 w-4" /> Log a case</Link>
-                </Button>
-                <Button asChild variant="outline" className="border-white/70 bg-white/80 text-teal-800 shadow-[0_12px_24px_rgba(15,23,42,0.04)]">
-                  <Link href="/procedures"><Stethoscope className="h-4 w-4" /> Log a procedure</Link>
-                </Button>
-                <Button asChild variant="outline" className="border-white/70 bg-white/80 text-teal-800 shadow-[0_12px_24px_rgba(15,23,42,0.04)]">
-                  <Link href="/postings"><CalendarDays className="h-4 w-4" /> Add posting / rotation</Link>
-                </Button>
+        <CardContent className="p-6 md:p-8">
+          <div className="grid items-stretch gap-7 xl:grid-cols-[.8fr_1.2fr]">
+            <div className="flex flex-col justify-center rounded-[24px] bg-gradient-to-br from-teal-950 via-teal-800 to-cyan-700 p-7 text-white md:p-9">
+              <p className="text-[10px] font-bold uppercase tracking-[.2em] text-teal-100">{logs.profile?.department || "Department Unassigned"}</p>
+              <h1 className="mt-3 text-3xl font-semibold leading-tight tracking-tight md:text-4xl">Welcome back, {user?.name?.split(" ")[0] || "Student"}</h1>
+              <p className="mt-4 max-w-lg text-sm leading-6 text-teal-50/85">Your clinical record, academic work, and verification status are summarised here.</p>
+              <div className="mt-8 flex items-center gap-3 text-xs text-teal-50/80">
+                <div className="h-px w-10 bg-teal-200/60" />
+                <span>Batch {logs.profile?.joiningYear || "—"}</span>
               </div>
             </div>
-            <Card className="min-w-0 max-w-2xl border-white/70 bg-white/74 layer-1">
-              <CardContent className="p-6 md:p-7">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <ProfileField label="Resident" value={user?.name || "Student"} />
+            <Card className="min-w-0 border-slate-200/80 bg-white layer-1">
+              <CardContent className="p-0">
+                <div className="flex items-center gap-4 border-b border-slate-100 p-5 md:p-6">
+                  <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-teal-500 to-cyan-500 text-lg font-bold text-white shadow-[0_14px_30px_rgba(13,148,136,.2)]">
+                    {(user?.name || "Student").split(" ").map((part: string) => part[0]).join("").slice(0, 2).toUpperCase()}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold uppercase tracking-[.16em] text-teal-700">Resident profile</p>
+                    <p className="mt-1 truncate text-xl font-semibold text-slate-950">{user?.name || "Student"}</p>
+                  </div>
+                </div>
+                <div className="grid gap-px bg-slate-100 sm:grid-cols-2">
                   <ProfileField label="Registration number" value={logs.profile?.registrationNumber || "—"} />
+                  <ProfileField label="Department" value={logs.profile?.department || "Unassigned"} />
                   <ProfileField label="Date of joining" value={formatLogbookDate(logs.profile?.dateOfJoining || "—")} />
                   <ProfileField label="Expected completion" value={formatLogbookDate(calculateExpectedCompletion(logs.profile?.dateOfJoining))} />
-                </div>
-                <div className="mt-4 grid gap-3 rounded-[18px] border border-teal-100/70 bg-teal-50/60 p-4 sm:grid-cols-2">
-                  <div>
-                    <p className="metric-label">Current year</p>
-                    <p className="mt-1 text-xl font-semibold text-slate-950">{logs.profile?.joiningYear || "—"}</p>
-                  </div>
-                  <div>
-                    <p className="metric-label">Department</p>
-                    <p className="mt-1 text-xl font-semibold text-slate-950">{logs.profile?.department || "Unassigned"}</p>
-                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -178,33 +160,35 @@ export function Dashboard() {
 
       <Card className="overflow-hidden border-white/70 bg-white/78 layer-2">
         <CardContent className="p-6 md:p-8">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex items-center gap-5">
-              <div className="relative flex h-24 w-24 items-center justify-center rounded-full border border-teal-100/80 bg-white shadow-[0_12px_32px_rgba(15,23,42,0.05)]">
-                <div className="flex h-18 w-18 items-center justify-center rounded-full border border-teal-100 bg-teal-50 text-center">
-                  <div>
-                    <div className="text-2xl font-semibold text-slate-950 transition-all duration-700">{completion}%</div>
-                    <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-teal-700">Overall progress</div>
-                  </div>
-                </div>
-              </div>
+          <div className="grid gap-8 lg:grid-cols-[1fr_.9fr] lg:items-center">
+            <div className="flex items-center gap-6">
+              <ProgressDonut value={completion} />
               <div>
                 <p className="page-eyebrow">Dashboard insights</p>
                 <h2 className="mt-1 text-2xl font-semibold text-slate-950">You need {overallRemaining} more entries to complete the core targets.</h2>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">On track for completion. Your next milestone is due in {nextDeadlineDays} days, and recent activity still needs verification.</p>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">{pendingCount > 0 ? `${pendingCount} ${pendingCount === 1 ? "entry is" : "entries are"} waiting for faculty verification.` : "All submitted entries have been reviewed."}</p>
+                <Badge variant="secondary" className="mt-4 rounded-full border-white/70 bg-teal-50 px-3 py-1 text-teal-800">{progressLabel}</Badge>
               </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Badge variant="secondary" className="rounded-full border-white/70 bg-white/80 px-3 py-1 text-teal-800">On track</Badge>
-              <Badge variant="outline" className="rounded-full border-white/70 bg-white/80 px-3 py-1 text-slate-700">Next due in {nextDeadlineDays} days</Badge>
-              <Badge variant="outline" className="rounded-full border-white/70 bg-white/80 px-3 py-1 text-slate-700">45% ahead of peers</Badge>
+            <div className="space-y-4 rounded-[22px] border border-slate-100 bg-slate-50/75 p-5">
+              {categories.map((item) => {
+                const percent = Math.min(Math.round(item.logged / item.required * 100), 100);
+                return (
+                  <div key={item.label}>
+                    <div className="mb-2 flex items-center justify-between text-xs">
+                      <span className="font-semibold text-slate-700">{item.label}</span>
+                      <span className="font-bold text-teal-700">{percent}%</span>
+                    </div>
+                    <Progress value={percent} className="h-2 bg-slate-200" />
+                  </div>
+                );
+              })}
             </div>
           </div>
-          <Progress value={completion} className="mt-6 h-3 bg-teal-100/70" />
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {categories.map((item) => {
           const Icon = item.icon;
           const percent = Math.min(Math.round(item.logged / item.required * 100), 100);
@@ -215,9 +199,9 @@ export function Dashboard() {
                 <CardContent className="p-5">
                   <div className="flex items-start justify-between gap-4">
                     <div className={`flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br ${item.tone} text-white shadow-[0_12px_28px_rgba(13,148,136,0.18)]`}><Icon className="h-5 w-5" /></div>
-                    <div className="text-right">
-                      <div className="text-4xl font-semibold leading-none text-slate-950 transition-all duration-700">{item.logged}</div>
-                      <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">Completed</div>
+                    <CircularProgress value={percent} />
+                    <div className="sr-only">
+                      <div className="text-4xl font-semibold leading-none text-slate-950">{item.logged}</div>
                     </div>
                   </div>
                   <p className="mt-4 text-sm font-semibold text-slate-900">{item.label}</p>
@@ -258,11 +242,11 @@ export function Dashboard() {
               </div>
             ) : (
               <Table>
-                <TableHeader><TableRow><TableHead>Number</TableHead><TableHead>Date</TableHead><TableHead>Type</TableHead><TableHead>Entry</TableHead><TableHead>Patient UHID</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+                <TableHeader><TableRow><TableHead>#</TableHead><TableHead>Date</TableHead><TableHead>Type</TableHead><TableHead>Entry</TableHead><TableHead>Patient UHID</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
                 <TableBody>
-                  {recent.map((item) => (
+                  {recent.map((item, index) => (
                     <TableRow key={`${item.type}-${item.number}`}>
-                      <TableCell className="font-bold">{item.number}</TableCell>
+                      <TableCell className="font-bold">{index + 1}</TableCell>
                       <TableCell>{formatLogbookDate(item.date)}</TableCell>
                       <TableCell><Badge variant="outline" className="border-teal-100 bg-teal-50 text-teal-800">{item.type}</Badge></TableCell>
                       <TableCell className="max-w-xs font-semibold">{item.title}</TableCell>
@@ -320,11 +304,31 @@ export function Dashboard() {
 }
 
 function ProfileField({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-[18px] border border-white/70 bg-white/80 px-4 py-3 shadow-[0_10px_24px_rgba(15,23,42,0.04)]"><p className="text-[9px] font-bold uppercase tracking-[.15em] text-teal-700">{label}</p><p className="mt-1 truncate text-sm font-semibold text-slate-950">{value}</p></div>;
+  return <div className="min-w-0 bg-white px-5 py-4 md:px-6"><p className="text-[9px] font-bold uppercase tracking-[.15em] text-teal-700">{label}</p><p className="mt-1 truncate text-sm font-semibold text-slate-950">{value}</p></div>;
 }
 
 function Status({ value }: { value: string }) {
   if (value === "verified") return <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700"><CheckCircle2 className="mr-1 h-3 w-3" /> Verified</Badge>;
   if (value === "rejected") return <Badge className="border-rose-200 bg-rose-50 text-rose-700">Revision</Badge>;
   return <Badge className="border-amber-200 bg-amber-50 text-amber-700">Pending</Badge>;
+}
+
+function CircularProgress({ value }: { value: number }) {
+  const safeValue = Math.max(0, Math.min(value, 100));
+  return (
+    <div className="relative grid h-14 w-14 place-items-center rounded-full" style={{ background: `conic-gradient(#0d9488 ${safeValue * 3.6}deg, #e2e8f0 0deg)` }}>
+      <div className="grid h-10 w-10 place-items-center rounded-full bg-white text-[11px] font-bold text-slate-900">{safeValue}%</div>
+    </div>
+  );
+}
+
+function ProgressDonut({ value }: { value: number }) {
+  const safeValue = Math.max(0, Math.min(value, 100));
+  return (
+    <div className="relative grid h-32 w-32 shrink-0 place-items-center rounded-full p-3 shadow-[0_18px_45px_rgba(13,148,136,.12)]" style={{ background: `conic-gradient(from -90deg, #0d9488 0deg, #06b6d4 ${safeValue * 3.6}deg, #e2e8f0 ${safeValue * 3.6}deg)` }} aria-label={`Overall progress ${safeValue}%`}>
+      <div className="grid h-full w-full place-items-center rounded-full bg-white text-center shadow-inner">
+        <div><p className="text-2xl font-semibold text-slate-950">{safeValue}%</p><p className="text-[8px] font-bold uppercase tracking-[.14em] text-slate-500">Complete</p></div>
+      </div>
+    </div>
+  );
 }

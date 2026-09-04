@@ -24,7 +24,7 @@ function shortfallStatus(pct: number): "on_track" | "at_risk" | "behind" {
 
 router.get("/:professorId/review-queue", async (req, res) => {
   try {
-    const professorId = parseInt(req.params.professorId, 10);
+    const professorId = parseInt(String(req.params.professorId), 10);
     if (isNaN(professorId)) {
       res.status(400).json({ message: "Invalid professorId" });
       return;
@@ -45,6 +45,11 @@ router.get("/:professorId/review-queue", async (req, res) => {
 
     if (profMatch.length === 0) {
       res.status(404).json({ message: "Professor not found" });
+      return;
+    }
+
+    if (caller.role === "hod" && caller.departmentId !== profMatch[0].departmentId) {
+      res.status(403).json({ message: "Faculty member is outside your department" });
       return;
     }
 
@@ -72,7 +77,6 @@ router.get("/:professorId/review-queue", async (req, res) => {
       department: departmentsTable,
     })
     .from(caseLogsTable)
-    .where(caseWhere)
     .innerJoin(studentsTable, eq(caseLogsTable.studentId, studentsTable.id))
     .innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
     .leftJoin(departmentsTable, eq(usersTable.departmentId, departmentsTable.id));
@@ -80,7 +84,7 @@ router.get("/:professorId/review-queue", async (req, res) => {
     // If HOD, filter to their department via the joined usersTable
     const cases = isHod && deptId != null
       ? await caseQuery.where(and(eq(caseLogsTable.status, "pending"), eq(usersTable.departmentId, deptId)))
-      : await caseQuery;
+      : await caseQuery.where(caseWhere);
 
     const procQuery = db.select({
       log: procedureLogsTable,
@@ -89,14 +93,13 @@ router.get("/:professorId/review-queue", async (req, res) => {
       department: departmentsTable,
     })
     .from(procedureLogsTable)
-    .where(procWhere)
     .innerJoin(studentsTable, eq(procedureLogsTable.studentId, studentsTable.id))
     .innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
     .leftJoin(departmentsTable, eq(usersTable.departmentId, departmentsTable.id));
 
     const procedures = isHod && deptId != null
       ? await procQuery.where(and(eq(procedureLogsTable.status, "pending"), eq(usersTable.departmentId, deptId)))
-      : await procQuery;
+      : await procQuery.where(procWhere);
 
     const acadQuery = db.select({
       log: academicLogsTable,
@@ -105,14 +108,13 @@ router.get("/:professorId/review-queue", async (req, res) => {
       department: departmentsTable,
     })
     .from(academicLogsTable)
-    .where(acadWhere)
     .innerJoin(studentsTable, eq(academicLogsTable.studentId, studentsTable.id))
     .innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
     .leftJoin(departmentsTable, eq(usersTable.departmentId, departmentsTable.id));
 
     const academics = isHod && deptId != null
       ? await acadQuery.where(and(eq(academicLogsTable.status, "pending"), eq(usersTable.departmentId, deptId)))
-      : await acadQuery;
+      : await acadQuery.where(acadWhere);
 
     const pendingReviews = [
       ...cases.map(c => ({
@@ -179,7 +181,7 @@ router.get("/:professorId/review-queue", async (req, res) => {
         .from(studentsTable)
         .innerJoin(usersTable,      eq(studentsTable.userId,      usersTable.id))
         .leftJoin(departmentsTable, eq(usersTable.departmentId,   departmentsTable.id))
-        .where(eq(usersTable.departmentId, deptId));
+        .where(and(eq(usersTable.departmentId, deptId), eq(usersTable.status, "approved")));
 
       const caseCountRows = await db
         .select({ studentId: caseLogsTable.studentId, cnt: count() })

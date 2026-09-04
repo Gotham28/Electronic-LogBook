@@ -5,9 +5,9 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { sendOtpEmail, sendPasswordResetEmail } from "../lib/mailer.js";
 import { requireAuth } from "../middlewares/auth.js";
+import { JWT_SECRET } from "../lib/env.js";
 
 const router: IRouter = Router();
-const JWT_SECRET = process.env.JWT_SECRET || "fallback-secret-for-dev-only";
 
 router.post("/send-otp", async (req, res) => {
   const { email } = req.body;
@@ -413,6 +413,7 @@ router.post("/login", async (req, res) => {
       role: userRow.role,
       departmentId: userRow.departmentId,
       studentProfileId,
+      token, // returned so clients that can't use cross-site cookies (Samsung, Safari) can send it as a Bearer token
     });
   } catch (error) {
     req.log.error(error, "Login error");

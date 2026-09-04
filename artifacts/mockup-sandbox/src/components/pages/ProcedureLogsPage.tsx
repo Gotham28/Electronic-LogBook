@@ -1,7 +1,7 @@
 import * as React from "react";
-import { AlertCircle, CheckCircle2, Clock, PlusCircle, Stethoscope, Loader2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, Clock, PlusCircle, Stethoscope, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { apiGet, apiPost } from "@/lib/apiClient";
+import { apiGet, apiPost, apiDelete } from "@/lib/apiClient";
 import { getCurrentUser } from "@/lib/session";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTi
 import { formatLogbookDate, PROCEDURE_GROUPS, PROCEDURE_REQUIREMENTS, REQUIRED_PROCEDURE_COUNT, todayForInput, type ProcedureGroup } from "@/lib/logbook-config";
 
 type ProcedureLog = {
+  id: number;
   number: number;
   date: string;
   group: ProcedureGroup;
@@ -24,6 +25,9 @@ type ProcedureLog = {
   experience: string;
   verifiedCompetency: string;
   status: "pending" | "verified" | "revision";
+  procedureGroup: string;
+  patientAge: string;
+  competencyLevel: string;
 };
 
 
@@ -78,6 +82,22 @@ export function ProcedureLogsPage() {
     }
   }, [user?.studentProfileId]);
 
+  async function handleDeleteProcedureLog(logId: number) {
+    if (!window.confirm("Delete this log? This cannot be undone.")) return;
+    
+    try {
+      const res = await apiDelete(`/api/students/${user!.studentProfileId}/procedure-logs/${logId}`);
+      if (res.error) {
+        toast.error("Failed to delete log: " + res.error);
+        return;
+      }
+      setLogs(prev => prev.filter(log => log.id !== logId));
+      toast.success("Log deleted successfully");
+    } catch (error) {
+      toast.error("An error occurred");
+    }
+  }
+
   React.useEffect(() => {
     fetchLogs();
     if (user?.departmentId) {
@@ -88,7 +108,7 @@ export function ProcedureLogsPage() {
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!form.supervisorId) {
-      toast.error("Please select a reviewing professor");
+      toast.error("Please select a reviewing faculty member");
       return;
     }
     
@@ -139,7 +159,7 @@ export function ProcedureLogsPage() {
         <div>
           <p className="page-eyebrow">Procedures seen and performed</p>
           <h2 className="page-title mt-1">Procedure log</h2>
-          <p className="mt-2 text-sm text-slate-500">Emergency and invasive procedure exposure, with competency verified only by the reviewing professor.</p>
+          <p className="mt-2 text-sm text-slate-500">Emergency and invasive procedure exposure, with competency verified only by the reviewing faculty member.</p>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild><Button><PlusCircle className="h-4 w-4" /> Log procedure</Button></DialogTrigger>
@@ -180,11 +200,11 @@ export function ProcedureLogsPage() {
                 </Select>
               </Field>
               <p className="rounded-xl border border-teal-100 bg-teal-50 p-3 text-[11px] leading-5 text-teal-800">
-                Verified competency is not self-selected. It is assigned by a professor during procedure review.
+                Verified competency is not self-selected. It is assigned by a faculty member during procedure review.
               </p>
-              <Field label="Reviewing professor">
+              <Field label="Reviewing faculty member">
                 <Select value={form.supervisorId} onValueChange={(value) => setForm({ ...form, supervisorId: value })}>
-                  <SelectTrigger><SelectValue placeholder="Select a professor" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Select a faculty member" /></SelectTrigger>
                   <SelectContent>
                     {professors.map(p => <SelectItem key={p.id} value={String(p.id)}>{p.fullName}</SelectItem>)}
                   </SelectContent>
@@ -194,7 +214,7 @@ export function ProcedureLogsPage() {
                 <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={isSubmitting}>Save draft</Button>
                 <Button type="submit" disabled={isSubmitting}>
                   {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Send to professor
+                  Send to faculty
                 </Button>
               </DialogFooter>
             </form>
@@ -278,7 +298,7 @@ export function ProcedureLogsPage() {
             </Empty>
           ) : (
             <Table>
-              <TableHeader><TableRow><TableHead>Number</TableHead><TableHead>Date</TableHead><TableHead>Group</TableHead><TableHead>Procedure</TableHead><TableHead>Patient UHID</TableHead><TableHead>Age</TableHead><TableHead>Experience</TableHead><TableHead>Verified competency</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Number</TableHead><TableHead>Date</TableHead><TableHead>Group</TableHead><TableHead>Procedure</TableHead><TableHead>Patient UHID</TableHead><TableHead>Age</TableHead><TableHead>Experience</TableHead><TableHead>Verified competency</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
               <TableBody>
                 {logs.map((log) => (
                   <TableRow key={log.id}>
@@ -291,6 +311,13 @@ export function ProcedureLogsPage() {
                     <TableCell className="text-xs">{log.competencyLevel}</TableCell>
                     <TableCell className="text-xs">{log.verifiedCompetency || (log.status === 'verified' ? log.competencyLevel : 'Pending verification')}</TableCell>
                     <TableCell>{statusBadge(log.status)}</TableCell>
+                    <TableCell className="text-right">
+                      {log.status === "pending" && (
+                        <Button variant="ghost" size="sm" className="text-rose-500 hover:text-rose-700 hover:bg-rose-50" onClick={() => handleDeleteProcedureLog(log.id)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

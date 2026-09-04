@@ -57,7 +57,7 @@ import { DEPARTMENTS, formatLogbookDate } from "@/lib/logbook-config";
 import { apiGet, apiPatch, apiPost } from "@/lib/apiClient";
 import { getCurrentUser } from "@/lib/session";
 
-export function ProfessorPortal({ activeTab }: { activeTab?: string }) {
+export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; embedded?: boolean }) {
   const [location, setLocation] = useLocation();
   const [data, setData] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
@@ -72,6 +72,8 @@ export function ProfessorPortal({ activeTab }: { activeTab?: string }) {
 
   // Selected mentee for Logbook Inspector Modal
   const [selectedMentee, setSelectedMentee] = React.useState<any | null>(null);
+  const [menteeLogs, setMenteeLogs] = React.useState<any>(null);
+  const [menteeLogsLoading, setMenteeLogsLoading] = React.useState(false);
 
   // Assessment form state
   const [assessExamName, setAssessExamName] = React.useState("");
@@ -134,6 +136,27 @@ export function ProfessorPortal({ activeTab }: { activeTab?: string }) {
     }
   }, [reviews.length, currentIndex]);
 
+  React.useEffect(() => {
+    if (!selectedMentee) {
+      setMenteeLogs(null);
+      return;
+    }
+    let mounted = true;
+    const fetchLogs = async () => {
+      setMenteeLogsLoading(true);
+      try {
+        const logs = await apiGet(`/api/students/${selectedMentee.id}/logs`);
+        if (mounted) setMenteeLogs(logs);
+      } catch (err) {
+        if (mounted) toast.error("Failed to load student logs");
+      } finally {
+        if (mounted) setMenteeLogsLoading(false);
+      }
+    };
+    fetchLogs();
+    return () => { mounted = false; };
+  }, [selectedMentee]);
+
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -160,13 +183,10 @@ export function ProfessorPortal({ activeTab }: { activeTab?: string }) {
     if (!currentItem || isSubmitting) return;
     
     setIsSubmitting(true);
-    const user = getCurrentUser();
-    
     try {
       await apiPatch(`/api/logs/${currentItem.logType}/${currentItem.dbId}/review`, {
         status,
-        comments: remarks || defaultRemarks,
-        reviewerId: user?.id
+        comments: remarks || defaultRemarks
       });
       
       // Optimistic update for evaluatedLogs mapping
@@ -192,40 +212,45 @@ export function ProfessorPortal({ activeTab }: { activeTab?: string }) {
 
   return (
     <div className="space-y-6 pb-12">
-      {/* Top Banner: Professor Profile */}
-      <div className="rounded-2xl bg-gradient-to-r from-teal-900 via-slate-900 to-teal-950 p-6 text-white shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <Badge className="bg-teal-500/20 text-teal-300 border-teal-500/30 text-xs font-semibold mb-2">
-            Faculty &amp; Evaluator Portal
-          </Badge>
-          <h2 className="text-2xl font-black">Welcome, {data?.faculty?.name || "Dr. Mohammed"}</h2>
-          <p className="text-xs text-slate-300">
-            {data?.faculty?.role} • All Departments • Full access: <strong>{allStudents.length} Students</strong>
-          </p>
-        </div>
+      {/* Top Banner: Professor Profile — hidden when embedded in HOD portal */}
+      {!embedded && (
+        <div className="rounded-2xl bg-gradient-to-r from-teal-900 via-slate-900 to-teal-950 p-6 text-white shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <Badge className="bg-teal-500/20 text-teal-300 border-teal-500/30 text-xs font-semibold mb-2">
+              Faculty &amp; Evaluator Portal
+            </Badge>
+            <h2 className="text-2xl font-black">Welcome, {data?.faculty?.name || "Dr. Mohammed"}</h2>
+            <p className="text-xs text-slate-300">
+              Department faculty • <strong>{allStudents.length} approved students</strong>
+            </p>
+          </div>
 
-        <div className="flex items-center gap-3">
-          <div className="bg-teal-500/10 border border-teal-500/30 px-4 py-2 rounded-xl text-right">
-            <p className="text-xl font-extrabold text-teal-300">{reviews.length - Object.keys(evaluatedLogs).length}</p>
-            <p className="text-[11px] text-slate-300 font-medium">Pending Review Items</p>
+          <div className="flex items-center gap-3">
+            <div className="bg-teal-500/10 border border-teal-500/30 px-4 py-2 rounded-xl text-right">
+              <p className="text-xl font-extrabold text-teal-300">{reviews.length - Object.keys(evaluatedLogs).length}</p>
+              <p className="text-[11px] text-slate-300 font-medium">Pending Review Items</p>
+            </div>
           </div>
         </div>
-      </div>
-      
+      )}
+
 
 
       <Tabs value={currentTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="bg-slate-200/70 p-1 rounded-xl">
-          <TabsTrigger value="review-queue" className="gap-2 text-xs font-semibold">
-            <FileCheck className="h-4 w-4" /> Sequential Review Queue ({reviews.length - Object.keys(evaluatedLogs).length})
-          </TabsTrigger>
-          <TabsTrigger value="mentees" className="gap-2 text-xs font-semibold">
-            <UserCheck className="h-4 w-4" /> All Students ({allStudents.length})
-          </TabsTrigger>
-          <TabsTrigger value="assessments" className="gap-2 text-xs font-semibold">
-            <Award className="h-4 w-4" /> Add Assessment
-          </TabsTrigger>
-        </TabsList>
+        {/* Inner tab bar — hidden when embedded in HOD portal (HOD sidebar handles navigation) */}
+        {!embedded && (
+          <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-white p-1 shadow-sm sm:w-auto">
+            <TabsTrigger value="review-queue" className="gap-2 text-xs font-semibold">
+              <FileCheck className="h-4 w-4" /> Sequential Review Queue ({reviews.length - Object.keys(evaluatedLogs).length})
+            </TabsTrigger>
+            <TabsTrigger value="mentees" className="gap-2 text-xs font-semibold">
+              <UserCheck className="h-4 w-4" /> All Students ({allStudents.length})
+            </TabsTrigger>
+            <TabsTrigger value="assessments" className="gap-2 text-xs font-semibold">
+              <Award className="h-4 w-4" /> Add Assessment
+            </TabsTrigger>
+          </TabsList>
+        )}
 
         {/* Tab 1: Sequential Fast Review Queue */}
         <TabsContent value="review-queue" className="pt-4 space-y-6">
@@ -395,8 +420,12 @@ export function ProfessorPortal({ activeTab }: { activeTab?: string }) {
           <Card className="border-cyan-100 bg-cyan-50/60">
             <CardContent className="flex flex-col justify-between gap-4 p-5 sm:flex-row sm:items-center">
               <div>
-                <p className="font-bold text-slate-900">Professor-wide student access</p>
-                <p className="mt-1 text-xs text-slate-600">You can inspect and review every student's complete work in your department.</p>
+                <p className="font-bold text-slate-900">Privacy-protected student access</p>
+                <p className="mt-1 text-xs text-slate-600">
+                  {data?.faculty?.role === "hod"
+                    ? "As HOD, you can inspect progress and complete logbooks for every approved student in your department."
+                    : "Progress is visible department-wide; detailed entries are limited to logs explicitly sent to you."}
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -596,87 +625,106 @@ export function ProfessorPortal({ activeTab }: { activeTab?: string }) {
                 </TabsList>
 
                 <TabsContent value="case-logs" className="pt-3">
-                  <Table>
-                    <TableHeader className="bg-slate-50">
-                      <TableRow>
-                        <TableHead className="text-xs font-semibold">Date</TableHead>
-                        <TableHead className="text-xs font-semibold">Diagnosis</TableHead>
-                        <TableHead className="text-xs font-semibold">Patient UHID &amp; Info</TableHead>
-                        <TableHead className="text-xs font-semibold text-right">Status</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      <TableRow>
-                        <TableCell className="text-xs font-medium">26/07/26</TableCell>
-                        <TableCell className="text-xs font-bold text-slate-900">Acute Severe Asthma Exacerbation</TableCell>
-                        <TableCell className="text-xs text-slate-600">
-                          <p className="font-semibold text-teal-800">UHID-2026-004281</p>
-                          <p>7 yr / Male</p>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Badge className="bg-amber-50 text-amber-700 border-amber-200 text-[10px]">Pending Review</Badge>
-                        </TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell className="text-xs font-medium">23/07/26</TableCell>
-                        <TableCell className="text-xs font-bold text-slate-900">Severe Dengue Hemorrhagic Fever</TableCell>
-                        <TableCell className="text-xs text-slate-600">
-                          <p className="font-semibold text-teal-800">UHID-2026-004097</p>
-                          <p>3 yr / Female</p>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px]">Faculty Verified</Badge>
-                        </TableCell>
-                      </TableRow>
-                    </TableBody>
-                  </Table>
+                  {menteeLogsLoading ? (
+                    <div className="flex h-32 items-center justify-center"><div className="animate-spin rounded-full border-4 border-slate-300 border-t-teal-600 h-8 w-8" /></div>
+                  ) : (
+                    <Table>
+                      <TableHeader className="bg-slate-50">
+                        <TableRow>
+                          <TableHead className="text-xs font-semibold">Date</TableHead>
+                          <TableHead className="text-xs font-semibold">Diagnosis</TableHead>
+                          <TableHead className="text-xs font-semibold">Patient UHID &amp; Info</TableHead>
+                          <TableHead className="text-xs font-semibold text-right">Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {menteeLogs?.caseLogs?.length ? (
+                          menteeLogs.caseLogs.map((log: any) => (
+                            <TableRow key={log.id}>
+                              <TableCell className="text-xs font-medium">{formatLogbookDate(log.date)}</TableCell>
+                              <TableCell className="text-xs font-bold text-slate-900">{log.diagnosisFinal}</TableCell>
+                              <TableCell className="text-xs text-slate-600">
+                                <p className="font-semibold text-teal-800">{log.patientUhid || "—"}</p>
+                                <p>{log.patientAge} / {log.patientGender}</p>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {renderLogStatusBadge(log.status)}
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        ) : (
+                          <TableRow><TableCell colSpan={4} className="text-center text-sm text-slate-500 py-6">No case logs found.</TableCell></TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  )}
                 </TabsContent>
 
                 <TabsContent value="proc-logs" className="pt-3">
-                  <Table>
-                    <TableHeader className="bg-slate-50">
-                      <TableRow>
-                        <TableHead className="text-xs font-semibold">Procedure Name</TableHead>
-                        <TableHead className="text-xs font-semibold">Patient UHID &amp; Age</TableHead>
-                        <TableHead className="text-xs font-semibold">Competency</TableHead>
-                        <TableHead className="text-xs font-semibold text-right">Status</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      <TableRow>
-                        <TableCell className="text-xs font-bold text-slate-900">Endotracheal Intubation</TableCell>
-                        <TableCell className="text-xs text-slate-600">
-                          <p className="font-semibold text-teal-800">UHID-2026-003944</p>
-                          <p>7 years</p>
-                        </TableCell>
-                        <TableCell className="text-xs text-teal-800 font-semibold">Performed Independently</TableCell>
-                        <TableCell className="text-right">
-                          <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px]">Verified</Badge>
-                        </TableCell>
-                      </TableRow>
-                    </TableBody>
-                  </Table>
+                  {menteeLogsLoading ? (
+                    <div className="flex h-32 items-center justify-center"><div className="animate-spin rounded-full border-4 border-slate-300 border-t-teal-600 h-8 w-8" /></div>
+                  ) : (
+                    <Table>
+                      <TableHeader className="bg-slate-50">
+                        <TableRow>
+                          <TableHead className="text-xs font-semibold">Procedure Name</TableHead>
+                          <TableHead className="text-xs font-semibold">Patient UHID &amp; Age</TableHead>
+                          <TableHead className="text-xs font-semibold">Competency</TableHead>
+                          <TableHead className="text-xs font-semibold text-right">Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {menteeLogs?.procedureLogs?.length ? (
+                          menteeLogs.procedureLogs.map((log: any) => (
+                            <TableRow key={log.id}>
+                              <TableCell className="text-xs font-bold text-slate-900">{log.procedureName}</TableCell>
+                              <TableCell className="text-xs text-slate-600">
+                                <p className="font-semibold text-teal-800">{log.patientUhid || "—"}</p>
+                                <p>{log.patientAge}</p>
+                              </TableCell>
+                              <TableCell className="text-xs text-teal-800 font-semibold">{log.competencyDeclared}</TableCell>
+                              <TableCell className="text-right">
+                                {renderLogStatusBadge(log.status)}
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        ) : (
+                          <TableRow><TableCell colSpan={4} className="text-center text-sm text-slate-500 py-6">No procedure logs found.</TableCell></TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  )}
                 </TabsContent>
 
                 <TabsContent value="acad-logs" className="pt-3">
-                  <Table>
-                    <TableHeader className="bg-slate-50">
-                      <TableRow>
-                        <TableHead className="text-xs font-semibold">Type</TableHead>
-                        <TableHead className="text-xs font-semibold">Topic</TableHead>
-                        <TableHead className="text-xs font-semibold text-right">Status</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      <TableRow>
-                        <TableCell className="text-xs font-semibold">Journal Club</TableCell>
-                        <TableCell className="text-xs text-slate-900">High-Flow Nasal Cannula in Bronchiolitis</TableCell>
-                        <TableCell className="text-right">
-                          <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px]">Verified</Badge>
-                        </TableCell>
-                      </TableRow>
-                    </TableBody>
-                  </Table>
+                  {menteeLogsLoading ? (
+                    <div className="flex h-32 items-center justify-center"><div className="animate-spin rounded-full border-4 border-slate-300 border-t-teal-600 h-8 w-8" /></div>
+                  ) : (
+                    <Table>
+                      <TableHeader className="bg-slate-50">
+                        <TableRow>
+                          <TableHead className="text-xs font-semibold">Type</TableHead>
+                          <TableHead className="text-xs font-semibold">Topic</TableHead>
+                          <TableHead className="text-xs font-semibold text-right">Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {menteeLogs?.academicLogs?.length ? (
+                          menteeLogs.academicLogs.map((log: any) => (
+                            <TableRow key={log.id}>
+                              <TableCell className="text-xs font-semibold">{log.activityType}</TableCell>
+                              <TableCell className="text-xs text-slate-900">{log.topic}</TableCell>
+                              <TableCell className="text-right">
+                                {renderLogStatusBadge(log.status)}
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        ) : (
+                          <TableRow><TableCell colSpan={3} className="text-center text-sm text-slate-500 py-6">No academic logs found.</TableCell></TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  )}
                 </TabsContent>
               </Tabs>
             </div>
@@ -695,6 +743,17 @@ function renderShortfallBadge(status: string) {
       return <Badge className="bg-rose-50 text-rose-700 border-rose-200 text-[10px]">Behind</Badge>;
     default:
       return <Badge className="bg-amber-50 text-amber-700 border-amber-200 text-[10px]">At Risk</Badge>;
+  }
+}
+
+function renderLogStatusBadge(status: string) {
+  switch (status) {
+    case "verified":
+      return <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px]">Verified</Badge>;
+    case "rejected":
+      return <Badge className="bg-rose-50 text-rose-700 border-rose-200 text-[10px]">Rejected</Badge>;
+    default:
+      return <Badge className="bg-amber-50 text-amber-700 border-amber-200 text-[10px]">Pending</Badge>;
   }
 }
 

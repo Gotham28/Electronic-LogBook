@@ -27,6 +27,7 @@ export const caseLogsTable = pgTable("case_logs", {
   facultyGrade: text("faculty_grade"),
   reviewedBy: integer("reviewed_by").references(() => usersTable.id),
   reviewedAt: timestamp("reviewed_at"),
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -51,6 +52,7 @@ export const procedureLogsTable = pgTable("procedure_logs", {
   facultyRemarks: text("faculty_remarks"),
   reviewedBy: integer("reviewed_by").references(() => usersTable.id),
   reviewedAt: timestamp("reviewed_at"),
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
