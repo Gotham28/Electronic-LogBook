@@ -144,7 +144,7 @@ export function PostingsPage() {
               <div className="space-y-2">
                 <Label>Supervisor (Unit Chief)</Label>
                 <Select value={supervisorId} onValueChange={setSupervisorId}>
-                  <SelectTrigger><SelectValue placeholder="Select professor" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Select faculty member" /></SelectTrigger>
                   <SelectContent>
                     {professors.map(p => <SelectItem key={p.id} value={String(p.id)}>{p.fullName}</SelectItem>)}
                   </SelectContent>

@@ -125,7 +125,7 @@ function App() {
   
   const activeRole: RoleType = (() => {
     if (currentUser?.role === "hod") return "HOD";
-    if (currentUser?.role === "professor") return "Professor";
+    if (currentUser?.role === "professor") return "Faculty";
     return "Student";
   })();
   
@@ -183,7 +183,7 @@ function App() {
         setIsAuthenticated(false);
       }}
     >
-      {activeRole === "Professor" && (
+      {activeRole === "Faculty" && (
         <ProfessorPortal />
       )}
       {activeRole === "HOD" && (
