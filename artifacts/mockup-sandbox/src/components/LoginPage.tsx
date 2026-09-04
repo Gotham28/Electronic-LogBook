@@ -153,7 +153,7 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
                     Student
                   </TabsTrigger>
                   <TabsTrigger value="professor" className="rounded-xl text-xs data-[state=active]:bg-white data-[state=active]:text-teal-800 data-[state=active]:shadow-sm">
-                    Professor
+                    Faculty
                   </TabsTrigger>
                   <TabsTrigger value="hod" className="rounded-xl text-xs data-[state=active]:bg-white data-[state=active]:text-teal-800 data-[state=active]:shadow-sm">
                     HOD
@@ -163,7 +163,7 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
             )}
 
             <p className="page-eyebrow">
-               {role === "student" ? "Secure student access" : role === "professor" ? "Professor portal" : "HOD Administration"}
+               {role === "student" ? "Secure student access" : role === "professor" ? "Faculty portal" : "HOD Administration"}
             </p>
             <h2 className="mt-2 text-4xl font-bold text-slate-900">Welcome back</h2>
             <p className="mt-2 text-sm text-slate-500">

@@ -91,7 +91,7 @@ export function AcademicLogsPage() {
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!form.supervisorId) {
-      toast.error("Please select a reviewing professor");
+      toast.error("Please select a reviewing faculty member");
       return;
     }
     
@@ -148,7 +148,7 @@ export function AcademicLogsPage() {
           <DialogContent className="rounded-2xl bg-white sm:max-w-lg">
             <DialogHeader>
               <DialogTitle>New academic activity</DialogTitle>
-              <DialogDescription>Add attendance or presentation details for professor verification.</DialogDescription>
+              <DialogDescription>Add attendance or presentation details for faculty verification.</DialogDescription>
             </DialogHeader>
             <form onSubmit={submit} className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
@@ -185,9 +185,9 @@ export function AcademicLogsPage() {
               <Field label={form.type === "Conference Attended" ? "Conference name" : "Topic / title"}>
                 <Input value={form.topic} onChange={(e) => setForm({ ...form, topic: e.target.value })} required />
               </Field>
-              <Field label="Reviewing professor">
+              <Field label="Reviewing faculty member">
                 <Select value={form.supervisorId} onValueChange={(value) => setForm({ ...form, supervisorId: value })}>
-                  <SelectTrigger><SelectValue placeholder="Select a professor" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Select a faculty member" /></SelectTrigger>
                   <SelectContent>
                     {professors.map(p => <SelectItem key={p.id} value={String(p.id)}>{p.fullName}</SelectItem>)}
                   </SelectContent>
@@ -197,7 +197,7 @@ export function AcademicLogsPage() {
                 <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={isSubmitting}>Save draft</Button>
                 <Button type="submit" disabled={isSubmitting}>
                   {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Send to professor
+                  Send to faculty
                 </Button>
               </DialogFooter>
             </form>
@@ -251,7 +251,7 @@ export function AcademicLogsPage() {
             </Empty>
           ) : (
             <Table>
-              <TableHeader><TableRow><TableHead>Number</TableHead><TableHead>Date</TableHead><TableHead>Activity</TableHead><TableHead>Presentation</TableHead><TableHead>Topic / conference</TableHead><TableHead>Reviewing professor</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Number</TableHead><TableHead>Date</TableHead><TableHead>Activity</TableHead><TableHead>Presentation</TableHead><TableHead>Topic / conference</TableHead><TableHead>Reviewing faculty member</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
               <TableBody>
                 {logs.map((log) => (
                   <TableRow key={log.id}>
