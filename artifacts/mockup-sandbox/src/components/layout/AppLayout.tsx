@@ -55,7 +55,7 @@ import {
   UserPlus,
 } from "lucide-react";
 
-export type RoleType = "Student" | "Professor" | "HOD";
+export type RoleType = "Student" | "Faculty" | "HOD";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -93,7 +93,7 @@ const navigationDescriptions: Record<string, string> = {
 };
 
 function navigationForRole(role: RoleType, dashboardData?: any, loadingBadges?: boolean): NavigationItem[] {
-  if (role === "Professor") {
+  if (role === "Faculty") {
     return [
       { title: "Evaluation Queue", icon: FileText, href: "/" },
       { title: "Student Progress", icon: UserCheck, href: "/mentees" },
@@ -383,7 +383,7 @@ export function AppLayout({
                     </DropdownMenuItem>
                     <DropdownMenuItem className="rounded-xl px-3 py-2">
                       <div className="flex flex-col gap-1">
-                        <span className="text-xs font-semibold text-slate-900">Professor remarks pending</span>
+                        <span className="text-xs font-semibold text-slate-900">Faculty remarks pending</span>
                         <span className="text-[11px] text-slate-500">Recent entries are waiting for verification.</span>
                       </div>
                     </DropdownMenuItem>
@@ -442,13 +442,13 @@ export function AppLayout({
 }
 
 function getNameForRole(role: RoleType) {
-  if (role === "Professor") return "Dr. Radhamani K V";
+  if (role === "Faculty") return "Dr. Radhamani K V";
   if (role === "HOD") return "Dr. Mohammed M T P";
   return "Aravind P";
 }
 
 function getInitialsForRole(role: RoleType) {
-  if (role === "Professor") return "RK";
+  if (role === "Faculty") return "RK";
   if (role === "HOD") return "MM";
   return "AP";
 }

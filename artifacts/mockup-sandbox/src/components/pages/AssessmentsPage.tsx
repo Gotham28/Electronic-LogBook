@@ -64,7 +64,7 @@ export function AssessmentsPage() {
               <EmptyHeader>
                 <EmptyMedia variant="icon"><ClipboardCheck className="h-6 w-6" /></EmptyMedia>
                 <EmptyTitle>No assessments recorded</EmptyTitle>
-                <EmptyDescription>Assessment scores will appear here once your professor enters them.</EmptyDescription>
+                <EmptyDescription>Assessment scores will appear here once your faculty member enters them.</EmptyDescription>
               </EmptyHeader>
             </Empty>
           ) : (
