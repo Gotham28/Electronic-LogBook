@@ -26,8 +26,31 @@ app.use(
     },
   }),
 );
-const frontendUrl = process.env.FRONTEND_URL || "https://electronic-log-book-mockup-sandbox-six.vercel.app";
-app.use(cors({ origin: frontendUrl, credentials: true }));
+const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? "")
+  .split(",")
+  .map((entry) => entry.trim().replace(/\/+$/, "").toLowerCase())
+  .filter((entry) => entry.length > 0);
+
+if (allowedOrigins.length === 0) {
+  throw new Error(
+    "Missing required environment variable: ALLOWED_ORIGINS (comma-separated list of allowed browser origins)",
+  );
+}
+
+app.use(
+  cors({
+    origin(requestOrigin, callback) {
+      // Requests without an Origin header are not browser cross-origin requests
+      // (curl, health checks, server-to-server), so the allowlist does not apply.
+      if (!requestOrigin) {
+        callback(null, true);
+        return;
+      }
+      callback(null, allowedOrigins.includes(requestOrigin));
+    },
+    credentials: true,
+  }),
+);
 app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
