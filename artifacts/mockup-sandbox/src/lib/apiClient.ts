@@ -1,3 +1,5 @@
+import { getToken } from './session';
+
 export class ApiError extends Error {
   public status: number;
   public data: any;
@@ -17,14 +19,13 @@ if (!import.meta.env.VITE_API_URL && import.meta.env.PROD) {
 }
 
 /**
- * Helper to retrieve the current user session (we are not using JWTs/Bearer tokens yet).
- * Note: This is a temporary mechanism until real auth is implemented.
+ * Retrieves the JWT stored in sessionStorage after login.
+ * Sent as an Authorization: Bearer header on every request so auth works
+ * in all browsers (including Samsung Browser and Safari) regardless of
+ * whether cross-site cookies are blocked.
  */
 function getAuthToken(): string | null {
-  // We're not using a Bearer token yet. For now, the backend might rely on cookies
-  // or we might send the user ID in a header if needed. Since we don't have JWT infra,
-  // we will not fake a Bearer token.
-  return null;
+  return getToken();
 }
 
 async function fetchWithAuth(
@@ -34,15 +35,12 @@ async function fetchWithAuth(
   const url = `${API_BASE_URL}${endpoint}`;
   
   const headers = new Headers(options.headers || {});
-  
-  // Note: We are explicitly not faking a Bearer token here since we have no JWT infra yet.
-  // The token logic is removed/commented out until real auth is implemented.
-  /*
+
+  // Send JWT as Bearer token — works in all browsers regardless of cookie policy
   const token = getAuthToken();
   if (token) {
     headers.set("Authorization", `Bearer ${token}`);
   }
-  */
 
   // Automatically set Content-Type to JSON for requests with body, if not already set
   if (options.body && !headers.has("Content-Type")) {
@@ -50,7 +48,7 @@ async function fetchWithAuth(
   }
 
   const response = await fetch(url, {
-    credentials: "include",
+    credentials: "include", // kept for backward compat in browsers that do support cookies
     ...options,
     headers,
   });

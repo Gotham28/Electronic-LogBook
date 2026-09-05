@@ -108,7 +108,7 @@ export function ProcedureLogsPage() {
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!form.supervisorId) {
-      toast.error("Please select a reviewing professor");
+      toast.error("Please select a reviewing faculty member");
       return;
     }
     
@@ -159,7 +159,7 @@ export function ProcedureLogsPage() {
         <div>
           <p className="page-eyebrow">Procedures seen and performed</p>
           <h2 className="page-title mt-1">Procedure log</h2>
-          <p className="mt-2 text-sm text-slate-500">Emergency and invasive procedure exposure, with competency verified only by the reviewing professor.</p>
+          <p className="mt-2 text-sm text-slate-500">Emergency and invasive procedure exposure, with competency verified only by the reviewing faculty member.</p>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild><Button><PlusCircle className="h-4 w-4" /> Log procedure</Button></DialogTrigger>
@@ -200,11 +200,11 @@ export function ProcedureLogsPage() {
                 </Select>
               </Field>
               <p className="rounded-xl border border-teal-100 bg-teal-50 p-3 text-[11px] leading-5 text-teal-800">
-                Verified competency is not self-selected. It is assigned by a professor during procedure review.
+                Verified competency is not self-selected. It is assigned by a faculty member during procedure review.
               </p>
-              <Field label="Reviewing professor">
+              <Field label="Reviewing faculty member">
                 <Select value={form.supervisorId} onValueChange={(value) => setForm({ ...form, supervisorId: value })}>
-                  <SelectTrigger><SelectValue placeholder="Select a professor" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Select a faculty member" /></SelectTrigger>
                   <SelectContent>
                     {professors.map(p => <SelectItem key={p.id} value={String(p.id)}>{p.fullName}</SelectItem>)}
                   </SelectContent>
@@ -214,7 +214,7 @@ export function ProcedureLogsPage() {
                 <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={isSubmitting}>Save draft</Button>
                 <Button type="submit" disabled={isSubmitting}>
                   {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Send to professor
+                  Send to faculty
                 </Button>
               </DialogFooter>
             </form>

@@ -1,5 +1,5 @@
 import * as React from "react";
-import { BookOpenCheck, CheckCircle2, KeyRound, ShieldCheck, UserPlus, Loader2, Building, Stethoscope, UserCheck, AtSign } from "lucide-react";
+import { BookOpenCheck, CheckCircle2, KeyRound, ShieldCheck, UserPlus, Loader2, AtSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,6 +7,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { toast } from "sonner";
 import { apiPost } from "@/lib/apiClient";
+import { LoginProductPreview } from "@/components/LoginProductPreview";
+import { saveToken } from "@/lib/session";
 
 export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRegister: () => void }) {
   const [role, setRole] = React.useState<"student" | "professor" | "hod">("student");
@@ -55,6 +57,12 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
       if (user.role !== role) {
          // Optionally warn or just let it proceed since the AppLayout routes based on actual role
          console.warn(`Logged in as ${user.role} but ${role} tab was selected.`);
+      }
+
+      // Persist the JWT as a Bearer token — this ensures auth works in all browsers
+      // (Samsung Browser, Safari, Firefox strict mode) regardless of cross-site cookie policies
+      if (user.token) {
+        saveToken(user.token);
       }
 
       window.sessionStorage.setItem('elogbook-user', JSON.stringify(user));
@@ -113,43 +121,6 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
     }
   };
 
-  const getLeftPanelContent = () => {
-    if (role === "student") {
-      return (
-        <div className="mt-12 grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
-          {[
-            ["1", "Student completes self-registration"],
-            ["2", "Registration payment is completed"],
-            ["3", "Account activates for sign in"],
-          ].map(([number, text]) => (
-            <div key={number} className="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur">
-              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white text-xs font-bold text-teal-700">{number}</span>
-              <p className="mt-3 text-xs font-semibold leading-5 text-white">{text}</p>
-            </div>
-          ))}
-        </div>
-      );
-    }
-    if (role === "professor") {
-      return (
-        <div className="mt-12 space-y-4">
-           <div className="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur">
-              <p className="flex items-center gap-2 text-sm font-bold text-white"><CheckCircle2 className="h-5 w-5" /> Evaluate efficiently</p>
-              <p className="mt-2 text-xs leading-5 text-teal-50">Review and verify student logbook entries directly from your personalized dashboard.</p>
-           </div>
-        </div>
-      );
-    }
-    return (
-        <div className="mt-12 space-y-4">
-           <div className="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur">
-              <p className="flex items-center gap-2 text-sm font-bold text-white"><ShieldCheck className="h-5 w-5" /> Administer Department</p>
-              <p className="mt-2 text-xs leading-5 text-teal-50">Manage leave approvals, add professor accounts, and monitor department-wide compliance.</p>
-           </div>
-        </div>
-    );
-  };
-
   return (
     <div className="medical-grid flex min-h-screen items-center justify-center p-4 md:p-8">
       <div className="glass-panel grid w-full max-w-6xl overflow-hidden rounded-[30px] lg:grid-cols-[1.08fr_.92fr]">
@@ -161,14 +132,13 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/16 shadow-lg ring-1 ring-white/25">
                 <BookOpenCheck className="h-7 w-7" />
               </div>
-              <p className="mt-12 text-xs font-bold uppercase tracking-[0.2em] text-teal-50">Department of Pediatrics</p>
-              <h1 className="mt-3 max-w-xl text-4xl font-bold leading-[1.05] md:text-5xl">
+              <h1 className="mt-10 max-w-xl text-4xl font-bold leading-[1.05] md:text-5xl">
                 Clinical training, clearly organised.
               </h1>
               <p className="mt-5 max-w-xl text-sm leading-6 text-teal-50/85">
                 Keep cases, procedures, academic work, assessments and milestones together.
               </p>
-              {getLeftPanelContent()}
+              <LoginProductPreview />
             </div>
           </div>
         </section>
@@ -183,7 +153,7 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
                     Student
                   </TabsTrigger>
                   <TabsTrigger value="professor" className="rounded-xl text-xs data-[state=active]:bg-white data-[state=active]:text-teal-800 data-[state=active]:shadow-sm">
-                    Professor
+                    Faculty
                   </TabsTrigger>
                   <TabsTrigger value="hod" className="rounded-xl text-xs data-[state=active]:bg-white data-[state=active]:text-teal-800 data-[state=active]:shadow-sm">
                     HOD
@@ -193,7 +163,7 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
             )}
 
             <p className="page-eyebrow">
-               {role === "student" ? "Secure student access" : role === "professor" ? "Professor portal" : "HOD Administration"}
+               {role === "student" ? "Secure student access" : role === "professor" ? "Faculty portal" : "HOD Administration"}
             </p>
             <h2 className="mt-2 text-4xl font-bold text-slate-900">Welcome back</h2>
             <p className="mt-2 text-sm text-slate-500">

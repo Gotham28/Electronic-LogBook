@@ -25,7 +25,7 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
   }
 
   if (!token) {
-    res.status(401).json({ message: "Authentication required" });
+    res.status(401).json({ message: "No token found in cookies or authorization header" });
     return;
   }
 
@@ -33,8 +33,12 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
     const decoded = jwt.verify(token, JWT_SECRET) as AuthUser;
     req.user = decoded;
     next();
-  } catch (error) {
-    res.status(401).json({ message: "Invalid or expired token" });
+  } catch (error: any) {
+    if (error.name === "TokenExpiredError") {
+      res.status(401).json({ message: "Token expired" });
+    } else {
+      res.status(401).json({ message: "Invalid or malformed token", error: error.message });
+    }
   }
 }
 

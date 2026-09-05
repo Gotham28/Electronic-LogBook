@@ -102,7 +102,7 @@ export function CaseLogsPage() {
   const handleAddCase = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!form.supervisorId) {
-      toast.error("Please select a reviewing professor");
+      toast.error("Please select a reviewing faculty member");
       return;
     }
     
@@ -182,7 +182,7 @@ export function CaseLogsPage() {
           <DialogContent className="max-h-[90vh] overflow-y-auto rounded-2xl bg-white sm:max-w-3xl">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-xl"><FileText className="h-5 w-5 text-teal-600" /> New clinical case</DialogTitle>
-              <DialogDescription>Complete the clinical record before sending it to a professor.</DialogDescription>
+              <DialogDescription>Complete the clinical record before sending it to a faculty member.</DialogDescription>
             </DialogHeader>
             <form onSubmit={handleAddCase} className="space-y-5">
               <div className="grid gap-4 sm:grid-cols-4">
@@ -207,9 +207,9 @@ export function CaseLogsPage() {
               <Field label="Management and interventions"><Textarea rows={3} value={form.management} onChange={(e) => setField("management", e.target.value)} /></Field>
               <Field label="Outcome / follow-up"><Textarea rows={2} value={form.outcome} onChange={(e) => setField("outcome", e.target.value)} /></Field>
               <Field label="Learning points"><Textarea rows={2} value={form.learningPoints} onChange={(e) => setField("learningPoints", e.target.value)} /></Field>
-              <Field label="Reviewing professor">
+              <Field label="Reviewing faculty member">
                 <Select value={form.supervisorId} onValueChange={(value) => setField("supervisorId", value)}>
-                  <SelectTrigger><SelectValue placeholder="Select a professor" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Select a faculty member" /></SelectTrigger>
                   <SelectContent>
                     {professors.map(p => <SelectItem key={p.id} value={String(p.id)}>{p.fullName}</SelectItem>)}
                   </SelectContent>
@@ -219,7 +219,7 @@ export function CaseLogsPage() {
                 <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)} disabled={isSubmitting}>Save draft</Button>
                 <Button type="submit" disabled={isSubmitting}>
                   {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Send to professor
+                  Send to faculty
                 </Button>
               </DialogFooter>
             </form>
@@ -319,7 +319,7 @@ export function CaseLogsPage() {
                 <Detail label="Learning points" value={selectedLog.learningPoints} />
                 {(selectedLog.comments || selectedLog.remarks) && (
                   <div className="rounded-2xl border border-teal-100 bg-teal-50/70 p-4">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-teal-700">Professor remarks</p>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-teal-700">Faculty remarks</p>
                     <p className="mt-1 text-sm text-teal-950">{selectedLog.comments || selectedLog.remarks}</p>
                   </div>
                 )}
