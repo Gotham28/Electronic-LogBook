@@ -132,7 +132,7 @@ router.post("/login", validate(z.object({ username: z.string().trim().min(1).max
     user = student?.user;
   }
   if (!user?.passwordHash || !(await bcrypt.compare(password, user.passwordHash))) { res.status(401).json({ message: "Invalid credentials" }); return; }
-  if (user.status === "pending") {
+  if (user.role === "student" && user.status === "pending") {
     const [paid] = await db.select({ id: paymentsTable.id }).from(paymentsTable)
       .where(and(eq(paymentsTable.userId, user.id), eq(paymentsTable.status, "paid"))).limit(1);
     if (!paid) {
