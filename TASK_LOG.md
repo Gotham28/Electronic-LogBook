@@ -38,9 +38,10 @@
 - Local `FRONTEND_URL` resolves to a production Vercel origin. Not investigated.
 - `pnpm run build` is esbuild only and does not type-check. `pnpm run typecheck` is a
   separate script that nothing runs automatically.
-- `artifacts/api-server/verify-jwt.mjs` is untracked. Decide whether it is committed.
-- `CURRENT_TASK.md` and `TASK_LOG.md` are not tracked on this branch — it was cut from
-  `origin/main`, which predates the commit that added them.
+- `artifacts/api-server/verify-jwt.mjs` no longer appears in `git status`; the "decide
+  whether it is committed" question is moot.
+- `CURRENT_TASK.md` and `TASK_LOG.md` are tracked, as of commit `a291788` "chore: track
+  task file and task log in git" (2026-08-19), on both `main` and this branch.
 
 **Commit** — `76daae7` "fix(auth): require JWT_SECRET with no fallback default", on `main`.
 **PR** — not recorded.
@@ -81,9 +82,9 @@
 - `.env.example`, `AGENTS.md`
 
 **Evidence**
-- AGENTS.md §12 evidence standard (§11 before this task renumbered the sections) has NOT
-  been produced. The migration has not been applied to any database and no endpoint has
-  been executed. No request has been made against any of this code.
+- AGENTS.md §11 evidence standard has NOT been produced. The migration has not been
+  applied to any database and no endpoint has been executed. No request has been made
+  against any of this code.
 - `0003_subscriptions_payments.sql` has never run anywhere, not even against PGlite.
 - TypeScript type checking was run and reports 20 errors, all pre-existing and unrelated to
   this work: 9 x TS2307 `Cannot find module 'zod'` and 11 x TS7006 implicit-any downstream
@@ -112,7 +113,7 @@
 - Refund policy undecided; `refundStatus`, `refundedAt` and `refundNote` exist unused.
 - `payment_capture: 1` unconfirmed against current Razorpay Orders API docs.
 - `.pnpm-store` is tracked in git and is what broke workspace linking.
-- The seven credential-bearing scripts in `lib/db/`, recorded in AGENTS.md §11.
+- The seven credential-bearing scripts in `lib/db/`, recorded in AGENTS.md §13.
 
 **Commits** — on `feat/razorpay-subscription`
 - `ef94fd4` docs: commit reconstructed AGENTS.md
