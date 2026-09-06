@@ -2,40 +2,32 @@ import { Router, type IRouter } from "express";
 import { 
   db, studentsTable, caseLogsTable, procedureLogsTable, 
   academicLogsTable, usersTable, departmentsTable, departmentConfigsTable,
-  postingsTable, leaveRecordsTable, appraisalsTable, researchTable, assessmentsTable
+  postingsTable, leaveRecordsTable, appraisalsTable, researchTable, assessmentsTable, procedureTypesTable, departmentCatalogTable, certificationsTable
 } from "@workspace/db";
 import { eq, and, desc, count, sql, isNull } from "drizzle-orm";
-import { requireAuth, requireRole } from "../middlewares/auth.js";
+import { requireAuth, requireRole, requireDepartment } from "../middlewares/auth.js";
+import { studentAccess } from "../middlewares/student-access.js";
+import { z } from "zod";
+import { dateSchema, idSchema, nameSchema, validate } from "../lib/validation.js";
 
 const router: IRouter = Router();
+router.use(requireAuth, requireRole(["student", "professor", "hod"]), requireDepartment);
 
-// Static Requirements Data
-const procedureRequirements = [
-  { name: "Endotracheal Intubation", required: 15, group: "emergency" },
-  { name: "Lumbar Puncture", required: 20, group: "invasive" },
-  { name: "ICD Insertion", required: 5, group: "emergency" },
-  { name: "Bone Marrow Aspiration", required: 3, group: "invasive" },
-  { name: "Central Venous Line Insertion", required: 3, group: "invasive" },
-  { name: "Peritoneal Dialysis", required: 2, group: "invasive" },
-  { name: "Umbilical Venous Catheterisation", required: 20, group: "invasive" },
-  { name: "Arterial Blood Gas", required: 3, group: "emergency" },
-  { name: "Mechanical Ventilation Setup", required: 20, group: "emergency" },
-  { name: "CPAP / HFNC", required: 10, group: "emergency" },
-];
-
-const academicRequirements = [
-  { name: "Case Discussion", required: 50, period: "total" },
-  { name: "Journal Club", required: 2, period: "month" },
-  { name: "Seminar", required: 2, period: "month" },
-  { name: "Interesting Case Presentation", required: 1, period: "month" },
-];
-
-router.get("/requirements", (_req, res) => res.json({ procedureRequirements, academicRequirements }));
+router.get("/requirements", async (req, res) => {
+  const departmentId = req.user!.departmentId!;
+  const [procedureRequirements, academicRequirements] = await Promise.all([
+    db.select().from(procedureTypesTable).where(eq(procedureTypesTable.departmentId, departmentId)),
+    db.select().from(departmentCatalogTable).where(and(eq(departmentCatalogTable.departmentId, departmentId), eq(departmentCatalogTable.kind, "academic"))),
+  ]);
+  res.json({ procedureRequirements, academicRequirements });
+});
+router.use("/:studentId", studentAccess);
 
 // Helper for validating supervisor
-async function validateSupervisor(supervisorId: number) {
-  if (isNaN(supervisorId)) return false;
-  const supervisorMatch = await db.select().from(usersTable).where(eq(usersTable.id, supervisorId)).limit(1);
+async function validateSupervisor(supervisorId: number, departmentId: number) {
+  if (!Number.isSafeInteger(supervisorId) || supervisorId <= 0) return false;
+  const supervisorMatch = await db.select().from(usersTable).where(and(eq(usersTable.id, supervisorId),
+    eq(usersTable.departmentId, departmentId), eq(usersTable.status, "approved"))).limit(1);
   return supervisorMatch.length > 0 && ["professor", "hod"].includes(supervisorMatch[0].role);
 }
 
@@ -97,13 +89,10 @@ router.get("/:studentId/dashboard", requireAuth, async (req, res) => {
     const procs = calcCounts(procLogsCounts);
     const acads = calcCounts(acadLogsCounts);
 
-    let reqCases = 50, reqProcs = 101, reqAcad = 50;
-    if (student.departmentId) {
-      const [config] = await db.select().from(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, student.departmentId));
-      reqCases = config?.requiredCases || 50;
-      reqProcs = config?.requiredProcedures || 101;
-      reqAcad = config?.requiredAcademic || 50;
-    }
+    const [config] = await db.select().from(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, student.departmentId!));
+    const reqCases = config?.requiredCases ?? 0;
+    const reqProcs = config?.requiredProcedures ?? 0;
+    const reqAcad = config?.requiredAcademic ?? 0;
 
     // Recent Logs (simplified for dashboard)
     const recentCases = await db.select().from(caseLogsTable).where(eq(caseLogsTable.studentId, studentId)).orderBy(desc(caseLogsTable.createdAt)).limit(1);
@@ -230,21 +219,29 @@ router.get("/:studentId/postings", async (req, res) => {
       .where(eq(postingsTable.studentId, studentId))
       .orderBy(desc(postingsTable.createdAt));
       
-    res.json({ options: ["Ward Posting U1", "Ward Posting U2", "PICU", "NICU", "DRP"], data });
+    const options = await db.select({ name: departmentCatalogTable.value }).from(departmentCatalogTable)
+      .where(and(eq(departmentCatalogTable.departmentId, req.user!.departmentId!), eq(departmentCatalogTable.kind, "posting")));
+    res.json({ options: options.map((item) => item.name), data });
   } catch (error) {
     req.log.error(error, "Error fetching postings");
     res.status(500).json({ message: "Internal server error" });
   }
 });
 
-router.post("/:studentId/postings", async (req, res) => {
+router.post("/:studentId/postings", validate(z.object({ ward: nameSchema, startDate: dateSchema, endDate: dateSchema,
+  supervisorId: idSchema }).strict().refine((v) => v.endDate >= v.startDate, "End date must be on or after start date")), async (req, res) => {
   try {
     const studentId = parseInt(String(req.params.studentId), 10);
     const { ward, postingName, startDate, endDate, supervisorId } = req.body;
+    const [option] = await db.select({ id: departmentCatalogTable.id }).from(departmentCatalogTable).where(and(
+      eq(departmentCatalogTable.departmentId, req.user!.departmentId!), eq(departmentCatalogTable.kind, "posting"), eq(departmentCatalogTable.value, ward))).limit(1);
+    if (!option || !(await validateSupervisor(Number(supervisorId), req.user!.departmentId!))) {
+      res.status(400).json({ message: "Select a posting and supervisor from your department" }); return;
+    }
     
     const [inserted] = await db.insert(postingsTable).values({
       studentId,
-      ward: ward || postingName || "General",
+      ward,
       startDate,
       endDate,
       supervisorId: parseInt(supervisorId, 10) || null,
@@ -315,9 +312,10 @@ router.get("/:studentId/leave-balance", requireAuth, async (req, res) => {
       }
     }
 
+    const [config] = await db.select().from(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, caller.departmentId!));
     res.json({
-      casual: { used: casualUsed, total: 20 },
-      academic: { used: academicUsed, total: 15 }
+      casual: { used: casualUsed, total: config?.casualLeaveAllowance ?? null },
+      academic: { used: academicUsed, total: config?.academicLeaveAllowance ?? null }
     });
   } catch (error) {
     req.log.error(error, "Error fetching leave balance");
@@ -335,7 +333,9 @@ router.get("/:studentId/leave-records", async (req, res) => {
   }
 });
 
-router.post("/:studentId/leave-records", async (req, res) => {
+router.post("/:studentId/leave-records", validate(z.object({ startDate: dateSchema, endDate: dateSchema,
+  leaveType: z.enum(["Casual", "Academic", "Medical", "Maternity / Paternity", "casual", "academic", "medical", "maternity_paternity"]),
+  reason: z.string().trim().min(1).max(4000) }).strict().refine((v) => v.endDate >= v.startDate, "End date must be on or after start date")), async (req, res) => {
   try {
     const studentId = parseInt(String(req.params.studentId), 10);
     const { fromDate, toDate, leaveType, reason, startDate, endDate } = req.body;
@@ -344,7 +344,7 @@ router.post("/:studentId/leave-records", async (req, res) => {
     const rawType = leaveType?.toLowerCase();
     if (rawType === "academic") type = "academic";
     else if (rawType === "medical") type = "medical";
-    else if (rawType === "maternity" || rawType === "maternity_paternity") type = "maternity_paternity";
+    else if (rawType === "maternity / paternity" || rawType === "maternity_paternity") type = "maternity_paternity";
 
     const [inserted] = await db.insert(leaveRecordsTable).values({
       studentId,
@@ -421,7 +421,8 @@ router.get("/:studentId/assessments", requireAuth, async (req, res) => {
 });
 
 // POST /students/:studentId/assessments — professors only; assessorId set server-side
-router.post("/:studentId/assessments", requireAuth, requireRole(["professor", "hod"]), async (req, res) => {
+router.post("/:studentId/assessments", requireAuth, requireRole(["professor", "hod"]), validate(z.object({ examName: nameSchema,
+  type: z.enum(["quarterly", "annual"]), date: dateSchema, marks: z.coerce.number().int().min(0).max(100) }).strict()), async (req, res) => {
   try {
     const professorId = req.user!.id;
     const professorDeptId = req.user!.departmentId;
@@ -450,7 +451,7 @@ router.post("/:studentId/assessments", requireAuth, requireRole(["professor", "h
     }
 
     const { examName, type, date, marks } = req.body;
-    if (!examName || !marks) {
+    if (!examName || marks === undefined) {
       res.status(400).json({ message: "examName and marks are required" });
       return;
     }
@@ -481,16 +482,48 @@ router.get("/:studentId/thesis", async (req, res) => {
 });
 
 
-// ---------------------------------------------------------
-// POST LOGS (Existing DB endpoints preserved)
-// ---------------------------------------------------------
+const optionalDate = z.union([dateSchema, z.literal(""), z.null()]).transform((v) => v || null);
+router.post("/:studentId/thesis", validate(z.object({ thesisTitle: z.string().trim().min(1).max(4000), guideId: idSchema,
+  coGuideId: idSchema.nullable(), protocolSubmissionDate: optionalDate, iecClearanceDate: optionalDate,
+  dataCollectionStartDate: optionalDate, dataCollectionEndDate: optionalDate, submissionDate: optionalDate }).strict()), async (req, res) => {
+  const body = req.body;
+  if (!(await validateSupervisor(body.guideId, req.user!.departmentId!)) ||
+    (body.coGuideId && !(await validateSupervisor(body.coGuideId, req.user!.departmentId!)))) {
+    res.status(400).json({ message: "Select guides from your department" }); return;
+  }
+  if (body.dataCollectionStartDate && body.dataCollectionEndDate && body.dataCollectionEndDate < body.dataCollectionStartDate) {
+    res.status(400).json({ message: "Data collection end date must follow the start date" }); return;
+  }
+  const [row] = await db.insert(researchTable).values({ ...body, studentId: Number(req.params.studentId) })
+    .onConflictDoUpdate({ target: researchTable.studentId, set: { ...body, updatedAt: new Date() } }).returning();
+  res.json({ data: row });
+});
 
-router.post("/:studentId/case-logs", async (req, res) => {
+router.get("/:studentId/certifications", async (req, res) => {
+  res.json(await db.select().from(certificationsTable).where(eq(certificationsTable.studentId, Number(req.params.studentId))).orderBy(desc(certificationsTable.createdAt)));
+});
+
+router.post("/:studentId/certifications", validate(z.object({ title: nameSchema, provider: nameSchema, issueDate: dateSchema,
+  expiryDate: dateSchema, certificateUrl: z.string().url().max(2000).refine((value) => new URL(value).protocol === "https:", "Use an HTTPS URL")
+}).strict().refine((v) => v.expiryDate >= v.issueDate, "Expiry must be on or after issue date")), async (req, res) => {
+  const [row] = await db.insert(certificationsTable).values({ ...req.body, studentId: Number(req.params.studentId),
+    issueDate: new Date(req.body.issueDate + "T00:00:00Z"), expiryDate: new Date(req.body.expiryDate + "T00:00:00Z") }).returning();
+  res.status(201).json(row);
+});
+
+// POST LOGS
+
+const optionalText = z.string().max(8000).optional();
+router.post("/:studentId/case-logs", validate(z.object({ supervisorId: idSchema, date: dateSchema, patientAge: nameSchema,
+  patientGender: z.enum(["male", "female", "other"]), diagnosisFinal: z.string().trim().min(1).max(8000),
+  patientUhid: optionalText, chiefComplaints: optionalText, diagnosisProvisional: optionalText, history: optionalText,
+  examination: optionalText, investigations: optionalText, differentialDiagnosis: optionalText, managementPlan: optionalText,
+  outcome: optionalText, learningPoints: optionalText }).strict()), async (req, res) => {
   try {
     const studentId = parseInt(String(req.params.studentId), 10);
     const { supervisorId, date, patientAge, patientGender, diagnosisFinal } = req.body;
     const supervisorIdNum = parseInt(supervisorId, 10);
-    if (!(await validateSupervisor(supervisorIdNum))) {
+    if (!(await validateSupervisor(supervisorIdNum, req.user!.departmentId!))) {
       res.status(400).json({ message: "Invalid supervisorId" });
       return;
     }
@@ -512,16 +545,21 @@ router.post("/:studentId/case-logs", async (req, res) => {
   }
 });
 
-router.post("/:studentId/procedure-logs", async (req, res) => {
+router.post("/:studentId/procedure-logs", validate(z.object({ supervisorId: idSchema, procedureGroup: nameSchema,
+  procedureName: nameSchema, date: dateSchema, patientUhid: nameSchema, patientAge: nameSchema,
+  competencyLevel: z.enum(["observed", "assisted", "performed_under_supervision", "performed_independently"]) }).strict()), async (req, res) => {
   try {
     const studentId = parseInt(String(req.params.studentId), 10);
     const { supervisorId, procedureGroup, procedureName, date, patientUhid, patientAge, competencyLevel } = req.body;
     const supervisorIdNum = parseInt(supervisorId, 10);
-    if (!(await validateSupervisor(supervisorIdNum))) {
+    if (!(await validateSupervisor(supervisorIdNum, req.user!.departmentId!))) {
       res.status(400).json({ message: "Invalid supervisorId" });
       return;
     }
 
+    const [option] = await db.select({ id: procedureTypesTable.id }).from(procedureTypesTable).where(and(
+      eq(procedureTypesTable.departmentId, req.user!.departmentId!), eq(procedureTypesTable.name, procedureName), eq(procedureTypesTable.group, procedureGroup))).limit(1);
+    if (!option) { res.status(400).json({ message: "Select a procedure from your department" }); return; }
     const [inserted] = await db.insert(procedureLogsTable).values({
       studentId, supervisorId: supervisorIdNum, procedureGroup, procedureName, date, 
       patientUhid, patientAge, competencyLevel, status: "pending"
@@ -532,16 +570,21 @@ router.post("/:studentId/procedure-logs", async (req, res) => {
   }
 });
 
-router.post("/:studentId/academic-logs", async (req, res) => {
+router.post("/:studentId/academic-logs", validate(z.object({ supervisorId: idSchema, activityType: nameSchema,
+  topic: z.string().trim().min(1).max(4000), date: dateSchema, presenter: optionalText,
+  presentationType: z.string().max(160).nullable().optional() }).strict()), async (req, res) => {
   try {
     const studentId = parseInt(String(req.params.studentId), 10);
     const { supervisorId, activityType, topic, date } = req.body;
     const supervisorIdNum = parseInt(supervisorId, 10);
-    if (!(await validateSupervisor(supervisorIdNum))) {
+    if (!(await validateSupervisor(supervisorIdNum, req.user!.departmentId!))) {
       res.status(400).json({ message: "Invalid supervisorId" });
       return;
     }
 
+    const [option] = await db.select({ id: departmentCatalogTable.id }).from(departmentCatalogTable).where(and(
+      eq(departmentCatalogTable.departmentId, req.user!.departmentId!), eq(departmentCatalogTable.kind, "academic"), eq(departmentCatalogTable.value, activityType))).limit(1);
+    if (!option) { res.status(400).json({ message: "Select an academic activity from your department" }); return; }
     const [inserted] = await db.insert(academicLogsTable).values({
       studentId, supervisorId: supervisorIdNum, activityType, presentationType: req.body.presentationType, 
       topic, date, presenter: req.body.presenter, status: "pending"

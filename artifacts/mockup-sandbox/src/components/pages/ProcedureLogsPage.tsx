@@ -12,7 +12,9 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
-import { formatLogbookDate, PROCEDURE_GROUPS, PROCEDURE_REQUIREMENTS, REQUIRED_PROCEDURE_COUNT, todayForInput, type ProcedureGroup } from "@/lib/logbook-config";
+import { formatLogbookDate, todayForInput } from "@/lib/logbook-config";
+import { useDepartment } from "@/lib/department-context";
+type ProcedureGroup = string;
 
 type ProcedureLog = {
   id: number;
@@ -31,19 +33,20 @@ type ProcedureLog = {
 };
 
 
-const groupNames: Record<ProcedureGroup, string> = {
-  emergency: "Emergency procedures",
-  invasive: "Invasive procedures",
-};
+
 
 export function ProcedureLogsPage() {
+  const { procedures: PROCEDURE_REQUIREMENTS } = useDepartment();
+  const PROCEDURE_GROUPS = React.useMemo(() => Object.fromEntries([...new Set(PROCEDURE_REQUIREMENTS.map((p) => p.group))].map((group) => [group, PROCEDURE_REQUIREMENTS.filter((p) => p.group === group).map((p) => p.name)])), [PROCEDURE_REQUIREMENTS]);
+  const REQUIRED_PROCEDURE_COUNT = PROCEDURE_REQUIREMENTS.reduce((sum, p) => sum + p.required, 0);
+  const groupNames: Record<string, string> = Object.fromEntries(Object.keys(PROCEDURE_GROUPS).map((group) => [group, group]));
   const [open, setOpen] = React.useState(false);
   const [logs, setLogs] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [form, setForm] = React.useState({
     date: todayForInput(),
-    group: "emergency" as ProcedureGroup,
+    group: "" as ProcedureGroup,
     procedureName: "",
     patientUhid: "",
     age: "",
@@ -55,7 +58,7 @@ export function ProcedureLogsPage() {
       requirement.name,
       logs.filter((log) => log.procedureName === requirement.name).length,
     ])),
-    [logs],
+    [logs, PROCEDURE_REQUIREMENTS],
   );
 
   const setGroup = (group: ProcedureGroup) => setForm({ ...form, group, procedureName: "" });
@@ -132,7 +135,7 @@ export function ProcedureLogsPage() {
       setOpen(false);
       setForm({
         date: todayForInput(),
-        group: "emergency",
+        group: "",
         procedureName: "",
         patientUhid: "",
         age: "",
@@ -159,7 +162,7 @@ export function ProcedureLogsPage() {
         <div>
           <p className="page-eyebrow">Procedures seen and performed</p>
           <h2 className="page-title mt-1">Procedure log</h2>
-          <p className="mt-2 text-sm text-slate-500">Emergency and invasive procedure exposure, with competency verified only by the reviewing faculty member.</p>
+          <p className="mt-2 text-sm text-slate-500">Procedure exposure, with competency verified only by the reviewing faculty member.</p>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild><Button><PlusCircle className="h-4 w-4" /> Log procedure</Button></DialogTrigger>
@@ -174,14 +177,14 @@ export function ProcedureLogsPage() {
                 <Field label="Procedure group">
                   <Select value={form.group} onValueChange={(value: ProcedureGroup) => setGroup(value)}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent><SelectItem value="emergency">Emergency procedures</SelectItem><SelectItem value="invasive">Invasive procedures</SelectItem></SelectContent>
+                    <SelectContent>{Object.keys(PROCEDURE_GROUPS).map((group) => <SelectItem key={group} value={group}>{group}</SelectItem>)}</SelectContent>
                   </Select>
                 </Field>
               </div>
               <Field label="Procedure">
                 <Select value={form.procedureName} onValueChange={(value) => setForm({ ...form, procedureName: value })}>
                   <SelectTrigger><SelectValue placeholder="Select a required procedure" /></SelectTrigger>
-                  <SelectContent>{PROCEDURE_GROUPS[form.group].map((procedure) => <SelectItem key={procedure} value={procedure}>{procedure}</SelectItem>)}</SelectContent>
+                  <SelectContent>{(PROCEDURE_GROUPS[form.group] || []).map((procedure) => <SelectItem key={procedure} value={procedure}>{procedure}</SelectItem>)}</SelectContent>
                 </Select>
               </Field>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -222,9 +225,10 @@ export function ProcedureLogsPage() {
         </Dialog>
       </div>
 
+      {!PROCEDURE_REQUIREMENTS.length && <p className="rounded-xl bg-teal-50 p-4 text-sm text-teal-800">Your HOD has not configured procedure types for this department yet.</p>}
       <div className="grid gap-4 md:grid-cols-2">
         {(Object.keys(PROCEDURE_GROUPS) as ProcedureGroup[]).map((group) => {
-          const completed = logs.filter((log) => log.group === group).length;
+          const completed = logs.filter((log) => log.procedureGroup === group).length;
           return (
             <Card key={group} className={group === "emergency" ? "border-cyan-100" : "border-teal-100"}>
               <CardContent className="flex items-center justify-between p-5">
@@ -247,7 +251,7 @@ export function ProcedureLogsPage() {
       <Card>
         <CardHeader className="border-b border-teal-100">
           <CardTitle className="text-lg">Number of procedures required</CardTitle>
-          <p className="text-xs text-slate-500">The total is calculated from every required emergency and invasive procedure.</p>
+          <p className="text-xs text-slate-500">The total is calculated from the procedure targets configured by your HOD.</p>
         </CardHeader>
         <CardContent className="p-0">
           <Table>

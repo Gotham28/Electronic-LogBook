@@ -14,9 +14,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DEPARTMENTS, expectedCompletionDate, formatLogbookDate, todayForInput } from "@/lib/logbook-config";
+import { expectedCompletionDate, formatLogbookDate, todayForInput } from "@/lib/logbook-config";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
-import { apiPost } from "@/lib/apiClient";
+import { apiGet, apiPost } from "@/lib/apiClient";
 
 export function RegistrationPage({
   onBack,
@@ -29,7 +29,8 @@ export function RegistrationPage({
   const [form, setForm] = React.useState({
     fullName: "",
     email: "",
-    department: "Pediatrics",
+    department: "",
+    kuhsId: "",
     registrationNumber: "",
     joiningDate: todayForInput(),
     password: "",
@@ -37,6 +38,17 @@ export function RegistrationPage({
   });
 
   const [emailVerified, setEmailVerified] = React.useState(false);
+  const [verificationToken, setVerificationToken] = React.useState("");
+  const [departments, setDepartments] = React.useState<Array<{ id: number; name: string; programDurationMonths: number | null }>>([]);
+  const [departmentError, setDepartmentError] = React.useState("");
+  const [departmentsLoading, setDepartmentsLoading] = React.useState(true);
+  const loadDepartments = React.useCallback(async () => {
+    setDepartmentsLoading(true); setDepartmentError("");
+    try { setDepartments(await apiGet("/api/departments")); }
+    catch (err) { setDepartmentError(err instanceof Error ? err.message : "Could not load departments"); }
+    finally { setDepartmentsLoading(false); }
+  }, []);
+  React.useEffect(() => { void loadDepartments(); }, [loadDepartments]);
   const [otpSent, setOtpSent] = React.useState(false);
   const [otp, setOtp] = React.useState("");
   const [countdown, setCountdown] = React.useState(0);
@@ -51,7 +63,7 @@ export function RegistrationPage({
     return () => clearTimeout(timer);
   }, [countdown]);
 
-  const completionDate = expectedCompletionDate(form.joiningDate);
+  const completionDate = expectedCompletionDate(form.joiningDate, departments.find((d) => String(d.id) === form.department)?.programDurationMonths);
   const joiningYear = form.joiningDate ? new Date(`${form.joiningDate}T00:00:00`).getFullYear() : "";
   const passwordsMatch = Boolean(form.password) && form.password === form.confirmPassword;
 
@@ -74,7 +86,8 @@ export function RegistrationPage({
     if (!form.email || otp.length !== 6) return;
     setVerifyingOtp(true);
     try {
-      await apiPost("/api/auth/verify-otp", { email: form.email, otp });
+      const verified = await apiPost("/api/auth/verify-otp", { email: form.email, otp });
+      setVerificationToken(verified.verificationToken);
       setEmailVerified(true);
       setOtpSent(false); // Hide OTP input on success
       toast.success("Email successfully verified");
@@ -98,8 +111,9 @@ export function RegistrationPage({
         registrationNumber: form.registrationNumber,
         batch: joiningYear.toString(),
         dateOfJoining: form.joiningDate,
-        kuhsId: `KUHS-${form.registrationNumber}`, // Mock KUHS ID for now
-        specialty: form.department,
+        kuhsId: form.kuhsId,
+        departmentId: Number(form.department),
+        verificationToken,
       });
       toast.success("Registration submitted", {
         description: `HOD verification is pending. You will be able to log in after approval.`,
@@ -200,10 +214,14 @@ export function RegistrationPage({
                   <Field label="Department" htmlFor="registration-department">
                     <Select value={form.department} onValueChange={(department) => setForm({ ...form, department })}>
                       <SelectTrigger id="registration-department"><SelectValue /></SelectTrigger>
-                      <SelectContent>{DEPARTMENTS.map((department) => <SelectItem key={department} value={department}>{department}</SelectItem>)}</SelectContent>
+                      <SelectContent>{departments.map((department) => <SelectItem key={department.id} value={String(department.id)}>{department.name}</SelectItem>)}</SelectContent>
                     </Select>
                   </Field>
-                  <Field label="University registration number" htmlFor="registration-number"><Input id="registration-number" value={form.registrationNumber} onChange={(e) => setForm({ ...form, registrationNumber: e.target.value })} placeholder="e.g. PG2024-PAED-014" required /></Field>
+                  {departmentsLoading && <p role="status" className="text-sm text-slate-500">Loading departments…</p>}
+                  {departmentError && <p role="alert" className="text-sm text-rose-700">{departmentError} <button type="button" className="underline" onClick={loadDepartments}>Try again</button></p>}
+                  {!departmentsLoading && !departmentError && !departments.length && <p className="text-sm text-slate-500">No departments are accepting registrations yet. Contact your institution.</p>}
+                  <Field label="University ID" htmlFor="registration-university-id"><Input id="registration-university-id" value={form.kuhsId} onChange={(e) => setForm({ ...form, kuhsId: e.target.value })} required /></Field>
+                  <Field label="University registration number" htmlFor="registration-number"><Input id="registration-number" value={form.registrationNumber} onChange={(e) => setForm({ ...form, registrationNumber: e.target.value })} required /></Field>
                   <Field label="Exact joining date" htmlFor="registration-joining-date">
                     <Input id="registration-joining-date" type="date" value={form.joiningDate} onChange={(e) => setForm({ ...form, joiningDate: e.target.value })} required />
                     <p className="text-[10px] text-slate-500">Day, month and year are required.</p>
@@ -219,7 +237,7 @@ export function RegistrationPage({
                   </Field>
                 </div>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center mt-6">
-                  <Button type="submit" disabled={!passwordsMatch || submitting || !emailVerified} className="w-full sm:w-auto">
+                  <Button type="submit" disabled={!passwordsMatch || submitting || !emailVerified || !form.department || departmentsLoading} className="w-full sm:w-auto">
                     {submitting ? "Submitting Registration..." : "Complete Registration"} <ArrowRight className="h-4 w-4 ml-2" />
                   </Button>
                   {!emailVerified && <p className="text-xs font-medium text-slate-500">Please verify your email to continue</p>}

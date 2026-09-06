@@ -43,7 +43,7 @@ async function fetchWithAuth(
   }
 
   // Automatically set Content-Type to JSON for requests with body, if not already set
-  if (options.body && !headers.has("Content-Type")) {
+  if (options.method && !["GET", "HEAD"].includes(options.method) && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
 

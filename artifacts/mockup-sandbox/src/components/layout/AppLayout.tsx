@@ -55,6 +55,8 @@ import {
   UserPlus,
 } from "lucide-react";
 
+import { useDepartment } from "@/lib/department-context";
+
 export type RoleType = "Student" | "Faculty" | "HOD";
 
 interface AppLayoutProps {
@@ -95,6 +97,7 @@ const navigationDescriptions: Record<string, string> = {
 function navigationForRole(role: RoleType, dashboardData?: any, loadingBadges?: boolean): NavigationItem[] {
   if (role === "Faculty") {
     return [
+      { title: "Assignments", icon: ClipboardCheck, href: "/assignments" },
       { title: "Evaluation Queue", icon: FileText, href: "/" },
       { title: "Student Progress", icon: UserCheck, href: "/mentees" },
       { title: "Assessments", icon: ClipboardCheck, href: "/assessments" },
@@ -103,6 +106,7 @@ function navigationForRole(role: RoleType, dashboardData?: any, loadingBadges?: 
 
   if (role === "HOD") {
     return [
+      { title: "Assignments", icon: ClipboardCheck, href: "/assignments" },
       { title: "Students", icon: GraduationCap, href: "/roster" },
       { title: "Review Queue", icon: FileText, href: "/review-queue" },
       { title: "Add Assessment", icon: ClipboardCheck, href: "/assessments" },
@@ -121,6 +125,7 @@ function navigationForRole(role: RoleType, dashboardData?: any, loadingBadges?: 
   };
 
   return [
+    { title: "Assignments", icon: ClipboardCheck, href: "/assignments" },
     { title: "Dashboard", icon: LayoutDashboard, href: "/" },
     { title: "Postings & Rotations", icon: CalendarDays, href: "/postings" },
     { title: "Case Logs", icon: FileText, href: "/cases", badge: getCount("cases"), badgeLoading: loadingBadges },
@@ -138,6 +143,7 @@ export function AppLayout({
   onSignOut,
 }: AppLayoutProps) {
   const [location] = useLocation();
+  const { department } = useDepartment();
   const [dashboardData, setDashboardData] = React.useState<any>(null);
   const [loadingBadges, setLoadingBadges] = React.useState(activeRole === "Student");
 
@@ -149,10 +155,10 @@ export function AppLayout({
 
   // Fix: Get actual user from session for the sidebar profile
   const currentUser = getCurrentUser();
-  const displayName = currentUser?.name || getNameForRole(activeRole);
+  const displayName = currentUser?.name || "";
   const initials = currentUser?.name 
     ? currentUser.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()
-    : getInitialsForRole(activeRole);
+    : "";
 
   React.useEffect(() => {
     if (activeRole !== "Student") return;
@@ -216,6 +222,7 @@ export function AppLayout({
       toast.success("Password changed successfully");
       setIsChangePasswordOpen(false);
       setCpForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+      onSignOut?.();
     } catch (err: any) {
       toast.error(err.message || "Failed to change password");
     } finally {
@@ -332,7 +339,7 @@ export function AppLayout({
                 <div className="hidden h-7 w-px bg-teal-100 sm:block" />
                 <div className="min-w-0">
                   <p className="truncate font-display text-base font-bold text-slate-900">
-                    Department of Pediatrics
+                    Department of {department.name}
                   </p>
                   <p className="truncate text-[11px] font-medium text-slate-500">
                     {activeRole} workspace
@@ -375,24 +382,7 @@ export function AppLayout({
                   <DropdownMenuContent align="end" className="w-80 rounded-2xl border-white/70 bg-white/92 p-2 shadow-[0_24px_60px_rgba(15,23,42,0.12)] backdrop-blur-xl">
                     <DropdownMenuLabel className="px-3 pt-2">Notifications</DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem className="rounded-xl px-3 py-2">
-                      <div className="flex flex-col gap-1">
-                        <span className="text-xs font-semibold text-slate-900">3 procedures due this week</span>
-                        <span className="text-[11px] text-slate-500">Keep the logbook moving to stay on track.</span>
-                      </div>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem className="rounded-xl px-3 py-2">
-                      <div className="flex flex-col gap-1">
-                        <span className="text-xs font-semibold text-slate-900">Faculty remarks pending</span>
-                        <span className="text-[11px] text-slate-500">Recent entries are waiting for verification.</span>
-                      </div>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem className="rounded-xl px-3 py-2">
-                      <div className="flex flex-col gap-1">
-                        <span className="text-xs font-semibold text-slate-900">Next milestone due in 18 days</span>
-                        <span className="text-[11px] text-slate-500">Thesis planning and leave review are both active.</span>
-                      </div>
-                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => window.location.assign("/assignments")} className="rounded-xl px-3 py-2">Open assignments to see due work and faculty feedback.</DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
@@ -400,7 +390,7 @@ export function AppLayout({
 
             <main className="mx-auto w-full max-w-[1380px] flex-1 p-4 md:p-6 lg:p-8">
               <div className="print-only mb-6 border-b border-slate-300 pb-4">
-                <p className="page-eyebrow">Department of Pediatrics</p>
+                <p className="page-eyebrow">Department of {department.name}</p>
                 <h1 className="mt-1 text-2xl font-bold">Resident Training Record</h1>
               </div>
               {children}
@@ -441,14 +431,3 @@ export function AppLayout({
   );
 }
 
-function getNameForRole(role: RoleType) {
-  if (role === "Faculty") return "Dr. Radhamani K V";
-  if (role === "HOD") return "Dr. Mohammed M T P";
-  return "Aravind P";
-}
-
-function getInitialsForRole(role: RoleType) {
-  if (role === "Faculty") return "RK";
-  if (role === "HOD") return "MM";
-  return "AP";
-}

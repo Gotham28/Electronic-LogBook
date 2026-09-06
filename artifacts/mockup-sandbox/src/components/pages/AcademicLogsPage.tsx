@@ -12,7 +12,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
-import { ACADEMIC_REQUIREMENTS, formatLogbookDate, todayForInput } from "@/lib/logbook-config";
+import { formatLogbookDate, todayForInput } from "@/lib/logbook-config";
+import { useDepartment } from "@/lib/department-context";
 
 type AcademicLog = {
   number: number;
@@ -25,17 +26,18 @@ type AcademicLog = {
 };
 
 
-const conferenceTypes = new Set(["Conference Presentation", "Symposia"]);
+
 
 export function AcademicLogsPage() {
+  const { academics: academicOptions } = useDepartment();
   const [open, setOpen] = React.useState(false);
   const [logs, setLogs] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [form, setForm] = React.useState({
     date: todayForInput(),
-    type: "Journal Club",
-    presentationType: "Paper",
+    type: "",
+    presentationType: "",
     topic: "",
     supervisorId: "",
   });
@@ -44,15 +46,7 @@ export function AcademicLogsPage() {
   const [professors, setProfessors] = React.useState<any[]>([]);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
-  const reverseTypeMap: Record<string, string> = {
-    "journal_club": "Journal Club",
-    "seminar": "Seminar",
-    "symposia": "Symposia",
-    "bedside_presentation": "Case Discussion",
-    "mortality_meeting": "Mortality Meeting",
-    "conference_attended": "Conference Attended",
-    "conference_presentation": "Conference Presentation"
-  };
+
 
   const fetchLogs = React.useCallback(async () => {
     if (!user?.studentProfileId) {
@@ -67,7 +61,7 @@ export function AcademicLogsPage() {
       setLogs(sortedLogs.map((log: any, index: number) => ({ 
         ...log, 
         number: sortedLogs.length - index,
-        type: reverseTypeMap[log.activityType] || log.activityType,
+        type: log.activityType,
         presentationType: log.presentationType || "—",
         faculty: log.supervisorName || "Unknown",
       })));
@@ -97,20 +91,11 @@ export function AcademicLogsPage() {
     
     setIsSubmitting(true);
     try {
-      const typeMap: Record<string, string> = {
-        "Journal Club": "journal_club",
-        "Seminar": "seminar",
-        "Symposia": "symposia",
-        "Case Discussion": "bedside_presentation",
-        "Interesting Case Presentation": "bedside_presentation",
-        "Mortality Meeting": "mortality_meeting",
-        "Conference Attended": "conference_attended",
-        "Conference Presentation": "conference_presentation"
-      };
+
 
       const payload = {
-        activityType: typeMap[form.type] || "journal_club",
-        presentationType: conferenceTypes.has(form.type) ? form.presentationType.toLowerCase().replace(" ", "_") : null,
+        activityType: form.type,
+        presentationType: form.presentationType || null,
         topic: form.topic,
         date: form.date,
         supervisorId: form.supervisorId,
@@ -157,32 +142,14 @@ export function AcademicLogsPage() {
                   <Select value={form.type} onValueChange={(value) => setForm({ ...form, type: value })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Journal Club">Journal club</SelectItem>
-                      <SelectItem value="Seminar">Seminar</SelectItem>
-                      <SelectItem value="Case Discussion">Case discussion</SelectItem>
-                      <SelectItem value="Interesting Case Presentation">Interesting case presentation</SelectItem>
-                      <SelectItem value="Symposia">Symposia</SelectItem>
-                      <SelectItem value="Bedside Case Presentation">Bedside case presentation</SelectItem>
-                      <SelectItem value="Mortality Meeting">Mortality meeting</SelectItem>
-                      <SelectItem value="Conference Attended">Conference attended</SelectItem>
-                      <SelectItem value="Conference Presentation">Conference presentation</SelectItem>
+                      {!academicOptions.length && <p className="text-sm text-slate-500">Your HOD has not configured academic activities yet.</p>}
+          {academicOptions.map((item) => <SelectItem key={item.id} value={item.value}>{item.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </Field>
               </div>
-              {conferenceTypes.has(form.type) && (
-                <Field label="Presentation format">
-                  <Select value={form.presentationType} onValueChange={(value) => setForm({ ...form, presentationType: value })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Poster">Poster</SelectItem>
-                      <SelectItem value="Paper">Paper</SelectItem>
-                      <SelectItem value="Case presentation">Case presentation</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </Field>
-              )}
-              <Field label={form.type === "Conference Attended" ? "Conference name" : "Topic / title"}>
+              <Field label="Presentation format (optional)"><Input value={form.presentationType} onChange={(e) => setForm({ ...form, presentationType: e.target.value })} maxLength={160} /></Field>
+              <Field label="Topic / title">
                 <Input value={form.topic} onChange={(e) => setForm({ ...form, topic: e.target.value })} required />
               </Field>
               <Field label="Reviewing faculty member">
@@ -206,8 +173,8 @@ export function AcademicLogsPage() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <Summary label="Conferences attended" value={logs.filter((log) => log.type === "Conference Attended").length} />
-        <Summary label="Conference presentations" value={logs.filter((log) => log.type === "Conference Presentation").length} />
+        <Summary label="Awaiting review" value={logs.filter((log) => log.status === "pending").length} />
+        <Summary label="Verified activities" value={logs.filter((log) => log.status === "verified").length} />
         <Summary label="All academic activities" value={logs.length} />
       </div>
 
@@ -216,14 +183,14 @@ export function AcademicLogsPage() {
           <CardTitle className="text-lg">Mandatory academic requirements</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-4">
-          {ACADEMIC_REQUIREMENTS.map((requirement) => {
-            const logged = logs.filter((log) => log.type === requirement.name).length;
+          {academicOptions.map((requirement) => {
+            const logged = logs.filter((log) => log.type === requirement.value && (requirement.period !== "month" || log.date.startsWith(todayForInput().slice(0, 7)))).length;
             return (
               <div key={requirement.name} className="rounded-2xl border border-teal-100 bg-teal-50/50 p-4">
                 <p className="text-sm font-bold text-slate-900">{requirement.name}</p>
-                <p className="mt-3 text-2xl font-bold text-teal-700">{requirement.target}</p>
-                <p className="text-xs text-slate-500">{requirement.requirement}</p>
-                <p className="mt-3 text-xs font-semibold text-slate-700">{logged} logged in this demo</p>
+                <p className="mt-3 text-2xl font-bold text-teal-700">{requirement.required}</p>
+                <p className="text-xs text-slate-500">{requirement.period === "month" ? "per month" : "overall"}</p>
+                <p className="mt-3 text-xs font-semibold text-slate-700">{logged} logged {requirement.period === "month" ? "this month" : "overall"}</p>
               </div>
             );
           })}

@@ -14,8 +14,8 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
   const [role, setRole] = React.useState<"student" | "professor" | "hod">("student");
   
   // Credentials state
-  const [username, setUsername] = React.useState("PG2024-PAED-014");
-  const [password, setPassword] = React.useState("password123");
+  const [username, setUsername] = React.useState("");
+  const [password, setPassword] = React.useState("");
   
   const [error, setError] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
@@ -23,20 +23,13 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
   const [forgotStep, setForgotStep] = React.useState<0 | 1 | 2 | 3>(0);
   const [resetEmail, setResetEmail] = React.useState("");
   const [resetOtp, setResetOtp] = React.useState("");
+  const [verificationToken, setVerificationToken] = React.useState("");
   const [newPassword, setNewPassword] = React.useState("");
   const [confirmNewPassword, setConfirmNewPassword] = React.useState("");
   const [isResetting, setIsResetting] = React.useState(false);
 
-  // Update pre-filled credentials when role changes
+  // Roles change the login label; credentials are always entered by the user.
   React.useEffect(() => {
-    if (role === "student") {
-      setUsername("aravind@elogbook.com");
-    } else if (role === "professor") {
-      setUsername("radhamani@elogbook.com");
-    } else if (role === "hod") {
-      setUsername("hod@elogbook.com");
-    }
-    setPassword("password123");
     setError(null);
   }, [role]);
 
@@ -93,7 +86,8 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
     if (resetOtp.length !== 6) return;
     setIsResetting(true);
     try {
-      await apiPost("/api/auth/verify-reset-otp", { email: resetEmail, otp: resetOtp });
+      const verified = await apiPost("/api/auth/verify-reset-otp", { email: resetEmail, otp: resetOtp });
+      setVerificationToken(verified.verificationToken);
       toast.success("Code verified");
       setForgotStep(3);
     } catch (err: any) {
@@ -111,7 +105,7 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
     }
     setIsResetting(true);
     try {
-      await apiPost("/api/auth/reset-password", { email: resetEmail, newPassword });
+      await apiPost("/api/auth/reset-password", { email: resetEmail, newPassword, verificationToken });
       toast.success("Password reset. Please log in with your new password.");
       setForgotStep(0);
     } catch (err: any) {
@@ -289,17 +283,17 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
                   <div className="h-px flex-1 bg-teal-100" />
                 </div>
                 <Button type="button" variant="outline" onClick={onRegister} className="h-11 w-full border-teal-200 text-teal-800">
-                  <UserPlus className="h-4 w-4" /> Register and pay
+                  <UserPlus className="h-4 w-4" /> Register as a student
                 </Button>
               </>
             )}
 
             <div className="mt-6 rounded-2xl border border-teal-100 bg-teal-50/75 p-4">
               <p className="flex items-center gap-2 text-xs font-bold text-teal-900">
-                <CheckCircle2 className="h-4 w-4 text-teal-600" /> Demo account ready
+                <CheckCircle2 className="h-4 w-4 text-teal-600" /> Department access
               </p>
               <p className="mt-1 text-[11px] leading-5 text-teal-800/75">
-                The sample credentials for the {role} account are pre-filled so the portal can be explored immediately.
+                Students register for their department and await HOD approval. Faculty accounts are created by the department HOD.
               </p>
             </div>
           </div>
