@@ -17,3 +17,5 @@ export * from "./otp.js";
 export * from "./password-resets.js";
 export * from "./department_catalog.js";
 export * from "./assignments.js";
+export * from "./subscription_plans.js";
+export * from "./payments.js";
