@@ -201,7 +201,9 @@ test("student self-registration needs possession of a verified single-use proof 
   assert.equal((await call("/auth/register", undefined, "POST", { ...registration, departmentId: 999999 })).status, 400);
   assert.equal((await call("/auth/register", undefined, "POST", registration)).status, 201);
   assert.equal((await call("/auth/register", undefined, "POST", registration)).status, 400);
-  assert.equal((await call("/auth/login", undefined, "POST", { username: email, password })).status, 403);
+  const unpaidLogin = await call("/auth/login", undefined, "POST", { username: email, password });
+  assert.equal(unpaidLogin.status, 402);
+  assert.ok(unpaidLogin.body.paymentToken);
   const pending = (await call("/admin/students/pending", "hod1")).body.find((r: any) => r.email === email);
   assert.ok(pending);
   assert.ok(!(await call("/admin/students/pending", "hod0")).body.some((r: any) => r.email === email));
