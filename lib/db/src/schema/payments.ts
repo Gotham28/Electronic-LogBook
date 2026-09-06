@@ -10,7 +10,7 @@ export const paymentsTable = pgTable("payments", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => usersTable.id),
   planId: integer("plan_id").notNull().references(() => subscriptionPlansTable.id),
-  razorpayOrderId: text("razorpay_order_id").notNull().unique(),
+  razorpayOrderId: text("razorpay_order_id").notNull(),
   razorpayPaymentId: text("razorpay_payment_id"),
   amountPaise: integer("amount_paise").notNull(),
   currency: text("currency").notNull(),
