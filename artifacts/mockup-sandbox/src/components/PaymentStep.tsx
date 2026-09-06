@@ -16,6 +16,10 @@ interface CreateOrderResponse {
   keyId: string;
 }
 
+// Comfortably longer than a real payment takes, comfortably shorter than the 30-minute
+// payment token, so a stuck modal always resolves to a visible state before the token dies.
+const PAYMENT_WINDOW_TIMEOUT_MS = 15 * 60 * 1000;
+
 export function PaymentStep({
   paymentToken,
   onPaid,
@@ -31,6 +35,21 @@ export function PaymentStep({
   const [paying, setPaying] = React.useState(false);
   const [verifying, setVerifying] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+  // Set only when money may have already moved (a verify call that failed after the
+  // modal reported success, or a payment window that timed out with no callback at all).
+  // Kept apart from errorMessage so the UI can refuse to offer a retry in exactly these
+  // cases, while still offering retry for a create-order failure or a dismissed modal,
+  // where no charge has happened.
+  const [uncertainPaymentMessage, setUncertainPaymentMessage] = React.useState<string | null>(null);
+
+  const timeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+  const clearPaymentTimeout = React.useCallback(() => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+  }, []);
+  React.useEffect(() => clearPaymentTimeout, [clearPaymentTimeout]);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -44,6 +63,7 @@ export function PaymentStep({
 
   const handleVerify = React.useCallback(
     async (response: RazorpaySuccessResponse) => {
+      clearPaymentTimeout();
       setVerifying(true);
       setErrorMessage(null);
       try {
@@ -57,17 +77,20 @@ export function PaymentStep({
           { headers: { Authorization: `Bearer ${paymentToken}` } }
         );
         onPaid();
-      } catch (err: unknown) {
-        setErrorMessage(err instanceof Error ? err.message : "Payment verification failed. Please try again.");
+      } catch {
+        setUncertainPaymentMessage(
+          "Your payment may have already been completed, but we could not confirm it. Please do not pay again — contact your HOD to check your payment status."
+        );
       } finally {
         setVerifying(false);
         setPaying(false);
       }
     },
-    [paymentToken, onPaid]
+    [paymentToken, onPaid, clearPaymentTimeout]
   );
 
   const handlePay = React.useCallback(async () => {
+    clearPaymentTimeout();
     setErrorMessage(null);
     setPaying(true);
 
@@ -106,21 +129,35 @@ export function PaymentStep({
         },
         modal: {
           ondismiss: () => {
+            clearPaymentTimeout();
             setPaying(false);
             setErrorMessage("Payment window was closed before completing. You can try again.");
           },
         },
       });
       checkout.on("payment.failed", (response) => {
+        clearPaymentTimeout();
         setPaying(false);
         setErrorMessage(response.error?.description || "Payment failed. Please try again.");
       });
       checkout.open();
+      // Neither handler, ondismiss, nor payment.failed is guaranteed to fire — a dropped
+      // network connection or a dismissal Razorpay doesn't report would otherwise leave
+      // `paying` stuck true forever with no way to retry.
+      clearPaymentTimeout();
+      timeoutRef.current = setTimeout(() => {
+        timeoutRef.current = null;
+        setPaying(false);
+        setUncertainPaymentMessage(
+          "The payment window was open for more than 15 minutes with no response. If you completed the payment, it may have gone through — please do not pay again. Contact your HOD to check your payment status."
+        );
+      }, PAYMENT_WINDOW_TIMEOUT_MS);
     } catch (err: unknown) {
+      clearPaymentTimeout();
       setPaying(false);
       setErrorMessage(err instanceof Error ? err.message : "Could not open the payment gateway.");
     }
-  }, [paymentToken, handleVerify]);
+  }, [paymentToken, handleVerify, clearPaymentTimeout]);
 
   const busy = paying || verifying;
   const formattedAmount =
@@ -143,12 +180,17 @@ export function PaymentStep({
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {uncertainPaymentMessage && (
+            <div role="alert" className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+              {uncertainPaymentMessage}
+            </div>
+          )}
           {scriptError && (
             <div role="alert" className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
               {scriptError}
             </div>
           )}
-          {errorMessage && (
+          {errorMessage && !uncertainPaymentMessage && (
             <div role="alert" className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
               {errorMessage}
             </div>
@@ -159,19 +201,21 @@ export function PaymentStep({
               <p className="mt-1 text-2xl font-bold text-slate-900">{formattedAmount}</p>
             </div>
           )}
-          <Button type="button" className="h-11 w-full" onClick={() => void handlePay()} disabled={busy}>
-            {busy ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                {verifying ? "Confirming payment..." : "Opening payment gateway..."}
-              </>
-            ) : (
-              <>
-                <ShieldCheck className="mr-2 h-4 w-4" />
-                {errorMessage || scriptError ? "Retry payment" : "Pay now"}
-              </>
-            )}
-          </Button>
+          {!uncertainPaymentMessage && (
+            <Button type="button" className="h-11 w-full" onClick={() => void handlePay()} disabled={busy}>
+              {busy ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {verifying ? "Confirming payment..." : "Opening payment gateway..."}
+                </>
+              ) : (
+                <>
+                  <ShieldCheck className="mr-2 h-4 w-4" />
+                  {errorMessage || scriptError ? "Retry payment" : "Pay now"}
+                </>
+              )}
+            </Button>
+          )}
           <button
             type="button"
             onClick={onExit}
