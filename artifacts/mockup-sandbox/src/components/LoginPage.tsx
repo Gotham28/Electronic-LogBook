@@ -11,8 +11,6 @@ import { LoginProductPreview } from "@/components/LoginProductPreview";
 import { saveToken } from "@/lib/session";
 
 export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRegister: () => void }) {
-  const [role, setRole] = React.useState<"student" | "professor" | "hod">("student");
-  
   // Credentials state
   const [username, setUsername] = React.useState("");
   const [password, setPassword] = React.useState("");
@@ -28,11 +26,6 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
   const [confirmNewPassword, setConfirmNewPassword] = React.useState("");
   const [isResetting, setIsResetting] = React.useState(false);
 
-  // Roles change the login label; credentials are always entered by the user.
-  React.useEffect(() => {
-    setError(null);
-  }, [role]);
-
   const signIn = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!username || !password) return;
@@ -45,12 +38,6 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
         username, 
         password 
       });
-      
-      // We could optionally verify the returned user.role matches the selected tab
-      if (user.role !== role) {
-         // Optionally warn or just let it proceed since the AppLayout routes based on actual role
-         console.warn(`Logged in as ${user.role} but ${role} tab was selected.`);
-      }
 
       // Persist the JWT as a Bearer token — this ensures auth works in all browsers
       // (Samsung Browser, Safari, Firefox strict mode) regardless of cross-site cookie policies
@@ -140,28 +127,12 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
         <section className="bg-white/80 p-8 md:p-12">
           <div className="mx-auto max-w-sm">
             
-            {forgotStep === 0 && (
-              <Tabs value={role} onValueChange={(v) => { setRole(v as any); setForgotStep(0); }} className="w-full mb-8">
-                <TabsList className="grid w-full grid-cols-3 bg-teal-50/50 p-1">
-                  <TabsTrigger value="student" className="rounded-xl text-xs data-[state=active]:bg-white data-[state=active]:text-teal-800 data-[state=active]:shadow-sm">
-                    Student
-                  </TabsTrigger>
-                  <TabsTrigger value="professor" className="rounded-xl text-xs data-[state=active]:bg-white data-[state=active]:text-teal-800 data-[state=active]:shadow-sm">
-                    Faculty
-                  </TabsTrigger>
-                  <TabsTrigger value="hod" className="rounded-xl text-xs data-[state=active]:bg-white data-[state=active]:text-teal-800 data-[state=active]:shadow-sm">
-                    HOD
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
-            )}
-
             <p className="page-eyebrow">
-               {role === "student" ? "Secure student access" : role === "professor" ? "Faculty portal" : "HOD Administration"}
+               Secure access
             </p>
             <h2 className="mt-2 text-4xl font-bold text-slate-900">Welcome back</h2>
             <p className="mt-2 text-sm text-slate-500">
-              {role === "student" ? "Sign in with your university registration number and password." : "Sign in with your email address and password."}
+              Sign in with your university registration number or email address and password.
             </p>
 
             {error && (
@@ -228,14 +199,10 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
             <form onSubmit={signIn} className="mt-9 space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-300">
               <div className="space-y-2">
                 <Label htmlFor="username">
-                  {role === "student" ? "Registration number" : "Email address"}
+                  Registration number or Email
                 </Label>
                 <div className="relative">
-                  {role === "student" ? (
-                    <UserPlus className="absolute left-3 top-3 h-4 w-4 text-teal-600" />
-                  ) : (
-                    <AtSign className="absolute left-3 top-3 h-4 w-4 text-teal-600" />
-                  )}
+                  <UserPlus className="absolute left-3 top-3 h-4 w-4 text-teal-600" />
                   <Input
                     id="username"
                     value={username}
@@ -275,27 +242,18 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
             </form>
             )}
 
-            {role === "student" && forgotStep === 0 && (
+            {forgotStep === 0 && (
               <>
                 <div className="my-6 flex items-center gap-3">
                   <div className="h-px flex-1 bg-teal-100" />
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">New student</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">New here?</span>
                   <div className="h-px flex-1 bg-teal-100" />
                 </div>
                 <Button type="button" variant="outline" onClick={onRegister} className="h-11 w-full border-teal-200 text-teal-800">
-                  <UserPlus className="h-4 w-4" /> Register as a student
+                  <UserPlus className="h-4 w-4" /> Register & Pay
                 </Button>
               </>
             )}
-
-            <div className="mt-6 rounded-2xl border border-teal-100 bg-teal-50/75 p-4">
-              <p className="flex items-center gap-2 text-xs font-bold text-teal-900">
-                <CheckCircle2 className="h-4 w-4 text-teal-600" /> Department access
-              </p>
-              <p className="mt-1 text-[11px] leading-5 text-teal-800/75">
-                Students register for their department and await HOD approval. Faculty accounts are created by the department HOD.
-              </p>
-            </div>
           </div>
         </section>
       </div>
