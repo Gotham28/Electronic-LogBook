@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { randomInt } from "node:crypto";
 import { z } from "zod";
-import { db, usersTable, studentsTable, departmentsTable, registrationOtpsTable, passwordResetsTable } from "@workspace/db";
+import { db, usersTable, studentsTable, departmentsTable, registrationOtpsTable, passwordResetsTable, paymentsTable } from "@workspace/db";
 import { eq, and, desc, gt, lt, sql } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -100,18 +100,19 @@ router.post("/register", validate(registrationBody), async (req, res) => {
     res.status(400).json({ message: "Please verify your email before registering" }); return;
   }
   const passwordHash = await bcrypt.hash(body.password, 12);
-  const created = await db.transaction(async (tx) => {
+  const createdUserId = await db.transaction(async (tx) => {
     const [consumed] = await tx.delete(registrationOtpsTable).where(and(eq(registrationOtpsTable.id, code.id),
       eq(registrationOtpsTable.verified, true), gt(registrationOtpsTable.expiresAt, new Date()))).returning();
-    if (!consumed) return false;
+    if (!consumed) return null;
     const [user] = await tx.insert(usersTable).values({ fullName: body.fullName, email: body.email, passwordHash,
       role: "student", status: "pending", departmentId: department.id }).returning({ id: usersTable.id });
     await tx.insert(studentsTable).values({ userId: user.id, registrationNumber: body.registrationNumber, batch: body.batch,
       dateOfJoining: body.dateOfJoining, kuhsId: body.kuhsId, specialty: department.name });
-    return true;
+    return user.id;
   });
-  if (!created) { res.status(409).json({ message: "Verification has already been used" }); return; }
-  res.status(201).json({ message: "Registration successful. Pending your department HOD's approval." });
+  if (!createdUserId) { res.status(409).json({ message: "Verification has already been used" }); return; }
+  const paymentToken = jwt.sign({ id: createdUserId, scope: "payment" }, JWT_SECRET, { expiresIn: "30m" });
+  res.status(201).json({ message: "Registration successful. Pending your department HOD's approval.", paymentToken });
 });
 
 async function sessionProfile(id: number) {
@@ -131,6 +132,15 @@ router.post("/login", validate(z.object({ username: z.string().trim().min(1).max
     user = student?.user;
   }
   if (!user?.passwordHash || !(await bcrypt.compare(password, user.passwordHash))) { res.status(401).json({ message: "Invalid credentials" }); return; }
+  if (user.status === "pending") {
+    const [paid] = await db.select({ id: paymentsTable.id }).from(paymentsTable)
+      .where(and(eq(paymentsTable.userId, user.id), eq(paymentsTable.status, "paid"))).limit(1);
+    if (!paid) {
+      const paymentToken = jwt.sign({ id: user.id, scope: "payment" }, JWT_SECRET, { expiresIn: "30m" });
+      res.status(402).json({ message: "Payment is required before your account can be approved.", paymentToken });
+      return;
+    }
+  }
   if (user.status !== "approved") { res.status(403).json({ message: "Your account is pending approval or is inactive" }); return; }
   if (["student", "professor", "hod"].includes(user.role) && !user.departmentId) {
     res.status(403).json({ message: "Your account needs a department assignment" }); return;
