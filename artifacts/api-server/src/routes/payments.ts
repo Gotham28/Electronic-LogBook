@@ -2,7 +2,7 @@ import { Router } from "express";
 import crypto from "node:crypto";
 import { z } from "zod";
 import { db, paymentsTable, subscriptionPlansTable, usersTable } from "@workspace/db";
-import { eq, and, isNull, desc } from "drizzle-orm";
+import { eq, and, isNull, desc, gt, sql } from "drizzle-orm";
 import { requirePaymentToken } from "../middlewares/payment-token.js";
 import { validate } from "../lib/validation.js";
 import { logger } from "../lib/logger.js";
@@ -36,21 +36,34 @@ function razorpayCredentials(): { keyId: string; keySecret: string } | null {
   return { keyId, keySecret };
 }
 
+// An unpaid order is only reused while the payment token that can pay it is still valid.
+const REUSE_WINDOW_MS = 1800000;
+
 router.post("/create-order", validate(z.object({}).strict()), async (req, res) => {
   const credentials = razorpayCredentials();
   if (!credentials) { res.status(503).json({ message: "Payments are not configured" }); return; }
   const userId = req.paymentUser!.id;
+  const lockKey = "payment-order:" + userId;
 
-  const [existingPaid] = await db.select({ id: paymentsTable.id }).from(paymentsTable)
-    .where(and(eq(paymentsTable.userId, userId), eq(paymentsTable.status, "paid"))).limit(1);
-  if (existingPaid) { res.status(409).json({ message: "A completed payment already exists for this account" }); return; }
-
-  const [existingCreated] = await db.select().from(paymentsTable)
-    .where(and(eq(paymentsTable.userId, userId), eq(paymentsTable.status, "created")))
-    .orderBy(desc(paymentsTable.createdAt)).limit(1);
-  if (existingCreated) {
-    res.json({ orderId: existingCreated.razorpayOrderId, amountPaise: existingCreated.amountPaise,
-      currency: existingCreated.currency, keyId: credentials.keyId });
+  // Both checks run under a per-user advisory lock so a concurrent call cannot slip between
+  // them. The Razorpay call below deliberately runs outside any transaction; the second
+  // transaction re-checks under the same lock before inserting.
+  const decided = await db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`);
+    const [paid] = await tx.select({ id: paymentsTable.id }).from(paymentsTable)
+      .where(and(eq(paymentsTable.userId, userId), eq(paymentsTable.status, "paid"))).limit(1);
+    if (paid) return { outcome: "paid" as const };
+    const [reusable] = await tx.select().from(paymentsTable)
+      .where(and(eq(paymentsTable.userId, userId), eq(paymentsTable.status, "created"),
+        gt(paymentsTable.createdAt, new Date(Date.now() - REUSE_WINDOW_MS))))
+      .orderBy(desc(paymentsTable.createdAt)).limit(1);
+    if (reusable) return { outcome: "reuse" as const, row: reusable };
+    return { outcome: "create" as const };
+  });
+  if (decided.outcome === "paid") { res.status(409).json({ message: "A completed payment already exists for this account" }); return; }
+  if (decided.outcome === "reuse") {
+    res.json({ orderId: decided.row.razorpayOrderId, amountPaise: decided.row.amountPaise,
+      currency: decided.row.currency, keyId: credentials.keyId });
     return;
   }
 
@@ -68,6 +81,7 @@ router.post("/create-order", validate(z.object({}).strict()), async (req, res) =
       .where(and(isNull(subscriptionPlansTable.departmentId), eq(subscriptionPlansTable.active, true))).limit(1);
   }
   if (!plan) { res.status(500).json({ message: "No subscription plan is configured" }); return; }
+  const selectedPlan = plan;
 
   let response: Response;
   try {
@@ -78,8 +92,8 @@ router.post("/create-order", validate(z.object({}).strict()), async (req, res) =
         Authorization: "Basic " + Buffer.from(`${credentials.keyId}:${credentials.keySecret}`).toString("base64"),
       },
       body: JSON.stringify({
-        amount: plan.amountPaise,
-        currency: plan.currency,
+        amount: selectedPlan.amountPaise,
+        currency: selectedPlan.currency,
         receipt: crypto.randomUUID(),
         payment_capture: 1,
       }),
@@ -100,13 +114,32 @@ router.post("/create-order", validate(z.object({}).strict()), async (req, res) =
     res.status(502).json({ message: "Unable to create payment order" });
     return;
   }
+  const orderId = order.id;
 
-  await db.insert(paymentsTable).values({
-    userId, planId: plan.id, razorpayOrderId: order.id,
-    amountPaise: plan.amountPaise, currency: plan.currency, status: "created",
+  // Re-check under the same lock: a concurrent request may have inserted its own row while
+  // this one was at Razorpay. The loser's order is left unused at Razorpay, never stored and
+  // never handed to the client, so no applicant is shown two payable orders.
+  const stored = await db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`);
+    const [paid] = await tx.select({ id: paymentsTable.id }).from(paymentsTable)
+      .where(and(eq(paymentsTable.userId, userId), eq(paymentsTable.status, "paid"))).limit(1);
+    if (paid) return { outcome: "paid" as const };
+    const [reusable] = await tx.select().from(paymentsTable)
+      .where(and(eq(paymentsTable.userId, userId), eq(paymentsTable.status, "created"),
+        gt(paymentsTable.createdAt, new Date(Date.now() - REUSE_WINDOW_MS))))
+      .orderBy(desc(paymentsTable.createdAt)).limit(1);
+    if (reusable) return { outcome: "reuse" as const, row: reusable };
+    const [inserted] = await tx.insert(paymentsTable).values({
+      userId, planId: selectedPlan.id, razorpayOrderId: orderId,
+      amountPaise: selectedPlan.amountPaise, currency: selectedPlan.currency, status: "created",
+    }).returning();
+    return { outcome: "inserted" as const, row: inserted };
   });
 
-  res.json({ orderId: order.id, amountPaise: plan.amountPaise, currency: plan.currency, keyId: credentials.keyId });
+  if (stored.outcome === "paid") { res.status(409).json({ message: "A completed payment already exists for this account" }); return; }
+  if (stored.outcome === "reuse") logger.info({ userId }, "Concurrent request won; discarding this duplicate Razorpay order");
+  res.json({ orderId: stored.row.razorpayOrderId, amountPaise: stored.row.amountPaise,
+    currency: stored.row.currency, keyId: credentials.keyId });
 });
 
 const verifyBody = z.object({
@@ -132,8 +165,18 @@ router.post("/verify", validate(verifyBody), async (req, res) => {
   const matches = expectedBuffer.length === providedBuffer.length && crypto.timingSafeEqual(expectedBuffer, providedBuffer);
   if (!matches) { res.status(400).json({ message: "Signature verification failed" }); return; }
 
-  await db.update(paymentsTable).set({ status: "paid", razorpayPaymentId: razorpay_payment_id, updatedAt: new Date() })
-    .where(and(eq(paymentsTable.id, payment.id), eq(paymentsTable.status, "created")));
+  const [updated] = await db.update(paymentsTable).set({ status: "paid", razorpayPaymentId: razorpay_payment_id, updatedAt: new Date() })
+    .where(and(eq(paymentsTable.id, payment.id), eq(paymentsTable.status, "created")))
+    .returning({ id: paymentsTable.id });
+  if (!updated) {
+    // The row was not 'created', so nothing was marked paid. Report what it actually is
+    // rather than the stale copy read above.
+    const [current] = await db.select({ status: paymentsTable.status }).from(paymentsTable)
+      .where(eq(paymentsTable.id, payment.id)).limit(1);
+    if (!current) { res.status(404).json({ message: "Payment order not found" }); return; }
+    res.status(409).json({ message: "This payment cannot be completed", status: current.status });
+    return;
+  }
 
   res.json({ status: "paid" });
 });
