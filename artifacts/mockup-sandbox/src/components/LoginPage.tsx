@@ -6,17 +6,19 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { toast } from "sonner";
-import { apiPost } from "@/lib/apiClient";
+import { apiPost, ApiError } from "@/lib/apiClient";
 import { LoginProductPreview } from "@/components/LoginProductPreview";
 import { saveToken } from "@/lib/session";
+import { PaymentStep } from "@/components/PaymentStep";
 
 export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRegister: () => void }) {
   // Credentials state
   const [username, setUsername] = React.useState("");
   const [password, setPassword] = React.useState("");
-  
+
   const [error, setError] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
+  const [pendingPaymentToken, setPendingPaymentToken] = React.useState<string | null>(null);
 
   const [forgotStep, setForgotStep] = React.useState<0 | 1 | 2 | 3>(0);
   const [resetEmail, setResetEmail] = React.useState("");
@@ -48,6 +50,10 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
       window.sessionStorage.setItem('elogbook-user', JSON.stringify(user));
       onSignIn();
     } catch (err: any) {
+      if (err instanceof ApiError && err.status === 402 && typeof err.data?.paymentToken === "string") {
+        setPendingPaymentToken(err.data.paymentToken);
+        return;
+      }
       setError(err.message || "Failed to sign in. Please check your credentials.");
     } finally {
       setIsLoading(false);
@@ -101,6 +107,21 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
       setIsResetting(false);
     }
   };
+
+  if (pendingPaymentToken) {
+    return (
+      <PaymentStep
+        paymentToken={pendingPaymentToken}
+        onPaid={() => {
+          toast.success("Payment received", {
+            description: "Sign in again once your HOD has approved your account.",
+          });
+          setPendingPaymentToken(null);
+        }}
+        onExit={() => setPendingPaymentToken(null)}
+      />
+    );
+  }
 
   return (
     <div className="medical-grid flex min-h-screen items-center justify-center p-4 md:p-8">
