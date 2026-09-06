@@ -128,7 +128,7 @@ export function RegistrationPage({
 
   return (
     <div className="medical-grid min-h-screen p-4 md:p-8">
-      <div className="glass-panel mx-auto max-w-5xl overflow-hidden rounded-[30px]">
+      <div className="glass-panel mx-auto max-w-5xl overflow-hidden rounded-[30px] motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-4 motion-safe:duration-500 motion-reduce:animate-none">
         <header className="flex items-center justify-between border-b border-white/80 bg-white/65 px-5 py-4 md:px-8">
           <button onClick={onBack} className="flex items-center gap-2 text-xs font-bold text-teal-800">
             <ArrowLeft className="h-4 w-4" /> Back to sign in
@@ -140,7 +140,7 @@ export function RegistrationPage({
         </header>
 
         <div className="grid lg:grid-cols-[.72fr_1.28fr]">
-          <aside className="bg-gradient-to-br from-teal-700 to-cyan-600 p-7 text-white md:p-9">
+          <aside className="bg-gradient-to-br from-teal-700 to-cyan-600 p-7 text-white md:p-9 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-left-4 motion-safe:duration-500 motion-reduce:animate-none">
             <p className="text-[10px] font-bold uppercase tracking-[.2em] text-teal-100">Registration progress</p>
             <h1 className="mt-3 text-3xl font-bold">Create your E-Logbook account</h1>
             <p className="mt-3 text-xs leading-5 text-teal-50/85">
@@ -158,7 +158,7 @@ export function RegistrationPage({
           </aside>
 
           <main className="bg-white/82 p-6 md:p-9">
-              <form onSubmit={completeRegistration} className="space-y-5">
+              <form onSubmit={completeRegistration} className="space-y-5 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-3 motion-safe:duration-500 motion-reduce:animate-none">
                 <div>
                   <h2 className="mt-1 text-3xl font-bold">Student details</h2>
                   <p className="mt-2 text-sm text-slate-500">All fields must match the official admission record.</p>
@@ -218,7 +218,7 @@ export function RegistrationPage({
                     </Select>
                   </Field>
                   {departmentsLoading && <p role="status" className="text-sm text-slate-500">Loading departments…</p>}
-                  {departmentError && <p role="alert" className="text-sm text-rose-700">{departmentError} <button type="button" className="underline" onClick={loadDepartments}>Try again</button></p>}
+                  {departmentError && <p role="alert" className="text-sm text-rose-700">We could not load the department directory. Check that the API is running with the current branch, then <button type="button" className="font-semibold underline underline-offset-2" onClick={loadDepartments}>try again</button>.</p>}
                   {!departmentsLoading && !departmentError && !departments.length && <p className="text-sm text-slate-500">No departments are accepting registrations yet. Contact your institution.</p>}
                   <Field label="University ID" htmlFor="registration-university-id"><Input id="registration-university-id" value={form.kuhsId} onChange={(e) => setForm({ ...form, kuhsId: e.target.value })} required /></Field>
                   <Field label="University registration number" htmlFor="registration-number"><Input id="registration-number" value={form.registrationNumber} onChange={(e) => setForm({ ...form, registrationNumber: e.target.value })} required /></Field>
@@ -260,7 +260,7 @@ function Summary({ label, value }: { label: string; value: string }) {
 
 function Step({ number, title, active, complete }: { number: string; title: string; active: boolean; complete: boolean }) {
   return (
-    <div className={`flex items-center gap-3 rounded-2xl border p-3 ${active ? "border-white/35 bg-white/15" : "border-white/10 bg-white/5"}`}>
+    <div className={`flex items-center gap-3 rounded-2xl border p-3 ${active ? "border-white/35 bg-white/15 motion-safe:animate-pulse-soft motion-reduce:animate-none" : "border-white/10 bg-white/5"}`}>
       <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white text-xs font-bold text-teal-700">
         {complete ? <BadgeCheck className="h-4 w-4" /> : number}
       </span>
