@@ -27,9 +27,29 @@ app.use(
   }),
 );
 const frontendUrl = process.env.FRONTEND_URL;
-if (process.env.NODE_ENV === "production" && !frontendUrl) throw new Error("FRONTEND_URL is required in production");
+const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? frontendUrl ?? "")
+  .split(",")
+  .map((entry) => entry.trim().replace(/\/+$/, "").toLowerCase())
+  .filter((entry) => entry.length > 0);
+
+if (process.env.NODE_ENV === "production" && allowedOrigins.length === 0) {
+  throw new Error("ALLOWED_ORIGINS is required in production");
+}
+
 app.disable("x-powered-by");
-app.use(cors({ origin: frontendUrl || false, credentials: true }));
+app.use(
+  cors({
+    origin(requestOrigin, callback) {
+      // Requests without an Origin header are not browser cross-origin requests.
+      if (!requestOrigin) {
+        callback(null, true);
+        return;
+      }
+      callback(null, allowedOrigins.includes(requestOrigin.toLowerCase()));
+    },
+    credentials: true,
+  }),
+);
 app.use(cookieParser());
 app.use((req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
@@ -40,7 +60,7 @@ app.use((req, res, next) => {
     }
     const origin = req.headers.origin;
     const ownOrigin = `${req.protocol}://${req.get("host")}`;
-    if (origin && origin !== frontendUrl && origin !== ownOrigin) {
+    if (origin && origin !== ownOrigin && !allowedOrigins.includes(origin.toLowerCase().replace(/\/+$/, ""))) {
       res.status(403).json({ message: "Untrusted request origin" }); return;
     }
     if (req.cookies?.token && !req.headers.authorization && !origin) {
