@@ -25,9 +25,12 @@ It stores:
 - Patient clinical detail — UHID, complaints, history, examination, diagnoses.
 - Resident personal data — including leave reasons, which can disclose health conditions.
 
-There is **no automated test suite, no staging environment, and no database migration
-history.** Mistakes are caught by people, late, and cannot be rolled back. Every rule below
-exists because of that.
+There is a test suite at `artifacts/api-server/tests/` — `access.test.ts`,
+`migrations.test.ts`, `support.ts` and `database.ts`. `tests/migrations.test.ts` runs the
+real migrations against in-process PGlite, so it requires no database and is safe to run.
+
+There is still **no staging environment.** Mistakes are caught by people, late, and cannot
+be rolled back. Every rule below exists because of that.
 
 ---
 
@@ -216,6 +219,22 @@ Every agent report states:
 - Anything that contradicts the task instructions or this file.
 
 If an instruction in a task conflicts with this file, **stop and say so.** Do not pick one.
+
+---
+
+## 13. Committed credentials
+
+Seven tracked scripts in `lib/db/` hardcode a production database connection string as a
+`||` fallback: `check_reetha.mjs`, `check_reetha_student.mjs`, `check_schema.mjs`,
+`check_schema_exact.mjs`, `delete_reetha.mjs`, `query_reetha.mjs`, `query_tables.mjs`.
+
+They entered history at commit `10bbd69` and are on `origin/main`.
+
+The pattern **fails open**: with `DATABASE_URL` unset they silently target production. One
+of them is named `delete_reetha.mjs`. `phase0.js` at the repository root also reads
+`DATABASE_URL`.
+
+Removing these scripts and purging the credential from history is an open task.
 
 ---
 

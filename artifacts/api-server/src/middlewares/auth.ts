@@ -33,7 +33,13 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   }
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ["HS256"] }) as AuthUser;
+    const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ["HS256"] }) as AuthUser & { scope?: string };
+    // A payment token (scope: "payment") is issued to pending applicants who cannot pass
+    // this check. It must never be accepted as a session token.
+    if (decoded.scope === "payment") {
+      res.status(401).json({ message: "Invalid session" });
+      return;
+    }
     if (!Number.isSafeInteger(decoded.id) || decoded.id <= 0) {
       res.status(401).json({ message: "Invalid session" });
       return;
