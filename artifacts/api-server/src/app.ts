@@ -26,12 +26,13 @@ app.use(
     },
   }),
 );
-const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? "")
+const localFrontendUrl = process.env.FRONTEND_URL ?? "http://localhost:5173";
+const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? (process.env.NODE_ENV === "production" ? "" : localFrontendUrl))
   .split(",")
   .map((entry) => entry.trim().replace(/\/+$/, "").toLowerCase())
   .filter((entry) => entry.length > 0);
 
-if (allowedOrigins.length === 0) {
+if (process.env.NODE_ENV === "production" && allowedOrigins.length === 0) {
   throw new Error(
     "Missing required environment variable: ALLOWED_ORIGINS (comma-separated list of allowed browser origins)",
   );
