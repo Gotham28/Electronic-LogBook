@@ -10,7 +10,7 @@ import { engine, migrationConnection, db, departmentsTable, usersTable, students
 process.env.JWT_SECRET = randomBytes(48).toString("hex");
 process.env.NODE_ENV = "test";
 process.env.LOG_LEVEL = "silent";
-process.env.FRONTEND_URL = "http://localhost:5173";
+process.env.ALLOWED_ORIGINS = "http://localhost:5173";
 // Tests capture outbound codes; this transport is never part of the application bundle.
 export const mail = new Map<string, string>();
 nodemailer.createTransport = (() => ({ sendMail: async (message: any) => {

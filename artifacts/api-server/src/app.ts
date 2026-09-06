@@ -26,21 +26,23 @@ app.use(
     },
   }),
 );
-const frontendUrl = process.env.FRONTEND_URL;
-const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? frontendUrl ?? "")
+const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? "")
   .split(",")
   .map((entry) => entry.trim().replace(/\/+$/, "").toLowerCase())
   .filter((entry) => entry.length > 0);
 
-if (process.env.NODE_ENV === "production" && allowedOrigins.length === 0) {
-  throw new Error("ALLOWED_ORIGINS is required in production");
+if (allowedOrigins.length === 0) {
+  throw new Error(
+    "Missing required environment variable: ALLOWED_ORIGINS (comma-separated list of allowed browser origins)",
+  );
 }
 
 app.disable("x-powered-by");
 app.use(
   cors({
     origin(requestOrigin, callback) {
-      // Requests without an Origin header are not browser cross-origin requests.
+      // Requests without an Origin header are not browser cross-origin requests
+      // (curl, health checks, server-to-server), so the allowlist does not apply.
       if (!requestOrigin) {
         callback(null, true);
         return;
