@@ -19,29 +19,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
-import { formatLogbookDate } from "@/lib/logbook-config";
+import { formatLogbookDate, expectedCompletionDate } from "@/lib/logbook-config";
 import { apiGet } from "@/lib/apiClient";
 import { getCurrentUser } from "@/lib/session";
-
-// Calculate expected completion by adding 3 years to dateOfJoining
-function calculateExpectedCompletion(dateOfJoining: string) {
-  if (!dateOfJoining) return "Unknown";
-  try {
-    const d = new Date(dateOfJoining);
-    d.setFullYear(d.getFullYear() + 3);
-    return d.toISOString().slice(0, 10);
-  } catch {
-    return "Unknown";
-  }
-}
+import { useDepartment } from "@/lib/department-context";
 
 export function Dashboard() {
+  const { config: departmentConfig } = useDepartment();
+  const deptConfig = departmentConfig;
   const user = React.useMemo(() => getCurrentUser(), []);
   const [logs, setLogs] = React.useState<any>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
-  const [deptConfig, setDeptConfig] = React.useState({ requiredCases: 50, requiredProcedures: 101, requiredAcademic: 50 });
-
   const fetchDashboardData = React.useCallback(async () => {
     if (!user?.studentProfileId) {
       setError("No student profile ID found. Please log in as a student.");
@@ -51,12 +40,8 @@ export function Dashboard() {
     try {
       setIsLoading(true);
       setError(null);
-      const [logsData, configData] = await Promise.all([
-        apiGet(`/api/students/${user.studentProfileId}/logs`),
-        apiGet(`/api/departments/${user.departmentId}/config`).catch(() => null)
-      ]);
+      const logsData = await apiGet(`/api/students/${user.studentProfileId}/logs`);
       setLogs(logsData);
-      if (configData) setDeptConfig(configData);
     } catch (err: any) {
       setError(err.message || "Failed to load dashboard data");
     } finally {
@@ -92,14 +77,13 @@ export function Dashboard() {
   if (!logs) return null;
 
   const categories = [
-    { label: "Clinical cases", logged: logs.caseLogs?.length || 0, required: deptConfig.requiredCases, icon: FileText, href: "/cases", tone: "from-teal-500 to-cyan-500" },
-    { label: "Procedures", logged: logs.procedureLogs?.length || 0, required: deptConfig.requiredProcedures, icon: Stethoscope, href: "/procedures", tone: "from-cyan-500 to-sky-500" },
-    { label: "Case discussions", logged: logs.academicLogs?.length || 0, required: deptConfig.requiredAcademic, icon: GraduationCap, href: "/academics", tone: "from-emerald-500 to-teal-500" },
+    { label: "Clinical cases", logged: logs.caseLogs?.length || 0, required: deptConfig?.requiredCases ?? 0, verified: logs.caseLogs?.filter((l: any) => l.status === "verified").length || 0, icon: FileText, href: "/cases", tone: "from-teal-500 to-cyan-500" },
+    { label: "Procedures", logged: logs.procedureLogs?.length || 0, required: deptConfig?.requiredProcedures ?? 0, verified: logs.procedureLogs?.filter((l: any) => l.status === "verified").length || 0, icon: Stethoscope, href: "/procedures", tone: "from-cyan-500 to-sky-500" },
+    { label: "Case discussions", logged: logs.academicLogs?.length || 0, required: deptConfig?.requiredAcademic ?? 0, verified: logs.academicLogs?.filter((l: any) => l.status === "verified").length || 0, icon: GraduationCap, href: "/academics", tone: "from-emerald-500 to-teal-500" },
   ];
 
-  const completion = Math.round(
-    categories.reduce((sum, item) => sum + Math.min(item.logged / item.required, 1), 0) / categories.length * 100,
-  );
+  const configured = categories.filter((item) => item.required > 0);
+  const completion = configured.length ? Math.round(configured.reduce((sum, item) => sum + Math.min(item.verified / item.required, 1), 0) / configured.length * 100) : 0;
 
   const mappedCaseLogs = (logs.caseLogs || []).map((l: any) => ({
     number: l.id, date: l.date, type: "Case", title: l.diagnosisProvisional || "Case Log", patientUhid: l.patientUhid, status: l.status, timestamp: new Date(l.createdAt).getTime()
@@ -115,13 +99,14 @@ export function Dashboard() {
     .sort((a, b) => b.timestamp - a.timestamp)
     .slice(0, 5);
 
-  const overallRemaining = categories.reduce((sum, item) => sum + Math.max(item.required - item.logged, 0), 0);
+  const overallRemaining = categories.reduce((sum, item) => sum + Math.max(item.required - item.verified, 0), 0);
   const pendingCount = [...(logs.caseLogs || []), ...(logs.procedureLogs || []), ...(logs.academicLogs || [])]
     .filter((entry: any) => entry.status === "pending").length;
   const progressLabel = completion >= 75 ? "On track" : completion >= 40 ? "Needs attention" : "Getting started";
 
   return (
     <div className="section-spacing pb-12">
+      {!configured.length && <p className="rounded-xl bg-teal-50 p-4 text-sm text-teal-800">Your HOD has not configured completion targets yet.</p>}
       <Card className="overflow-hidden border-white/70 bg-white/72 layer-2 animate-float-up">
         <div className="h-1.5 bg-gradient-to-r from-teal-500 via-cyan-400 to-emerald-400" />
         <CardContent className="p-6 md:p-8">
@@ -150,7 +135,7 @@ export function Dashboard() {
                   <ProfileField label="Registration number" value={logs.profile?.registrationNumber || "—"} />
                   <ProfileField label="Department" value={logs.profile?.department || "Unassigned"} />
                   <ProfileField label="Date of joining" value={formatLogbookDate(logs.profile?.dateOfJoining || "—")} />
-                  <ProfileField label="Expected completion" value={formatLogbookDate(calculateExpectedCompletion(logs.profile?.dateOfJoining))} />
+                  <ProfileField label="Expected completion" value={formatLogbookDate(expectedCompletionDate(logs.profile?.dateOfJoining, deptConfig?.programDurationMonths) || "Not configured")} />
                 </div>
               </CardContent>
             </Card>
@@ -172,7 +157,7 @@ export function Dashboard() {
             </div>
             <div className="space-y-4 rounded-[22px] border border-slate-100 bg-slate-50/75 p-5">
               {categories.map((item) => {
-                const percent = Math.min(Math.round(item.logged / item.required * 100), 100);
+                const percent = item.required > 0 ? Math.min(Math.round(item.verified / item.required * 100), 100) : 0;
                 return (
                   <div key={item.label}>
                     <div className="mb-2 flex items-center justify-between text-xs">
@@ -191,8 +176,8 @@ export function Dashboard() {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {categories.map((item) => {
           const Icon = item.icon;
-          const percent = Math.min(Math.round(item.logged / item.required * 100), 100);
-          const remaining = Math.max(item.required - item.logged, 0);
+          const percent = item.required > 0 ? Math.min(Math.round(item.verified / item.required * 100), 100) : 0;
+          const remaining = Math.max(item.required - item.verified, 0);
           return (
             <Link key={item.label} href={item.href}>
               <Card className="h-full cursor-pointer border-white/70 bg-white/76 shadow-[0_18px_48px_rgba(15,23,42,0.05)] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_24px_70px_rgba(15,23,42,0.08)]">

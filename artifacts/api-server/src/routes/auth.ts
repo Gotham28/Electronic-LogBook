@@ -1,502 +1,177 @@
-import { Router, type IRouter } from "express";
+import { Router } from "express";
+import { randomInt } from "node:crypto";
+import { z } from "zod";
 import { db, usersTable, studentsTable, departmentsTable, registrationOtpsTable, passwordResetsTable } from "@workspace/db";
-import { eq, ilike, and, desc } from "drizzle-orm";
+import { eq, and, desc, gt, lt, sql } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { sendOtpEmail, sendPasswordResetEmail } from "../lib/mailer.js";
 import { requireAuth } from "../middlewares/auth.js";
 import { JWT_SECRET } from "../lib/env.js";
+import { dateSchema, emailSchema, idSchema, nameSchema, passwordSchema, validate } from "../lib/validation.js";
 
-const router: IRouter = Router();
+const router = Router();
+const cookieOptions = { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax" as const, path: "/" };
 
-router.post("/send-otp", async (req, res) => {
-  const { email } = req.body;
-  if (!email) {
-    res.status(400).json({ message: "Email is required" });
-    return;
+// Bounded per-process throttling supplements single-use, attempt-limited database codes.
+// Multi-instance deployments must also rate-limit at their shared gateway.
+const attempts = new Map<string, { count: number; expires: number }>();
+router.use((req, res, next) => {
+  if (req.method !== "POST") { next(); return; }
+  const now = Date.now();
+  for (const [key, value] of attempts) if (value.expires <= now) attempts.delete(key);
+  const key = req.ip || "unknown";
+  const entry = attempts.get(key);
+  if ((!entry && attempts.size >= 5000) || (entry && entry.count >= 100)) {
+    res.setHeader("Retry-After", "900");
+    res.status(429).json({ message: "Too many authentication attempts. Try again later." }); return;
   }
+  attempts.set(key, { count: (entry?.count || 0) + 1, expires: entry?.expires || now + 900000 });
+  next();
+});
 
+const emailBody = z.object({ email: emailSchema }).strict();
+const verifyBody = z.object({ email: emailSchema, otp: z.string().regex(/^\d{6}$/) }).strict();
+
+function proofMatches(token: unknown, purpose: string, email: string, id: number): boolean {
   try {
-    const existingUser = await db.select().from(usersTable).where(eq(usersTable.email, email)).limit(1);
-    if (existingUser.length > 0) {
-      res.status(400).json({ message: "Email already registered" });
-      return;
-    }
+    if (typeof token !== "string") return false;
+    const payload = jwt.verify(token, JWT_SECRET, { algorithms: ["HS256"] }) as jwt.JwtPayload;
+    return payload.purpose === purpose && payload.email === email && payload.otpId === id;
+  } catch { return false; }
+}
 
-    const recentOtp = await db.select().from(registrationOtpsTable)
-      .where(eq(registrationOtpsTable.email, email))
-      .orderBy(desc(registrationOtpsTable.createdAt))
-      .limit(1);
-
-    const now = new Date();
-    if (recentOtp.length > 0) {
-      const timeSinceCreation = now.getTime() - new Date(recentOtp[0].createdAt).getTime();
-      if (timeSinceCreation < 60000) {
-        res.status(429).json({ message: "Please wait 60 seconds before requesting another OTP" });
-        return;
-      }
-    }
-
-    await db.delete(registrationOtpsTable).where(
-      and(eq(registrationOtpsTable.email, email), eq(registrationOtpsTable.verified, false))
-    );
-
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+for (const flow of [
+  { send: "/send-otp", verify: "/verify-otp", table: registrationOtpsTable, purpose: "registration", mail: sendOtpEmail },
+  { send: "/forgot-password", verify: "/verify-reset-otp", table: passwordResetsTable, purpose: "password-reset", mail: sendPasswordResetEmail },
+] as const) {
+  router.post(flow.send, validate(emailBody), async (req, res) => {
+    const { email } = req.body;
+    const [account] = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.email, email)).limit(1);
+    const eligible = flow.purpose === "registration" ? !account : !!account;
+    const message = "If this email is eligible, a verification code has been sent.";
+    if (!eligible) { res.json({ message }); return; }
+    const otp = randomInt(100000, 1000000).toString();
     const otpHash = await bcrypt.hash(otp, 10);
-    const expiresAt = new Date(now.getTime() + 10 * 60000);
-
-    await db.insert(registrationOtpsTable).values({
-      email,
-      otpHash,
-      expiresAt,
+    const issued = await db.transaction(async (tx) => {
+      // Serialize issuance for this email across API instances; concurrent sends cannot reset attempts.
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${flow.purpose + ":" + email}))`);
+      const [recent] = await tx.select().from(flow.table).where(eq(flow.table.email, email)).orderBy(desc(flow.table.createdAt)).limit(1);
+      if (recent && Date.now() - recent.createdAt.getTime() < 60000) return false;
+      await tx.delete(flow.table).where(eq(flow.table.email, email));
+      await tx.insert(flow.table).values({ email, otpHash, expiresAt: new Date(Date.now() + 600000) });
+      return true;
     });
-
-    await sendOtpEmail(email, otp);
-
-    res.status(200).json({ message: "OTP sent" });
-  } catch (error) {
-    req.log.error(error, "Error sending OTP");
-    res.status(500).json({ message: "Internal server error" });
-  }
-});
-
-router.post("/verify-otp", async (req, res) => {
-  const { email, otp } = req.body;
-  if (!email || !otp) {
-    res.status(400).json({ message: "Email and OTP are required" });
-    return;
-  }
-
-  try {
-    const latestOtp = await db.select().from(registrationOtpsTable)
-      .where(eq(registrationOtpsTable.email, email))
-      .orderBy(desc(registrationOtpsTable.createdAt))
-      .limit(1);
-
-    if (latestOtp.length === 0) {
-      res.status(400).json({ message: "No OTP found for this email" });
-      return;
-    }
-
-    const otpRecord = latestOtp[0];
-
-    if (new Date() > new Date(otpRecord.expiresAt)) {
-      res.status(400).json({ message: "OTP has expired" });
-      return;
-    }
-
-    const isValid = await bcrypt.compare(otp, otpRecord.otpHash);
-    if (!isValid) {
-      res.status(400).json({ message: "Invalid OTP" });
-      return;
-    }
-
-    await db.update(registrationOtpsTable)
-      .set({ verified: true })
-      .where(eq(registrationOtpsTable.id, otpRecord.id));
-
-    res.status(200).json({ message: "Email verified" });
-  } catch (error) {
-    req.log.error(error, "Error verifying OTP");
-    res.status(500).json({ message: "Internal server error" });
-  }
-});
-
-// ==========================================
-// FORGOT PASSWORD FLOW
-// ==========================================
-router.post("/forgot-password", async (req, res) => {
-  const { email } = req.body;
-  if (!email) {
-    res.status(400).json({ message: "Email is required" });
-    return;
-  }
-
-  try {
-    const existingUser = await db.select().from(usersTable).where(eq(usersTable.email, email)).limit(1);
-    
-    // If user exists, process OTP. Otherwise do nothing but still return success.
-    if (existingUser.length > 0) {
-      const recentOtp = await db.select().from(passwordResetsTable)
-        .where(eq(passwordResetsTable.email, email))
-        .orderBy(desc(passwordResetsTable.createdAt))
-        .limit(1);
-
-      const now = new Date();
-      if (recentOtp.length > 0) {
-        const timeSinceCreation = now.getTime() - new Date(recentOtp[0].createdAt).getTime();
-        if (timeSinceCreation < 60000) {
-          res.status(429).json({ message: "Please wait 60 seconds before requesting another code" });
-          return;
-        }
-      }
-
-      await db.delete(passwordResetsTable).where(
-        and(eq(passwordResetsTable.email, email), eq(passwordResetsTable.verified, false))
-      );
-
-      const otp = Math.floor(100000 + Math.random() * 900000).toString();
-      const otpHash = await bcrypt.hash(otp, 10);
-      const expiresAt = new Date(now.getTime() + 10 * 60000);
-
-      await db.insert(passwordResetsTable).values({ email, otpHash, expiresAt });
-      
-      await sendPasswordResetEmail(email, otp); 
-    }
-
-    res.status(200).json({ message: "If an account exists with this email, a reset code has been sent." });
-  } catch (error) {
-    req.log.error(error, "Error in forgot password");
-    res.status(500).json({ message: "Internal server error" });
-  }
-});
-
-router.post("/verify-reset-otp", async (req, res) => {
-  const { email, otp } = req.body;
-  if (!email || !otp) {
-    res.status(400).json({ message: "Email and OTP are required" });
-    return;
-  }
-
-  try {
-    const latestOtp = await db.select().from(passwordResetsTable)
-      .where(eq(passwordResetsTable.email, email))
-      .orderBy(desc(passwordResetsTable.createdAt))
-      .limit(1);
-
-    if (latestOtp.length === 0) {
-      res.status(400).json({ message: "No OTP found for this email" });
-      return;
-    }
-    
-    const otpRecord = latestOtp[0];
-    if (new Date() > new Date(otpRecord.expiresAt)) {
-      res.status(400).json({ message: "OTP has expired" });
-      return;
-    }
-    
-    const isValid = await bcrypt.compare(otp, otpRecord.otpHash);
-    if (!isValid) {
-      res.status(400).json({ message: "Invalid OTP" });
-      return;
-    }
-
-    await db.update(passwordResetsTable).set({ verified: true }).where(eq(passwordResetsTable.id, otpRecord.id));
-    res.status(200).json({ message: "Code verified" });
-  } catch (error) {
-    req.log.error(error, "Error verifying reset OTP");
-    res.status(500).json({ message: "Internal server error" });
-  }
-});
-
-router.post("/reset-password", async (req, res) => {
-  const { email, newPassword } = req.body;
-  if (!email || !newPassword) {
-    res.status(400).json({ message: "Email and new password are required" });
-    return;
-  }
-
-  if (newPassword.length < 8) {
-    res.status(400).json({ message: "Password must be at least 8 characters" });
-    return;
-  }
-
-  try {
-    const verifiedOtp = await db.select().from(passwordResetsTable)
-      .where(and(eq(passwordResetsTable.email, email), eq(passwordResetsTable.verified, true)))
-      .orderBy(desc(passwordResetsTable.createdAt))
-      .limit(1);
-
-    if (verifiedOtp.length === 0 || new Date() > new Date(verifiedOtp[0].expiresAt)) {
-      res.status(400).json({ message: "Email not verified or session expired." });
-      return;
-    }
-
-    const passwordHash = await bcrypt.hash(newPassword, 10);
-    await db.update(usersTable).set({ passwordHash }).where(eq(usersTable.email, email));
-    await db.delete(passwordResetsTable).where(eq(passwordResetsTable.email, email));
-
-    res.status(200).json({ message: "Password reset successfully" });
-  } catch (error) {
-    req.log.error(error, "Error resetting password");
-    res.status(500).json({ message: "Internal server error" });
-  }
-});
-
-router.post("/register", async (req, res) => {
-  try {
-    const { 
-      fullName, 
-      email, 
-      password, 
-      registrationNumber, 
-      batch, 
-      dateOfJoining, 
-      kuhsId, 
-      specialty 
-    } = req.body;
-
-    if (!fullName || !email || !password || !registrationNumber || !batch || !dateOfJoining || !kuhsId || !specialty) {
-      res.status(400).json({ message: "All fields are required" });
-      return;
-    }
-
-    const verifiedOtp = await db.select().from(registrationOtpsTable)
-      .where(
-        and(
-          eq(registrationOtpsTable.email, email),
-          eq(registrationOtpsTable.verified, true)
-        )
-      )
-      .orderBy(desc(registrationOtpsTable.createdAt))
-      .limit(1);
-
-    if (verifiedOtp.length === 0 || new Date() > new Date(verifiedOtp[0].expiresAt)) {
-      res.status(400).json({ message: "Email not verified. Please verify your email before registering." });
-      return;
-    }
-
-    // Check if email or reg number exists
-    const existingUser = await db.select().from(usersTable).where(eq(usersTable.email, email)).limit(1);
-    if (existingUser.length > 0) {
-      res.status(400).json({ message: "Email already registered" });
-      return;
-    }
-
-    const existingStudent = await db.select().from(studentsTable).where(eq(studentsTable.registrationNumber, registrationNumber)).limit(1);
-    if (existingStudent.length > 0) {
-      res.status(400).json({ message: "Registration number already registered" });
-      return;
-    }
-
-    // Lookup departmentId from specialty
-    if (!specialty) {
-      res.status(400).json({ message: "Specialty (Department) is required" });
-      return;
-    }
-
-    const deptMatch = await db
-      .select()
-      .from(departmentsTable)
-      .where(ilike(departmentsTable.name, specialty))
-      .limit(1);
-      
-    if (deptMatch.length === 0) {
-      res.status(400).json({ message: `Invalid department: ${specialty}` });
-      return;
-    }
-    
-    const departmentId = deptMatch[0].id;
-
-    const passwordHash = await bcrypt.hash(password, 10);
-
-    // Insert user (defaults to role: student, status: pending)
-    const [newUser] = await db.insert(usersTable).values({
-      fullName,
-      email,
-      passwordHash,
-      role: "student",
-      status: "pending",
-      departmentId,
-    }).returning();
-
-    // Insert student profile
-    await db.insert(studentsTable).values({
-      userId: newUser.id,
-      registrationNumber,
-      batch,
-      dateOfJoining,
-      kuhsId,
-      specialty
-    });
-
-    await db.delete(registrationOtpsTable).where(eq(registrationOtpsTable.email, email));
-
-    res.status(201).json({ message: "Registration successful. Pending HOD approval." });
-  } catch (error) {
-    req.log.error(error, "Registration error");
-    res.status(500).json({ message: "Internal server error" });
-  }
-});
-
-router.post("/login", async (req, res) => {
-  try {
-    const { username, password } = req.body;
-
-    if (!username || !password) {
-      res.status(400).json({ message: "Username and password are required" });
-      return;
-    }
-
-    let userRow = null;
-
-    // Check usersTable (email)
-    const match = await db
-      .select()
-      .from(usersTable)
-      .where(eq(usersTable.email, username))
-      .limit(1);
-    
-    if (match.length > 0) {
-      userRow = match[0];
-    } else {
-      // Fallback: Check registration number for students
-      const studentMatch = await db
-        .select()
-        .from(studentsTable)
-        .where(eq(studentsTable.registrationNumber, username))
-        .limit(1);
-
-      if (studentMatch.length > 0) {
-        const studentUserMatch = await db
-          .select()
-          .from(usersTable)
-          .where(eq(usersTable.id, studentMatch[0].userId))
-          .limit(1);
-        
-        if (studentUserMatch.length > 0) {
-          userRow = studentUserMatch[0];
-        }
-      }
-    }
-
-    if (!userRow || !userRow.passwordHash) {
-      res.status(401).json({ message: "Invalid credentials" });
-      return;
-    }
-
-    const isMatch = await bcrypt.compare(password, userRow.passwordHash);
-    if (!isMatch) {
-      res.status(401).json({ message: "Invalid credentials" });
-      return;
-    }
-
-    if (userRow.status === "pending") {
-      res.status(403).json({ message: "Account pending HOD approval" });
-      return;
-    }
-
-    if (userRow.status === "rejected") {
-      res.status(403).json({ message: "Account rejected by HOD" });
-      return;
-    }
-
-    const token = jwt.sign(
-      { id: userRow.id, role: userRow.role, departmentId: userRow.departmentId },
-      JWT_SECRET,
-      { expiresIn: "1d" }
-    );
-
-    res.cookie("token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-      maxAge: 24 * 60 * 60 * 1000 // 1 day
-    });
-
-    let studentProfileId = null;
-    if (userRow.role === "student") {
-      const studentProfileMatch = await db
-        .select()
-        .from(studentsTable)
-        .where(eq(studentsTable.userId, userRow.id))
-        .limit(1);
-      
-      if (studentProfileMatch.length > 0) {
-        studentProfileId = studentProfileMatch[0].id;
-      }
-    }
-
-    res.json({
-      id: userRow.id,
-      name: userRow.fullName,
-      role: userRow.role,
-      departmentId: userRow.departmentId,
-      studentProfileId,
-      token, // returned so clients that can't use cross-site cookies (Samsung, Safari) can send it as a Bearer token
-    });
-  } catch (error) {
-    req.log.error(error, "Login error");
-    res.status(500).json({ message: "Internal server error" });
-  }
-});
-
-router.post("/logout", (req, res) => {
-  res.clearCookie("token", {
-    secure: process.env.NODE_ENV === "production",
-    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax"
+    if (!issued) { res.status(429).json({ message: "Please wait 60 seconds before requesting another code" }); return; }
+    await flow.mail(email, otp);
+    res.json({ message });
   });
-  res.json({ message: "Logged out successfully" });
+
+  router.post(flow.verify, validate(verifyBody), async (req, res) => {
+    const { email, otp } = req.body;
+    const [latest] = await db.select().from(flow.table).where(eq(flow.table.email, email)).orderBy(desc(flow.table.createdAt)).limit(1);
+    if (!latest) { res.status(400).json({ message: "Invalid or expired code" }); return; }
+    const [record] = await db.update(flow.table).set({ attempts: sql`${flow.table.attempts} + 1` })
+      .where(and(eq(flow.table.id, latest.id), eq(flow.table.verified, false), gt(flow.table.expiresAt, new Date()), lt(flow.table.attempts, 5))).returning();
+    if (!record || !(await bcrypt.compare(otp, record.otpHash))) {
+      res.status(400).json({ message: "Invalid or expired code" }); return;
+    }
+    const [verified] = await db.update(flow.table).set({ verified: true })
+      .where(and(eq(flow.table.id, record.id), eq(flow.table.verified, false))).returning();
+    if (!verified) { res.status(400).json({ message: "Code has already been used" }); return; }
+    const verificationToken = jwt.sign({ purpose: flow.purpose, email, otpId: record.id }, JWT_SECRET, { expiresIn: "10m" });
+    res.json({ message: "Email verified", verificationToken });
+  });
+}
+
+const registrationBody = z.object({ fullName: nameSchema, email: emailSchema, password: passwordSchema,
+  registrationNumber: nameSchema, batch: z.string().trim().min(1).max(40), dateOfJoining: dateSchema,
+  kuhsId: nameSchema, departmentId: idSchema, verificationToken: z.string().min(1).max(2048) }).strict();
+
+router.post("/register", validate(registrationBody), async (req, res) => {
+  const body = req.body as z.infer<typeof registrationBody>;
+  const [department] = await db.select({ id: departmentsTable.id, name: departmentsTable.name }).from(departmentsTable)
+    .innerJoin(usersTable, and(eq(usersTable.departmentId, departmentsTable.id), eq(usersTable.role, "hod"), eq(usersTable.status, "approved")))
+    .where(eq(departmentsTable.id, body.departmentId)).limit(1);
+  if (!department) { res.status(400).json({ message: "Choose an available department" }); return; }
+  const [code] = await db.select().from(registrationOtpsTable).where(and(eq(registrationOtpsTable.email, body.email),
+    eq(registrationOtpsTable.verified, true), gt(registrationOtpsTable.expiresAt, new Date()))).orderBy(desc(registrationOtpsTable.createdAt)).limit(1);
+  if (!code || !proofMatches(body.verificationToken, "registration", body.email, code.id)) {
+    res.status(400).json({ message: "Please verify your email before registering" }); return;
+  }
+  const passwordHash = await bcrypt.hash(body.password, 12);
+  const created = await db.transaction(async (tx) => {
+    const [consumed] = await tx.delete(registrationOtpsTable).where(and(eq(registrationOtpsTable.id, code.id),
+      eq(registrationOtpsTable.verified, true), gt(registrationOtpsTable.expiresAt, new Date()))).returning();
+    if (!consumed) return false;
+    const [user] = await tx.insert(usersTable).values({ fullName: body.fullName, email: body.email, passwordHash,
+      role: "student", status: "pending", departmentId: department.id }).returning({ id: usersTable.id });
+    await tx.insert(studentsTable).values({ userId: user.id, registrationNumber: body.registrationNumber, batch: body.batch,
+      dateOfJoining: body.dateOfJoining, kuhsId: body.kuhsId, specialty: department.name });
+    return true;
+  });
+  if (!created) { res.status(409).json({ message: "Verification has already been used" }); return; }
+  res.status(201).json({ message: "Registration successful. Pending your department HOD's approval." });
 });
 
-router.get("/me", async (req, res) => {
-  let token = req.cookies?.token;
-  if (!token && req.headers.authorization?.startsWith("Bearer ")) {
-    token = req.headers.authorization.split(" ")[1];
-  }
+async function sessionProfile(id: number) {
+  const [row] = await db.select({ id: usersTable.id, name: usersTable.fullName, role: usersTable.role,
+    departmentId: usersTable.departmentId, departmentName: departmentsTable.name, studentProfileId: studentsTable.id })
+    .from(usersTable).leftJoin(departmentsTable, eq(usersTable.departmentId, departmentsTable.id))
+    .leftJoin(studentsTable, eq(studentsTable.userId, usersTable.id)).where(eq(usersTable.id, id)).limit(1);
+  return row;
+}
 
-  if (!token) {
-    res.status(401).json({ message: "Not authenticated" });
-    return;
+router.post("/login", validate(z.object({ username: z.string().trim().min(1).max(254), password: z.string().min(1).max(72) }).strict()), async (req, res) => {
+  const { username, password } = req.body;
+  let user = (await db.select().from(usersTable).where(eq(usersTable.email, username.toLowerCase())).limit(1))[0];
+  if (!user) {
+    const [student] = await db.select({ user: usersTable }).from(studentsTable).innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
+      .where(eq(studentsTable.registrationNumber, username)).limit(1);
+    user = student?.user;
   }
-
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
-    const [userRow] = await db.select().from(usersTable).where(eq(usersTable.id, decoded.id)).limit(1);
-    
-    if (!userRow) {
-      res.status(401).json({ message: "User not found" });
-      return;
-    }
-
-    res.json({
-      id: userRow.id,
-      name: userRow.fullName,
-      role: userRow.role,
-      departmentId: userRow.departmentId,
-    });
-  } catch (error) {
-    res.status(401).json({ message: "Invalid token" });
+  if (!user?.passwordHash || !(await bcrypt.compare(password, user.passwordHash))) { res.status(401).json({ message: "Invalid credentials" }); return; }
+  if (user.status !== "approved") { res.status(403).json({ message: "Your account is pending approval or is inactive" }); return; }
+  if (["student", "professor", "hod"].includes(user.role) && !user.departmentId) {
+    res.status(403).json({ message: "Your account needs a department assignment" }); return;
   }
+  const token = jwt.sign({ id: user.id, sessionVersion: user.sessionVersion }, JWT_SECRET, { expiresIn: "1d" });
+  res.cookie("token", token, { ...cookieOptions, maxAge: 86400000 });
+  res.json({ ...await sessionProfile(user.id), token });
 });
 
-// ==========================================
-// CHANGE PASSWORD FLOW (Authenticated)
-// ==========================================
-router.post("/change-password", requireAuth, async (req, res) => {
-  const { currentPassword, newPassword } = req.body;
-  if (!currentPassword || !newPassword) {
-    res.status(400).json({ message: "Both current and new password are required" });
-    return;
-  }
-  if (newPassword.length < 8) {
-    res.status(400).json({ message: "New password must be at least 8 characters" });
-    return;
-  }
+router.get("/me", requireAuth, async (req, res) => { res.json(await sessionProfile(req.user!.id)); });
+router.post("/logout", (_req, res) => { res.clearCookie("token", cookieOptions); res.json({ message: "Logged out" }); });
 
-  try {
-    const userId = req.user!.id;
-    const userMatch = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
-    if (userMatch.length === 0) {
-      res.status(404).json({ message: "User not found" });
-      return;
-    }
-    
-    const userRow = userMatch[0];
-    const isMatch = await bcrypt.compare(currentPassword, userRow.passwordHash || "");
-    if (!isMatch) {
-      res.status(400).json({ message: "Current password is incorrect" });
-      return;
-    }
-
-    const passwordHash = await bcrypt.hash(newPassword, 10);
-    await db.update(usersTable).set({ passwordHash }).where(eq(usersTable.id, userId));
-
-    res.status(200).json({ message: "Password changed successfully" });
-  } catch (error) {
-    req.log.error(error, "Error changing password");
-    res.status(500).json({ message: "Internal server error" });
+router.post("/reset-password", validate(z.object({ email: emailSchema, newPassword: passwordSchema,
+  verificationToken: z.string().min(1).max(2048) }).strict()), async (req, res) => {
+  const { email, newPassword, verificationToken } = req.body;
+  const [code] = await db.select().from(passwordResetsTable).where(and(eq(passwordResetsTable.email, email),
+    eq(passwordResetsTable.verified, true), gt(passwordResetsTable.expiresAt, new Date()))).orderBy(desc(passwordResetsTable.createdAt)).limit(1);
+  if (!code || !proofMatches(verificationToken, "password-reset", email, code.id)) {
+    res.status(400).json({ message: "Please verify your reset code" }); return;
   }
+  const passwordHash = await bcrypt.hash(newPassword, 12);
+  const changed = await db.transaction(async (tx) => {
+    const [consumed] = await tx.delete(passwordResetsTable).where(and(eq(passwordResetsTable.id, code.id),
+      eq(passwordResetsTable.verified, true), gt(passwordResetsTable.expiresAt, new Date()))).returning();
+    if (!consumed) return false;
+    await tx.update(usersTable).set({ passwordHash, sessionVersion: sql`${usersTable.sessionVersion} + 1` }).where(eq(usersTable.email, email));
+    return true;
+  });
+  if (!changed) { res.status(409).json({ message: "Verification has already been used" }); return; }
+  res.json({ message: "Password reset. Please sign in again." });
+});
+
+router.post("/change-password", requireAuth, validate(z.object({ currentPassword: z.string().min(1).max(72), newPassword: passwordSchema }).strict()), async (req, res) => {
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, req.user!.id)).limit(1);
+  if (!user?.passwordHash || !(await bcrypt.compare(req.body.currentPassword, user.passwordHash))) {
+    res.status(400).json({ message: "Current password is incorrect" }); return;
+  }
+  const passwordHash = await bcrypt.hash(req.body.newPassword, 12);
+  await db.update(usersTable).set({ passwordHash, sessionVersion: sql`${usersTable.sessionVersion} + 1` }).where(eq(usersTable.id, user.id));
+  res.clearCookie("token", cookieOptions);
+  res.json({ message: "Password changed. Please sign in again." });
 });
 
 export default router;

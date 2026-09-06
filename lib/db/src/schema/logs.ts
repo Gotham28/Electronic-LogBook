@@ -39,7 +39,7 @@ export const procedureLogsTable = pgTable("procedure_logs", {
   id: serial("id").primaryKey(),
   studentId: integer("student_id").notNull().references(() => studentsTable.id),
   supervisorId: integer("supervisor_id").references(() => usersTable.id),
-  procedureGroup: text("procedure_group", { enum: ["emergency", "invasive"] }).notNull(),
+  procedureGroup: text("procedure_group").notNull(),
   procedureName: text("procedure_name").notNull(),
   date: text("date").notNull(),
   patientUhid: text("patient_uhid").notNull(),
@@ -63,9 +63,7 @@ export type ProcedureLog = typeof procedureLogsTable.$inferSelect;
 export const academicLogsTable = pgTable("academic_logs", {
   id: serial("id").primaryKey(),
   studentId: integer("student_id").notNull().references(() => studentsTable.id),
-  activityType: text("activity_type", {
-    enum: ["journal_club", "seminar", "symposia", "bedside_presentation", "mortality_meeting", "conference_attended", "conference_presentation"]
-  }).notNull(),
+  activityType: text("activity_type").notNull(),
   presentationType: text("presentation_type", { enum: ["poster", "paper", "case_presentation"] }),
   topic: text("topic").notNull(),
   date: text("date").notNull(),

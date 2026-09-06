@@ -4,7 +4,7 @@ import { usersTable } from "./users.js";
 
 export const studentsTable = pgTable("students", {
   id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull().references(() => usersTable.id),
+  userId: integer("user_id").notNull().unique().references(() => usersTable.id),
   batch: text("batch").notNull(),
   registrationNumber: text("registration_number").notNull().unique(),
   dateOfJoining: text("date_of_joining").notNull(),

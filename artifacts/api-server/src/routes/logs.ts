@@ -1,12 +1,15 @@
 import { Router, type IRouter } from "express";
 import { db, caseLogsTable, procedureLogsTable, academicLogsTable, studentsTable, usersTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
-import { requireAuth, requireRole } from "../middlewares/auth.js";
+import { eq, and, inArray, isNull } from "drizzle-orm";
+import { requireAuth, requireRole, requireDepartment } from "../middlewares/auth.js";
+import { z } from "zod";
+import { validate } from "../lib/validation.js";
 
 const router: IRouter = Router();
 
 // PATCH /api/logs/:logType/:logId/review
-router.patch("/:logType/:logId/review", requireAuth, requireRole(["professor", "hod"]), async (req, res) => {
+router.patch("/:logType/:logId/review", requireAuth, requireRole(["professor", "hod"]), requireDepartment,
+  validate(z.object({ status: z.enum(["verified", "rejected"]), comments: z.string().max(10000).optional() }).strict()), async (req, res) => {
   try {
     const { logType, logId } = req.params;
     const { status, comments } = req.body;
@@ -50,14 +53,14 @@ router.patch("/:logType/:logId/review", requireAuth, requireRole(["professor", "
       return;
     }
 
-    // HOD oversight is limited to students in the HOD's own department.
-    if (reviewer.role === "hod") {
+    // All reviewers, including the named supervisor, are bound to the student's department.
+    {
       const [student] = await db.select({ departmentId: usersTable.departmentId })
         .from(studentsTable)
         .innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
         .where(eq(studentsTable.id, target.studentId))
         .limit(1);
-      if (!student || student.departmentId !== reviewer.departmentId) {
+      if (!student || !student.departmentId || student.departmentId !== reviewer.departmentId) {
         res.status(403).json({ message: "This entry is outside your department" });
         return;
       }
@@ -70,13 +73,19 @@ router.patch("/:logType/:logId/review", requireAuth, requireRole(["professor", "
       reviewedBy: reviewer.id,
       reviewedAt: new Date()
     };
+    const departmentStudents = db.select({ id: studentsTable.id }).from(studentsTable)
+      .innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
+      .where(and(eq(usersTable.departmentId, reviewer.departmentId!), eq(usersTable.status, "approved")));
 
     if (logType === "case") {
-      updatedRows = await db.update(caseLogsTable).set(updateData).where(eq(caseLogsTable.id, id)).returning();
+      updatedRows = await db.update(caseLogsTable).set(updateData).where(and(eq(caseLogsTable.id, id), eq(caseLogsTable.status, "pending"), isNull(caseLogsTable.deletedAt),
+        inArray(caseLogsTable.studentId, departmentStudents), reviewer.role === "professor" ? eq(caseLogsTable.supervisorId, reviewer.id) : undefined)).returning();
     } else if (logType === "procedure") {
-      updatedRows = await db.update(procedureLogsTable).set(updateData).where(eq(procedureLogsTable.id, id)).returning();
+      updatedRows = await db.update(procedureLogsTable).set(updateData).where(and(eq(procedureLogsTable.id, id), eq(procedureLogsTable.status, "pending"), isNull(procedureLogsTable.deletedAt),
+        inArray(procedureLogsTable.studentId, departmentStudents), reviewer.role === "professor" ? eq(procedureLogsTable.supervisorId, reviewer.id) : undefined)).returning();
     } else if (logType === "academic") {
-      updatedRows = await db.update(academicLogsTable).set(updateData).where(eq(academicLogsTable.id, id)).returning();
+      updatedRows = await db.update(academicLogsTable).set(updateData).where(and(eq(academicLogsTable.id, id), eq(academicLogsTable.status, "pending"),
+        inArray(academicLogsTable.studentId, departmentStudents), reviewer.role === "professor" ? eq(academicLogsTable.supervisorId, reviewer.id) : undefined)).returning();
     }
 
     if (updatedRows.length === 0) {

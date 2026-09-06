@@ -53,7 +53,7 @@ import {
   User,
   FileText,
 } from "lucide-react";
-import { DEPARTMENTS, formatLogbookDate } from "@/lib/logbook-config";
+import { formatLogbookDate } from "@/lib/logbook-config";
 import { apiGet, apiPatch, apiPost } from "@/lib/apiClient";
 import { getCurrentUser } from "@/lib/session";
 
@@ -219,7 +219,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
             <Badge className="bg-teal-500/20 text-teal-300 border-teal-500/30 text-xs font-semibold mb-2">
               Faculty &amp; Evaluator Portal
             </Badge>
-            <h2 className="text-2xl font-black">Welcome, {data?.faculty?.name || "Dr. Mohammed"}</h2>
+            <h2 className="text-2xl font-black">Welcome, {data?.faculty?.name || getCurrentUser()?.name}</h2>
             <p className="text-xs text-slate-300">
               Department faculty • <strong>{allStudents.length} approved students</strong>
             </p>

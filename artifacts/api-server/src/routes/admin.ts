@@ -1,13 +1,27 @@
 import { Router } from "express";
-import { db, usersTable, studentsTable, departmentsTable, departmentConfigsTable, procedureTypesTable, caseLogsTable, procedureLogsTable, academicLogsTable } from "@workspace/db";
-import { eq, and, count } from "drizzle-orm";
+import { db, usersTable, studentsTable, departmentsTable, departmentConfigsTable, procedureTypesTable, caseLogsTable, procedureLogsTable, academicLogsTable, departmentCatalogTable } from "@workspace/db";
+import { eq, and, count, inArray, sql } from "drizzle-orm";
+import { z } from "zod";
 import bcrypt from "bcryptjs";
-import { requireAuth, requireRole } from "../middlewares/auth.js";
+import { requireAuth, requireRole, requireDepartment } from "../middlewares/auth.js";
+import { completionPercent, configSchema, emailSchema, nameSchema, passwordSchema, targetSchema, validate } from "../lib/validation.js";
 
 const router = Router();
 
 // Only HODs can access these routes
-router.use(requireAuth, requireRole(["hod"]));
+router.use(requireAuth, requireRole(["hod"]), requireDepartment);
+router.param("id", (req, res, next, value) => {
+  if (!Number.isSafeInteger(Number(value)) || Number(value) <= 0) { res.status(400).json({ message: "Invalid record ID" }); return; }
+  next();
+});
+
+router.post("/users/:id/reactivate", validate(z.object({}).strict()), async (req, res) => {
+  const [account] = await db.update(usersTable).set({ status: "approved", sessionVersion: sql`${usersTable.sessionVersion} + 1` })
+    .where(and(eq(usersTable.id, Number(req.params.id)), eq(usersTable.departmentId, req.user!.departmentId!),
+      inArray(usersTable.role, ["student", "professor"]), eq(usersTable.status, "rejected"))).returning({ id: usersTable.id });
+  if (!account) { res.status(404).json({ message: "Inactive account not found in your department" }); return; }
+  res.json({ message: "Account reactivated. The user must sign in again." });
+});
 
 // GET /api/admin/students/pending
 // List all students pending approval
@@ -18,9 +32,7 @@ router.get("/students/pending", async (req, res) => {
       eq(usersTable.role, "student"), 
       eq(usersTable.status, "pending")
     ];
-    if (departmentId) {
-      conditions.push(eq(usersTable.departmentId, departmentId));
-    }
+    conditions.push(eq(usersTable.departmentId, departmentId!));
 
     const pendingUsers = await db
       .select({
@@ -65,14 +77,14 @@ router.post("/students/:id/approve", async (req, res) => {
       res.status(404).json({ message: "Pending student not found" });
       return;
     }
-    if (departmentId && target.departmentId !== departmentId) {
+    if (target.departmentId !== departmentId) {
       res.status(403).json({ message: "Cannot approve a student outside your department" });
       return;
     }
 
     await db.update(usersTable)
       .set({ status: "approved" })
-      .where(eq(usersTable.id, userId));
+      .where(and(eq(usersTable.id, userId), eq(usersTable.departmentId, departmentId!), eq(usersTable.status, "pending")));
 
     res.json({ message: "Student approved successfully" });
   } catch (error) {
@@ -101,16 +113,15 @@ router.post("/students/:id/reject", async (req, res) => {
       res.status(404).json({ message: "Pending student not found" });
       return;
     }
-    if (departmentId && target.departmentId !== departmentId) {
+    if (target.departmentId !== departmentId) {
       res.status(403).json({ message: "Cannot reject a student outside your department" });
       return;
     }
 
-    // Delete student profile first (FK), then the user row
-    await db.delete(studentsTable).where(eq(studentsTable.userId, userId));
-    await db.delete(usersTable).where(eq(usersTable.id, userId));
+    await db.update(usersTable).set({ status: "rejected", sessionVersion: sql`${usersTable.sessionVersion} + 1` })
+      .where(and(eq(usersTable.id, userId), eq(usersTable.departmentId, departmentId!), eq(usersTable.status, "pending")));
 
-    res.json({ message: "Student registration rejected and removed" });
+    res.json({ message: "Student registration rejected" });
   } catch (error) {
     req.log.error(error, "Error rejecting student");
     res.status(500).json({ message: "Internal server error" });
@@ -134,7 +145,7 @@ router.delete("/users/:id", async (req, res) => {
       res.status(404).json({ message: "User not found" });
       return;
     }
-    if (departmentId && target.departmentId !== departmentId) {
+    if (target.departmentId !== departmentId || !["student", "professor"].includes(target.role)) {
       res.status(403).json({ message: "Cannot remove a user outside your department" });
       return;
     }
@@ -144,13 +155,11 @@ router.delete("/users/:id", async (req, res) => {
       return;
     }
 
-    // If student, remove student profile row first (FK constraint)
-    if (target.role === "student") {
-      await db.delete(studentsTable).where(eq(studentsTable.userId, userId));
-    }
-    await db.delete(usersTable).where(eq(usersTable.id, userId));
+    // Revoke access while preserving logbooks, assignments and their audit history.
+    await db.update(usersTable).set({ status: "rejected", sessionVersion: sql`${usersTable.sessionVersion} + 1` })
+      .where(and(eq(usersTable.id, userId), eq(usersTable.departmentId, departmentId!), inArray(usersTable.role, ["student", "professor"])));
 
-    res.json({ message: "User removed from department" });
+    res.json({ message: "Account deactivated; records retained" });
   } catch (error: any) {
     if (error.code === "23503") {
       res.status(409).json({ message: "This student has existing logs or records and cannot be removed. Please contact an administrator if removal is required." });
@@ -164,7 +173,7 @@ router.delete("/users/:id", async (req, res) => {
 
 // POST /api/admin/professors
 // Create a new professor account
-router.post("/professors", async (req, res) => {
+router.post("/professors", validate(z.object({ fullName: nameSchema, email: emailSchema, password: passwordSchema }).strict()), async (req, res) => {
   try {
     const { fullName, email, password } = req.body;
 
@@ -187,11 +196,11 @@ router.post("/professors", async (req, res) => {
       passwordHash,
       role: "professor",
       status: "approved", // Professors created by HOD are auto-approved
-      departmentId: req.user?.departmentId || null
+      departmentId: req.user!.departmentId!
     }).returning();
 
     res.status(201).json({ 
-      message: "Professor created successfully",
+      message: "Faculty account created successfully",
       professor: {
         id: newProf.id,
         fullName: newProf.fullName,
@@ -211,7 +220,7 @@ router.get("/leaves/pending", async (req, res) => {
   try {
     const { leaveRecordsTable } = await import("@workspace/db");
     
-    // We should ideally filter by department, but for MVP HOD sees all leaves or leaves in their dept
+    // Leave records are scoped through their student's current department.
     const pendingLeaves = await db
       .select({
         id: leaveRecordsTable.id,
@@ -227,7 +236,7 @@ router.get("/leaves/pending", async (req, res) => {
       .from(leaveRecordsTable)
       .innerJoin(studentsTable, eq(leaveRecordsTable.studentId, studentsTable.id))
       .innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
-      .where(eq(leaveRecordsTable.status, "pending"));
+      .where(and(eq(leaveRecordsTable.status, "pending"), eq(usersTable.departmentId, req.user!.departmentId!)));
 
     const mappedLeaves = pendingLeaves.map(leave => {
       const start = new Date(leave.fromDate).getTime();
@@ -262,7 +271,9 @@ router.post("/leaves/:id/action", async (req, res) => {
         status, 
         reviewedBy: req.user?.id 
       })
-      .where(eq(leaveRecordsTable.id, leaveId))
+      .where(and(eq(leaveRecordsTable.id, leaveId), eq(leaveRecordsTable.status, "pending"),
+        inArray(leaveRecordsTable.studentId, db.select({ id: studentsTable.id }).from(studentsTable)
+          .innerJoin(usersTable, eq(studentsTable.userId, usersTable.id)).where(eq(usersTable.departmentId, req.user!.departmentId!)))))
       .returning();
 
     if (!updated) {
@@ -287,7 +298,7 @@ router.get("/department/config", async (req, res) => {
     }
 
     const [config] = await db.select().from(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, departmentId));
-    res.json(config || { requiredCases: 50, requiredProcedures: 101, requiredAcademic: 15 });
+    res.json(config || null);
   } catch (error) {
     req.log.error(error, "Error fetching department config");
     res.status(500).json({ message: "Internal server error" });
@@ -295,7 +306,7 @@ router.get("/department/config", async (req, res) => {
 });
 
 // POST /api/admin/department/config
-router.post("/department/config", async (req, res) => {
+router.post("/department/config", validate(configSchema), async (req, res) => {
   try {
     const departmentId = req.user?.departmentId;
     if (!departmentId) {
@@ -309,6 +320,9 @@ router.post("/department/config", async (req, res) => {
     
     if (existing.length > 0) {
       const [updated] = await db.update(departmentConfigsTable).set({
+        programDurationMonths: req.body.programDurationMonths,
+        casualLeaveAllowance: req.body.casualLeaveAllowance,
+        academicLeaveAllowance: req.body.academicLeaveAllowance,
         requiredCases: parseInt(requiredCases, 10),
         requiredProcedures: parseInt(requiredProcedures, 10),
         requiredAcademic: parseInt(requiredAcademic, 10)
@@ -318,6 +332,9 @@ router.post("/department/config", async (req, res) => {
     } else {
       const [inserted] = await db.insert(departmentConfigsTable).values({
         departmentId,
+        programDurationMonths: req.body.programDurationMonths,
+        casualLeaveAllowance: req.body.casualLeaveAllowance,
+        academicLeaveAllowance: req.body.academicLeaveAllowance,
         requiredCases: parseInt(requiredCases, 10),
         requiredProcedures: parseInt(requiredProcedures, 10),
         requiredAcademic: parseInt(requiredAcademic, 10)
@@ -349,7 +366,7 @@ router.get("/department/procedures", async (req, res) => {
 });
 
 // POST /api/admin/department/procedures
-router.post("/department/procedures", async (req, res) => {
+router.post("/department/procedures", validate(z.object({ name: nameSchema, group: nameSchema, required: targetSchema }).strict()), async (req, res) => {
   try {
     const departmentId = req.user?.departmentId;
     if (!departmentId) {
@@ -366,7 +383,8 @@ router.post("/department/procedures", async (req, res) => {
     const [inserted] = await db.insert(procedureTypesTable).values({
       departmentId,
       name,
-      group
+      group,
+      required: req.body.required,
     }).returning();
     res.json(inserted);
   } catch (error) {
@@ -416,9 +434,9 @@ router.get("/roster", async (req, res) => {
     const academicCounts = toMap(academicCountRows as any);
     const config = configs[0];
     const targets = {
-      cases: config?.requiredCases || 50,
-      procedures: config?.requiredProcedures || 101,
-      academics: config?.requiredAcademic || 50,
+      cases: config?.requiredCases ?? 0,
+      procedures: config?.requiredProcedures ?? 0,
+      academics: config?.requiredAcademic ?? 0,
     };
     const studentsWithProgress = students.map((student) => {
       const verified = {
@@ -426,11 +444,7 @@ router.get("/roster", async (req, res) => {
         procedures: procedureCounts.get(student.studentProfileId) || 0,
         academics: academicCounts.get(student.studentProfileId) || 0,
       };
-      const completion = Math.round((
-        Math.min(verified.cases / targets.cases, 1) +
-        Math.min(verified.procedures / targets.procedures, 1) +
-        Math.min(verified.academics / targets.academics, 1)
-      ) / 3 * 100);
+      const completion = completionPercent([[verified.cases, targets.cases], [verified.procedures, targets.procedures], [verified.academics, targets.academics]]);
       return { ...student, verified, targets, completion };
     });
 
@@ -451,6 +465,26 @@ router.get("/roster", async (req, res) => {
     req.log.error(error, "Error fetching department roster");
     res.status(500).json({ message: "Internal server error" });
   }
+});
+
+router.post("/department/catalog", validate(z.object({ kind: z.enum(["posting", "academic"]), name: nameSchema,
+  value: nameSchema, required: targetSchema, period: z.enum(["total", "month"]) }).strict()), async (req, res) => {
+  const [row] = await db.insert(departmentCatalogTable).values({ ...req.body, departmentId: req.user!.departmentId! }).returning();
+  res.status(201).json(row);
+});
+
+router.patch("/department/procedures/:id", validate(z.object({ required: targetSchema }).strict()), async (req, res) => {
+  const [row] = await db.update(procedureTypesTable).set({ required: req.body.required })
+    .where(and(eq(procedureTypesTable.id, Number(req.params.id)), eq(procedureTypesTable.departmentId, req.user!.departmentId!))).returning();
+  if (!row) { res.status(404).json({ message: "Procedure not found" }); return; }
+  res.json(row);
+});
+
+router.patch("/department/catalog/:id", validate(z.object({ required: targetSchema, period: z.enum(["total", "month"]) }).strict()), async (req, res) => {
+  const [row] = await db.update(departmentCatalogTable).set(req.body)
+    .where(and(eq(departmentCatalogTable.id, Number(req.params.id)), eq(departmentCatalogTable.departmentId, req.user!.departmentId!))).returning();
+  if (!row) { res.status(404).json({ message: "Training option not found" }); return; }
+  res.json(row);
 });
 
 export default router;

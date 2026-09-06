@@ -5,6 +5,7 @@ export interface UserSession {
   name: string;
   role: string;
   departmentId: number | null;
+  departmentName: string | null;
   studentProfileId: number | null;
 }
 

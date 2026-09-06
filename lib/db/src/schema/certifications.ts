@@ -9,7 +9,8 @@ export const certificationsTable = pgTable("certifications", {
   id: uuid("id").primaryKey().defaultRandom(),
   // Note: Using integer instead of uuid for foreign key to match studentsTable.id
   studentId: integer("student_id").notNull().references(() => studentsTable.id),
-  title: certificationTitleEnum("title").notNull(),
+  title: text("title").notNull(),
+  provider: text("provider"),
   issueDate: timestamp("issue_date").notNull(),
   expiryDate: timestamp("expiry_date").notNull(),
   certificateUrl: text("certificate_url").notNull(),

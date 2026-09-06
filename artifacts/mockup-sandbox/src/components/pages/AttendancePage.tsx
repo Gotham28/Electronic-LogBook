@@ -35,14 +35,14 @@ type LeaveRecord = {
 
 export function AttendancePage() {
   const [leaveType, setLeaveType] = React.useState("Casual Leave");
-  const [fromDate, setFromDate] = React.useState("2026-08-12");
-  const [toDate, setToDate] = React.useState("2026-08-14");
+  const [fromDate, setFromDate] = React.useState(todayForInput());
+  const [toDate, setToDate] = React.useState(todayForInput());
   const [reason, setReason] = React.useState("");
 
   const [leaves, setLeaves] = React.useState<LeaveRecord[]>([]);
   const [balance, setBalance] = React.useState({
-    casual: { used: 0, total: 20 },
-    academic: { used: 0, total: 15 }
+    casual: { used: 0, total: null as number | null },
+    academic: { used: 0, total: null as number | null }
   });
   const user = React.useMemo(() => getCurrentUser(), []);
 
@@ -122,8 +122,8 @@ export function AttendancePage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
-        <SummaryCard label={`Casual Leave (${balance.casual.total}/yr)`} value={balance.casual.used} total={balance.casual.total} tone="teal" />
-        <SummaryCard label={`Academic Leave (${balance.academic.total}/yr)`} value={balance.academic.used} total={balance.academic.total} tone="teal" />
+        <SummaryCard label={`Casual Leave (${balance.casual.total ?? "not configured"})`} value={balance.casual.used} total={balance.casual.total} tone="teal" />
+        <SummaryCard label={`Academic Leave (${balance.academic.total ?? "not configured"})`} value={balance.academic.used} total={balance.academic.total} tone="teal" />
         <SummaryCard label="Pending Approval" value={pendingCount} tone="amber" />
       </div>
 
@@ -230,7 +230,7 @@ function getInclusiveDays(fromDate: string, toDate: string) {
   return Math.floor((end - start) / 86_400_000) + 1;
 }
 
-function SummaryCard({ label, value, tone, total }: { label: string; value: number; tone: "teal" | "amber" | "slate", total?: number }) {
+function SummaryCard({ label, value, tone, total }: { label: string; value: number; tone: "teal" | "amber" | "slate", total?: number | null }) {
   const toneClass = {
     teal: "border-white/70 bg-white/76 text-teal-900",
     amber: "border-white/70 bg-white/76 text-amber-900",

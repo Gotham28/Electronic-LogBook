@@ -14,7 +14,10 @@ import { AttendancePage } from "@/components/pages/AttendancePage";
 import { MilestonesPage } from "@/components/pages/MilestonesPage";
 import { AssessmentsPage } from "@/components/pages/AssessmentsPage";
 import { PrintableLogbook } from "@/components/pages/PrintableLogbook";
-import { getCurrentUser, clearSession } from "@/lib/session";
+import { getCurrentUser, clearSession, getToken } from "@/lib/session";
+import { apiGet, apiPost } from "@/lib/apiClient";
+import { DepartmentProvider } from "@/lib/department-context";
+import { AssignmentsPage } from "@/components/pages/AssignmentsPage";
 import { Toaster } from "@/components/ui/sonner";
 
 import { modules as discoveredModules } from "./.generated/mockup-components";
@@ -133,6 +136,14 @@ function App() {
     () => window.sessionStorage.getItem("elogbook-authenticated") === "true"
   );
   const [authScreen, setAuthScreen] = useState<"login" | "register">("login");
+  const [checkingSession, setCheckingSession] = useState(!!getToken());
+  useEffect(() => {
+    if (!getToken()) { setIsAuthenticated(false); setCheckingSession(false); return; }
+    apiGet("/api/auth/me").then((user) => {
+      sessionStorage.setItem("elogbook-user", JSON.stringify(user));
+      setIsAuthenticated(true);
+    }).catch(() => { clearSession(); setIsAuthenticated(false); }).finally(() => setCheckingSession(false));
+  }, []);
 
   if (previewPath) {
     return (
@@ -143,9 +154,7 @@ function App() {
     );
   }
 
-  if (window.location.pathname === "/print") {
-    return <PrintableLogbook />;
-  }
+  if (checkingSession) return <p className="p-10" role="status">Checking your session…</p>;
 
   if (!isAuthenticated) {
     if (authScreen === "register") {
@@ -175,14 +184,21 @@ function App() {
     );
   }
 
+  if (window.location.pathname === "/print" && activeRole === "Student") return <PrintableLogbook />;
+
   return (
+    <DepartmentProvider departmentId={currentUser?.departmentId ?? null}>
     <AppLayout
       activeRole={activeRole}
       onSignOut={() => {
+        void apiPost("/api/auth/logout", {}).catch(() => {});
         clearSession();
         setIsAuthenticated(false);
       }}
     >
+      <Switch>
+      <Route path="/assignments" component={AssignmentsPage} />
+      <Route>
       {activeRole === "Faculty" && (
         <ProfessorPortal />
       )}
@@ -203,7 +219,10 @@ function App() {
           <Route component={Dashboard} />
         </Switch>
       )}
+      </Route>
+      </Switch>
     </AppLayout>
+    </DepartmentProvider>
   );
 }
 

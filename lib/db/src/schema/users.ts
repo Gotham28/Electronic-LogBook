@@ -1,4 +1,5 @@
-import { pgTable, serial, text, integer, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, timestamp, uniqueIndex, check } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 
 export const departmentsTable = pgTable("departments", {
@@ -21,8 +22,13 @@ export const usersTable = pgTable("users", {
   status: text("status", { enum: ["pending", "approved", "rejected"] }).notNull().default("pending"),
   departmentId: integer("department_id").references(() => departmentsTable.id),
   avatarUrl: text("avatar_url"),
+  sessionVersion: integer("session_version").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => [
+  uniqueIndex("users_one_approved_hod_per_department").on(table.departmentId)
+    .where(sql`${table.role} = 'hod' AND ${table.status} = 'approved'`),
+  check("users_department_required", sql`${table.role} NOT IN ('student', 'professor', 'hod') OR ${table.departmentId} IS NOT NULL`),
+]);
 
 export const insertUserSchema = createInsertSchema(usersTable);
 export type InsertUser = typeof usersTable.$inferInsert;

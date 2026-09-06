@@ -18,14 +18,10 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
-import {
-  formatLogbookDate,
-  POSTING_CHIEFS,
-  POSTING_OPTIONS,
-  todayForInput,
-} from "@/lib/logbook-config";
+import { formatLogbookDate, todayForInput } from "@/lib/logbook-config";
+import { useDepartment } from "@/lib/department-context";
 
-type PostingName = (typeof POSTING_OPTIONS)[number];
+type PostingName = string;
 
 type Posting = {
   id: number;
@@ -40,6 +36,7 @@ import { apiGet, apiPost } from "@/lib/apiClient";
 import { getCurrentUser } from "@/lib/session";
 
 export function PostingsPage() {
+  const { postings: postingOptions } = useDepartment();
   const [open, setOpen] = React.useState(false);
   const [postings, setPostings] = React.useState<Posting[]>([]);
   const user = React.useMemo(() => getCurrentUser(), []);
@@ -47,7 +44,7 @@ export function PostingsPage() {
   const [professors, setProfessors] = React.useState<any[]>([]);
 
   // Form State
-  const [ward, setWard] = React.useState<PostingName>(POSTING_OPTIONS[0]);
+  const [ward, setWard] = React.useState<PostingName>("");
   const [startDate, setStartDate] = React.useState(todayForInput());
   const [endDate, setEndDate] = React.useState(todayForInput());
   const [supervisorId, setSupervisorId] = React.useState("");
@@ -122,11 +119,12 @@ export function PostingsPage() {
             <form onSubmit={handleAddPosting} className="space-y-4">
               <div className="space-y-2">
                 <Label>Ward / Posting Unit</Label>
+                {!postingOptions.length && <p className="text-xs text-slate-500">Your HOD has not configured postings yet.</p>}
                 <Select value={ward} onValueChange={(val: any) => setWard(val)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {POSTING_OPTIONS.map((opt) => (
-                      <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                    {postingOptions.map((opt) => (
+                      <SelectItem key={opt.id} value={opt.value}>{opt.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

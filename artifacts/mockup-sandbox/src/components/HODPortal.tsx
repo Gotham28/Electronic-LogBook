@@ -24,12 +24,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  ACADEMIC_REQUIREMENTS,
-  DEPARTMENT_HOD,
-  formatLogbookDate,
-  REQUIRED_PROCEDURE_COUNT,
-} from "@/lib/logbook-config";
+import { formatLogbookDate } from "@/lib/logbook-config";
+import { useDepartment } from "@/lib/department-context";
+import { DepartmentSettings } from "@/components/DepartmentSettings";
 import { apiGet, apiPost, apiDelete } from "@/lib/apiClient";
 import { getCurrentUser } from "@/lib/session";
 import { ProfessorPortal } from "@/components/ProfessorPortal";
@@ -81,6 +78,7 @@ const paths: Record<string, string> = {
 
 export function HODPortal({ activeTab }: { activeTab?: string }) {
   const [location, setLocation] = useLocation();
+  const { department, hod } = useDepartment();
   const currentTab = React.useMemo(() => {
     if (activeTab) return activeTab;
     if (location === "/" || location === "/mentees") return "mentees";
@@ -107,15 +105,6 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
   const [searchQuery, setSearchQuery] = React.useState("");
   const [filterBatch, setFilterBatch] = React.useState("all");
   const [filterStatus, setFilterStatus] = React.useState("all");
-
-  // Settings State
-  const [deptConfig, setDeptConfig] = React.useState({ requiredCases: 50, requiredProcedures: 101, requiredAcademic: 15 });
-  const [savingConfig, setSavingConfig] = React.useState(false);
-
-  // Procedures State
-  const [procedures, setProcedures] = React.useState<any[]>([]);
-  const [procForm, setProcForm] = React.useState({ name: "", group: "emergency" });
-  const [addingProc, setAddingProc] = React.useState(false);
 
   // Professor Form State
   const [profForm, setProfForm] = React.useState({ fullName: "", email: "", password: "" });
@@ -151,20 +140,6 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
       } catch (err) {
         console.warn("Could not fetch pending leaves", err);
         setLeavesError("Could not load pending leaves");
-      }
-
-      try {
-        const config = await apiGet<any>("/api/admin/department/config");
-        if (config) setDeptConfig(config);
-      } catch (err) {
-        console.warn("Could not fetch config", err);
-      }
-
-      try {
-        const procs = await apiGet<any[]>("/api/admin/department/procedures");
-        if (procs) setProcedures(procs);
-      } catch (err) {
-        console.warn("Could not fetch procedures", err);
       }
 
       try {
@@ -206,38 +181,42 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
       await apiPost(`/api/admin/students/${id}/approve`, {});
       toast.success("Student approved successfully");
       setPendingStudents((current) => current.filter((s) => s.id !== id));
+      setRoster(null);
     } catch (err: any) {
       toast.error(err.message || "Failed to approve student");
     }
   };
 
   const rejectStudent = async (id: number) => {
-    if (!window.confirm("Reject and permanently remove this student registration?")) return;
+    if (!window.confirm("Reject this student registration?")) return;
     try {
       await apiPost(`/api/admin/students/${id}/reject`, {});
       toast.success("Student registration rejected");
       setPendingStudents((current) => current.filter((s) => s.id !== id));
+      setRoster(null);
     } catch (err: any) {
       toast.error(err.message || "Failed to reject student");
     }
   };
 
   const removeUser = async (id: number, name: string) => {
-    if (!window.confirm(`Remove ${name} from the department? This cannot be undone.`)) return;
+    if (!window.confirm(`Deactivate ${name}? Access will be revoked; logbooks and assignments will be retained.`)) return;
     try {
       await apiDelete(`/api/admin/users/${id}`);
-      toast.success(`${name} removed from department`);
-      setRoster((current) =>
-        current
-          ? {
-              students: current.students.filter((s) => s.id !== id),
-              professors: current.professors.filter((p) => p.id !== id),
-            }
-          : null
-      );
+      toast.success("Account deactivated; records retained");
+      await fetchRoster();
     } catch (err: any) {
       toast.error(err.message || "Failed to remove user");
     }
+  };
+
+  const reactivateUser = async (id: number, name: string) => {
+    if (!window.confirm(`Restore department access for ${name}?`)) return;
+    try {
+      await apiPost(`/api/admin/users/${id}/reactivate`, {});
+      toast.success("Account reactivated");
+      await fetchRoster();
+    } catch (err: any) { toast.error(err.message || "Could not reactivate account"); }
   };
 
   const handleCreateProfessor = async (e: React.FormEvent) => {
@@ -245,11 +224,11 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
     setCreatingProf(true);
     try {
       await apiPost("/api/admin/professors", {
-        ...profForm,
-        departmentId: getCurrentUser()?.departmentId
+        ...profForm
       });
       toast.success("Faculty account created successfully");
       setProfForm({ fullName: "", email: "", password: "" });
+      setRoster(null);
     } catch (err: any) {
       toast.error(err.message || "Failed to create faculty account");
     } finally {
@@ -265,34 +244,6 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
       toast.success(approved ? "Leave approved" : "Leave returned");
     } catch (err: any) {
       toast.error(err.message || "Failed to process leave request");
-    }
-  };
-
-  const handleSaveConfig = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSavingConfig(true);
-    try {
-      await apiPost("/api/admin/department/config", deptConfig);
-      toast.success("Settings saved successfully");
-    } catch (err: any) {
-      toast.error(err.message || "Failed to save settings");
-    } finally {
-      setSavingConfig(false);
-    }
-  };
-
-  const handleAddProcedure = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAddingProc(true);
-    try {
-      const newProc = await apiPost("/api/admin/department/procedures", procForm);
-      toast.success("Procedure added successfully");
-      setProcedures([...procedures, newProc]);
-      setProcForm({ name: "", group: "emergency" });
-    } catch (err: any) {
-      toast.error(err.message || "Failed to add procedure");
-    } finally {
-      setAddingProc(false);
     }
   };
 
@@ -326,8 +277,8 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
           <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
             <div>
               <p className="text-[10px] font-bold uppercase tracking-[.18em] text-teal-100">Department leadership</p>
-              <h2 className="mt-2 text-3xl font-bold">{DEPARTMENT_HOD}</h2>
-              <p className="mt-2 text-sm text-teal-50">HOD, Department of Pediatrics</p>
+              <h2 className="mt-2 text-3xl font-bold">{hod?.name || getCurrentUser()?.name}</h2>
+              <p className="mt-2 text-sm text-teal-50">HOD, Department of {department.name}</p>
             </div>
           </div>
         </CardContent>
@@ -432,8 +383,8 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
                               <Badge variant={s.status === "approved" ? "default" : "secondary"} className="capitalize text-xs">{s.status}</Badge>
                             </TableCell>
                             <TableCell className="text-right">
-                              <Button size="sm" variant="outline" onClick={() => removeUser(s.id, s.fullName)} className="text-rose-700 border-rose-200 hover:bg-rose-50">
-                                <XCircle className="h-4 w-4 mr-1" /> Remove
+                              <Button size="sm" variant="outline" onClick={() => s.status === "rejected" ? reactivateUser(s.id, s.fullName) : removeUser(s.id, s.fullName)} className="text-rose-700 border-rose-200 hover:bg-rose-50">
+                                <XCircle className="h-4 w-4 mr-1" /> {s.status === "rejected" ? "Reactivate" : "Deactivate"}
                               </Button>
                             </TableCell>
                           </TableRow>
@@ -473,8 +424,8 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
                               <Badge variant={p.status === "approved" ? "default" : "secondary"} className="capitalize text-xs">{p.status}</Badge>
                             </TableCell>
                             <TableCell className="text-right">
-                              <Button size="sm" variant="outline" onClick={() => removeUser(p.id, p.fullName)} className="text-rose-700 border-rose-200 hover:bg-rose-50">
-                                <XCircle className="h-4 w-4 mr-1" /> Remove
+                              <Button size="sm" variant="outline" onClick={() => p.status === "rejected" ? reactivateUser(p.id, p.fullName) : removeUser(p.id, p.fullName)} className="text-rose-700 border-rose-200 hover:bg-rose-50">
+                                <XCircle className="h-4 w-4 mr-1" /> {p.status === "rejected" ? "Reactivate" : "Deactivate"}
                               </Button>
                             </TableCell>
                           </TableRow>
@@ -601,94 +552,7 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
           </Card>
         </TabsContent>
 
-        <TabsContent value="requirements" className="space-y-6 pt-4">
-          <div className="grid gap-6 lg:grid-cols-2">
-            {/* Left column: Department target settings */}
-            <div className="space-y-4">
-              <Card>
-                <CardHeader className="border-b border-teal-100">
-                  <CardTitle className="text-xl flex items-center gap-2">
-                    <Settings className="h-5 w-5 text-teal-600" /> Department Targets
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-5">
-                  <form onSubmit={handleSaveConfig} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>Required Case Discussions (per resident)</Label>
-                      <Input type="number" min="0" value={deptConfig.requiredCases} onChange={(e) => setDeptConfig({...deptConfig, requiredCases: parseInt(e.target.value, 10) || 0})} required />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Required Procedures (per resident)</Label>
-                      <Input type="number" min="0" value={deptConfig.requiredProcedures} onChange={(e) => setDeptConfig({...deptConfig, requiredProcedures: parseInt(e.target.value, 10) || 0})} required />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Required Academic Presentations (per resident)</Label>
-                      <Input type="number" min="0" value={deptConfig.requiredAcademic} onChange={(e) => setDeptConfig({...deptConfig, requiredAcademic: parseInt(e.target.value, 10) || 0})} required />
-                    </div>
-                    <Button type="submit" disabled={savingConfig} className="w-full">
-                      <Settings className="h-4 w-4 mr-2" /> {savingConfig ? "Saving..." : "Save Settings"}
-                    </Button>
-                  </form>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Right column: Procedure management */}
-            <div className="space-y-4">
-              <Card>
-                <CardHeader className="border-b border-teal-100">
-                  <CardTitle className="text-xl flex items-center gap-2">
-                    <Syringe className="h-5 w-5 text-teal-600" /> Add Procedure Type
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-5">
-                  <form onSubmit={handleAddProcedure} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>Procedure Name</Label>
-                      <Input value={procForm.name} onChange={(e) => setProcForm({...procForm, name: e.target.value})} required />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Procedure Group</Label>
-                      <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" value={procForm.group} onChange={(e) => setProcForm({...procForm, group: e.target.value})} required>
-                        <option value="emergency">Emergency / Core</option>
-                        <option value="invasive">Invasive / Specialized</option>
-                        <option value="general">General / Routine</option>
-                      </select>
-                    </div>
-                    <Button type="submit" disabled={addingProc} className="w-full">
-                      <Syringe className="h-4 w-4 mr-2" /> {addingProc ? "Adding..." : "Add Procedure"}
-                    </Button>
-                  </form>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="border-b border-teal-100">
-                  <CardTitle className="text-xl flex items-center gap-2">
-                    <BookOpen className="h-5 w-5 text-teal-600" /> Existing Procedures
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-0">
-                  {procedures.length === 0 ? (
-                    <p className="p-6 text-center text-sm text-slate-500">No custom procedures defined.</p>
-                  ) : (
-                    <Table>
-                      <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Group</TableHead></TableRow></TableHeader>
-                      <TableBody>
-                        {procedures.map((p) => (
-                          <TableRow key={p.id}>
-                            <TableCell className="font-medium">{p.name}</TableCell>
-                            <TableCell className="capitalize">{p.group}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        </TabsContent>
+        <TabsContent value="requirements" className="pt-4"><DepartmentSettings /></TabsContent>
       </Tabs>
     </div>
   );
