@@ -7,6 +7,7 @@ import adminRouter from "./admin";
 import departmentRouter from "./department";
 import logsRouter from "./logs";
 import assignmentsRouter from "./assignments.js";
+import paymentsRouter from "./payments.js";
 
 const router: IRouter = Router();
 
@@ -19,5 +20,6 @@ router.use("/professors", professorRouter);
 router.use("/departments", departmentRouter);
 router.use("/logs", logsRouter);
 router.use("/assignments", assignmentsRouter);
+router.use("/payments", paymentsRouter);
 
 export default router;
