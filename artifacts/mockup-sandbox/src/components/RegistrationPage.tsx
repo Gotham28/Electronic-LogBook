@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { expectedCompletionDate, formatLogbookDate, todayForInput } from "@/lib/logbook-config";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { apiGet, apiPost } from "@/lib/apiClient";
+import { PaymentStep } from "@/components/PaymentStep";
 
 export function RegistrationPage({
   onBack,
@@ -26,6 +27,7 @@ export function RegistrationPage({
   onRegistered: () => void;
 }) {
   const [submitting, setSubmitting] = React.useState(false);
+  const [paymentToken, setPaymentToken] = React.useState<string | null>(null);
   const [form, setForm] = React.useState({
     fullName: "",
     email: "",
@@ -104,7 +106,7 @@ export function RegistrationPage({
     
     setSubmitting(true);
     try {
-      await apiPost("/api/auth/register", {
+      const result = await apiPost("/api/auth/register", {
         fullName: form.fullName,
         email: form.email,
         password: form.password,
@@ -115,16 +117,28 @@ export function RegistrationPage({
         departmentId: Number(form.department),
         verificationToken,
       });
-      toast.success("Registration submitted", {
-        description: `HOD verification is pending. You will be able to log in after approval.`,
-      });
-      onRegistered();
+      setPaymentToken(result.paymentToken);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Registration could not be completed.");
     } finally {
       setSubmitting(false);
     }
   };
+
+  if (paymentToken) {
+    return (
+      <PaymentStep
+        paymentToken={paymentToken}
+        onPaid={() => {
+          toast.success("Registration submitted", {
+            description: "HOD verification is pending. You will be able to log in after approval.",
+          });
+          onRegistered();
+        }}
+        onExit={onBack}
+      />
+    );
+  }
 
   return (
     <div className="medical-grid min-h-screen p-4 md:p-8">
