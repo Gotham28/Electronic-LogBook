@@ -174,6 +174,11 @@ router.post("/verify", validate(verifyBody), async (req, res) => {
     const [current] = await db.select({ status: paymentsTable.status }).from(paymentsTable)
       .where(eq(paymentsTable.id, payment.id)).limit(1);
     if (!current) { res.status(404).json({ message: "Payment order not found" }); return; }
+    // 'paid' here means a concurrent verify for this same order won the race and wrote the
+    // row first. The payment did succeed, so this caller gets the same 200 as the idempotent
+    // path above. Answering 409 would tell an applicant who has genuinely paid that they
+    // have not. Do NOT collapse this back into a single 409.
+    if (current.status === "paid") { res.json({ status: "paid" }); return; }
     res.status(409).json({ message: "This payment cannot be completed", status: current.status });
     return;
   }
