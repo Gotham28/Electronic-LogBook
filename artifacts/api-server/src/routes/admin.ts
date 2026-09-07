@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, usersTable, studentsTable, departmentsTable, departmentConfigsTable, procedureTypesTable, caseLogsTable, procedureLogsTable, academicLogsTable, departmentCatalogTable } from "@workspace/db";
+import { db, usersTable, studentsTable, departmentsTable, departmentConfigsTable, procedureTypesTable, caseLogsTable, procedureLogsTable, academicLogsTable, departmentCatalogTable, paymentsTable } from "@workspace/db";
 import { eq, and, count, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
@@ -79,6 +79,16 @@ router.post("/students/:id/approve", async (req, res) => {
     }
     if (target.departmentId !== departmentId) {
       res.status(403).json({ message: "Cannot approve a student outside your department" });
+      return;
+    }
+
+    // target.id (and therefore userId, since the lookup above matched eq(usersTable.id, userId))
+    // is a usersTable.id. paymentsTable.userId is also a usersTable.id (see lib/db/src/schema/payments.ts),
+    // so no separate studentsTable lookup is needed to compare them.
+    const [paidPayment] = await db.select({ id: paymentsTable.id }).from(paymentsTable)
+      .where(and(eq(paymentsTable.userId, userId), eq(paymentsTable.status, "paid"))).limit(1);
+    if (!paidPayment) {
+      res.status(402).json({ message: "This student has not completed payment and cannot be approved yet" });
       return;
     }
 
