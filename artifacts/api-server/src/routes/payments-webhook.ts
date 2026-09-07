@@ -1,7 +1,7 @@
 import { Router } from "express";
 import crypto from "node:crypto";
 import { db, paymentsTable } from "@workspace/db";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
 
 const router = Router();
@@ -26,7 +26,13 @@ router.post("/webhook", async (req, res) => {
   const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
   const raw = req.body;
 
-  if (typeof signatureHeader !== "string" || !signatureHeader || !secret || !Buffer.isBuffer(raw) || !verifySignature(raw, signatureHeader, secret)) {
+  if (!secret) {
+    logger.error({ eventId, status: 400 }, "Razorpay webhook: RAZORPAY_WEBHOOK_SECRET is not configured, webhooks cannot be verified");
+    res.sendStatus(400);
+    return;
+  }
+
+  if (typeof signatureHeader !== "string" || !signatureHeader || !Buffer.isBuffer(raw) || !verifySignature(raw, signatureHeader, secret)) {
     logger.warn({ eventId, status: 400 }, "Razorpay webhook: signature verification failed");
     res.sendStatus(400);
     return;
@@ -59,32 +65,46 @@ router.post("/webhook", async (req, res) => {
   const paymentId: string = entity.id;
   const amount: number = entity.amount;
 
-  const [row] = await db.select().from(paymentsTable).where(eq(paymentsTable.razorpayOrderId, orderId)).limit(1);
-  if (!row) {
-    logger.warn({ event, eventId, orderId, status: 200 }, "Razorpay webhook: order not found");
-    res.sendStatus(200);
-    return;
-  }
-
-  if (event === "payment.captured") {
-    if (amount !== row.amountPaise) {
-      logger.warn({ event, eventId, orderId, status: 200, receivedAmountPaise: amount, expectedAmountPaise: row.amountPaise },
-        "Razorpay webhook: captured amount does not match stored order amount");
+  try {
+    const [row] = await db.select().from(paymentsTable).where(eq(paymentsTable.razorpayOrderId, orderId)).limit(1);
+    if (!row) {
+      logger.warn({ event, eventId, orderId, status: 200 }, "Razorpay webhook: order not found");
       res.sendStatus(200);
       return;
     }
-    await db.update(paymentsTable).set({ status: "paid", razorpayPaymentId: paymentId, updatedAt: new Date() })
+
+    if (event === "payment.captured") {
+      if (amount !== row.amountPaise) {
+        logger.warn({ event, eventId, orderId, status: 200, receivedAmountPaise: amount, expectedAmountPaise: row.amountPaise },
+          "Razorpay webhook: captured amount does not match stored order amount");
+        res.sendStatus(200);
+        return;
+      }
+      // Razorpay allows retrying payment against the same order_id, so a prior payment.failed
+      // must not permanently strand the row - a declined card followed by a successful one is
+      // payment.failed then payment.captured for the same order_id. 'paid' is excluded (never
+      // reprocess an already-paid row) and 'refunded' is excluded (never silently resurrect a
+      // refunded payment back to paid) - inArray only, no "status != 'paid'" shortcut.
+      await db.update(paymentsTable).set({ status: "paid", razorpayPaymentId: paymentId, updatedAt: new Date() })
+        .where(and(eq(paymentsTable.razorpayOrderId, orderId), inArray(paymentsTable.status, ["created", "failed"])));
+      logger.info({ event, eventId, orderId, status: 200 }, "Razorpay webhook: processed");
+      res.sendStatus(200);
+      return;
+    }
+
+    // payment.failed
+    await db.update(paymentsTable).set({ status: "failed", updatedAt: new Date() })
       .where(and(eq(paymentsTable.razorpayOrderId, orderId), eq(paymentsTable.status, "created")));
     logger.info({ event, eventId, orderId, status: 200 }, "Razorpay webhook: processed");
     res.sendStatus(200);
-    return;
+  } catch {
+    // Never surface a non-2xx to Razorpay for a database error: it triggers retries and, after
+    // 24 hours of failures, Razorpay disables the webhook outright. The row simply stays at its
+    // previous status, which the browser /verify path already handles safely. No error object,
+    // payload, or stack trace is logged - only these four fields.
+    logger.error({ event, eventId, orderId, status: 200 }, "Razorpay webhook: database operation failed");
+    res.sendStatus(200);
   }
-
-  // payment.failed
-  await db.update(paymentsTable).set({ status: "failed", updatedAt: new Date() })
-    .where(and(eq(paymentsTable.razorpayOrderId, orderId), eq(paymentsTable.status, "created")));
-  logger.info({ event, eventId, orderId, status: 200 }, "Razorpay webhook: processed");
-  res.sendStatus(200);
 });
 
 export default router;
