@@ -36,6 +36,19 @@ function razorpayCredentials(): { keyId: string; keySecret: string } | null {
   return { keyId, keySecret };
 }
 
+// Razorpay's error responses are shaped { error: { code, description, ... } }. Narrowed from
+// unknown rather than cast to any, mirroring the postgresErrorCode style in
+// payments-webhook.ts.
+function razorpayErrorDetails(body: unknown): { code?: string; description?: string } {
+  if (typeof body !== "object" || body === null || !("error" in body)) return {};
+  const error = (body as { error?: unknown }).error;
+  if (typeof error !== "object" || error === null) return {};
+  const code = "code" in error && typeof (error as { code?: unknown }).code === "string" ? (error as { code: string }).code : undefined;
+  const description = "description" in error && typeof (error as { description?: unknown }).description === "string"
+    ? (error as { description: string }).description : undefined;
+  return { code, description };
+}
+
 // An unpaid order is only reused while the payment token that can pay it is still valid.
 const REUSE_WINDOW_MS = 1800000;
 
@@ -104,7 +117,9 @@ router.post("/create-order", validate(z.object({}).strict()), async (req, res) =
     return;
   }
   if (!response.ok) {
-    logger.error({ status: response.status }, "Razorpay order creation failed");
+    const errorBody: unknown = await response.json().catch(() => null);
+    const { code, description } = razorpayErrorDetails(errorBody);
+    logger.error({ status: response.status, razorpayCode: code, razorpayDescription: description }, "Razorpay order creation failed");
     res.status(502).json({ message: "Unable to create payment order" });
     return;
   }
