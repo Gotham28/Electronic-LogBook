@@ -1,7 +1,7 @@
 import { before, after, test } from "node:test";
 import assert from "node:assert/strict";
 import { setup, request, accounts as a, departmentIds, mail, password } from "./support.js";
-import { engine, db, usersTable, assignmentsTable, assignmentRecipientsTable, auditTable } from "./database.js";
+import { engine, db, usersTable, assignmentsTable, assignmentRecipientsTable, auditTable, subscriptionPlansTable, paymentsTable } from "./database.js";
 import { eq } from "drizzle-orm";
 import jwt from "jsonwebtoken";
 import { provisionDepartment } from "../src/lib/department-provisioning.js";
@@ -208,6 +208,14 @@ test("student self-registration needs possession of a verified single-use proof 
   assert.ok(pending);
   assert.ok(!(await call("/admin/students/pending", "hod0")).body.some((r: any) => r.email === email));
   assert.equal((await call("/admin/students/" + pending.id + "/approve", "hod0", "POST")).status, 403);
+  assert.equal((await call("/admin/students/" + pending.id + "/approve", undefined, "POST")).status, 401);
+  const nonexistentId = 999999999;
+  assert.equal((await db.select().from(usersTable).where(eq(usersTable.id, nonexistentId))).length, 0);
+  assert.equal((await call("/admin/students/" + nonexistentId + "/approve", "hod1", "POST")).status, 404);
+  assert.equal((await call("/admin/students/" + pending.id + "/approve", "hod1", "POST")).status, 402);
+  assert.equal((await db.select().from(usersTable).where(eq(usersTable.id, pending.id)))[0].status, "pending");
+  const [plan] = await db.insert(subscriptionPlansTable).values({ code: "TEST-PLAN-" + pending.id, name: "Test plan", amountPaise: 140000, durationMonths: 12 }).returning();
+  await db.insert(paymentsTable).values({ userId: pending.id, planId: plan.id, razorpayOrderId: "test-order-" + pending.id, amountPaise: 140000, currency: "INR", status: "paid" });
   assert.equal((await call("/admin/students/" + pending.id + "/approve", "hod1", "POST")).status, 200);
   const login = await call("/auth/login", undefined, "POST", { username: email, password });
   assert.equal(login.status, 200);
