@@ -72,7 +72,16 @@ app.use((req, res, next) => {
   }
   next();
 });
-app.use(express.json({ limit: "128kb" }));
+// Razorpay webhook signatures are computed over the raw request body bytes; parsing this one
+// path through express.json() first would make the signature unverifiable (JSON.stringify is
+// not byte-identical to what Razorpay signed). This path alone gets its own raw-body parser
+// and is excluded from the JSON parser below - every other route is unaffected.
+const RAZORPAY_WEBHOOK_PATH = "/api/payments/webhook";
+app.use(RAZORPAY_WEBHOOK_PATH, express.raw({ type: "application/json" }));
+app.use(express.json({
+  limit: "128kb",
+  type: (req) => req.url?.split("?")[0] !== RAZORPAY_WEBHOOK_PATH && /^application\/json(?:;|$)/i.test(req.headers["content-type"] || ""),
+}));
 
 app.use("/api", router);
 app.use((_req, res) => { res.status(404).json({ message: "Route not found" }); });
