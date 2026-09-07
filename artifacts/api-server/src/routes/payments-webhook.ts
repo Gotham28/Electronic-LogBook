@@ -13,6 +13,20 @@ function verifySignature(raw: Buffer, signature: string, secret: string): boolea
   return expectedBuffer.length === providedBuffer.length && crypto.timingSafeEqual(expectedBuffer, providedBuffer);
 }
 
+// Mirrors the error.code / error.cause.code shape already relied on in app.ts's error
+// handler, narrowed for an `unknown` catch binding instead of `any`.
+function postgresErrorCode(error: unknown): string | undefined {
+  if (typeof error !== "object" || error === null) return undefined;
+  const direct = "code" in error ? (error as { code?: unknown }).code : undefined;
+  if (typeof direct === "string") return direct;
+  const cause = "cause" in error ? (error as { cause?: unknown }).cause : undefined;
+  if (typeof cause === "object" && cause !== null && "code" in cause) {
+    const nested = (cause as { code?: unknown }).code;
+    if (typeof nested === "string") return nested;
+  }
+  return undefined;
+}
+
 // No requireAuth / requirePaymentToken here, deliberately. The caller is Razorpay's own
 // server, not a logged-in user or a pending applicant with a payment token - there is no
 // session to authenticate. Ownership (AGENTS.md "ownership before data") is still enforced,
@@ -97,12 +111,20 @@ router.post("/webhook", async (req, res) => {
       .where(and(eq(paymentsTable.razorpayOrderId, orderId), eq(paymentsTable.status, "created")));
     logger.info({ event, eventId, orderId, status: 200 }, "Razorpay webhook: processed");
     res.sendStatus(200);
-  } catch {
+  } catch (error) {
     // Never surface a non-2xx to Razorpay for a database error: it triggers retries and, after
     // 24 hours of failures, Razorpay disables the webhook outright. The row simply stays at its
     // previous status, which the browser /verify path already handles safely. No error object,
     // payload, or stack trace is logged - only these four fields.
-    logger.error({ event, eventId, orderId, status: 200 }, "Razorpay webhook: database operation failed");
+    if (postgresErrorCode(error) === "23505") {
+      // payments_one_paid_per_user rejected this write: the user already has a 'paid' row and
+      // this capture could not be recorded against a second one. This is not a transient
+      // blip - it means the user was charged twice and only one charge is on record.
+      logger.error({ event, eventId, orderId, status: 200 },
+        "Razorpay webhook: duplicate paid row for this user, capture could not be recorded, MANUAL RECONCILIATION REQUIRED");
+    } else {
+      logger.error({ event, eventId, orderId, status: 200 }, "Razorpay webhook: database operation failed");
+    }
     res.sendStatus(200);
   }
 });

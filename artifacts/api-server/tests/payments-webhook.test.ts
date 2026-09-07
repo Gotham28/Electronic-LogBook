@@ -172,3 +172,14 @@ test("RAZORPAY_WEBHOOK_SECRET unset -> 400, payments row unchanged", async () =>
   assert.equal(status, 400);
   assert.equal((await paymentRow("order_secret_unset"))!.status, "created");
 });
+
+test("second 'created' row for a user who already has a 'paid' row -> 200, second row STILL 'created' (unique violation swallowed)", async () => {
+  // a.pending0 already holds a 'paid' row from the "known order at 'created'" test above -
+  // this second row simulates the reuse-window-lapsed scenario from payments.ts:40, where a
+  // user can legitimately end up with more than one payments row.
+  await insertPayment("order_duplicate_paid_attempt", a.pending0.id, 140000, "created");
+  const body = capturedBody("order_duplicate_paid_attempt", "pay_duplicate_attempt", 140000);
+  const status = await postWebhook(body, sign(body));
+  assert.equal(status, 200);
+  assert.equal((await paymentRow("order_duplicate_paid_attempt"))!.status, "created");
+});
