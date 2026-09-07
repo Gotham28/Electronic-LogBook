@@ -36,8 +36,12 @@ async function postWebhook(rawBody: string, signature?: string) {
   return response.status;
 }
 
-async function insertPayment(orderId: string, userId: number, amountPaise = 140000, status: "created" | "paid" | "failed" = "created") {
-  const [row] = await db.insert(paymentsTable).values({ userId, planId, razorpayOrderId: orderId, amountPaise, currency: "INR", status }).returning();
+async function insertPayment(
+  orderId: string, userId: number, amountPaise = 140000,
+  status: "created" | "paid" | "failed" | "refunded" = "created",
+  razorpayPaymentId: string | null = null,
+) {
+  const [row] = await db.insert(paymentsTable).values({ userId, planId, razorpayOrderId: orderId, amountPaise, currency: "INR", status, razorpayPaymentId }).returning();
   return row;
 }
 
@@ -127,4 +131,44 @@ test("valid signature, payment.captured, amount mismatch -> 200, row still 'crea
   const status = await postWebhook(body, sign(body));
   assert.equal(status, 200);
   assert.equal((await paymentRow("order_amount_mismatch"))!.status, "created");
+});
+
+test("payment.failed then payment.captured on the same order id -> 200, row ends at 'paid' with the captured payment id (Fix 1 regression)", async () => {
+  await insertPayment("order_failed_then_captured", a.student0.id);
+  const failedReq = failedBody("order_failed_then_captured", "pay_declined_attempt", 140000);
+  assert.equal(await postWebhook(failedReq, sign(failedReq)), 200);
+  assert.equal((await paymentRow("order_failed_then_captured"))!.status, "failed");
+
+  const capturedReq = capturedBody("order_failed_then_captured", "pay_succeeded_attempt", 140000);
+  const status = await postWebhook(capturedReq, sign(capturedReq));
+  assert.equal(status, 200);
+  const row = await paymentRow("order_failed_then_captured");
+  assert.equal(row!.status, "paid");
+  assert.equal(row!.razorpayPaymentId, "pay_succeeded_attempt");
+});
+
+test("valid signature, payment.captured against a row already 'refunded' -> 200, row STILL 'refunded', razorpay_payment_id unchanged", async () => {
+  await insertPayment("order_refunded_stays_refunded", a.faculty0.id, 140000, "refunded", "pay_original_before_refund");
+  const body = capturedBody("order_refunded_stays_refunded", "pay_should_not_apply", 140000);
+  const status = await postWebhook(body, sign(body));
+  assert.equal(status, 200);
+  const row = await paymentRow("order_refunded_stays_refunded");
+  assert.equal(row!.status, "refunded");
+  assert.equal(row!.razorpayPaymentId, "pay_original_before_refund");
+});
+
+test("RAZORPAY_WEBHOOK_SECRET unset -> 400, payments row unchanged", async () => {
+  await insertPayment("order_secret_unset", a.hod0.id);
+  const body = capturedBody("order_secret_unset", "pay_irrelevant", 140000);
+  const signature = sign(body); // computed while the secret is still set, before deleting it below
+  const original = process.env.RAZORPAY_WEBHOOK_SECRET;
+  delete process.env.RAZORPAY_WEBHOOK_SECRET;
+  let status: number;
+  try {
+    status = await postWebhook(body, signature);
+  } finally {
+    process.env.RAZORPAY_WEBHOOK_SECRET = original;
+  }
+  assert.equal(status, 400);
+  assert.equal((await paymentRow("order_secret_unset"))!.status, "created");
 });
