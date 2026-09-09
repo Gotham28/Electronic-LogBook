@@ -385,7 +385,11 @@ router.post("/:studentId/leave-records", validate(z.object({ startDate: dateSche
     }).returning();
     res.status(201).json({ success: true, leave: { ...inserted, number: inserted.id } });
   } catch (error) {
-    req.log.error(error, "Leave POST error");
+    // Never the error object itself: a failed insert throws DrizzleQueryError, whose
+    // message carries the SQL plus every bound parameter - including the leave reason,
+    // which can disclose a health condition (AGENTS.md sec 8). Id and status code only,
+    // matching app.ts:96.
+    req.log.error({ studentId: req.params.studentId, status: 500 }, "Leave POST error");
     res.status(500).json({ message: "Internal server error" });
   }
 });

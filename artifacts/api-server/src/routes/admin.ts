@@ -219,7 +219,10 @@ router.post("/professors", validate(z.object({ fullName: nameSchema, email: emai
       }
     });
   } catch (error) {
-    req.log.error(error, "Error creating professor");
+    // Never the error object itself: a failed insert throws DrizzleQueryError, whose
+    // message carries the SQL plus every bound parameter - including the new professor's
+    // passwordHash. Id and status code only, matching app.ts:96.
+    req.log.error({ departmentId: req.user!.departmentId, status: 500 }, "Error creating professor");
     res.status(500).json({ message: "Internal server error" });
   }
 });
