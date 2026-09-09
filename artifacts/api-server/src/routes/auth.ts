@@ -151,7 +151,15 @@ router.post("/login", validate(z.object({ username: z.string().trim().min(1).max
 });
 
 router.get("/me", requireAuth, async (req, res) => { res.json(await sessionProfile(req.user!.id)); });
-router.post("/logout", (_req, res) => { res.clearCookie("token", cookieOptions); res.json({ message: "Logged out" }); });
+// Bumps sessionVersion (same mechanism as change-password below and admin.ts's
+// deactivate/reactivate), so a token captured before logout is rejected by requireAuth's
+// account.sessionVersion check (middlewares/auth.ts:51) rather than staying valid for the
+// rest of its 1-day expiry.
+router.post("/logout", requireAuth, async (req, res) => {
+  await db.update(usersTable).set({ sessionVersion: sql`${usersTable.sessionVersion} + 1` }).where(eq(usersTable.id, req.user!.id));
+  res.clearCookie("token", cookieOptions);
+  res.json({ message: "Logged out" });
+});
 
 router.post("/reset-password", validate(z.object({ email: emailSchema, newPassword: passwordSchema,
   verificationToken: z.string().min(1).max(2048) }).strict()), async (req, res) => {
