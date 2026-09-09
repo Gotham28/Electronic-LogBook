@@ -95,7 +95,7 @@ router.patch("/:logType/:logId/review", requireAuth, requireRole(["professor", "
 
     res.json(updatedRows[0]);
   } catch (error) {
-    req.log.error(error, "Error updating log review status");
+    req.log.error({ logType: req.params.logType, logId: req.params.logId, status: 500 }, "Error updating log review status");
     res.status(500).json({ message: "Internal server error" });
   }
 });

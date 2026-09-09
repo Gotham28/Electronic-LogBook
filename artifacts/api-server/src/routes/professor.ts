@@ -229,7 +229,7 @@ router.get("/:professorId/review-queue", async (req, res) => {
       assignedMentees: menteesData,
     });
   } catch (error) {
-    req.log.error(error, "Error fetching professor review queue");
+    req.log.error({ professorId: req.params.professorId, status: 500 }, "Error fetching professor review queue");
     res.status(500).json({ message: "Internal server error" });
   }
 });

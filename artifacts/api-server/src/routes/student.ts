@@ -126,7 +126,7 @@ router.get("/:studentId/dashboard", requireAuth, async (req, res) => {
       recentLogs: [...recentCases, ...recentProcs]
     });
   } catch (error) {
-    req.log.error(error, "Error fetching dashboard");
+    req.log.error({ studentId: req.params.studentId, status: 500 }, "Error fetching dashboard");
     res.status(500).json({ message: "Internal server error" });
   }
 });
@@ -207,7 +207,7 @@ router.get("/:studentId/logs", requireAuth, async (req, res) => {
       academicLogs: academicLogsRaw.map(r => ({ ...r.log, supervisorName: r.supervisorName })),
     });
   } catch (error) {
-    req.log.error(error, "Error fetching student logs");
+    req.log.error({ studentId: req.params.studentId, status: 500 }, "Error fetching student logs");
     res.status(500).json({ message: "Internal server error" });
   }
 });
@@ -241,7 +241,7 @@ router.get("/:studentId/postings", async (req, res) => {
       .where(and(eq(departmentCatalogTable.departmentId, req.user!.departmentId!), eq(departmentCatalogTable.kind, "posting")));
     res.json({ options: options.map((item) => item.name), data });
   } catch (error) {
-    req.log.error(error, "Error fetching postings");
+    req.log.error({ studentId: req.params.studentId, status: 500 }, "Error fetching postings");
     res.status(500).json({ message: "Internal server error" });
   }
 });
@@ -266,7 +266,7 @@ router.post("/:studentId/postings", validate(z.object({ ward: nameSchema, startD
     }).returning();
     res.status(201).json({ success: true, posting: inserted });
   } catch (error) {
-    req.log.error(error, "Error creating posting");
+    req.log.error({ studentId: req.params.studentId, status: 500 }, "Error creating posting");
     res.status(500).json({ message: "Internal server error" });
   }
 });
@@ -336,7 +336,7 @@ router.get("/:studentId/leave-balance", requireAuth, async (req, res) => {
       academic: { used: academicUsed, total: config?.academicLeaveAllowance ?? null }
     });
   } catch (error) {
-    req.log.error(error, "Error fetching leave balance");
+    req.log.error({ studentId: req.params.studentId, status: 500 }, "Error fetching leave balance");
     res.status(500).json({ message: "Internal server error" });
   }
 });
@@ -454,7 +454,7 @@ router.get("/:studentId/assessments", requireAuth, async (req, res) => {
       .orderBy(desc(assessmentsTable.createdAt));
     res.json(data);
   } catch (error) {
-    req.log.error(error, "Error fetching assessments");
+    req.log.error({ studentId: req.params.studentId, status: 500 }, "Error fetching assessments");
     res.status(500).json({ message: "Internal server error" });
   }
 });
@@ -505,7 +505,7 @@ router.post("/:studentId/assessments", requireAuth, requireRole(["professor", "h
     }).returning();
     res.status(201).json(inserted);
   } catch (error) {
-    req.log.error(error, "Error creating assessment");
+    req.log.error({ studentId: req.params.studentId, status: 500 }, "Error creating assessment");
     res.status(500).json({ message: "Internal server error" });
   }
 });
@@ -680,7 +680,7 @@ router.delete("/:studentId/case-logs/:logId", requireAuth, async (req, res) => {
     await db.update(caseLogsTable).set({ deletedAt: new Date() }).where(eq(caseLogsTable.id, logId));
     res.json({ message: "Log deleted successfully" });
   } catch (error) {
-    req.log.error(error, "Error deleting case log");
+    req.log.error({ logId: req.params.logId, status: 500 }, "Error deleting case log");
     res.status(500).json({ message: "Internal server error" });
   }
 });
@@ -717,7 +717,7 @@ router.delete("/:studentId/procedure-logs/:logId", requireAuth, async (req, res)
     await db.update(procedureLogsTable).set({ deletedAt: new Date() }).where(eq(procedureLogsTable.id, logId));
     res.json({ message: "Log deleted successfully" });
   } catch (error) {
-    req.log.error(error, "Error deleting procedure log");
+    req.log.error({ logId: req.params.logId, status: 500 }, "Error deleting procedure log");
     res.status(500).json({ message: "Internal server error" });
   }
 });
