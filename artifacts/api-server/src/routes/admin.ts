@@ -73,11 +73,9 @@ router.post("/students/:id/approve", async (req, res) => {
     const [target] = await db.select().from(usersTable)
       .where(and(eq(usersTable.id, userId), eq(usersTable.role, "student"), eq(usersTable.status, "pending")))
       .limit(1);
-    if (!target) {
-      res.status(404).json({ message: "Pending student not found" });
-      return;
-    }
-    if (target.departmentId !== departmentId) {
+    // Nonexistent id and wrong-department both return the same status and body (SEC-36):
+    // an HOD probing ids cannot tell "no such student" from "real student, other department".
+    if (!target || target.departmentId !== departmentId) {
       res.status(403).json({ message: "Cannot approve a student outside your department" });
       return;
     }
@@ -119,11 +117,9 @@ router.post("/students/:id/reject", async (req, res) => {
       .where(and(eq(usersTable.id, userId), eq(usersTable.role, "student"), eq(usersTable.status, "pending")))
       .limit(1);
 
-    if (!target) {
-      res.status(404).json({ message: "Pending student not found" });
-      return;
-    }
-    if (target.departmentId !== departmentId) {
+    // Nonexistent id and wrong-department both return the same status and body (SEC-36):
+    // an HOD probing ids cannot tell "no such student" from "real student, other department".
+    if (!target || target.departmentId !== departmentId) {
       res.status(403).json({ message: "Cannot reject a student outside your department" });
       return;
     }
@@ -151,11 +147,10 @@ router.delete("/users/:id", async (req, res) => {
     const departmentId = req.user?.departmentId;
     const [target] = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
 
-    if (!target) {
-      res.status(404).json({ message: "User not found" });
-      return;
-    }
-    if (target.departmentId !== departmentId || !["student", "professor"].includes(target.role)) {
+    // Nonexistent id and wrong-department/role both return the same status and body
+    // (SEC-36): an HOD probing ids cannot tell "no such user" from "real user, not theirs
+    // to remove".
+    if (!target || target.departmentId !== departmentId || !["student", "professor"].includes(target.role)) {
       res.status(403).json({ message: "Cannot remove a user outside your department" });
       return;
     }

@@ -169,8 +169,9 @@ router.post("/verify", validate(verifyBody), async (req, res) => {
   const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body as z.infer<typeof verifyBody>;
 
   const [payment] = await db.select().from(paymentsTable).where(eq(paymentsTable.razorpayOrderId, razorpay_order_id)).limit(1);
-  if (!payment) { res.status(404).json({ message: "Payment order not found" }); return; }
-  if (payment.userId !== req.paymentUser!.id) { res.status(403).json({ message: "This payment does not belong to your account" }); return; }
+  // Nonexistent order id and wrong-owner both return the same status and body (SEC-37): a
+  // caller probing order ids cannot tell "no such order" from "real order, not yours".
+  if (!payment || payment.userId !== req.paymentUser!.id) { res.status(403).json({ message: "This payment does not belong to your account" }); return; }
   if (payment.status === "paid") { res.json({ status: "paid" }); return; }
 
   const expected = crypto.createHmac("sha256", credentials.keySecret)

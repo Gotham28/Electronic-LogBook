@@ -40,12 +40,9 @@ router.get("/:professorId/review-queue", async (req, res) => {
       .where(and(eq(usersTable.id, professorId), inArray(usersTable.role, ["professor", "hod"])))
       .limit(1);
 
-    if (profMatch.length === 0) {
-      res.status(404).json({ message: "Professor not found" });
-      return;
-    }
-
-    if (caller.departmentId !== profMatch[0].departmentId || profMatch[0].status !== "approved") {
+    // Nonexistent id and wrong-department both return the same status and body (SEC-35):
+    // an HOD probing ids cannot tell "no such user" from "real user, different department".
+    if (profMatch.length === 0 || caller.departmentId !== profMatch[0].departmentId || profMatch[0].status !== "approved") {
       res.status(403).json({ message: "Faculty member is outside your department" });
       return;
     }
