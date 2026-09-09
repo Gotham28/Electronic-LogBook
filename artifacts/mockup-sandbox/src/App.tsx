@@ -17,7 +17,7 @@ import { PrintableLogbook } from "@/components/pages/PrintableLogbook";
 import { getCurrentUser, clearSession, getToken } from "@/lib/session";
 import { apiGet, apiPost } from "@/lib/apiClient";
 import { DepartmentProvider } from "@/lib/department-context";
-import { AssignmentsPage } from "@/components/pages/AssignmentsPage";
+
 import { Toaster } from "@/components/ui/sonner";
 
 import { modules as discoveredModules } from "./.generated/mockup-components";
@@ -197,7 +197,6 @@ function App() {
       }}
     >
       <Switch>
-      <Route path="/assignments" component={AssignmentsPage} />
       <Route>
       {activeRole === "Faculty" && (
         <ProfessorPortal />
