@@ -97,7 +97,6 @@ const navigationDescriptions: Record<string, string> = {
 function navigationForRole(role: RoleType, dashboardData?: any, loadingBadges?: boolean): NavigationItem[] {
   if (role === "Faculty") {
     return [
-      { title: "Assignments", icon: ClipboardCheck, href: "/assignments" },
       { title: "Evaluation Queue", icon: FileText, href: "/" },
       { title: "Student Progress", icon: UserCheck, href: "/mentees" },
       { title: "Assessments", icon: ClipboardCheck, href: "/assessments" },
@@ -106,7 +105,6 @@ function navigationForRole(role: RoleType, dashboardData?: any, loadingBadges?: 
 
   if (role === "HOD") {
     return [
-      { title: "Assignments", icon: ClipboardCheck, href: "/assignments" },
       { title: "Students", icon: GraduationCap, href: "/roster" },
       { title: "Review Queue", icon: FileText, href: "/review-queue" },
       { title: "Add Assessment", icon: ClipboardCheck, href: "/assessments" },
@@ -125,7 +123,6 @@ function navigationForRole(role: RoleType, dashboardData?: any, loadingBadges?: 
   };
 
   return [
-    { title: "Assignments", icon: ClipboardCheck, href: "/assignments" },
     { title: "Dashboard", icon: LayoutDashboard, href: "/" },
     { title: "Postings & Rotations", icon: CalendarDays, href: "/postings" },
     { title: "Case Logs", icon: FileText, href: "/cases", badge: getCount("cases"), badgeLoading: loadingBadges },
@@ -142,7 +139,7 @@ export function AppLayout({
   activeRole,
   onSignOut,
 }: AppLayoutProps) {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const { department } = useDepartment();
   const [dashboardData, setDashboardData] = React.useState<any>(null);
   const [loadingBadges, setLoadingBadges] = React.useState(activeRole === "Student");
@@ -152,6 +149,17 @@ export function AppLayout({
   const [changingPassword, setChangingPassword] = React.useState(false);
   const [isTourOpen, setIsTourOpen] = React.useState(false);
   const tourButtonRef = React.useRef<HTMLButtonElement>(null);
+
+  // Notification item type
+  type NotifItem = {
+    id: string;
+    text: string;
+    href: string;
+    onDismiss?: () => void;
+  };
+
+  // Notification state — populated by the effects below, never fabricated (§7)
+  const [notifItems, setNotifItems] = React.useState<NotifItem[]>([]);
 
   // Fix: Get actual user from session for the sidebar profile
   const currentUser = getCurrentUser();
@@ -169,6 +177,114 @@ export function AppLayout({
       .catch(err => console.error("Failed to load nav badges", err))
       .finally(() => setLoadingBadges(false));
   }, [activeRole, currentUser?.studentProfileId]);
+
+  // Student: fetch assessments & logs to build notification items
+  React.useEffect(() => {
+    if (!currentUser || activeRole !== "Student" || !currentUser.studentProfileId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const [assessmentsRes, logsRes] = await Promise.allSettled([
+          apiGet<any[]>(`/api/students/${currentUser.studentProfileId}/assessments`),
+          apiGet<any>(`/api/students/${currentUser.studentProfileId}/logs`),
+        ]);
+        if (cancelled) return;
+
+        const items: NotifItem[] = [];
+
+        if (assessmentsRes.status === "fulfilled" && Array.isArray(assessmentsRes.value)) {
+          const totalAssessments = assessmentsRes.value.length;
+          const key = `seen_assessments_${currentUser.studentProfileId}`;
+          const seenStr = sessionStorage.getItem(key);
+          const seenCount = seenStr ? parseInt(seenStr, 10) : totalAssessments;
+          if (!seenStr) {
+            sessionStorage.setItem(key, String(totalAssessments));
+          }
+          const newAssess = Math.max(0, totalAssessments - seenCount);
+          if (newAssess > 0) {
+            items.push({
+              id: "assessments",
+              text: `${newAssess} new assessment${newAssess === 1 ? "" : "s"} recorded`,
+              href: "/assessments",
+              onDismiss: () => sessionStorage.setItem(key, String(totalAssessments)),
+            });
+          }
+        }
+
+        if (logsRes.status === "fulfilled" && logsRes.value) {
+          const { caseLogs = [], procedureLogs = [], academicLogs = [] } = logsRes.value;
+          const rejectedCases = caseLogs.filter((l: any) => l.status === "rejected").length;
+          const rejectedProcs = procedureLogs.filter((l: any) => l.status === "rejected").length;
+          const rejectedAcads = academicLogs.filter((l: any) => l.status === "rejected").length;
+          const rejectedTotal = rejectedCases + rejectedProcs + rejectedAcads;
+
+          const rejKey = `dismissed_rejected_${currentUser.studentProfileId}`;
+          const dismissedStr = sessionStorage.getItem(rejKey);
+          if (rejectedTotal > 0 && dismissedStr !== String(rejectedTotal)) {
+            items.push({
+              id: "rejected_logs",
+              text: `${rejectedTotal} log ${rejectedTotal === 1 ? "entry" : "entries"} returned for revision`,
+              href: "/cases",
+              onDismiss: () => sessionStorage.setItem(rejKey, String(rejectedTotal)),
+            });
+          }
+        }
+
+        setNotifItems(items);
+      } catch {
+        /* fail silently - no fabricated numbers (§7) */
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [activeRole, currentUser]);
+
+  // Faculty / HOD: load action-required items
+  React.useEffect(() => {
+    if (!currentUser) return;
+    if (activeRole !== "Faculty" && activeRole !== "HOD") return;
+    let cancelled = false;
+    (async () => {
+      const items: NotifItem[] = [];
+      if (activeRole === "Faculty") {
+        try {
+          const queue = await apiGet<any[]>(`/api/professors/${currentUser.id}/review-queue`);
+          const n = Array.isArray(queue) ? queue.length : 0;
+          if (n > 0) {
+            items.push({
+              id: "faculty_queue",
+              text: `${n} log${n === 1 ? "" : "s"} pending your review`,
+              href: "/",
+            });
+          }
+        } catch { /* fail silently — no fabricated data (§7) */ }
+      }
+      if (activeRole === "HOD") {
+        const [ps, pl] = await Promise.allSettled([
+          apiGet<any[]>("/api/admin/students/pending"),
+          apiGet<any[]>("/api/admin/leaves/pending"),
+        ]);
+        const sc = ps.status === "fulfilled" && Array.isArray(ps.value) ? ps.value.length : 0;
+        const lc = pl.status === "fulfilled" && Array.isArray(pl.value) ? pl.value.length : 0;
+        if (sc > 0) {
+          items.push({
+            id: "hod_pending_students",
+            text: `${sc} student${sc === 1 ? "" : "s"} awaiting approval`,
+            href: "/student-access",
+          });
+        }
+        if (lc > 0) {
+          items.push({
+            id: "hod_pending_leaves",
+            text: `${lc} leave request${lc === 1 ? "" : "s"} pending`,
+            href: "/leave-approvals",
+          });
+        }
+      }
+      if (!cancelled) setNotifItems(items);
+    })();
+    return () => { cancelled = true; };
+  }, [activeRole, currentUser?.id]);
+
 
   const navigationItems = React.useMemo(
     () => navigationForRole(activeRole, dashboardData, loadingBadges),
@@ -376,13 +492,31 @@ export function AppLayout({
                   <DropdownMenuTrigger asChild>
                     <button data-tour-id="notifications" aria-label="Open notifications" className="relative rounded-xl border border-white/70 bg-white/72 p-2 text-teal-800 shadow-[0_12px_24px_rgba(15,23,42,0.05)] transition hover:-translate-y-0.5 hover:bg-white">
                       <Bell className="h-4 w-4" />
-                      <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-rose-500 ring-2 ring-white" />
+                      {notifItems.length > 0 && (
+                        <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-rose-500 ring-2 ring-white" />
+                      )}
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-80 rounded-2xl border-white/70 bg-white/92 p-2 shadow-[0_24px_60px_rgba(15,23,42,0.12)] backdrop-blur-xl">
                     <DropdownMenuLabel className="px-3 pt-2">Notifications</DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => window.location.assign("/assignments")} className="rounded-xl px-3 py-2">Open assignments to see due work and faculty feedback.</DropdownMenuItem>
+                    {notifItems.length > 0 ? (
+                      notifItems.map((item) => (
+                        <DropdownMenuItem
+                          key={item.id}
+                          onClick={() => {
+                            item.onDismiss?.();
+                            setNotifItems((prev) => prev.filter((i) => i.id !== item.id));
+                            setLocation(item.href);
+                          }}
+                          className="cursor-pointer rounded-xl px-3 py-2 text-xs font-medium text-slate-700 hover:bg-teal-50 hover:text-teal-900 transition-colors"
+                        >
+                          {item.text}
+                        </DropdownMenuItem>
+                      ))
+                    ) : (
+                      <DropdownMenuItem className="rounded-xl px-3 py-2 text-slate-500 text-xs">No new notifications</DropdownMenuItem>
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
