@@ -54,7 +54,7 @@ router.get("/students/pending", async (req, res) => {
 
     res.json(pendingUsers);
   } catch (error) {
-    req.log.error(error, "Error fetching pending students");
+    req.log.error({ departmentId: req.user!.departmentId, status: 500 }, "Error fetching pending students");
     res.status(500).json({ message: "Internal server error" });
   }
 });
@@ -73,11 +73,9 @@ router.post("/students/:id/approve", async (req, res) => {
     const [target] = await db.select().from(usersTable)
       .where(and(eq(usersTable.id, userId), eq(usersTable.role, "student"), eq(usersTable.status, "pending")))
       .limit(1);
-    if (!target) {
-      res.status(404).json({ message: "Pending student not found" });
-      return;
-    }
-    if (target.departmentId !== departmentId) {
+    // Nonexistent id and wrong-department both return the same status and body (SEC-36):
+    // an HOD probing ids cannot tell "no such student" from "real student, other department".
+    if (!target || target.departmentId !== departmentId) {
       res.status(403).json({ message: "Cannot approve a student outside your department" });
       return;
     }
@@ -98,7 +96,7 @@ router.post("/students/:id/approve", async (req, res) => {
 
     res.json({ message: "Student approved successfully" });
   } catch (error) {
-    req.log.error(error, "Error approving student");
+    req.log.error({ userId: req.params.id, status: 500 }, "Error approving student");
     res.status(500).json({ message: "Internal server error" });
   }
 });
@@ -119,11 +117,9 @@ router.post("/students/:id/reject", async (req, res) => {
       .where(and(eq(usersTable.id, userId), eq(usersTable.role, "student"), eq(usersTable.status, "pending")))
       .limit(1);
 
-    if (!target) {
-      res.status(404).json({ message: "Pending student not found" });
-      return;
-    }
-    if (target.departmentId !== departmentId) {
+    // Nonexistent id and wrong-department both return the same status and body (SEC-36):
+    // an HOD probing ids cannot tell "no such student" from "real student, other department".
+    if (!target || target.departmentId !== departmentId) {
       res.status(403).json({ message: "Cannot reject a student outside your department" });
       return;
     }
@@ -133,7 +129,7 @@ router.post("/students/:id/reject", async (req, res) => {
 
     res.json({ message: "Student registration rejected" });
   } catch (error) {
-    req.log.error(error, "Error rejecting student");
+    req.log.error({ userId: req.params.id, status: 500 }, "Error rejecting student");
     res.status(500).json({ message: "Internal server error" });
   }
 });
@@ -151,11 +147,10 @@ router.delete("/users/:id", async (req, res) => {
     const departmentId = req.user?.departmentId;
     const [target] = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
 
-    if (!target) {
-      res.status(404).json({ message: "User not found" });
-      return;
-    }
-    if (target.departmentId !== departmentId || !["student", "professor"].includes(target.role)) {
+    // Nonexistent id and wrong-department/role both return the same status and body
+    // (SEC-36): an HOD probing ids cannot tell "no such user" from "real user, not theirs
+    // to remove".
+    if (!target || target.departmentId !== departmentId || !["student", "professor"].includes(target.role)) {
       res.status(403).json({ message: "Cannot remove a user outside your department" });
       return;
     }
@@ -175,7 +170,7 @@ router.delete("/users/:id", async (req, res) => {
       res.status(409).json({ message: "This student has existing logs or records and cannot be removed. Please contact an administrator if removal is required." });
       return;
     }
-    req.log.error(error, "Error removing user");
+    req.log.error({ userId: req.params.id, status: 500 }, "Error removing user");
     res.status(500).json({ message: "Internal server error" });
   }
 });
@@ -219,7 +214,10 @@ router.post("/professors", validate(z.object({ fullName: nameSchema, email: emai
       }
     });
   } catch (error) {
-    req.log.error(error, "Error creating professor");
+    // Never the error object itself: a failed insert throws DrizzleQueryError, whose
+    // message carries the SQL plus every bound parameter - including the new professor's
+    // passwordHash. Id and status code only, matching app.ts:96.
+    req.log.error({ departmentId: req.user!.departmentId, status: 500 }, "Error creating professor");
     res.status(500).json({ message: "Internal server error" });
   }
 });
@@ -257,7 +255,7 @@ router.get("/leaves/pending", async (req, res) => {
 
     res.json(mappedLeaves);
   } catch (error) {
-    req.log.error(error, "Error fetching pending leaves");
+    req.log.error({ departmentId: req.user!.departmentId, status: 500 }, "Error fetching pending leaves");
     res.status(500).json({ message: "Internal server error" });
   }
 });
@@ -293,7 +291,7 @@ router.post("/leaves/:id/action", async (req, res) => {
 
     res.json({ message: `Leave ${status} successfully` });
   } catch (error) {
-    req.log.error(error, "Error updating leave status");
+    req.log.error({ leaveId: req.params.id, status: 500 }, "Error updating leave status");
     res.status(500).json({ message: "Internal server error" });
   }
 });
@@ -310,7 +308,7 @@ router.get("/department/config", async (req, res) => {
     const [config] = await db.select().from(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, departmentId));
     res.json(config || null);
   } catch (error) {
-    req.log.error(error, "Error fetching department config");
+    req.log.error({ departmentId: req.user!.departmentId, status: 500 }, "Error fetching department config");
     res.status(500).json({ message: "Internal server error" });
   }
 });
@@ -353,7 +351,7 @@ router.post("/department/config", validate(configSchema), async (req, res) => {
       return;
     }
   } catch (error) {
-    req.log.error(error, "Error updating department config");
+    req.log.error({ departmentId: req.user!.departmentId, status: 500 }, "Error updating department config");
     res.status(500).json({ message: "Internal server error" });
   }
 });
@@ -370,7 +368,7 @@ router.get("/department/procedures", async (req, res) => {
     const procedures = await db.select().from(procedureTypesTable).where(eq(procedureTypesTable.departmentId, departmentId));
     res.json(procedures);
   } catch (error) {
-    req.log.error(error, "Error fetching procedures");
+    req.log.error({ departmentId: req.user!.departmentId, status: 500 }, "Error fetching procedures");
     res.status(500).json({ message: "Internal server error" });
   }
 });
@@ -398,7 +396,7 @@ router.post("/department/procedures", validate(z.object({ name: nameSchema, grou
     }).returning();
     res.json(inserted);
   } catch (error) {
-    req.log.error(error, "Error adding procedure");
+    req.log.error({ departmentId: req.user!.departmentId, status: 500 }, "Error adding procedure");
     res.status(500).json({ message: "Internal server error" });
   }
 });
@@ -472,7 +470,7 @@ router.get("/roster", async (req, res) => {
 
     res.json({ students: studentsWithProgress, professors });
   } catch (error) {
-    req.log.error(error, "Error fetching department roster");
+    req.log.error({ departmentId: req.user!.departmentId, status: 500 }, "Error fetching department roster");
     res.status(500).json({ message: "Internal server error" });
   }
 });

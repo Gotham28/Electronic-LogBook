@@ -4,7 +4,7 @@ import {
   academicLogsTable, usersTable, departmentsTable, departmentConfigsTable,
   postingsTable, leaveRecordsTable, appraisalsTable, researchTable, assessmentsTable, procedureTypesTable, departmentCatalogTable, certificationsTable
 } from "@workspace/db";
-import { eq, and, desc, count, sql, isNull } from "drizzle-orm";
+import { eq, and, or, desc, count, sql, isNull } from "drizzle-orm";
 import { requireAuth, requireRole, requireDepartment } from "../middlewares/auth.js";
 import { studentAccess } from "../middlewares/student-access.js";
 import { z } from "zod";
@@ -94,9 +94,20 @@ router.get("/:studentId/dashboard", requireAuth, async (req, res) => {
     const reqProcs = config?.requiredProcedures ?? 0;
     const reqAcad = config?.requiredAcademic ?? 0;
 
-    // Recent Logs (simplified for dashboard)
-    const recentCases = await db.select().from(caseLogsTable).where(eq(caseLogsTable.studentId, studentId)).orderBy(desc(caseLogsTable.createdAt)).limit(1);
-    const recentProcs = await db.select().from(procedureLogsTable).where(eq(procedureLogsTable.studentId, studentId)).orderBy(desc(procedureLogsTable.createdAt)).limit(1);
+    // Recent Logs (simplified for dashboard). Scoped like /logs (student.ts:165-173):
+    // professors see only entries they supervise; students (own) and HODs (dept-wide,
+    // already enforced by studentAccess) see the rest. Excludes soft-deleted rows and
+    // returns only the fields this summary needs - no clinical text, no UHID.
+    const recentCaseFilter = caller.role === "professor"
+      ? and(eq(caseLogsTable.studentId, studentId), eq(caseLogsTable.supervisorId, caller.id), isNull(caseLogsTable.deletedAt))
+      : and(eq(caseLogsTable.studentId, studentId), isNull(caseLogsTable.deletedAt));
+    const recentProcFilter = caller.role === "professor"
+      ? and(eq(procedureLogsTable.studentId, studentId), eq(procedureLogsTable.supervisorId, caller.id), isNull(procedureLogsTable.deletedAt))
+      : and(eq(procedureLogsTable.studentId, studentId), isNull(procedureLogsTable.deletedAt));
+    const recentCases = await db.select({ id: caseLogsTable.id, date: caseLogsTable.date, status: caseLogsTable.status })
+      .from(caseLogsTable).where(recentCaseFilter).orderBy(desc(caseLogsTable.createdAt)).limit(1);
+    const recentProcs = await db.select({ id: procedureLogsTable.id, date: procedureLogsTable.date, status: procedureLogsTable.status })
+      .from(procedureLogsTable).where(recentProcFilter).orderBy(desc(procedureLogsTable.createdAt)).limit(1);
     
     res.json({
       student: {
@@ -115,7 +126,7 @@ router.get("/:studentId/dashboard", requireAuth, async (req, res) => {
       recentLogs: [...recentCases, ...recentProcs]
     });
   } catch (error) {
-    req.log.error(error, "Error fetching dashboard");
+    req.log.error({ studentId: req.params.studentId, status: 500 }, "Error fetching dashboard");
     res.status(500).json({ message: "Internal server error" });
   }
 });
@@ -196,7 +207,7 @@ router.get("/:studentId/logs", requireAuth, async (req, res) => {
       academicLogs: academicLogsRaw.map(r => ({ ...r.log, supervisorName: r.supervisorName })),
     });
   } catch (error) {
-    req.log.error(error, "Error fetching student logs");
+    req.log.error({ studentId: req.params.studentId, status: 500 }, "Error fetching student logs");
     res.status(500).json({ message: "Internal server error" });
   }
 });
@@ -205,6 +216,13 @@ router.get("/:studentId/logs", requireAuth, async (req, res) => {
 router.get("/:studentId/postings", async (req, res) => {
   try {
     const studentId = parseInt(String(req.params.studentId), 10);
+    const caller = req.user!;
+    // Same supervisor scoping as /logs (student.ts:165-173): professors see only the
+    // postings they supervise; students (own) and HODs (dept-wide, already enforced by
+    // studentAccess) see the rest.
+    const postingsFilter = caller.role === "professor"
+      ? and(eq(postingsTable.studentId, studentId), eq(postingsTable.supervisorId, caller.id))
+      : eq(postingsTable.studentId, studentId);
     const data = await db
       .select({
         id: postingsTable.id,
@@ -216,14 +234,14 @@ router.get("/:studentId/postings", async (req, res) => {
       })
       .from(postingsTable)
       .leftJoin(usersTable, eq(postingsTable.supervisorId, usersTable.id))
-      .where(eq(postingsTable.studentId, studentId))
+      .where(postingsFilter)
       .orderBy(desc(postingsTable.createdAt));
       
     const options = await db.select({ name: departmentCatalogTable.value }).from(departmentCatalogTable)
       .where(and(eq(departmentCatalogTable.departmentId, req.user!.departmentId!), eq(departmentCatalogTable.kind, "posting")));
     res.json({ options: options.map((item) => item.name), data });
   } catch (error) {
-    req.log.error(error, "Error fetching postings");
+    req.log.error({ studentId: req.params.studentId, status: 500 }, "Error fetching postings");
     res.status(500).json({ message: "Internal server error" });
   }
 });
@@ -248,7 +266,7 @@ router.post("/:studentId/postings", validate(z.object({ ward: nameSchema, startD
     }).returning();
     res.status(201).json({ success: true, posting: inserted });
   } catch (error) {
-    req.log.error(error, "Error creating posting");
+    req.log.error({ studentId: req.params.studentId, status: 500 }, "Error creating posting");
     res.status(500).json({ message: "Internal server error" });
   }
 });
@@ -269,20 +287,24 @@ router.get("/:studentId/leave-balance", requireAuth, async (req, res) => {
         return;
       }
     } else if (caller.role === "professor" || caller.role === "hod") {
-      if (caller.departmentId !== null) {
-        const [studentUser] = await db
-          .select({ departmentId: usersTable.departmentId })
-          .from(studentsTable)
-          .innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
-          .where(eq(studentsTable.id, studentId));
-        if (!studentUser) {
-          res.status(404).json({ message: "Student not found" });
-          return;
-        }
-        if (studentUser.departmentId !== caller.departmentId) {
-          res.status(403).json({ message: "Forbidden: student is in a different department" });
-          return;
-        }
+      // Missing scope must fail closed (AGENTS.md sec 3) - a professor/HOD with no
+      // department assignment gets no data, never every department's.
+      if (caller.departmentId === null) {
+        res.status(403).json({ message: "Your account needs a department assignment" });
+        return;
+      }
+      const [studentUser] = await db
+        .select({ departmentId: usersTable.departmentId })
+        .from(studentsTable)
+        .innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
+        .where(eq(studentsTable.id, studentId));
+      if (!studentUser) {
+        res.status(404).json({ message: "Student not found" });
+        return;
+      }
+      if (studentUser.departmentId !== caller.departmentId) {
+        res.status(403).json({ message: "Forbidden: student is in a different department" });
+        return;
       }
     }
 
@@ -318,14 +340,25 @@ router.get("/:studentId/leave-balance", requireAuth, async (req, res) => {
       academic: { used: academicUsed, total: config?.academicLeaveAllowance ?? null }
     });
   } catch (error) {
-    req.log.error(error, "Error fetching leave balance");
+    req.log.error({ studentId: req.params.studentId, status: 500 }, "Error fetching leave balance");
     res.status(500).json({ message: "Internal server error" });
   }
 });
 
-router.get("/:studentId/leave-records", async (req, res) => {
+router.get("/:studentId/leave-records", requireAuth, async (req, res) => {
   try {
     const studentId = parseInt(String(req.params.studentId), 10);
+    // Leave reasons can disclose a health condition (AGENTS.md sec 8). Unlike the other
+    // student.ts record types, no supervisor relationship exists for leave - the owning
+    // student and the department HOD are the only legitimate readers. Body matches
+    // studentAccess's own 403 exactly (middlewares/student-access.ts:16): a professor's
+    // rejection here must not be distinguishable from "no such student" or this becomes
+    // a second way to enumerate which students exist, the exact leak studentAccess's
+    // uniform 403 exists to close (docs/SECURITY_FIXES.md sec 1b).
+    if (req.user!.role === "professor") {
+      res.status(403).json({ message: "Student is outside your access scope" });
+      return;
+    }
     const data = await db.select().from(leaveRecordsTable).where(eq(leaveRecordsTable.studentId, studentId)).orderBy(desc(leaveRecordsTable.createdAt));
     res.json({ data: data.map(d => ({ ...d, number: d.id })) }); // Map id to number for frontend compat
   } catch (error) {
@@ -356,7 +389,11 @@ router.post("/:studentId/leave-records", validate(z.object({ startDate: dateSche
     }).returning();
     res.status(201).json({ success: true, leave: { ...inserted, number: inserted.id } });
   } catch (error) {
-    req.log.error(error, "Leave POST error");
+    // Never the error object itself: a failed insert throws DrizzleQueryError, whose
+    // message carries the SQL plus every bound parameter - including the leave reason,
+    // which can disclose a health condition (AGENTS.md sec 8). Id and status code only,
+    // matching app.ts:96.
+    req.log.error({ studentId: req.params.studentId, status: 500 }, "Leave POST error");
     res.status(500).json({ message: "Internal server error" });
   }
 });
@@ -378,25 +415,35 @@ router.get("/:studentId/assessments", requireAuth, async (req, res) => {
         return;
       }
     } else if (caller.role === "professor" || caller.role === "hod") {
-      // Professors/HODs may only read assessments for students in their department
-      if (caller.departmentId !== null) {
-        const [studentUser] = await db
-          .select({ departmentId: usersTable.departmentId })
-          .from(studentsTable)
-          .innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
-          .where(eq(studentsTable.id, studentId));
-        if (!studentUser) {
-          res.status(404).json({ message: "Student not found" });
-          return;
-        }
-        if (studentUser.departmentId !== caller.departmentId) {
-          res.status(403).json({ message: "Forbidden: student is not in your department" });
-          return;
-        }
+      // Professors/HODs may only read assessments for students in their department.
+      // Missing scope must fail closed (AGENTS.md sec 3) - a professor/HOD with no
+      // department assignment gets no data, never every department's.
+      if (caller.departmentId === null) {
+        res.status(403).json({ message: "Your account needs a department assignment" });
+        return;
+      }
+      const [studentUser] = await db
+        .select({ departmentId: usersTable.departmentId })
+        .from(studentsTable)
+        .innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
+        .where(eq(studentsTable.id, studentId));
+      if (!studentUser) {
+        res.status(404).json({ message: "Student not found" });
+        return;
+      }
+      if (studentUser.departmentId !== caller.departmentId) {
+        res.status(403).json({ message: "Forbidden: student is not in your department" });
+        return;
       }
     }
     // admin role: no restriction
 
+    // Same supervisor scoping as /logs (student.ts:165-173): a professor sees only the
+    // assessments they themselves recorded; students (own) and HODs (dept-wide, already
+    // enforced above and by studentAccess) see the rest.
+    const assessmentsFilter = caller.role === "professor"
+      ? and(eq(assessmentsTable.studentId, studentId), eq(assessmentsTable.assessorId, caller.id))
+      : eq(assessmentsTable.studentId, studentId);
     const data = await db
       .select({
         id: assessmentsTable.id,
@@ -411,11 +458,11 @@ router.get("/:studentId/assessments", requireAuth, async (req, res) => {
       })
       .from(assessmentsTable)
       .leftJoin(usersTable, eq(assessmentsTable.assessorId, usersTable.id))
-      .where(eq(assessmentsTable.studentId, studentId))
+      .where(assessmentsFilter)
       .orderBy(desc(assessmentsTable.createdAt));
     res.json(data);
   } catch (error) {
-    req.log.error(error, "Error fetching assessments");
+    req.log.error({ studentId: req.params.studentId, status: 500 }, "Error fetching assessments");
     res.status(500).json({ message: "Internal server error" });
   }
 });
@@ -445,7 +492,9 @@ router.post("/:studentId/assessments", requireAuth, requireRole(["professor", "h
       .from(usersTable)
       .where(eq(usersTable.id, student.userId));
 
-    if (professorDeptId !== null && studentUser?.departmentId !== professorDeptId) {
+    // Missing scope must fail closed (AGENTS.md sec 3) - null !== null is false, so the
+    // old && form let a professor with no department create an assessment for anyone.
+    if (professorDeptId === null || studentUser?.departmentId !== professorDeptId) {
       res.status(403).json({ message: "Student does not belong to your department" });
       return;
     }
@@ -466,7 +515,7 @@ router.post("/:studentId/assessments", requireAuth, requireRole(["professor", "h
     }).returning();
     res.status(201).json(inserted);
   } catch (error) {
-    req.log.error(error, "Error creating assessment");
+    req.log.error({ studentId: req.params.studentId, status: 500 }, "Error creating assessment");
     res.status(500).json({ message: "Internal server error" });
   }
 });
@@ -474,7 +523,13 @@ router.post("/:studentId/assessments", requireAuth, requireRole(["professor", "h
 router.get("/:studentId/thesis", async (req, res) => {
   try {
     const studentId = parseInt(String(req.params.studentId), 10);
-    const match = await db.select().from(researchTable).where(eq(researchTable.studentId, studentId)).limit(1);
+    const caller = req.user!;
+    // A thesis has two possible supervisors - guide and co-guide - so scoping mirrors
+    // /logs (student.ts:165-173) against either, not a single supervisorId column.
+    const thesisFilter = caller.role === "professor"
+      ? and(eq(researchTable.studentId, studentId), or(eq(researchTable.guideId, caller.id), eq(researchTable.coGuideId, caller.id)))
+      : eq(researchTable.studentId, studentId);
+    const match = await db.select().from(researchTable).where(thesisFilter).limit(1);
     res.json({ data: match.length > 0 ? match[0] : null });
   } catch (error) {
     res.status(500).json({ message: "Internal server error" });
@@ -500,6 +555,14 @@ router.post("/:studentId/thesis", validate(z.object({ thesisTitle: z.string().tr
 });
 
 router.get("/:studentId/certifications", async (req, res) => {
+  // certifications carries no supervisor/guide relationship (lib/db/src/schema/certifications.ts) -
+  // same as leave-records, the owning student and department HOD are the only legitimate readers.
+  // Body matches studentAccess's own 403 exactly, for the same reason as leave-records above:
+  // a role-based rejection here must not be distinguishable from "no such student" (sec 1b).
+  if (req.user!.role === "professor") {
+    res.status(403).json({ message: "Student is outside your access scope" });
+    return;
+  }
   res.json(await db.select().from(certificationsTable).where(eq(certificationsTable.studentId, Number(req.params.studentId))).orderBy(desc(certificationsTable.createdAt)));
 });
 
@@ -627,7 +690,7 @@ router.delete("/:studentId/case-logs/:logId", requireAuth, async (req, res) => {
     await db.update(caseLogsTable).set({ deletedAt: new Date() }).where(eq(caseLogsTable.id, logId));
     res.json({ message: "Log deleted successfully" });
   } catch (error) {
-    req.log.error(error, "Error deleting case log");
+    req.log.error({ logId: req.params.logId, status: 500 }, "Error deleting case log");
     res.status(500).json({ message: "Internal server error" });
   }
 });
@@ -664,7 +727,7 @@ router.delete("/:studentId/procedure-logs/:logId", requireAuth, async (req, res)
     await db.update(procedureLogsTable).set({ deletedAt: new Date() }).where(eq(procedureLogsTable.id, logId));
     res.json({ message: "Log deleted successfully" });
   } catch (error) {
-    req.log.error(error, "Error deleting procedure log");
+    req.log.error({ logId: req.params.logId, status: 500 }, "Error deleting procedure log");
     res.status(500).json({ message: "Internal server error" });
   }
 });

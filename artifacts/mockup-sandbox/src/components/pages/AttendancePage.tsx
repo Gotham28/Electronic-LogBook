@@ -44,10 +44,12 @@ export function AttendancePage() {
     casual: { used: 0, total: null as number | null },
     academic: { used: 0, total: null as number | null }
   });
+  const [balanceError, setBalanceError] = React.useState<string | null>(null);
   const user = React.useMemo(() => getCurrentUser(), []);
 
   const fetchLeaves = React.useCallback(async () => {
     if (!user?.studentProfileId) return;
+    setBalanceError(null);
     try {
       const [leavesResponse, balanceData] = await Promise.all([
         apiGet(`/api/students/${user.studentProfileId}/leave-records`),
@@ -70,9 +72,14 @@ export function AttendancePage() {
       })));
 
       setBalance(balanceData);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching leave data:", error);
       toast.error("Failed to load leave records");
+      // AGENTS.md sec 7 (SEC-16): balance.total can legitimately be null when the
+      // department has no configured allowance yet, so the initial/failure state must
+      // not reuse that same shape - a resident who has actually used leave would see
+      // "0 used" and believe their full allowance is untouched.
+      setBalanceError(error?.message || "Could not load your leave balance");
     }
   }, [user?.studentProfileId]);
 
@@ -122,8 +129,17 @@ export function AttendancePage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
-        <SummaryCard label={`Casual Leave (${balance.casual.total ?? "not configured"})`} value={balance.casual.used} total={balance.casual.total} tone="teal" />
-        <SummaryCard label={`Academic Leave (${balance.academic.total ?? "not configured"})`} value={balance.academic.used} total={balance.academic.total} tone="teal" />
+        {balanceError ? (
+          <div className="md:col-span-2 flex flex-col items-center justify-center gap-3 rounded-2xl border border-rose-100 bg-rose-50 p-4 text-center" role="alert">
+            <p className="text-sm font-medium text-rose-700">{balanceError}</p>
+            <Button size="sm" variant="outline" onClick={fetchLeaves} className="border-rose-200 text-rose-700">Try again</Button>
+          </div>
+        ) : (
+          <>
+            <SummaryCard label={`Casual Leave (${balance.casual.total ?? "not configured"})`} value={balance.casual.used} total={balance.casual.total} tone="teal" />
+            <SummaryCard label={`Academic Leave (${balance.academic.total ?? "not configured"})`} value={balance.academic.used} total={balance.academic.total} tone="teal" />
+          </>
+        )}
         <SummaryCard label="Pending Approval" value={pendingCount} tone="amber" />
       </div>
 

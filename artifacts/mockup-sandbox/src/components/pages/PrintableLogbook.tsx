@@ -8,6 +8,7 @@ export function PrintableLogbook() {
   const user = React.useMemo(() => getCurrentUser(), []);
   const [data, setData] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
   const printStarted = React.useRef(false);
 
   const closePrintView = React.useCallback(() => {
@@ -19,51 +20,72 @@ export function PrintableLogbook() {
     else window.location.assign("/");
   }, []);
 
-  React.useEffect(() => {
+  // No per-call .catch fallbacks: a resident must never print, sign and submit a
+  // consolidated logbook that is silently missing a section because one fetch failed
+  // (AGENTS.md sec 7). window.print() below only runs after every one of the five
+  // requests has actually succeeded; any failure sets error and prints nothing.
+  const fetchAll = React.useCallback(async () => {
     if (!user?.studentProfileId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const id = user.studentProfileId;
 
-    const fetchAll = async () => {
-      try {
-        const id = user.studentProfileId;
+      // Step 1 fix: /logs returns caseLogs, procedureLogs, academicLogs + profile in ONE call.
+      // Removed the broken /procedures and /academics calls entirely.
+      const [logsBundle, postings, leaves, assessments, thesisRes] = await Promise.all([
+        apiGet(`/api/students/${id}/logs`),
+        apiGet(`/api/students/${id}/postings`),
+        apiGet(`/api/students/${id}/leave-records`),
+        apiGet(`/api/students/${id}/assessments`),
+        apiGet(`/api/students/${id}/thesis`),
+      ]);
 
-        // Step 1 fix: /logs returns caseLogs, procedureLogs, academicLogs + profile in ONE call.
-        // Removed the broken /procedures and /academics calls entirely.
-        const [logsBundle, postings, leaves, assessments, thesisRes] = await Promise.all([
-          apiGet(`/api/students/${id}/logs`).catch(() => ({
-            profile: null, caseLogs: [], procedureLogs: [], academicLogs: []
-          })),
-          apiGet(`/api/students/${id}/postings`).catch(() => ({ data: [] })),
-          apiGet(`/api/students/${id}/leave-records`).catch(() => []),
-          apiGet(`/api/students/${id}/assessments`).catch(() => []),
-          apiGet(`/api/students/${id}/thesis`).catch(() => ({ data: null })),
-        ]);
+      setData({
+        profile: logsBundle.profile || null,
+        cases: logsBundle.caseLogs || [],
+        procs: logsBundle.procedureLogs || [],
+        academics: logsBundle.academicLogs || [],
+        postings: postings.data || [],
+        leaves: Array.isArray(leaves) ? leaves : leaves?.data || [],
+        assessments: Array.isArray(assessments) ? assessments : assessments?.data || [],
+        thesis: thesisRes.data || null,
+      });
 
-        setData({
-          profile: logsBundle.profile || null,
-          cases: logsBundle.caseLogs || [],
-          procs: logsBundle.procedureLogs || [],
-          academics: logsBundle.academicLogs || [],
-          postings: postings.data || [],
-          leaves: Array.isArray(leaves) ? leaves : leaves?.data || [],
-          assessments: Array.isArray(assessments) ? assessments : assessments?.data || [],
-          thesis: thesisRes.data || null,
-        });
-      } catch (err) {
-        console.error("Failed to load consolidated print data", err);
-      } finally {
-        setLoading(false);
-        if (!printStarted.current) {
-          printStarted.current = true;
-          window.addEventListener("afterprint", closePrintView, { once: true });
-          setTimeout(() => window.print(), 500);
-        }
+      if (!printStarted.current) {
+        printStarted.current = true;
+        window.addEventListener("afterprint", closePrintView, { once: true });
+        setTimeout(() => window.print(), 500);
       }
-    };
-
-    fetchAll();
+    } catch (err) {
+      console.error("Failed to load consolidated print data", err);
+      setError(err instanceof Error ? err.message : "Could not load your complete logbook.");
+    } finally {
+      setLoading(false);
+    }
   }, [user, closePrintView]);
 
+  React.useEffect(() => {
+    fetchAll();
+  }, [fetchAll]);
+
   if (loading) return <div className="p-12 text-center text-slate-500">Preparing consolidated PDF...</div>;
+
+  if (error) {
+    return (
+      <div className="p-12 text-center print:hidden" role="alert">
+        <p className="text-lg font-semibold text-rose-700">Your logbook could not be printed</p>
+        <p className="mt-2 text-sm text-slate-600">{error}</p>
+        <p className="mt-1 text-xs text-slate-500">Nothing was printed. Some sections could not be loaded.</p>
+        <div className="mt-6 flex justify-center gap-3">
+          <button onClick={fetchAll} className="rounded bg-teal-600 px-4 py-2 text-white">Try again</button>
+          <button onClick={closePrintView} className="rounded border border-slate-300 bg-white px-4 py-2 text-slate-700">Cancel</button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!data) return null;
 
   // Step 3 fix: joiningYear comes from profile in /logs response — no hardcoding
   const joiningYear = data?.profile?.joiningYear ?? "—";

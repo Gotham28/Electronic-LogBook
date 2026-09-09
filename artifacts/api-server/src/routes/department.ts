@@ -52,7 +52,7 @@ router.get("/:departmentId/config", async (req, res) => {
     const [config] = await db.select().from(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, departmentId));
     res.json(config || null);
   } catch (error) {
-    req.log.error(error, "Error fetching department config");
+    req.log.error({ departmentId: req.params.departmentId, status: 500 }, "Error fetching department config");
     res.status(500).json({ message: "Internal server error" });
   }
 });
@@ -81,7 +81,7 @@ router.get("/:departmentId/professors", async (req, res) => {
 
     res.json(professors);
   } catch (error) {
-    req.log.error(error, "Error fetching professors by department");
+    req.log.error({ departmentId: req.params.departmentId, status: 500 }, "Error fetching professors by department");
     res.status(500).json({ message: "Internal server error" });
   }
 });
@@ -224,7 +224,7 @@ router.get("/:departmentId/analytics", requireRole(["hod"]), async (req, res) =>
       students,
     });
   } catch (error) {
-    req.log.error(error, "Error fetching department analytics");
+    req.log.error({ departmentId: req.params.departmentId, status: 500 }, "Error fetching department analytics");
     res.status(500).json({ message: "Internal server error" });
   }
 });

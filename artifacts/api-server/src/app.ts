@@ -7,6 +7,14 @@ import { logger } from "./lib/logger";
 
 const app: Express = express();
 
+// Exactly one hop: Render's own load balancer is the only proxy between the internet and
+// this process. With a number, Express/proxy-addr trusts only that many entries counting
+// from the end of X-Forwarded-For, so req.ip becomes whatever the load balancer itself
+// appended - never a value an attacker prepends before it reaches the load balancer.
+// `true` would trust the whole header, letting a client set its own req.ip outright
+// (SEC-12) - never use it here.
+app.set("trust proxy", 1);
+
 app.use(
   pinoHttp({
     logger,

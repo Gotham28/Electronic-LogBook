@@ -42,14 +42,17 @@ router.patch("/:logType/:logId/review", requireAuth, requireRole(["professor", "
       return;
     }
 
+    // Nonexistent id, wrong supervisor, and wrong department all return the same status
+    // and body (SEC-34): a caller who owns none of the three facts cannot use the
+    // response to learn which one was false, or that the id exists at all.
     if (!target) {
-      res.status(404).json({ message: "Log not found" });
+      res.status(403).json({ message: "Log not found or not assigned to you" });
       return;
     }
 
     // A faculty member can review only entries explicitly sent to them.
     if (reviewer.role === "professor" && target.supervisorId !== reviewer.id) {
-      res.status(403).json({ message: "This entry was assigned to another faculty member" });
+      res.status(403).json({ message: "Log not found or not assigned to you" });
       return;
     }
 
@@ -61,7 +64,7 @@ router.patch("/:logType/:logId/review", requireAuth, requireRole(["professor", "
         .where(eq(studentsTable.id, target.studentId))
         .limit(1);
       if (!student || !student.departmentId || student.departmentId !== reviewer.departmentId) {
-        res.status(403).json({ message: "This entry is outside your department" });
+        res.status(403).json({ message: "Log not found or not assigned to you" });
         return;
       }
     }
@@ -95,7 +98,7 @@ router.patch("/:logType/:logId/review", requireAuth, requireRole(["professor", "
 
     res.json(updatedRows[0]);
   } catch (error) {
-    req.log.error(error, "Error updating log review status");
+    req.log.error({ logType: req.params.logType, logId: req.params.logId, status: 500 }, "Error updating log review status");
     res.status(500).json({ message: "Internal server error" });
   }
 });

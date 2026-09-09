@@ -211,7 +211,9 @@ test("student self-registration needs possession of a verified single-use proof 
   assert.equal((await call("/admin/students/" + pending.id + "/approve", undefined, "POST")).status, 401);
   const nonexistentId = 999999999;
   assert.equal((await db.select().from(usersTable).where(eq(usersTable.id, nonexistentId))).length, 0);
-  assert.equal((await call("/admin/students/" + nonexistentId + "/approve", "hod1", "POST")).status, 404);
+  // SEC-36: a nonexistent id and a cross-department id return the same 403, not a
+  // distinguishing 404 - see tests/enumeration-collapse.test.ts for the full evidence gate.
+  assert.equal((await call("/admin/students/" + nonexistentId + "/approve", "hod1", "POST")).status, 403);
   assert.equal((await call("/admin/students/" + pending.id + "/approve", "hod1", "POST")).status, 402);
   assert.equal((await db.select().from(usersTable).where(eq(usersTable.id, pending.id)))[0].status, "pending");
   const [plan] = await db.insert(subscriptionPlansTable).values({ code: "TEST-PLAN-" + pending.id, name: "Test plan", amountPaise: 140000, durationMonths: 12 }).returning();
