@@ -236,6 +236,163 @@ of them is named `delete_reetha.mjs`. `phase0.js` at the repository root also re
 
 Removing these scripts and purging the credential from history is an open task.
 
+
+---
+
+## 14. Execution model
+
+### 14.1 Antigravity writes, Claude Code reasons
+
+Claude Code does not write implementation code in this repo. Every change to
+source, tests, config, or docs is dispatched to Antigravity. There is no
+small-change exception. A guard hook enforces this.
+
+Claude Code still runs, in its own shell: reads, `git` commands, and test,
+lint, and typecheck runs used to verify a claim. Running a test is
+verification. Editing the test is a dispatch.
+
+### 14.2 The loop
+
+1. **Scope** — `.agents/CURRENT_TASK.md` is written in Claude Chat. One
+   feature per task, per §9.
+2. **Dispatch** — Claude Code turns the `## Agent` bucket into one
+   Antigravity prompt. It does not write code.
+3. **Build** — Antigravity works, and returns a branch plus `HANDOFF.md`.
+4. **Review** — Claude Code reviews the diff through dispatched reviewers,
+   and produces the report in §14.6.
+5. **Decide** — the developer accepts, rejects, or asks for changes, in
+   Claude Chat.
+6. **Close** — commit, push, open the PR. Never automated end to end.
+
+No pull request is opened before step 5. A PR opened early points automated
+review at unreviewed code.
+
+### 14.3 Routes
+
+Exactly one route per task, named in `.agents/CURRENT_TASK.md`.
+
+| Route | Meaning |
+|---|---|
+| **A** | Purely manual. Credentials, approvals, merges. Nothing to dispatch. |
+| **B** | Default. Claude Code drives Antigravity, halts per §14.5, reviews at the end. |
+| **C** | Antigravity alone. Every file and line already named, no judgement anywhere. |
+
+Route C requires all of: nothing left to decide; no §15 Opus trigger
+expected; nothing irreversible; no open item under
+`## Blocked on developer input`; no edit to a code path enforcing §3 or §4;
+and verification that needs only a diff and an exit code.
+
+**When in doubt, route B.** Route B costs a halt. A wrong route C costs an
+unreviewed change to a clinical table.
+
+Close-out is never route C.
+
+### 14.4 Mechanical work
+
+Route C is for work with no judgement in it: formatting, a rename inside one
+file, docs wording, regenerating a snapshot. If a step turns out to need a
+decision, the agent stops and reports rather than deciding.
+
+### 14.5 Halt conditions
+
+Stop and hand the decision to the developer when any of these appear. Do not
+work around them, and do not decide them.
+
+- Any change to a route or query touching the clinical tables, or to
+  anything resolving ownership server-side (§3).
+- Any place `studentsTable.id` and `usersTable.id` could be conflated (§4).
+- Any schema change, migration, or backfill (§6).
+- Any new department-specific behaviour that should be configuration (§5).
+- Anything that puts patient text or leave reasons near a log, error, or
+  audit trail (§8).
+- Any secret, credential, or `.env` value (§10, §13).
+- The task turning out to be more than one feature (§9).
+- Any value the agent would otherwise guess or invent.
+
+### 14.6 The review report
+
+A completed review produces, in this order: scope adherence; rule violations
+by section number; evidence check; blast radius; what was expanded beyond
+scope; what was skipped; and a verdict of accept, accept with changes, or
+reject.
+
+The evidence check is decided by §11, not by the agent's summary. An
+ownership or authorization change without all four cases pasted individually
+is recorded as unverified, whatever the report claims.
+
+### 14.7 No MASTER_PLAN.md
+
+This repo has no roadmap document. A task that is not part of planned work is
+recorded in its own `.agents/CURRENT_TASK.md` under `## Plan reference` as
+unplanned, with one line of why. This project is not roadmap-driven. Unplanned work is recorded in the task
+file, not in a separate plan document.
+
+### 14.8 The task file
+
+`.agents/CURRENT_TASK.md` holds the current task, not history. It is
+overwritten each task, never appended to. Reset it to idle at close-out.
+
+`.agents/runs/` holds one file per dispatch, append-only.
+
+---
+
+## 15. Review tiers
+
+### 15.1 Set at scoping time
+
+The tier is chosen when the task is scoped, before code exists, so it can be
+cross-checked against what the agent layer names later. A *lower* tier coming
+back is itself a finding.
+
+### 15.2 Triggers
+
+| Tier | Effort | Fires when the task touches |
+|---|---|---|
+| Opus | high | Ownership resolution or the clinical tables (§3); the two ID systems (§4); schema, migration, or backfill (§6); patient text or leave reasons near a log (§8); secrets or credentials (§10, §13) |
+| Sonnet | medium | Ordinary feature work, bugfixes, UI, config fields, new routes on non-clinical tables |
+| Haiku | low | Docs, formatting, comments, test names, dependency bumps |
+
+### 15.3 Default down, not up
+
+Sonnet is the default. Opus is for the five triggers above and nothing else.
+Ordinary feature work reaching Opus is a scoping error, not caution.
+
+Never `max` effort. A task appearing to need it should have been split under
+§9.
+
+### 15.4 A tier is never lowered
+
+Not by the agent, not mid-task, not because the diff turned out smaller than
+expected. It can be raised.
+
+---
+
+## 16. Rule map
+
+Tooling written against a different project cites section numbers that mean
+other things here. This table is authoritative. A citation resolving through
+this table is **not** a numbering mismatch, and is not grounds to stop.
+
+| Cited as | In this repo |
+|---|---|
+| §5.1 — the boundary | §3 Ownership before data, and §4 the two ID systems |
+| §5.2 — customer-specific behaviour | §5 No hardcoded department behaviour |
+| §5.4 — irreversible change | §6 Schema changes are drafted, never pushed |
+| §5.6 — sensitive data near logs | §8 Never log patient text or leave reasons |
+| §5.8 — one feature per task | §9 One feature per task, one feature per diff |
+| §5.10 — evidence | §11 Evidence standard |
+| §6.4 — task file overwritten | §14.8 |
+| §9 — MASTER_PLAN append | Does not apply. See §14.7 |
+| §10 — review tiers | §15. **§10 in this file is Secrets** |
+| §12.2 — the loop | §14.2 |
+| §12.3 — mechanical work | §14.4 |
+| §12.5 — halt conditions | §14.5 |
+| §12.9 — tier never lowered | §15.4 |
+| §12.13 — the review report | §14.6 |
+
+Project tooling was authored against a differently-numbered rule set. This
+table records where each concept actually lives in this file. A citation not
+in this table, and not matching a real section here, does not resolve.
 ---
 
 ## Known gaps in this reconstruction
@@ -243,7 +400,10 @@ Removing these scripts and purging the credential from history is an open task.
 The original `AGENTS.md` contained at least the following sections, referenced by project
 tooling but not recoverable from the project rules:
 
-- **§10 — Opus trigger conditions** (cited by the `review-skill` workflow).
+§10 — Opus trigger conditions were referenced by project tooling but not
+recoverable from history. Reconstructed as §15 on 2026-09-09 from this
+file's own rules (§3, §4, §6, §8, §10, §13) rather than recovered. Treat as
+a reasonable reconstruction, not the original.
 - **§12.2 step 6 — end-of-task review step** (cited by the `code-review` workflow).
 - **§12.13 — the seven-section review report format** (cited by the `code-review`
   workflow).
