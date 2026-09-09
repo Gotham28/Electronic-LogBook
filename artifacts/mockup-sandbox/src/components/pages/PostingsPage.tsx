@@ -41,6 +41,7 @@ export function PostingsPage() {
   const [postings, setPostings] = React.useState<Posting[]>([]);
   const user = React.useMemo(() => getCurrentUser(), []);
   const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
   const [professors, setProfessors] = React.useState<any[]>([]);
 
   // Form State
@@ -52,11 +53,15 @@ export function PostingsPage() {
   const fetchPostings = React.useCallback(async () => {
     if (!user?.studentProfileId) return;
     setLoading(true);
+    setError(null);
     try {
       const resp = await apiGet(`/api/students/${user.studentProfileId}/postings`);
       setPostings(resp.data || []);
-    } catch (e) {
+    } catch (e: any) {
       toast.error("Failed to fetch postings");
+      // AGENTS.md sec 7 (SEC-17): postings stays [] on failure, which otherwise renders
+      // identically to "you genuinely have none yet" - and invites adding a duplicate.
+      setError(e?.message || "Could not load your postings");
     } finally {
       setLoading(false);
     }
@@ -164,6 +169,11 @@ export function PostingsPage() {
         <CardContent className="p-0">
           {loading ? (
              <div className="p-8 text-center text-slate-500">Loading...</div>
+          ) : error ? (
+            <div className="flex flex-col items-center justify-center gap-4 p-8 text-center" role="alert">
+              <p className="text-sm font-medium text-rose-700">{error}</p>
+              <Button size="sm" variant="outline" onClick={fetchPostings} className="border-rose-200 text-rose-700">Try again</Button>
+            </div>
           ) : postings.length === 0 ? (
             <Empty className="py-14">
               <EmptyHeader>

@@ -100,6 +100,7 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
 
   const [roster, setRoster] = React.useState<{ students: any[]; professors: any[] } | null>(null);
   const [rosterLoading, setRosterLoading] = React.useState(false);
+  const [rosterError, setRosterError] = React.useState<string | null>(null);
 
   // Roster Filters
   const [searchQuery, setSearchQuery] = React.useState("");
@@ -157,11 +158,17 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
 
   const fetchRoster = React.useCallback(async () => {
     setRosterLoading(true);
+    setRosterError(null);
     try {
       const data = await apiGet<{ students: any[]; professors: any[] }>("/api/admin/roster");
       setRoster(data);
     } catch (err: any) {
-      toast.error("Failed to load roster");
+      // AGENTS.md sec 7: this file has regressed on the fallback-numbers rule twice
+      // already (SEC-10, the analytics panel; SEC-15, this roster tab). A toast alone
+      // fades - the summary cards and tables below must not fall back to "?? 0" /
+      // "no students" while rosterError is set, or a failed load looks identical to a
+      // real, empty department.
+      setRosterError(err.message || "Could not load the department roster");
     } finally {
       setRosterLoading(false);
     }
@@ -279,10 +286,6 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
     );
   }
 
-  const logStats = analyticsData?.logStats ?? { pending: 0, verified: 0, rejected: 0 };
-  const topProcedures = analyticsData?.topProcedures ?? [];
-  const totalLogs = logStats.pending + logStats.verified + logStats.rejected;
-
   return (
     <div className="space-y-6 pb-12">
       <Card className="overflow-hidden border-teal-100 bg-gradient-to-r from-teal-800 via-teal-700 to-cyan-600 text-white">
@@ -323,6 +326,11 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
         <TabsContent value="roster" className="space-y-6 pt-4">
           {rosterLoading ? (
             <div className="flex h-40 items-center justify-center"><div className="animate-spin rounded-full border-4 border-slate-300 border-t-teal-600 h-8 w-8" /></div>
+          ) : rosterError ? (
+            <div className="flex h-40 flex-col items-center justify-center space-y-4 text-center" role="alert">
+              <p className="text-sm font-medium text-rose-700">{rosterError}</p>
+              <Button onClick={fetchRoster} variant="outline">Try again</Button>
+            </div>
           ) : (
             <>
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
