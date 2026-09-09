@@ -266,6 +266,19 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
     );
   }
 
+  // AGENTS.md sec 7: a failed load must show a visible error, never an ordinary-looking
+  // portal with silently missing data. error covers "not logged in" and any unexpected
+  // failure outside the three individually-scoped fetches below; when set, the portal
+  // itself does not render at all.
+  if (error) {
+    return (
+      <div className="flex h-64 flex-col items-center justify-center space-y-4 text-center" role="alert">
+        <p className="text-sm font-medium text-rose-700">{error}</p>
+        <Button onClick={fetchData} variant="outline">Try again</Button>
+      </div>
+    );
+  }
+
   const logStats = analyticsData?.logStats ?? { pending: 0, verified: 0, rejected: 0 };
   const topProcedures = analyticsData?.topProcedures ?? [];
   const totalLogs = logStats.pending + logStats.verified + logStats.rejected;
@@ -283,6 +296,13 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
           </div>
         </CardContent>
       </Card>
+
+      {analyticsError && (
+        <div role="alert" className="flex items-center justify-between gap-4 rounded-md border border-rose-200 bg-rose-50 px-4 py-3">
+          <p className="text-sm font-medium text-rose-700">{analyticsError}</p>
+          <Button size="sm" variant="outline" onClick={fetchData}>Try again</Button>
+        </div>
+      )}
 
       <Tabs value={currentTab} onValueChange={(value) => setLocation(paths[value] ?? "/")}>
 
