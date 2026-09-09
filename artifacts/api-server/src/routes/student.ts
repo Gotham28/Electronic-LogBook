@@ -287,20 +287,24 @@ router.get("/:studentId/leave-balance", requireAuth, async (req, res) => {
         return;
       }
     } else if (caller.role === "professor" || caller.role === "hod") {
-      if (caller.departmentId !== null) {
-        const [studentUser] = await db
-          .select({ departmentId: usersTable.departmentId })
-          .from(studentsTable)
-          .innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
-          .where(eq(studentsTable.id, studentId));
-        if (!studentUser) {
-          res.status(404).json({ message: "Student not found" });
-          return;
-        }
-        if (studentUser.departmentId !== caller.departmentId) {
-          res.status(403).json({ message: "Forbidden: student is in a different department" });
-          return;
-        }
+      // Missing scope must fail closed (AGENTS.md sec 3) - a professor/HOD with no
+      // department assignment gets no data, never every department's.
+      if (caller.departmentId === null) {
+        res.status(403).json({ message: "Your account needs a department assignment" });
+        return;
+      }
+      const [studentUser] = await db
+        .select({ departmentId: usersTable.departmentId })
+        .from(studentsTable)
+        .innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
+        .where(eq(studentsTable.id, studentId));
+      if (!studentUser) {
+        res.status(404).json({ message: "Student not found" });
+        return;
+      }
+      if (studentUser.departmentId !== caller.departmentId) {
+        res.status(403).json({ message: "Forbidden: student is in a different department" });
+        return;
       }
     }
 
@@ -411,21 +415,25 @@ router.get("/:studentId/assessments", requireAuth, async (req, res) => {
         return;
       }
     } else if (caller.role === "professor" || caller.role === "hod") {
-      // Professors/HODs may only read assessments for students in their department
-      if (caller.departmentId !== null) {
-        const [studentUser] = await db
-          .select({ departmentId: usersTable.departmentId })
-          .from(studentsTable)
-          .innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
-          .where(eq(studentsTable.id, studentId));
-        if (!studentUser) {
-          res.status(404).json({ message: "Student not found" });
-          return;
-        }
-        if (studentUser.departmentId !== caller.departmentId) {
-          res.status(403).json({ message: "Forbidden: student is not in your department" });
-          return;
-        }
+      // Professors/HODs may only read assessments for students in their department.
+      // Missing scope must fail closed (AGENTS.md sec 3) - a professor/HOD with no
+      // department assignment gets no data, never every department's.
+      if (caller.departmentId === null) {
+        res.status(403).json({ message: "Your account needs a department assignment" });
+        return;
+      }
+      const [studentUser] = await db
+        .select({ departmentId: usersTable.departmentId })
+        .from(studentsTable)
+        .innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
+        .where(eq(studentsTable.id, studentId));
+      if (!studentUser) {
+        res.status(404).json({ message: "Student not found" });
+        return;
+      }
+      if (studentUser.departmentId !== caller.departmentId) {
+        res.status(403).json({ message: "Forbidden: student is not in your department" });
+        return;
       }
     }
     // admin role: no restriction
@@ -484,7 +492,9 @@ router.post("/:studentId/assessments", requireAuth, requireRole(["professor", "h
       .from(usersTable)
       .where(eq(usersTable.id, student.userId));
 
-    if (professorDeptId !== null && studentUser?.departmentId !== professorDeptId) {
+    // Missing scope must fail closed (AGENTS.md sec 3) - null !== null is false, so the
+    // old && form let a professor with no department create an assessment for anyone.
+    if (professorDeptId === null || studentUser?.departmentId !== professorDeptId) {
       res.status(403).json({ message: "Student does not belong to your department" });
       return;
     }
