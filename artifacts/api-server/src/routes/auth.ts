@@ -15,6 +15,9 @@ const cookieOptions = { httpOnly: true, secure: process.env.NODE_ENV === "produc
 
 // Bounded per-process throttling supplements single-use, attempt-limited database codes.
 // Multi-instance deployments must also rate-limit at their shared gateway.
+// req.ip is the resolved client IP, not the shared load-balancer address, now that
+// app.ts sets trust proxy to exactly one hop (SEC-12) - each attacker gets their own
+// bucket instead of every caller sharing one.
 const attempts = new Map<string, { count: number; expires: number }>();
 router.use((req, res, next) => {
   if (req.method !== "POST") { next(); return; }
@@ -29,6 +32,16 @@ router.use((req, res, next) => {
   attempts.set(key, { count: (entry?.count || 0) + 1, expires: entry?.expires || now + 900000 });
   next();
 });
+
+// Per-account failed-login counter, independent of the IP throttle above. That throttle
+// stops one IP hammering any account; it does nothing against an attacker spread across
+// many IPs guessing passwords for one targeted account. Same bounded-per-process caveat
+// as the IP throttle - multi-instance deployments must also rate-limit at their shared
+// gateway. Checked and incremented only inside POST /login, keyed on the submitted
+// username so it cannot lock out a different account.
+const loginFailures = new Map<string, { count: number; expires: number }>();
+const MAX_LOGIN_FAILURES = 10;
+const LOGIN_FAILURE_WINDOW_MS = 900000;
 
 const emailBody = z.object({ email: emailSchema }).strict();
 const verifyBody = z.object({ email: emailSchema, otp: z.string().regex(/^\d{6}$/) }).strict();
@@ -125,13 +138,28 @@ async function sessionProfile(id: number) {
 
 router.post("/login", validate(z.object({ username: z.string().trim().min(1).max(254), password: z.string().min(1).max(72) }).strict()), async (req, res) => {
   const { username, password } = req.body;
+  const accountKey = username.trim().toLowerCase();
+  const now = Date.now();
+  for (const [key, value] of loginFailures) if (value.expires <= now) loginFailures.delete(key);
+  const failureEntry = loginFailures.get(accountKey);
+  if (failureEntry && failureEntry.count >= MAX_LOGIN_FAILURES) {
+    res.setHeader("Retry-After", "900");
+    res.status(429).json({ message: "Too many failed attempts for this account. Try again later." });
+    return;
+  }
+
   let user = (await db.select().from(usersTable).where(eq(usersTable.email, username.toLowerCase())).limit(1))[0];
   if (!user) {
     const [student] = await db.select({ user: usersTable }).from(studentsTable).innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
       .where(eq(studentsTable.registrationNumber, username)).limit(1);
     user = student?.user;
   }
-  if (!user?.passwordHash || !(await bcrypt.compare(password, user.passwordHash))) { res.status(401).json({ message: "Invalid credentials" }); return; }
+  if (!user?.passwordHash || !(await bcrypt.compare(password, user.passwordHash))) {
+    loginFailures.set(accountKey, { count: (failureEntry?.count || 0) + 1, expires: failureEntry?.expires || now + LOGIN_FAILURE_WINDOW_MS });
+    res.status(401).json({ message: "Invalid credentials" });
+    return;
+  }
+  loginFailures.delete(accountKey);
   if (user.role === "student" && user.status === "pending") {
     const [paid] = await db.select({ id: paymentsTable.id }).from(paymentsTable)
       .where(and(eq(paymentsTable.userId, user.id), eq(paymentsTable.status, "paid"))).limit(1);
