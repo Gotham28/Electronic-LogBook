@@ -1,9 +1,11 @@
 import * as React from "react";
-import { BookOpenCheck, CheckCircle2, KeyRound, ShieldCheck, UserPlus, Loader2, AtSign } from "lucide-react";
+import {
+  BookOpenCheck, KeyRound, ShieldCheck, UserPlus, Loader2,
+  GraduationCap, Users, Sparkles, LogIn, ChevronLeft,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { toast } from "sonner";
 import { apiPost, ApiError } from "@/lib/apiClient";
@@ -11,15 +13,65 @@ import { LoginProductPreview } from "@/components/LoginProductPreview";
 import { saveToken } from "@/lib/session";
 import { PaymentStep } from "@/components/PaymentStep";
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type Mode = "picker" | "demo" | "login";
+
+// Demo portal config — credentials come entirely from env vars, never source.
+// Set VITE_DEMO_STUDENT_EMAIL, VITE_DEMO_STUDENT_PASSWORD,
+//     VITE_DEMO_FACULTY_EMAIL, VITE_DEMO_FACULTY_PASSWORD,
+//     VITE_DEMO_HOD_EMAIL,     VITE_DEMO_HOD_PASSWORD
+// in .env.local (local) and in the Vercel project environment variables (production).
+const DEMO_PORTALS: {
+  key: string;
+  label: string;
+  subtitle: string;
+  icon: React.ReactNode;
+  emailVar: string;
+  passwordVar: string;
+}[] = [
+  {
+    key: "student",
+    label: "Resident Trainee",
+    subtitle: "Explore case logs, procedures and academic records",
+    icon: <GraduationCap className="h-6 w-6 text-teal-600" />,
+    emailVar: "VITE_DEMO_STUDENT_EMAIL",
+    passwordVar: "VITE_DEMO_STUDENT_PASSWORD",
+  },
+  {
+    key: "faculty",
+    label: "Faculty / Professor",
+    subtitle: "Browse the evaluation queue and student progress",
+    icon: <Users className="h-6 w-6 text-teal-600" />,
+    emailVar: "VITE_DEMO_FACULTY_EMAIL",
+    passwordVar: "VITE_DEMO_FACULTY_PASSWORD",
+  },
+  {
+    key: "hod",
+    label: "Head of Department",
+    subtitle: "See department analytics, approvals and leave management",
+    icon: <ShieldCheck className="h-6 w-6 text-teal-600" />,
+    emailVar: "VITE_DEMO_HOD_EMAIL",
+    passwordVar: "VITE_DEMO_HOD_PASSWORD",
+  },
+];
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
 export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRegister: () => void }) {
-  // Credentials state
+  const [mode, setMode] = React.useState<Mode>("picker");
+
+  // Demo state
+  const [demoLoading, setDemoLoading] = React.useState<string | null>(null);
+
+  // Login credentials
   const [username, setUsername] = React.useState("");
   const [password, setPassword] = React.useState("");
-
   const [error, setError] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
   const [pendingPaymentToken, setPendingPaymentToken] = React.useState<string | null>(null);
 
+  // Forgot-password flow (logic unchanged)
   const [forgotStep, setForgotStep] = React.useState<0 | 1 | 2 | 3>(0);
   const [resetEmail, setResetEmail] = React.useState("");
   const [resetOtp, setResetOtp] = React.useState("");
@@ -28,26 +80,54 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
   const [confirmNewPassword, setConfirmNewPassword] = React.useState("");
   const [isResetting, setIsResetting] = React.useState(false);
 
+  // ── Navigation ────────────────────────────────────────────────────────────
+
+  const goBack = () => {
+    setMode("picker");
+    setError(null);
+    setForgotStep(0);
+    setUsername("");
+    setPassword("");
+  };
+
+  // ── Demo auto-login ───────────────────────────────────────────────────────
+
+  const handleDemoLogin = async (portal: typeof DEMO_PORTALS[number]) => {
+    const email = (import.meta.env as Record<string, string>)[portal.emailVar];
+    const pw = (import.meta.env as Record<string, string>)[portal.passwordVar];
+
+    if (!email || !pw) {
+      toast.error("Demo account not configured. Please contact the system administrator.");
+      return;
+    }
+
+    setDemoLoading(portal.key);
+    try {
+      const user = await apiPost("/api/auth/login", { username: email, password: pw });
+      if (user.token) saveToken(user.token);
+      window.sessionStorage.setItem("elogbook-user", JSON.stringify(user));
+      onSignIn();
+    } catch (err: any) {
+      toast.error(err.message || "Demo login failed. Please try again.");
+    } finally {
+      setDemoLoading(null);
+    }
+  };
+
+  // ── Real sign-in ─────────────────────────────────────────────────────────
+
   const signIn = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!username || !password) return;
-    
+
     try {
       setIsLoading(true);
       setError(null);
-      
-      const user = await apiPost('/api/auth/login', { 
-        username, 
-        password 
-      });
 
-      // Persist the JWT as a Bearer token — this ensures auth works in all browsers
-      // (Samsung Browser, Safari, Firefox strict mode) regardless of cross-site cookie policies
-      if (user.token) {
-        saveToken(user.token);
-      }
+      const user = await apiPost("/api/auth/login", { username, password });
 
-      window.sessionStorage.setItem('elogbook-user', JSON.stringify(user));
+      if (user.token) saveToken(user.token);
+      window.sessionStorage.setItem("elogbook-user", JSON.stringify(user));
       onSignIn();
     } catch (err: any) {
       if (err instanceof ApiError && err.status === 402 && typeof err.data?.paymentToken === "string") {
@@ -59,6 +139,8 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
       setIsLoading(false);
     }
   };
+
+  // ── Forgot-password handlers (unchanged) ─────────────────────────────────
 
   const handleForgotSendCode = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,10 +174,7 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
 
   const handleForgotResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (newPassword !== confirmNewPassword) {
-      toast.error("Passwords do not match");
-      return;
-    }
+    if (newPassword !== confirmNewPassword) { toast.error("Passwords do not match"); return; }
     setIsResetting(true);
     try {
       await apiPost("/api/auth/reset-password", { email: resetEmail, newPassword, verificationToken });
@@ -107,6 +186,8 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
       setIsResetting(false);
     }
   };
+
+  // ── Payment gate ──────────────────────────────────────────────────────────
 
   if (pendingPaymentToken) {
     return (
@@ -123,9 +204,13 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
     );
   }
 
+  // ── Layout ────────────────────────────────────────────────────────────────
+
   return (
     <div className="medical-grid flex min-h-screen items-center justify-center p-4 md:p-8">
       <div className="glass-panel grid w-full max-w-6xl overflow-hidden rounded-[30px] lg:grid-cols-[1.08fr_.92fr]">
+
+        {/* Left branding panel — unchanged */}
         <section className="relative overflow-hidden bg-gradient-to-br from-teal-700 via-teal-600 to-cyan-500 p-8 text-white md:p-12 transition-colors">
           <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full border-[42px] border-white/10" />
           <div className="absolute -bottom-24 -left-20 h-64 w-64 rounded-full bg-cyan-300/15 blur-2xl" />
@@ -145,136 +230,243 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
           </div>
         </section>
 
-        <section className="bg-white/80 p-8 md:p-12">
-          <div className="mx-auto max-w-sm">
-            
-            <p className="page-eyebrow">
-               Secure access
-            </p>
-            <h2 className="mt-2 text-4xl font-bold text-slate-900">Welcome back</h2>
-            <p className="mt-2 text-sm text-slate-500">
-              Sign in with your university registration number or email address and password.
-            </p>
+        {/* Right panel */}
+        <section className="bg-white/80 p-8 md:p-12 flex items-center">
+          <div className="mx-auto w-full max-w-sm">
 
-            {error && (
-              <div className="mt-4 rounded-md bg-red-50 p-3 text-sm text-red-700 border border-red-200">
-                {error}
+            {/* ── MODE: Picker ─────────────────────────────────────────── */}
+            {mode === "picker" && (
+              <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
+                <p className="page-eyebrow">Arogya E-LogBook</p>
+                <h2 className="mt-2 text-4xl font-bold text-slate-900">Welcome</h2>
+                <p className="mt-2 text-sm text-slate-500">
+                  Already have an account? Sign in. New here? Explore the demo first.
+                </p>
+
+                <div className="mt-8 space-y-3">
+                  {/* Sign In card */}
+                  <button
+                    onClick={() => setMode("login")}
+                    className="flex w-full items-center gap-4 rounded-2xl border-2 border-teal-500 bg-teal-500 p-5 text-left text-white shadow-md transition-all hover:bg-teal-600 hover:shadow-lg hover:-translate-y-0.5"
+                  >
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white/20">
+                      <LogIn className="h-6 w-6" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-bold text-base">Sign In to my account</p>
+                      <p className="mt-0.5 text-xs text-teal-100">For registered residents, faculty and HOD</p>
+                    </div>
+                  </button>
+
+                  {/* Demo card */}
+                  <button
+                    onClick={() => setMode("demo")}
+                    className="flex w-full items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition-all hover:border-teal-300 hover:bg-teal-50 hover:shadow-md hover:-translate-y-0.5"
+                  >
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-50 ring-1 ring-amber-100">
+                      <Sparkles className="h-6 w-6 text-amber-500" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-slate-800">Explore the Demo</p>
+                      <p className="mt-0.5 text-xs text-slate-500">Try all three portals — no account needed</p>
+                    </div>
+                  </button>
+                </div>
               </div>
             )}
 
-            {forgotStep > 0 ? (
-               <div className="mt-9 space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-300">
-                 <div className="flex items-center justify-between mb-2">
-                   {forgotStep > 1 ? (
-                     <button type="button" onClick={() => setForgotStep(forgotStep === 3 ? 2 : 1 as any)} className="text-xs text-teal-700 hover:underline block">
-                       &larr; Back
-                     </button>
-                   ) : <div />}
-                   <button type="button" onClick={() => setForgotStep(0)} className="text-xs text-teal-700 hover:underline block">
-                     Exit to login
-                   </button>
-                 </div>
-                 
-                 {forgotStep === 1 && (
-                   <form onSubmit={handleForgotSendCode} className="space-y-4">
-                     <div className="space-y-2">
-                       <Label>Enter your email to reset password</Label>
-                       <Input type="email" value={resetEmail} onChange={e => setResetEmail(e.target.value)} required />
-                     </div>
-                     <Button type="submit" className="w-full" disabled={isResetting}>{isResetting ? "Sending..." : "Send Code"}</Button>
-                   </form>
-                 )}
+            {/* ── MODE: Demo ───────────────────────────────────────────── */}
+            {mode === "demo" && (
+              <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
+                <button
+                  type="button"
+                  onClick={goBack}
+                  className="mb-6 flex items-center gap-1 text-xs font-medium text-teal-700 hover:underline"
+                >
+                  <ChevronLeft className="h-3 w-3" /> Back
+                </button>
 
-                 {forgotStep === 2 && (
-                   <div className="space-y-4">
-                     <div className="space-y-2">
-                       <Label>Enter the 6-digit code sent to {resetEmail}</Label>
-                       <div className="flex justify-center py-2">
-                         <InputOTP maxLength={6} value={resetOtp} onChange={setResetOtp} disabled={isResetting}>
-                           <InputOTPGroup>
-                             <InputOTPSlot index={0} /><InputOTPSlot index={1} /><InputOTPSlot index={2} />
-                             <InputOTPSlot index={3} /><InputOTPSlot index={4} /><InputOTPSlot index={5} />
-                           </InputOTPGroup>
-                         </InputOTP>
-                       </div>
-                     </div>
-                     <Button type="button" onClick={handleForgotVerifyOtp} className="w-full" disabled={isResetting || resetOtp.length !== 6}>{isResetting ? "Verifying..." : "Verify Code"}</Button>
-                   </div>
-                 )}
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-amber-500" />
+                  <p className="page-eyebrow text-amber-600">Demo mode</p>
+                </div>
+                <h2 className="mt-2 text-3xl font-bold text-slate-900">Try a portal</h2>
+                <p className="mt-2 text-sm text-slate-500">
+                  Sign in instantly as any role. Demo accounts are read-only — no real records are affected.
+                </p>
 
-                 {forgotStep === 3 && (
-                   <form onSubmit={handleForgotResetPassword} className="space-y-4">
-                     <div className="space-y-2">
-                       <Label>New Password</Label>
-                       <Input type="password" minLength={8} value={newPassword} onChange={e => setNewPassword(e.target.value)} required />
-                     </div>
-                     <div className="space-y-2">
-                       <Label>Confirm New Password</Label>
-                       <Input type="password" minLength={8} value={confirmNewPassword} onChange={e => setConfirmNewPassword(e.target.value)} required />
-                     </div>
-                     <Button type="submit" className="w-full" disabled={isResetting}>{isResetting ? "Saving..." : "Reset Password"}</Button>
-                   </form>
-                 )}
-               </div>
-            ) : (
-            <form onSubmit={signIn} className="mt-9 space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-300">
-              <div className="space-y-2">
-                <Label htmlFor="username">
-                  Registration number or Email
-                </Label>
-                <div className="relative">
-                  <UserPlus className="absolute left-3 top-3 h-4 w-4 text-teal-600" />
-                  <Input
-                    id="username"
-                    value={username}
-                    onChange={(event) => setUsername(event.target.value)}
-                    className="pl-10"
-                    disabled={isLoading}
-                    required
-                  />
+                <div className="mt-7 space-y-3">
+                  {DEMO_PORTALS.map((portal) => {
+                    const loading = demoLoading === portal.key;
+                    return (
+                      <button
+                        key={portal.key}
+                        onClick={() => handleDemoLogin(portal)}
+                        disabled={demoLoading !== null}
+                        className="flex w-full items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition-all hover:border-teal-300 hover:bg-teal-50 hover:shadow-md hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-teal-50 ring-1 ring-teal-100">
+                          {loading ? <Loader2 className="h-5 w-5 text-teal-600 animate-spin" /> : portal.icon}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-semibold text-slate-800">{portal.label}</p>
+                          <p className="mt-0.5 text-xs text-slate-500">{portal.subtitle}</p>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
+
+                <p className="mt-6 text-center text-[10px] text-slate-400">
+                  Demo data is shared. Do not enter personal or patient information.
+                </p>
               </div>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="password">Password</Label>
-                  <button type="button" onClick={() => { setResetEmail(username); setForgotStep(1); }} className="text-[11px] font-medium text-teal-700 hover:underline">Forgot password?</button>
-                </div>
-                <div className="relative">
-                  <KeyRound className="absolute left-3 top-3 h-4 w-4 text-teal-600" />
-                  <Input
-                    id="password"
-                    type="password"
-                    value={password}
-                    onChange={(event) => setPassword(event.target.value)}
-                    className="pl-10"
-                    disabled={isLoading}
-                    required
-                  />
-                </div>
-              </div>
-              <Button type="submit" className="h-11 w-full" disabled={isLoading}>
-                {isLoading ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <ShieldCheck className="mr-2 h-4 w-4" />
+            )}
+
+            {/* ── MODE: Login ──────────────────────────────────────────── */}
+            {mode === "login" && (
+              <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
+                <button
+                  type="button"
+                  onClick={goBack}
+                  className="mb-6 flex items-center gap-1 text-xs font-medium text-teal-700 hover:underline"
+                >
+                  <ChevronLeft className="h-3 w-3" /> Back
+                </button>
+
+                <p className="page-eyebrow">Secure access</p>
+                <h2 className="mt-2 text-4xl font-bold text-slate-900">Sign in</h2>
+                <p className="mt-2 text-sm text-slate-500">
+                  Sign in with your university registration number or email address and password.
+                </p>
+
+                {error && (
+                  <div className="mt-4 rounded-md bg-red-50 p-3 text-sm text-red-700 border border-red-200">
+                    {error}
+                  </div>
                 )}
-                {isLoading ? "Signing in..." : "Sign in to E-Logbook"}
-              </Button>
-            </form>
+
+                {/* Forgot-password flow */}
+                {forgotStep > 0 ? (
+                  <div className="mt-9 space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                    <div className="flex items-center justify-between mb-2">
+                      {forgotStep > 1 ? (
+                        <button type="button" onClick={() => setForgotStep(forgotStep === 3 ? 2 : 1 as any)} className="text-xs text-teal-700 hover:underline block">
+                          &larr; Back
+                        </button>
+                      ) : <div />}
+                      <button type="button" onClick={() => setForgotStep(0)} className="text-xs text-teal-700 hover:underline block">
+                        Exit to login
+                      </button>
+                    </div>
+
+                    {forgotStep === 1 && (
+                      <form onSubmit={handleForgotSendCode} className="space-y-4">
+                        <div className="space-y-2">
+                          <Label>Enter your email to reset password</Label>
+                          <Input type="email" value={resetEmail} onChange={(e) => setResetEmail(e.target.value)} required />
+                        </div>
+                        <Button type="submit" className="w-full" disabled={isResetting}>{isResetting ? "Sending..." : "Send Code"}</Button>
+                      </form>
+                    )}
+
+                    {forgotStep === 2 && (
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label>Enter the 6-digit code sent to {resetEmail}</Label>
+                          <div className="flex justify-center py-2">
+                            <InputOTP maxLength={6} value={resetOtp} onChange={setResetOtp} disabled={isResetting}>
+                              <InputOTPGroup>
+                                <InputOTPSlot index={0} /><InputOTPSlot index={1} /><InputOTPSlot index={2} />
+                                <InputOTPSlot index={3} /><InputOTPSlot index={4} /><InputOTPSlot index={5} />
+                              </InputOTPGroup>
+                            </InputOTP>
+                          </div>
+                        </div>
+                        <Button type="button" onClick={handleForgotVerifyOtp} className="w-full" disabled={isResetting || resetOtp.length !== 6}>
+                          {isResetting ? "Verifying..." : "Verify Code"}
+                        </Button>
+                      </div>
+                    )}
+
+                    {forgotStep === 3 && (
+                      <form onSubmit={handleForgotResetPassword} className="space-y-4">
+                        <div className="space-y-2">
+                          <Label>New Password</Label>
+                          <Input type="password" minLength={8} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Confirm New Password</Label>
+                          <Input type="password" minLength={8} value={confirmNewPassword} onChange={(e) => setConfirmNewPassword(e.target.value)} required />
+                        </div>
+                        <Button type="submit" className="w-full" disabled={isResetting}>{isResetting ? "Saving..." : "Reset Password"}</Button>
+                      </form>
+                    )}
+                  </div>
+                ) : (
+                  <form onSubmit={signIn} className="mt-9 space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                    <div className="space-y-2">
+                      <Label htmlFor="username">Registration number or Email</Label>
+                      <div className="relative">
+                        <UserPlus className="absolute left-3 top-3 h-4 w-4 text-teal-600" />
+                        <Input
+                          id="username"
+                          value={username}
+                          onChange={(e) => setUsername(e.target.value)}
+                          className="pl-10"
+                          disabled={isLoading}
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="password">Password</Label>
+                        <button
+                          type="button"
+                          onClick={() => { setResetEmail(username); setForgotStep(1); }}
+                          className="text-[11px] font-medium text-teal-700 hover:underline"
+                        >
+                          Forgot password?
+                        </button>
+                      </div>
+                      <div className="relative">
+                        <KeyRound className="absolute left-3 top-3 h-4 w-4 text-teal-600" />
+                        <Input
+                          id="password"
+                          type="password"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          className="pl-10"
+                          disabled={isLoading}
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <Button type="submit" className="h-11 w-full" disabled={isLoading}>
+                      {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
+                      {isLoading ? "Signing in…" : "Sign in to E-Logbook"}
+                    </Button>
+                  </form>
+                )}
+
+                {forgotStep === 0 && (
+                  <>
+                    <div className="my-6 flex items-center gap-3">
+                      <div className="h-px flex-1 bg-teal-100" />
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">New here?</span>
+                      <div className="h-px flex-1 bg-teal-100" />
+                    </div>
+                    <Button type="button" variant="outline" onClick={onRegister} className="h-11 w-full border-teal-200 text-teal-800">
+                      <UserPlus className="h-4 w-4" /> Register &amp; Pay
+                    </Button>
+                  </>
+                )}
+              </div>
             )}
 
-            {forgotStep === 0 && (
-              <>
-                <div className="my-6 flex items-center gap-3">
-                  <div className="h-px flex-1 bg-teal-100" />
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">New here?</span>
-                  <div className="h-px flex-1 bg-teal-100" />
-                </div>
-                <Button type="button" variant="outline" onClick={onRegister} className="h-11 w-full border-teal-200 text-teal-800">
-                  <UserPlus className="h-4 w-4" /> Register & Pay
-                </Button>
-              </>
-            )}
           </div>
         </section>
       </div>
