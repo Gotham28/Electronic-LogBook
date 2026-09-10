@@ -5,6 +5,7 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { requireAuth, requireRole, requireDepartment } from "../middlewares/auth.js";
 import { completionPercent, configSchema, emailSchema, nameSchema, passwordSchema, targetSchema, validate } from "../lib/validation.js";
+import { sendAccountCreatedEmail } from "../lib/mailer.js";
 
 const router = Router();
 
@@ -203,6 +204,15 @@ router.post("/professors", validate(z.object({ fullName: nameSchema, email: emai
       status: "approved", // Professors created by HOD are auto-approved
       departmentId: req.user!.departmentId!
     }).returning();
+
+    try {
+      const [dept] = await db.select({ name: departmentsTable.name }).from(departmentsTable)
+        .where(eq(departmentsTable.id, req.user!.departmentId!)).limit(1);
+        
+      await sendAccountCreatedEmail(email, fullName, password, "professor", dept?.name);
+    } catch (error) {
+      req.log.warn({ email }, "Faculty account created but welcome email failed to send");
+    }
 
     res.status(201).json({ 
       message: "Faculty account created successfully",

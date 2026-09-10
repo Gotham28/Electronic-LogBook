@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { eq, and } from "drizzle-orm";
 import { db, departmentsTable, usersTable, departmentConfigsTable, procedureTypesTable, departmentCatalogTable } from "@workspace/db";
 import { configSchema, emailSchema, nameSchema, passwordSchema, targetSchema } from "./validation.js";
+import { sendAccountCreatedEmail } from "./mailer.js";
 
 export const setupSchema = z.object({
   name: nameSchema, code: z.string().trim().min(1).max(32).regex(/^[a-zA-Z0-9_-]+$/), description: z.string().max(1000).optional(),
@@ -31,6 +32,13 @@ export async function provisionDepartment(input: unknown, initialPassword: unkno
     if (setup.catalog?.length) await tx.insert(departmentCatalogTable).values(setup.catalog.map((p) => ({ ...p, departmentId: department.id })));
     return { departmentId: department.id, hodId: created.id };
   });
+
+  try {
+    await sendAccountCreatedEmail(setup.hod.email, setup.hod.fullName, password as string, "hod", setup.name);
+  } catch (error) {
+    console.warn(`HOD account created but welcome email failed to send to ${setup.hod.email}`);
+  }
+
   return result;
 }
 
