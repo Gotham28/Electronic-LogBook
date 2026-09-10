@@ -53,3 +53,7 @@ Thumbs.db
 
 # Repomix
 repomix-output*.xml
+
+*.debug.cjs
+live_schema*
+check_*.cjs
