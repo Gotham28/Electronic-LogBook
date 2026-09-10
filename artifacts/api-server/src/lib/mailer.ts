@@ -71,19 +71,19 @@ export const sendAccountCreatedEmail = async (email: string, fullName: string, p
 
   const textTemplate = `Hello ${fullName},\n\nAn account has been created for you (${title}).\n\nLogin Email: ${email}\nInitial Password: ${password}\n\nPlease log in and change your password from your account settings as soon as possible.`;
   
-  const htmlTemplate = \`
+  const htmlTemplate = `
     <div style="font-family: Arial, sans-serif; padding: 20px;">
       <h2>Your E-LogBook Account Has Been Created</h2>
       <p>Hello ${fullName},</p>
-      <p>An account has been created for you (<strong>\${title}</strong>).</p>
-      <p><strong>Login Email:</strong> \${email}</p>
-      <p><strong>Initial Password:</strong> <code style="font-family: monospace; background: #f4f4f4; padding: 2px 4px;">\${password}</code></p>
+      <p>An account has been created for you (<strong>${title}</strong>).</p>
+      <p><strong>Login Email:</strong> ${email}</p>
+      <p><strong>Initial Password:</strong> <code style="font-family: monospace; background: #f4f4f4; padding: 2px 4px;">${password}</code></p>
       <p>Please log in and change your password from your account settings as soon as possible.</p>
     </div>
-  \`;
+  `;
 
   await transporter.sendMail({
-    from: \`"E-LogBook" <\${process.env.EMAIL_USER}>\`,
+    from: `"E-LogBook" <${process.env.EMAIL_USER}>`,
     to: email,
     subject: "Your E-LogBook Account Has Been Created",
     text: textTemplate,
