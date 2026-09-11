@@ -1,6 +1,7 @@
-export function formatLogbookDate(value: string | Date): string {
+export function formatLogbookDate(value: string | Date | undefined | null): string {
+  if (!value) return "—";
   const date = value instanceof Date ? value : new Date(`${value}T00:00:00`);
-  if (Number.isNaN(date.getTime())) return value.toString();
+  if (Number.isNaN(date.getTime())) return "—";
   const day = String(date.getDate()).padStart(2, "0");
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const year = String(date.getFullYear()).slice(-2);

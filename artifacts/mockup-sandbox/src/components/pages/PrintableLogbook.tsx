@@ -4,6 +4,28 @@ import { apiGet } from "@/lib/apiClient";
 import { formatLogbookDate } from "@/lib/logbook-config";
 import { Printer, X } from "lucide-react";
 
+class PrintErrorBoundary extends React.Component<{children: React.ReactNode}, {error: Error | null}> {
+  constructor(props: {children: React.ReactNode}) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="p-8 text-red-600 bg-red-50 border border-red-200 rounded m-8">
+          <h1 className="text-2xl font-bold mb-4">Print Render Crash</h1>
+          <p className="mb-4">The PDF generation crashed during rendering:</p>
+          <pre className="p-4 bg-white text-xs overflow-auto rounded border">{this.state.error.message}\n{this.state.error.stack}</pre>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export function PrintableLogbook() {
   const user = React.useMemo(() => getCurrentUser(), []);
   const [data, setData] = React.useState<any>(null);
@@ -25,7 +47,11 @@ export function PrintableLogbook() {
   // (AGENTS.md sec 7). window.print() below only runs after every one of the five
   // requests has actually succeeded; any failure sets error and prints nothing.
   const fetchAll = React.useCallback(async () => {
-    if (!user?.studentProfileId) return;
+    if (!user?.studentProfileId) {
+      setError("User profile ID not found in session. Please log in again.");
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -46,7 +72,7 @@ export function PrintableLogbook() {
         cases: logsBundle.caseLogs || [],
         procs: logsBundle.procedureLogs || [],
         academics: logsBundle.academicLogs || [],
-        postings: postings.data || [],
+        postings: Array.isArray(postings) ? postings : postings?.data || [],
         leaves: Array.isArray(leaves) ? leaves : leaves?.data || [],
         assessments: Array.isArray(assessments) ? assessments : assessments?.data || [],
         thesis: thesisRes.data || null,
@@ -93,8 +119,9 @@ export function PrintableLogbook() {
   const regNumber = data?.profile?.registrationNumber ?? "—";
 
   return (
-    <div className="bg-white p-8 font-serif text-black max-w-[1000px] mx-auto">
-      <div className="mb-12 border-b-2 border-black pb-4 text-center">
+    <PrintErrorBoundary>
+      <div className="bg-white p-8 font-serif text-black max-w-[1000px] mx-auto">
+        <div className="mb-12 border-b-2 border-black pb-4 text-center">
         <h1 className="text-3xl font-bold uppercase tracking-wider">Department of {department}</h1>
         <h2 className="mt-2 text-xl">Resident Logbook - Complete Record</h2>
         <p className="mt-4 text-sm">
@@ -263,6 +290,7 @@ export function PrintableLogbook() {
         </button>
       </div>
     </div>
+    </PrintErrorBoundary>
   );
 }
 
