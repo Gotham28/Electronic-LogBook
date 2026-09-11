@@ -1,4 +1,5 @@
 import { getToken } from './session';
+import { handleDemoRequest } from './demoData';
 
 export class ApiError extends Error {
   public status: number;
@@ -32,6 +33,18 @@ async function fetchWithAuth(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<any> {
+  // --- DEMO MODE INTERCEPTION ---
+  const userStr = window.sessionStorage.getItem("elogbook-user");
+  if (userStr) {
+    try {
+      const user = JSON.parse(userStr);
+      if (user.isDemoMode) {
+        return handleDemoRequest(options.method || "GET", endpoint, options.body ? JSON.parse(options.body as string) : undefined);
+      }
+    } catch (e) { /* ignore parse error */ }
+  }
+  // ------------------------------
+
   const url = `${API_BASE_URL}${endpoint}`;
   
   const headers = new Headers(options.headers || {});

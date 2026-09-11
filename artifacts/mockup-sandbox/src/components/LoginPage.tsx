@@ -17,42 +17,30 @@ import { PaymentStep } from "@/components/PaymentStep";
 
 type Mode = "picker" | "demo" | "login";
 
-// Demo portal config — credentials come entirely from env vars, never source.
-// Set VITE_DEMO_STUDENT_EMAIL, VITE_DEMO_STUDENT_PASSWORD,
-//     VITE_DEMO_FACULTY_EMAIL, VITE_DEMO_FACULTY_PASSWORD,
-//     VITE_DEMO_HOD_EMAIL,     VITE_DEMO_HOD_PASSWORD
-// in .env.local (local) and in the Vercel project environment variables (production).
+// Demo portal config — credentials are now entirely mocked client-side
 const DEMO_PORTALS: {
   key: string;
   label: string;
   subtitle: string;
   icon: React.ReactNode;
-  emailVar: string;
-  passwordVar: string;
 }[] = [
   {
     key: "student",
     label: "Resident Trainee",
     subtitle: "Explore case logs, procedures and academic records",
     icon: <GraduationCap className="h-6 w-6 text-teal-600" />,
-    emailVar: "VITE_DEMO_STUDENT_EMAIL",
-    passwordVar: "VITE_DEMO_STUDENT_PASSWORD",
   },
   {
     key: "faculty",
     label: "Faculty / Professor",
     subtitle: "Browse the evaluation queue and student progress",
     icon: <Users className="h-6 w-6 text-teal-600" />,
-    emailVar: "VITE_DEMO_FACULTY_EMAIL",
-    passwordVar: "VITE_DEMO_FACULTY_PASSWORD",
   },
   {
     key: "hod",
     label: "Head of Department",
     subtitle: "See department analytics, approvals and leave management",
     icon: <ShieldCheck className="h-6 w-6 text-teal-600" />,
-    emailVar: "VITE_DEMO_HOD_EMAIL",
-    passwordVar: "VITE_DEMO_HOD_PASSWORD",
   },
 ];
 
@@ -93,18 +81,29 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
   // ── Demo auto-login ───────────────────────────────────────────────────────
 
   const handleDemoLogin = async (portal: typeof DEMO_PORTALS[number]) => {
-    const email = (import.meta.env as Record<string, string>)[portal.emailVar];
-    const pw = (import.meta.env as Record<string, string>)[portal.passwordVar];
-
-    if (!email || !pw) {
-      toast.error("Demo account not configured. Please contact the system administrator.");
-      return;
-    }
-
     setDemoLoading(portal.key);
     try {
-      const user = await apiPost("/api/auth/login", { username: email, password: pw });
-      if (user.token) saveToken(user.token);
+      // Mock network delay
+      await new Promise(r => setTimeout(r, 600));
+      
+      // Determine fake user data based on portal key
+      const roleMap: Record<string, string> = { "student": "student", "faculty": "professor", "hod": "hod" };
+      const emailMap: Record<string, string> = { "student": "kavya.nair.demo@example.com", "faculty": "arjun.mehta.demo@example.com", "hod": "priya.sharma.demo@example.com" };
+      const nameMap: Record<string, string> = { "student": "Kavya Nair", "faculty": "Dr. Arjun Mehta", "hod": "Dr. Priya Sharma" };
+      
+      const user = {
+        id: 999,
+        name: nameMap[portal.key] || portal.label, // changed from fullName
+        fullName: nameMap[portal.key] || portal.label,
+        email: emailMap[portal.key] || "demo@example.com",
+        role: roleMap[portal.key] || "student",
+        departmentId: 1,
+        studentProfileId: portal.key === "student" ? 1 : undefined,
+        token: "demo-token",
+        isDemoMode: true
+      };
+      
+      saveToken(user.token);
       window.sessionStorage.setItem("elogbook-user", JSON.stringify(user));
       onSignIn();
     } catch (err: any) {
