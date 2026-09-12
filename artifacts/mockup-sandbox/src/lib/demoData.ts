@@ -13,13 +13,21 @@ export const demoData = {
     procedures: [
       { id: 1, name: "Lumbar Puncture", group: "Emergency / Diagnostics", required: 15 },
       { id: 2, name: "Pediatric IV Cannulation", group: "Ward Procedures", required: 40 },
-      { id: 3, name: "Nebulization Technique", group: "Ward Procedures", required: 20 }
+      { id: 3, name: "Nebulization Technique", group: "Ward Procedures", required: 20 },
+      { id: 4, name: "Intraosseous Access", group: "Emergency / Diagnostics", required: 8 },
+      { id: 5, name: "Umbilical Catheterization", group: "Neonatal Procedures", required: 10 },
+      { id: 6, name: "Bag and Mask Ventilation", group: "Emergency / Diagnostics", required: 12 }
     ],
     academics: [
       { id: 1, name: "Journal Club", kind: "academic", required: 15 },
       { id: 2, name: "Case Presentation", kind: "academic", required: 20 }
     ],
-    postings: []
+    postings: [
+      { id: 1, name: "General Pediatric Ward", value: "general-pediatric-ward", required: 0, period: "total" },
+      { id: 2, name: "Neonatal Intensive Care Unit", value: "nicu", required: 0, period: "total" },
+      { id: 3, name: "Pediatric Intensive Care Unit", value: "picu", required: 0, period: "total" },
+      { id: 4, name: "Emergency Department", value: "emergency-department", required: 0, period: "total" }
+    ]
   },
   students: [
     {
@@ -84,7 +92,7 @@ export const demoData = {
     ]
   },
   professors: [
-    { id: 2, fullName: "Dr. Arjun Mehta", name: "Dr. Arjun Mehta", email: "arjun.mehta.demo@example.com", role: "professor", title: "Associate Professor" }
+    { id: 2, fullName: "Dr. Vivek Menon", name: "Dr. Vivek Menon", email: "vivek.menon.demo@example.com", role: "professor", title: "Associate Professor" }
   ],
   hodAnalytics: {
     totalStudents: 12,
@@ -133,7 +141,8 @@ export const demoData = {
       type: "internal",
       marks: 85,
       maximum: 100,
-      assessorName: "Dr. Arjun Mehta"
+      grade: "B",
+      assessorName: "Dr. Vivek Menon"
     }
   ]
 };

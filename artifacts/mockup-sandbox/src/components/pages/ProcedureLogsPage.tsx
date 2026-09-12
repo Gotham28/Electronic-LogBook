@@ -40,13 +40,16 @@ export function ProcedureLogsPage() {
   const PROCEDURE_GROUPS = React.useMemo(() => Object.fromEntries([...new Set(PROCEDURE_REQUIREMENTS.map((p) => p.group))].map((group) => [group, PROCEDURE_REQUIREMENTS.filter((p) => p.group === group).map((p) => p.name)])), [PROCEDURE_REQUIREMENTS]);
   const REQUIRED_PROCEDURE_COUNT = PROCEDURE_REQUIREMENTS.reduce((sum, p) => sum + p.required, 0);
   const groupNames: Record<string, string> = Object.fromEntries(Object.keys(PROCEDURE_GROUPS).map((group) => [group, group]));
+  const user = React.useMemo(() => getCurrentUser(), []);
+  const isDemoMode = window.sessionStorage.getItem("elogbook-user")?.includes('"isDemoMode":true') ?? false;
+  const initialGroup = isDemoMode ? PROCEDURE_REQUIREMENTS[0]?.group ?? "" : "";
   const [open, setOpen] = React.useState(false);
   const [logs, setLogs] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [form, setForm] = React.useState({
     date: todayForInput(),
-    group: "" as ProcedureGroup,
+    group: initialGroup as ProcedureGroup,
     procedureName: "",
     patientUhid: "",
     age: "",
@@ -63,7 +66,6 @@ export function ProcedureLogsPage() {
 
   const setGroup = (group: ProcedureGroup) => setForm({ ...form, group, procedureName: "" });
 
-  const user = React.useMemo(() => getCurrentUser(), []);
   const [professors, setProfessors] = React.useState<any[]>([]);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
@@ -135,7 +137,7 @@ export function ProcedureLogsPage() {
       setOpen(false);
       setForm({
         date: todayForInput(),
-        group: "",
+        group: initialGroup,
         procedureName: "",
         patientUhid: "",
         age: "",
