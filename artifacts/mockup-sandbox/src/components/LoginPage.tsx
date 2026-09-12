@@ -219,8 +219,9 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
   // ── Layout ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="medical-grid flex min-h-screen items-center justify-center p-4 md:p-8">
-      <div className="glass-panel grid w-full max-w-6xl overflow-hidden rounded-[30px] lg:grid-cols-[1.08fr_.92fr]">
+    <div className="min-h-screen bg-slate-50 flex flex-col">
+      <div className="medical-grid flex flex-1 items-center justify-center p-4 md:p-8">
+        <div className="glass-panel grid w-full max-w-6xl overflow-hidden rounded-[30px] lg:grid-cols-[1.08fr_.92fr]">
 
         {/* Left branding panel — unchanged */}
         <section className="relative overflow-hidden bg-gradient-to-br from-teal-700 via-teal-600 to-cyan-500 p-8 text-white md:p-12 transition-colors">
@@ -573,6 +574,18 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
           </div>
         </section>
       </div>
+      </div>
+      {/* Footer */}
+      <footer className="w-full mt-auto py-6 border-t border-slate-200 bg-white">
+        <div className="max-w-6xl mx-auto px-4 md:px-8 flex flex-wrap justify-center gap-6 text-sm text-slate-500">
+          <a href="/privacy-policy" className="hover:text-teal-700 transition-colors">Privacy Policy</a>
+          <a href="/grievance-officer" className="hover:text-teal-700 transition-colors">Grievance Officer</a>
+          <a href="/data-rights" className="hover:text-teal-700 transition-colors">Data Rights</a>
+        </div>
+      </footer>
     </div>
   );
 }
+
+
+
