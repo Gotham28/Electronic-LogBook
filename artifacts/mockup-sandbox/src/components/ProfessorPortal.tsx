@@ -438,7 +438,6 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                 <TableHeader className="bg-slate-50">
                   <TableRow>
                     <TableHead className="text-xs font-semibold">Resident Name</TableHead>
-                    <TableHead className="text-xs font-semibold">Department</TableHead>
                     <TableHead className="text-xs font-semibold">Requirement Progress</TableHead>
                     <TableHead className="text-xs font-semibold">Shortfall Status</TableHead>
                     <TableHead className="text-xs font-semibold text-right">Action</TableHead>
@@ -451,7 +450,6 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                         {m.name}
                         <p className="text-[11px] text-slate-500 font-normal">{m.registrationNumber}</p>
                       </TableCell>
-                      <TableCell className="text-xs">{m.department}</TableCell>
                       <TableCell className="text-xs w-48">
                         <div className="flex items-center justify-between text-[11px] mb-1">
                           <span className="font-semibold text-slate-700">{m.overallCompletion}%</span>

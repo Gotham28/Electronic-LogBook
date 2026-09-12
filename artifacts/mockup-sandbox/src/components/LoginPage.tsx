@@ -1,7 +1,7 @@
 import * as React from "react";
 import {
   BookOpenCheck, KeyRound, ShieldCheck, UserPlus, Loader2,
-  GraduationCap, Users, Sparkles, LogIn, ChevronLeft,
+  GraduationCap, Users, Sparkles, LogIn, ChevronLeft, Lock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -51,6 +51,16 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
 
   // Demo state
   const [demoLoading, setDemoLoading] = React.useState<string | null>(null);
+  // PIN gate — pinPortalKey is the portal key currently asking for a PIN, null = no PIN screen
+  const [pinPortalKey, setPinPortalKey] = React.useState<string | null>(null);
+  const [pinValue, setPinValue] = React.useState("");
+  const [pinError, setPinError] = React.useState<string | null>(null);
+
+  // Portals that require a PIN before demo access (key → env-var name)
+  const PIN_ENV_MAP: Record<string, string> = {
+    faculty: "VITE_DEMO_FACULTY_PIN",
+    hod: "VITE_DEMO_HOD_PIN",
+  };
 
   // Login credentials
   const [username, setUsername] = React.useState("");
@@ -76,6 +86,9 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
     setForgotStep(0);
     setUsername("");
     setPassword("");
+    setPinPortalKey(null);
+    setPinValue("");
+    setPinError(null);
   };
 
   // ── Demo auto-login ───────────────────────────────────────────────────────
@@ -279,46 +292,137 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
                 <button
                   type="button"
-                  onClick={goBack}
+                  onClick={() => {
+                    if (pinPortalKey) {
+                      setPinPortalKey(null);
+                      setPinValue("");
+                      setPinError(null);
+                    } else {
+                      goBack();
+                    }
+                  }}
                   className="mb-6 flex items-center gap-1 text-xs font-medium text-teal-700 hover:underline"
                 >
                   <ChevronLeft className="h-3 w-3" /> Back
                 </button>
 
-                <div className="flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-amber-500" />
-                  <p className="page-eyebrow text-amber-600">Demo mode</p>
-                </div>
-                <h2 className="mt-2 text-3xl font-bold text-slate-900">Try a portal</h2>
-                <p className="mt-2 text-sm text-slate-500">
-                  Sign in instantly as any role. Demo accounts are read-only — no real records are affected.
-                </p>
+                {/* ── PIN entry screen (Faculty or HOD) ────────────────── */}
+                {pinPortalKey ? (() => {
+                  const portal = DEMO_PORTALS.find(p => p.key === pinPortalKey)!;
+                  return (
+                    <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
+                      <div className="flex items-center gap-2">
+                        <Lock className="h-4 w-4 text-slate-500" />
+                        <p className="page-eyebrow text-slate-500">Access restricted</p>
+                      </div>
+                      <h2 className="mt-2 text-3xl font-bold text-slate-900">{portal.label} Demo</h2>
+                      <p className="mt-2 text-sm text-slate-500">
+                        This portal requires an access code. Contact the system administrator if you need it.
+                      </p>
 
-                <div className="mt-7 space-y-3">
-                  {DEMO_PORTALS.map((portal) => {
-                    const loading = demoLoading === portal.key;
-                    return (
-                      <button
-                        key={portal.key}
-                        onClick={() => handleDemoLogin(portal)}
-                        disabled={demoLoading !== null}
-                        className="flex w-full items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition-all hover:border-teal-300 hover:bg-teal-50 hover:shadow-md hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-teal-50 ring-1 ring-teal-100">
-                          {loading ? <Loader2 className="h-5 w-5 text-teal-600 animate-spin" /> : portal.icon}
+                      <div className="mt-8 space-y-5">
+                        <div className="space-y-3">
+                          <Label className="text-sm font-medium text-slate-700">Enter 4-digit access code</Label>
+                          <div className="flex justify-center">
+                            <InputOTP
+                              maxLength={4}
+                              value={pinValue}
+                              onChange={(v) => { setPinValue(v); setPinError(null); }}
+                            >
+                              <InputOTPGroup>
+                                <InputOTPSlot index={0} />
+                                <InputOTPSlot index={1} />
+                                <InputOTPSlot index={2} />
+                                <InputOTPSlot index={3} />
+                              </InputOTPGroup>
+                            </InputOTP>
+                          </div>
+                          {pinError && (
+                            <p className="text-center text-sm text-red-600 font-medium">{pinError}</p>
+                          )}
                         </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="font-semibold text-slate-800">{portal.label}</p>
-                          <p className="mt-0.5 text-xs text-slate-500">{portal.subtitle}</p>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
 
-                <p className="mt-6 text-center text-[10px] text-slate-400">
-                  Demo data is shared. Do not enter personal or patient information.
-                </p>
+                        <Button
+                          type="button"
+                          className="h-11 w-full"
+                          disabled={pinValue.length !== 4 || demoLoading !== null}
+                          onClick={() => {
+                            const envKey = PIN_ENV_MAP[pinPortalKey];
+                            const correctPin = (import.meta.env as Record<string, string>)[envKey];
+                            if (!correctPin) {
+                              setPinError("Demo access not configured. Contact the administrator.");
+                              return;
+                            }
+                            if (pinValue !== correctPin) {
+                              setPinError("Incorrect code. Please try again.");
+                              setPinValue("");
+                              return;
+                            }
+                            // PIN correct — proceed with demo login
+                            const key = pinPortalKey;
+                            setPinPortalKey(null);
+                            setPinValue("");
+                            setPinError(null);
+                            handleDemoLogin(DEMO_PORTALS.find(p => p.key === key)!);
+                          }}
+                        >
+                          {demoLoading === pinPortalKey ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : (
+                            <ShieldCheck className="mr-2 h-4 w-4" />
+                          )}
+                          {demoLoading === pinPortalKey ? "Signing in…" : `Access ${portal.label} Demo`}
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })() : (
+                  /* ── Portal cards ──────────────────────────────────── */
+                  <>
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-amber-500" />
+                      <p className="page-eyebrow text-amber-600">Demo mode</p>
+                    </div>
+                    <h2 className="mt-2 text-3xl font-bold text-slate-900">Try a portal</h2>
+                    <p className="mt-2 text-sm text-slate-500">
+                      Sign in instantly as any role. Demo accounts are read-only — no real records are affected.
+                    </p>
+
+                    <div className="mt-7 space-y-3">
+                      {DEMO_PORTALS.map((portal) => {
+                        const loading = demoLoading === portal.key;
+                        const requiresPin = portal.key in PIN_ENV_MAP;
+                        return (
+                          <button
+                            key={portal.key}
+                            onClick={() => {
+                              if (requiresPin) {
+                                setPinPortalKey(portal.key);
+                              } else {
+                                handleDemoLogin(portal);
+                              }
+                            }}
+                            disabled={demoLoading !== null}
+                            className="flex w-full items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition-all hover:border-teal-300 hover:bg-teal-50 hover:shadow-md hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-teal-50 ring-1 ring-teal-100">
+                              {loading ? <Loader2 className="h-5 w-5 text-teal-600 animate-spin" /> : portal.icon}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="font-semibold text-slate-800">{portal.label}</p>
+                              <p className="mt-0.5 text-xs text-slate-500">{portal.subtitle}</p>
+                            </div>
+                            {requiresPin && <Lock className="h-4 w-4 shrink-0 text-slate-400" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <p className="mt-6 text-center text-[10px] text-slate-400">
+                      Demo data is shared. Do not enter personal or patient information.
+                    </p>
+                  </>
+                )}
               </div>
             )}
 
