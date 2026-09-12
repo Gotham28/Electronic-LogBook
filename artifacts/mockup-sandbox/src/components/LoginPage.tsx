@@ -581,6 +581,15 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
           <a href="/privacy-policy" className="hover:text-teal-700 transition-colors">Privacy Policy</a>
           <a href="/grievance-officer" className="hover:text-teal-700 transition-colors">Grievance Officer</a>
           <a href="/data-rights" className="hover:text-teal-700 transition-colors">Data Rights</a>
+          <button 
+            onClick={(e) => {
+              e.preventDefault();
+              window.dispatchEvent(new Event("open-cookie-consent"));
+            }}
+            className="hover:text-teal-700 transition-colors cursor-pointer"
+          >
+            Cookie Preferences
+          </button>
         </div>
       </footer>
     </div>
