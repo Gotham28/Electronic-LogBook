@@ -14,6 +14,9 @@ import { AttendancePage } from "@/components/pages/AttendancePage";
 import { MilestonesPage } from "@/components/pages/MilestonesPage";
 import { AssessmentsPage } from "@/components/pages/AssessmentsPage";
 import { PrintableLogbook } from "@/components/pages/PrintableLogbook";
+import { PrivacyPolicyPage } from "@/components/pages/PrivacyPolicyPage";
+import { GrievanceOfficerPage } from "@/components/pages/GrievanceOfficerPage";
+import { DataRightsPage } from "@/components/pages/DataRightsPage";
 import { getCurrentUser, clearSession, getToken } from "@/lib/session";
 import { apiGet, apiPost } from "@/lib/apiClient";
 import { DepartmentProvider } from "@/lib/department-context";
@@ -155,6 +158,10 @@ function App() {
   }
 
   if (checkingSession) return <p className="p-10" role="status">Checking your session…</p>;
+
+  if (window.location.pathname === "/privacy-policy") return <PrivacyPolicyPage />;
+  if (window.location.pathname === "/grievance-officer") return <GrievanceOfficerPage />;
+  if (window.location.pathname === "/data-rights") return <DataRightsPage />;
 
   if (!isAuthenticated) {
     if (authScreen === "register") {
