@@ -8,9 +8,9 @@ export function GrievanceOfficerPage() {
         <a href="/" className="inline-flex items-center text-sm font-medium text-teal-600 hover:text-teal-700 mb-8 transition-colors">
           <ChevronLeft className="w-4 h-4 mr-1" /> Back to Home
         </a>
-        
+
         <h1 className="text-4xl font-bold text-slate-900 mb-8 pb-6 border-b border-slate-100">Grievance Officer</h1>
-        
+
         <div className="space-y-6 text-slate-700 leading-relaxed">
           <p>
             In accordance with Section 8(10) of the Digital Personal Data Protection Act, 2023, E-LogBook has appointed a Grievance Officer to address any concerns regarding the handling of your personal data.
@@ -19,7 +19,7 @@ export function GrievanceOfficerPage() {
           <div className="my-8 p-6 bg-slate-50 rounded-2xl border border-slate-200">
             <h2 className="text-lg font-bold text-slate-900 mb-2">Grievance Officer: Gautam P</h2>
             <p className="mb-1"><strong>Email:</strong> <a href="mailto:gothoslabs@gmail.com" className="text-teal-600 hover:underline">gothoslabs@gmail.com</a></p>
-            <p><strong>Address:</strong> Janaki House, Kuthirummal Road, Padannakkad, Nileshwar</p>
+            <p><strong>Address:</strong> Roses apartments, Kakkad, Kannur, Kerala, 670001</p>
           </div>
 
           <h3 className="text-lg font-bold text-slate-900 mt-8 mb-3">You may contact the Grievance Officer regarding:</h3>
