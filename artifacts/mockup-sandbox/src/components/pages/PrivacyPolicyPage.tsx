@@ -8,10 +8,10 @@ export function PrivacyPolicyPage() {
         <a href="/" className="inline-flex items-center text-sm font-medium text-teal-600 hover:text-teal-700 mb-8 transition-colors">
           <ChevronLeft className="w-4 h-4 mr-1" /> Back to Home
         </a>
-        
+
         <h1 className="text-4xl font-bold text-slate-900 mb-2">Privacy Policy</h1>
         <p className="text-sm text-slate-500 mb-10 pb-6 border-b border-slate-100">Last updated: {new Date().toLocaleDateString()}</p>
-        
+
         <div className="space-y-8 text-slate-700 leading-relaxed">
           <section>
             <h2 className="text-xl font-bold text-slate-900 mb-3">1. What data we collect</h2>
@@ -49,7 +49,7 @@ export function PrivacyPolicyPage() {
             <div className="mt-4 p-4 bg-slate-50 rounded-xl border border-slate-200">
               <p className="font-semibold text-slate-900">Gautam P</p>
               <p>Email: <a href="mailto:gothoslabs@gmail.com" className="text-teal-600 hover:underline">gothoslabs@gmail.com</a></p>
-              <p>Address: Janaki House, Kuthirummal Road, Padannakkad, Nileshwar</p>
+              <p>Address: Roses apartments, Kakkad, Kannur, Kerala, 670001</p>
             </div>
           </section>
         </div>
