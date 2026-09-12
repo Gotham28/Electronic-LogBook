@@ -85,7 +85,6 @@ const navigationDescriptions: Record<string, string> = {
   "Leave Records": "Check your leave balance, previous requests, and approval status.",
   "Evaluation Queue": "Open student log entries that are waiting for your review and verification.",
   "Student Progress": "Follow the training progress and completion status of the students assigned to you.",
-  Students: "View every student in the department and open their detailed training progress.",
   "Review Queue": "Review pending case and procedure entries submitted across the department.",
   "Add Assessment": "Create and manage assessments for postgraduate trainees.",
   "Pending Students": "Review new student registrations before granting access to the logbook.",
@@ -105,7 +104,7 @@ function navigationForRole(role: RoleType, dashboardData?: any, loadingBadges?: 
 
   if (role === "HOD") {
     return [
-      { title: "Students", icon: GraduationCap, href: "/roster" },
+      { title: "Dashboard", icon: GraduationCap, href: "/roster" },
       { title: "Review Queue", icon: FileText, href: "/review-queue" },
       { title: "Add Assessment", icon: ClipboardCheck, href: "/assessments" },
       { title: "Pending Students", icon: UserPlus, href: "/student-access" },
