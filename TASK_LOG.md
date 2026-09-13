@@ -8,8 +8,8 @@
   "fallback-secret-for-dev-only"` from `middlewares/auth.ts` and `routes/auth.ts`; both
   now import from `lib/env.ts`.
 - No other logic changed. `git diff --stat`: 2 files, 1 line in and 1 line out each.
-  Call sites at `middlewares/auth.ts:33`, `routes/auth.ts:386` and `routes/auth.ts:443`
-  kept their original line numbers.
+  Call sites in `middlewares/auth.ts` and `routes/auth.ts` originally kept their line numbers
+  (subsequent security fixes like SEC-11/12 and payment flows have since expanded both files).
 
 **Files**
 - `artifacts/api-server/src/lib/env.ts` (new)
@@ -86,6 +86,8 @@
   applied to any database and no endpoint has been executed. No request has been made
   against any of this code.
 - `0003_subscriptions_payments.sql` has never run anywhere, not even against PGlite.
+- **Update, 2026-09-13:** `0003_subscriptions_payments.sql` is now applied in production,
+  per the developer's direct confirmation.
 - TypeScript type checking was run and reports 20 errors, all pre-existing and unrelated to
   this work: 9 x TS2307 `Cannot find module 'zod'` and 11 x TS7006 implicit-any downstream
   of `zod` resolving to `any`. `routes/payments.ts` and `middlewares/payment-token.ts`
@@ -102,8 +104,8 @@
   unrotated.
 - `pg_dump` 18 client tools needed; the local `pg_dump` is 16.12 and refuses an 18.6
   server. No verified backup exists yet.
-- PGlite migration test not yet run. `tests/migrations.test.ts:15` asserts 2 ledger rows
-  and will fail at 3 until that number is corrected.
+- PGlite migration test: resolved — `tests/migrations.test.ts:15` already asserts 3 ledger
+  rows (covering `0003_subscriptions_payments.sql`).
 - `pnpm install` incomplete — `zod` is not linked into `artifacts/api-server/node_modules`
   and `@electric-sql/pglite` is absent entirely. The build has never been green.
 - No Razorpay webhook. A payment that succeeds after the browser dies is invisible to the
@@ -131,4 +133,4 @@
 `f15e6dc` was also cherry-picked onto `main` as `8765917` so the `drizzle-kit push` scripts
 would not wait on this branch.
 
-**PR** — none opened.
+**PR** — none opened at the time of writing. **Update, 2026-09-13:** PR #4 ("Razorpay subscription: backend and migration") and PR #5 ("feat(payment): add Razorpay payment step to registration and login") were both opened from branch `feat/razorpay-subscription` and merged on 2026-09-06 (at 18:58:40Z and 19:54:37Z respectively).

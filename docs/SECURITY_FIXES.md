@@ -6,6 +6,11 @@ Batch A (SEC-04) is already complete at commit `bcbb109`.
 
 Read `AGENTS.md` and `.agents/SECURITY_AUDIT.md` before starting.
 
+> **Scope Note:** This document's scope covers remediation Batches B through H, addressing
+> findings SEC-01 through SEC-12 and SEC-23 only. Findings SEC-14 through SEC-17 (UI fake data)
+> and SEC-34 through SEC-37 (status code collapses) were fixed later and are documented in
+> `.agents/SECURITY_AUDIT.md` and `docs/SECURITY_REPORT.md`.
+
 This is a live pilot at Pariyaram Medical College. Real residents, real professors,
 real patient records. No staging environment. No migration history. No rollback.
 
