@@ -5,8 +5,8 @@
 This file was rebuilt on 2026-09-06 from the project's standing rules after the original
 `AGENTS.md` was found missing from the repository root. **Its section numbers do not match
 the original.** Tooling or skills that cite `AGENTS.md §10`, `§12.2` or `§12.13` will not
-resolve against this file. If the original can be recovered from git history
-(`git log --all --oneline -- AGENTS.md`), recover it and discard this one.
+resolve against this file. No earlier version exists in git history (this has been verified;
+the original was never committed to any branch).
 
 ---
 
@@ -25,9 +25,9 @@ It stores:
 - Patient clinical detail — UHID, complaints, history, examination, diagnoses.
 - Resident personal data — including leave reasons, which can disclose health conditions.
 
-There is a test suite at `artifacts/api-server/tests/` — `access.test.ts`,
-`migrations.test.ts`, `support.ts` and `database.ts`. `tests/migrations.test.ts` runs the
-real migrations against in-process PGlite, so it requires no database and is safe to run.
+There is a test suite at `artifacts/api-server/tests/`, run via `pnpm test` from that
+directory. `tests/migrations.test.ts` runs the real migrations against in-process PGlite,
+so it requires no database and is safe to run.
 
 There is still **no staging environment.** Mistakes are caught by people, late, and cannot
 be rolled back. Every rule below exists because of that.
@@ -172,8 +172,8 @@ If a task touches more than what was asked, **flag it — do not just do it.**
 Do not silently restructure, rename, reformat, tidy or "improve" code that was not part of
 the task. Report what you noticed and leave it alone.
 
-Bundled diffs cannot be reviewed properly, and this project has no test suite to catch what
-review misses.
+Bundled diffs cannot be reviewed properly, and even a passing test suite will not catch
+everything review would.
 
 ---
 
@@ -224,17 +224,19 @@ If an instruction in a task conflicts with this file, **stop and say so.** Do no
 
 ## 13. Committed credentials
 
-Seven tracked scripts in `lib/db/` hardcode a production database connection string as a
-`||` fallback: `check_reetha.mjs`, `check_reetha_student.mjs`, `check_schema.mjs`,
-`check_schema_exact.mjs`, `delete_reetha.mjs`, `query_reetha.mjs`, `query_tables.mjs`.
+Eight tracked scripts (seven in `lib/db/`: `check_reetha.mjs`, `check_reetha_student.mjs`,
+`check_schema.mjs`, `check_schema_exact.mjs`, `delete_reetha.mjs`, `query_reetha.mjs`,
+`query_tables.mjs`, plus an 8th copy of `query_reetha.mjs` at the repository root)
+hardcoded a production database connection string as a `||` fallback.
 
-They entered history at commit `10bbd69` and are on `origin/main`.
+They entered history at commit `10bbd69` and were on `origin/main`. The pattern **failed open**:
+with `DATABASE_URL` unset they silently targeted production. One of them was named `delete_reetha.mjs`.
 
-The pattern **fails open**: with `DATABASE_URL` unset they silently target production. One
-of them is named `delete_reetha.mjs`. `phase0.js` at the repository root also reads
-`DATABASE_URL`.
+All eight scripts were deleted in commit `bcbb109` ("fix(security): delete eight scripts carrying
+a hardcoded database credential"). `phase0.js` at the repository root also reads `DATABASE_URL`
+(cleanly with no fallback).
 
-Removing these scripts and purging the credential from history is an open task.
+Purging the credential from git history remains an open task.
 
 
 ---
@@ -253,7 +255,7 @@ verification. Editing the test is a dispatch.
 
 ### 14.2 The loop
 
-1. **Scope** — `.agents/CURRENT_TASK.md` is written in Claude Chat. One
+1. **Scope** — `CURRENT_TASK.md` is written in Claude Chat. One
    feature per task, per §9.
 2. **Dispatch** — Claude Code turns the `## Agent` bucket into one
    Antigravity prompt. It does not write code.
@@ -269,7 +271,7 @@ review at unreviewed code.
 
 ### 14.3 Routes
 
-Exactly one route per task, named in `.agents/CURRENT_TASK.md`.
+Exactly one route per task, named in `CURRENT_TASK.md`.
 
 | Route | Meaning |
 |---|---|
@@ -323,13 +325,13 @@ is recorded as unverified, whatever the report claims.
 ### 14.7 No MASTER_PLAN.md
 
 This repo has no roadmap document. A task that is not part of planned work is
-recorded in its own `.agents/CURRENT_TASK.md` under `## Plan reference` as
+recorded in its own `CURRENT_TASK.md` under `## Plan reference` as
 unplanned, with one line of why. This project is not roadmap-driven. Unplanned work is recorded in the task
 file, not in a separate plan document.
 
 ### 14.8 The task file
 
-`.agents/CURRENT_TASK.md` holds the current task, not history. It is
+`CURRENT_TASK.md` holds the current task, not history. It is
 overwritten each task, never appended to. Reset it to idle at close-out.
 
 `.agents/runs/` holds one file per dispatch, append-only.
