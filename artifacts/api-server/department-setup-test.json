@@ -1,0 +1,9 @@
+{
+  "name": "Test Department",
+  "code": "TEST",
+  "description": "Internal QA/testing department. Not a real clinical department.",
+  "hod": {
+    "fullName": "Test HOD",
+    "email": "testhod@elogbook.com"
+  }
+}
