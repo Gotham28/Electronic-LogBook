@@ -139,6 +139,18 @@ Stop and hand the drafted change to the developer.
 Any evidence that an agent ran a command against a database must be reported immediately
 and prominently, not buried in a summary.
 
+### 6.1 — Test-database exception
+
+An agent may run `src/migrate.ts`, and only that (no other database-connecting command is permitted), only when
+ALL four of the following hold:
+1. `DATABASE_URL` points at a separate database created specifically for testing — never the
+   project's production database.
+2. The host portion of `DATABASE_URL` is verified and printed before every connecting
+   command, and any mismatch against the known test host halts immediately.
+3. Migrations run only through the project's own `src/migrate.ts` — never `drizzle-kit push`
+   or `drizzle-kit migrate`.
+4. No schema-altering DDL is hand-written outside existing migration files.
+
 ---
 
 ## 7. No fabricated content, no fabricated data

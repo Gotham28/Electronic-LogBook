@@ -330,3 +330,236 @@ The following items could not be executed or verified within this dispatch becau
 - **SEC-18 Soft-Delete Split:** Verified in `artifacts/api-server/src/routes/student.ts` that recent logs queries (`:102-106`) indeed already carried `isNull(caseLogsTable.deletedAt)` and `isNull(procedureLogsTable.deletedAt)` (from SEC-02), while the counts (`:79-81`) still omitted it, confirming the exact split described in SEC-18.
 - **SEC-12 Rate Limit Storage:** Confirmed in `artifacts/api-server/src/routes/auth.ts:42` that `loginFailures` is an in-memory `Map`, validating the removal of "database-backed" from SEC-20 in `docs/SECURITY_REPORT.md`.
 
+## Addendum: AGENTS.md §6.1 test-database exception (dispatch 05)
+
+# HANDOFF.md — Antigravity Dispatch 05: AGENTS.md §6 Test-Database Carve-out
+
+**Dispatch:** 05 — AGENTS.md §6 test-database carve-out  
+**Repository:** `Gotham28/Electronic-LogBook` (`D:\Electronic-LogBook-main`)  
+**Branch:** `main`  
+**Commit Worked From:** `43973319acae26330b4f7de33d486eb34bb43dad` (read directly from `.git/refs/heads/main`)  
+**Task Date:** 2026-09-13  
+**Model:** Gemini 3.8 Flash (High)  
+
+---
+
+## 1. Executive Summary
+
+This task implements the test-database carve-out in `AGENTS.md` §6 under the four conditions specified by the developer, and updates `CURRENT_TASK.md` to record the active scope for review.
+
+- **Files Modified/Created:**
+  1. `CURRENT_TASK.md` (Updated with verbatim task scope)
+  2. `AGENTS.md` (§6 amended with subsection §6.1; no other sections touched)
+  3. `HANDOFF.md` (This handoff report)
+- **Commands Executed:** Zero shell commands. Zero database commands. Pure filesystem inspection and text operations only (`view_file`, `write_to_file`, `replace_file_content`).
+
+---
+
+## 2. Text of AGENTS.md §6 Before and After Edit
+
+### 2.1 AGENTS.md §6 Before Edit (Lines 126–140)
+
+```markdown
+## 6. Schema changes are drafted, never pushed
+
+`drizzle-kit push` alters the live schema with no history and no rollback. There is no
+migration history in this project and no staging environment to catch a bad change.
+
+An agent may **write** a migration or a schema diff. An agent may **never**:
+- Run `drizzle-kit push`.
+- Run `drizzle-kit migrate`.
+- Run `psql`, or any other command that connects to a database — including read-only
+  queries.
+
+Stop and hand the drafted change to the developer.
+
+Any evidence that an agent ran a command against a database must be reported immediately
+and prominently, not buried in a summary.
+```
+
+### 2.2 AGENTS.md §6 After Edit (Lines 126–152)
+
+```markdown
+## 6. Schema changes are drafted, never pushed
+
+`drizzle-kit push` alters the live schema with no history and no rollback. There is no
+migration history in this project and no staging environment to catch a bad change.
+
+An agent may **write** a migration or a schema diff. An agent may **never**:
+- Run `drizzle-kit push`.
+- Run `drizzle-kit migrate`.
+- Run `psql`, or any other command that connects to a database — including read-only
+  queries.
+
+Stop and hand the drafted change to the developer.
+
+Any evidence that an agent ran a command against a database must be reported immediately
+and prominently, not buried in a summary.
+
+### 6.1 — Test-database exception
+
+An agent may run a database-connecting command, including via `src/migrate.ts`, only when
+ALL four of the following hold:
+1. `DATABASE_URL` points at a separate database created specifically for testing — never the
+   project's production database.
+2. The host portion of `DATABASE_URL` is verified and printed before every connecting
+   command, and any mismatch against the known test host halts immediately.
+3. Migrations run only through the project's own `src/migrate.ts` — never `drizzle-kit push`
+   or `drizzle-kit migrate`.
+4. No schema-altering DDL is hand-written outside existing migration files.
+```
+
+### 2.3 Verification of Existing Bullets
+The original four-line "may never" list remains byte-for-byte identical:
+```markdown
+- Run `drizzle-kit push`.
+- Run `drizzle-kit migrate`.
+- Run `psql`, or any other command that connects to a database — including read-only
+  queries.
+```
+Every preceding line and word in §6 is completely untouched.
+
+---
+
+## 3. Full Text Written to CURRENT_TASK.md
+
+The full text written to `CURRENT_TASK.md` matches the provided text verbatim:
+
+```markdown
+# Current Task
+
+## Feature
+Amend AGENTS.md §6 to add a narrow, explicit carve-out permitting an agent to run
+database-connecting commands only against a verified non-production test database, under
+four stated conditions — everything else in §6 stays exactly as strict as it is today.
+
+## Plan reference
+Unplanned — one-off developer-requested rule amendment, needed before a downstream task
+(standing up a separate test database with an HOD/professor/student and filler data) can be
+scoped. Recorded here per §14.7 (this repo has no MASTER_PLAN.md).
+
+## MASTER_PLAN.md update
+- [ ] None — this repo has no MASTER_PLAN.md (§14.7).
+
+## Files/areas in scope
+- `AGENTS.md` — §6 only: add a new subsection immediately after the existing "may never"
+  list, stating the carve-out.
+
+## Explicitly out of scope
+- Any other AGENTS.md section (§14.5 halt conditions, §15 review tiers, etc.) — no
+  cross-reference updates unless review finds one is factually broken by this change.
+- The actual test-database setup, migration run, account creation, or filler data (that is
+  a separate, blocked downstream task — do not scope it until this one is reviewed and
+  accepted).
+- Any `.ts`, `.js`, `.mjs`, `.sql`, `.json`, or other source/config file.
+
+## Do NOT touch
+- Do not run any command that connects to a database as part of this task — this task edits
+  policy text only, it does not exercise the policy.
+- Do not touch the existing four-line "may never" list's wording (drizzle-kit push/migrate,
+  psql, production, read-only queries) — it must remain exactly as strict.
+- Do not touch any file other than `AGENTS.md` (and `CURRENT_TASK.md` itself, in step 1).
+- Do not run `git push` in any form. Do not open a PR. Do not run `git commit`.
+
+## Execution route
+- B — Claude Code loop
+- Why: route-test point 2 fails for route C — §15.2's Opus trigger ("schema, migration, or
+  backfill (§6)") is expected to fire because the task's entire subject is §6 itself. A
+  wrongly-worded carve-out could silently widen database access beyond intent, which is not
+  mechanical work.
+- Close-out: route B — never automated
+
+## Manual (developer does)
+- [ ] Final review and explicit approval of the exact carve-out wording before it's treated
+  as active policy (via `review-skill`, once Antigravity's diff comes back).
+
+## Agent (does on its own, once scope is confirmed)
+- [ ] Add a new subsection to AGENTS.md §6 (e.g. "§6.1 — Test-database exception") stating:
+      an agent may run a database-connecting command, including via `src/migrate.ts`, only
+      when ALL of: (1) `DATABASE_URL` points at a separate database created specifically for
+      testing, never the project's production database; (2) the host portion of
+      `DATABASE_URL` is verified and printed before every connecting command, and any
+      mismatch against the known test host halts immediately; (3) migrations run only
+      through the project's own `src/migrate.ts`, never `drizzle-kit push` or
+      `drizzle-kit migrate`; (4) no schema-altering DDL is hand-written outside existing
+      migration files.
+- [ ] Leave every other word of §6 unchanged.
+- [ ] Show the full diff of AGENTS.md in the handoff.
+
+## Blocked on developer input
+None — the four conditions were fully specified by the developer.
+
+## Order
+### Steps inside this task
+1. Antigravity edits AGENTS.md §6 per the Agent bucket above.
+2. Claude Code reviews the diff (dispatched lens reviewers per §14.6).
+3. Developer decides via `review-skill`.
+
+### Where this task sits
+- Before this: nothing.
+- After this: unblocks scoping the test-database + test-accounts task (currently on hold).
+
+## Verification required before this is considered done
+- [ ] `git diff AGENTS.md` shows changes confined to §6 (a new subsection added, nothing
+      else in the file touched) — paste the full diff.
+- [ ] `git diff --stat` shows exactly one file changed: `AGENTS.md` (plus CURRENT_TASK.md
+      from step 1, which is scoping scaffolding, not the reviewed change itself).
+- [ ] The new subsection contains all four conditions, each independently checkable (not
+      merged into vague prose).
+- [ ] The existing "may never" list's four items (drizzle-kit push, drizzle-kit migrate,
+      psql, any other DB command / read-only queries) are byte-for-byte unchanged.
+
+## Flags (AGENTS.md rule triggers)
+- §6 — this task's entire subject.
+- §15.2 Opus trigger — "schema, migration, or backfill (§6)" fires because the edit is to
+  §6 itself, even though no migration is actually run.
+- §14.5 halt condition — "Any schema change, migration, or backfill (§6)" — treated as
+  triggered out of caution; developer sign-off required before the new rule is relied on.
+- §9 one-feature-per-task — satisfied, this is a single rule amendment.
+
+## Suggested review tier (set at scoping time)
+- Opus 5, high effort — §15.2's §6 trigger (schema/migration policy), given a
+  wrongly-scoped carve-out could weaken database-access policy beyond what's intended.
+
+## Suggested Antigravity model
+- The slowest, most deliberate model available in Antigravity's selector (nearest
+  equivalent to Claude Opus) — per the Opus review tier above.
+```
+
+---
+
+## 4. Full Diff of AGENTS.md
+
+```diff
+--- a/AGENTS.md
++++ b/AGENTS.md
+@@ -141,4 +141,16 @@ Stop and hand the drafted change to the developer.
+ Any evidence that an agent ran a command against a database must be reported immediately
+ and prominently, not buried in a summary.
+ 
++### 6.1 — Test-database exception
++
++An agent may run a database-connecting command, including via `src/migrate.ts`, only when
++ALL four of the following hold:
++1. `DATABASE_URL` points at a separate database created specifically for testing — never the
++   project's production database.
++2. The host portion of `DATABASE_URL` is verified and printed before every connecting
++   command, and any mismatch against the known test host halts immediately.
++3. Migrations run only through the project's own `src/migrate.ts` — never `drizzle-kit push`
++   or `drizzle-kit migrate`.
++4. No schema-altering DDL is hand-written outside existing migration files.
++
+ ---
+```
+
+---
+
+## 5. Items Skipped and Expanded
+
+### 5.1 Items Skipped & Why
+- **Shell commands (`run_command`):** Skipped per explicit prompt instruction ("Do not run any shell or database command", "No shell access needed for either verification — both are plain file-content checks"). Git commit hash was read directly via file view of `.git/HEAD` and `.git/refs/heads/main`.
+- **Database commands:** Skipped per AGENTS.md §6 and explicit prompt instruction ("Do not run any command that connects to a database as part of this task — this task edits policy text only, it does not exercise the policy").
+- **Git commit, push, PR:** Skipped per prompt instructions and AGENTS.md §2 / §14.2.
+
+### 5.2 Items Expanded & Why
+- None. Edits were strictly confined to `CURRENT_TASK.md` and `AGENTS.md` §6. No other files, sections, or code paths were modified.
