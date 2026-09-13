@@ -44,20 +44,20 @@ commit `2f1204c`, on branch `security-audit-2026-09`. The fixes ("Phase 2") were
 across 2026-09-08 22:15 through 2026-09-09 15:34, all on the same branch. This report is
 being added as the next commit after `4193397`.
 
-**Totals.** 37 findings in total. 21 are fixed. 16 are still open.
+**Totals.** 38 findings tracked in total (including SEC-38 identified post-audit). 21 are fixed. 17 are still open.
 
 | Severity | Total | Fixed | Still open |
 |---|---|---|---|
 | Critical | 4 | 4 | 0 |
 | High | 12 | 12 | 0 |
-| Medium | 9 | 4 | 5 |
+| Medium | 10 | 4 | 6 |
 | Low | 12 | 1 | 11 |
-| **All** | **37** | **21** | **16** |
+| **All** | **38** | **21** | **17** |
 
 Every Critical and every High finding is fixed. What remains open is Medium and Low —
 mostly data-accuracy issues, dependency updates that need a separate decision, and small
 hardening items, none of them a way for one person to read or change another person's
-data. Section 3 covers each of the 16 by name.
+data. Section 3 covers each of the 17 by name.
 
 ---
 
@@ -167,7 +167,11 @@ that they are in the same department.
 **What could have been reached:** Any professor could read any resident's postings, exam
 marks, thesis progress, and certificates, whether or not they supervise that resident.
 **How it was fixed:** Same supervisor check added to each of the four routes, matching the
-working pattern already used elsewhere in the code.
+working pattern already used elsewhere in the code. (Note: the certifications route specifically
+uses a flat professor-ban returning `403` for any professor caller, rather than a
+supervisor-relationship filter, because no supervisor, assessor, or guide relationship exists on
+the `certifications` table — unlike postings, assessments, and thesis, which filter by the
+caller's specific supervisory relationship.)
 **Commit:** `ca77022`
 **Evidence:** Same test suite and same four-case evidence described under SEC-01, run
 across all six routes fixed in this one commit.
@@ -508,7 +512,7 @@ number anywhere.
 
 ## 3. STILL OPEN
 
-The 16 findings not fixed in this pass, in the same order and format as Section 2, minus
+The 17 findings not fixed in this pass (including SEC-38 identified post-audit), in the same order and format as Section 2, minus
 the "how it was fixed" and "evidence" lines (there is neither yet), with a note on why each
 was left for later and what closing it would take.
 
@@ -529,16 +533,17 @@ outside a safe, non-production setting — a small change that simply was not sc
 this pass.
 
 #### SEC-18 — Medium
-**Where:** `student.ts:79-81`, `:98-99`.
-**What's wrong:** The resident dashboard's counts (how many logs are "pending," and so on)
-and its "recent entries" list do not exclude entries the resident has already deleted, even
-though the underlying tables track deletion and another part of the same file already
-filters it out correctly.
-**What could be reached:** A resident's dashboard numbers can be wrong — counting entries
-they deleted, and occasionally showing a deleted entry as "recent."
+**Where:** `student.ts:79-81` (counts; lines `:98-106` for recent entries were already fixed).
+**What's wrong:** The resident dashboard's status counts (how many case, procedure, and academic
+logs are "pending," and so on) do not exclude entries the resident has already soft-deleted, even
+though the underlying tables track deletion and other queries filter it out. (Note: the "recent
+entries" query cited in the original audit was already updated to filter `isNull(deletedAt)`
+alongside the SEC-02 fix; only the dashboard counts at lines 79-81 still lack the soft-delete filter.)
+**What could be reached:** A resident's dashboard counts can be inaccurate — counting entries
+they soft-deleted.
 **Why not fixed here, and what it would take:** A data-accuracy issue rather than an access
 or leak issue, so it fell outside this pass's security-first scope. The fix is small — add
-the same "exclude deleted" condition, already used correctly nearby, to four more queries.
+`isNull(deletedAt)` to the three `groupBy(status)` count queries in `student.ts:79-81`.
 
 #### SEC-19 — Medium
 **Where:** `artifacts/mockup-sandbox/src/lib/session.ts:22-28`.
@@ -561,7 +566,7 @@ account at all — the only limiter was tied to the visitor's network address.
 **What could be reached:** Password guessing against one specific, named account, spread
 across many different network addresses to avoid an address-based limit.
 **Why not fixed here, and what it would take:** SEC-12, fixed in this same pass, added a
-real, database-backed lockout after 10 failed attempts against one account within 15
+real, per-process in-memory lockout after 10 failed attempts against one account within 15
 minutes — which speaks directly to this finding, though it was recorded and fixed under
 SEC-12's own name, not this one. Whether that fix fully closes this finding, or whether a
 longer-term, persisted counter with escalating delays is still wanted on top of it, is not
@@ -578,6 +583,24 @@ crash, reachable by anyone sending it an ordinary web request — no login requi
 code fix, and every dependency change in this task was treated as its own decision needing
 the project owner's explicit go-ahead, separate from code fixes. It would take upgrading
 `express` to a version that pulls in a patched `qs`.
+
+#### SEC-38 — Medium
+**Where:** `artifacts/api-server/package.json` → `nodemailer` (added in commit `b4b3233` on
+2026-09-10 for account-creation emails, after the original audit closed).
+**What's wrong:** Five known security advisories exist in the installed version of
+`nodemailer`: 1 high-severity advisory (GHSA-2x7j-588g-ccc2: quadratic-time complexity in
+`addressparser` causing remote denial of service via crafted address lists) and 4
+moderate-severity advisories (GHSA-8m3c-c648-2xjj: `resolveContent()` bypass of file/URL
+access restrictions under legacy signature; GHSA-wmmp-3585-3rmp: IDN/Punycode domain allow-list
+bypass; GHSA-cc9r-2j5m-2m83: recipient domain validation bypass via RFC 5322 comment
+mis-parsing; and a related IDN validation issue).
+**What could be reached:** Reached only indirectly through email sending functions (e.g.
+account-creation notifications). Rated Medium matching this project's convention for
+SEC-21 (the `qs`/`express` dependency vulnerability), as it is not directly exploitable
+through ordinary unauthenticated application routes.
+**Why not fixed here, and what it would take:** Added after the original audit closed; fixing
+it requires a dependency upgrade and lockfile refresh, which is a dependency-management decision
+requiring the project owner's explicit direction.
 
 ### Low
 
