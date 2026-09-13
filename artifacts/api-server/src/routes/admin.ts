@@ -194,7 +194,7 @@ router.post("/professors", validate(z.object({ fullName: nameSchema, email: emai
       return;
     }
 
-    const passwordHash = await bcrypt.hash(password, 10);
+    const passwordHash = await bcrypt.hash(password, 12);
 
     const [newProf] = await db.insert(usersTable).values({
       fullName,
@@ -211,7 +211,8 @@ router.post("/professors", validate(z.object({ fullName: nameSchema, email: emai
         
       await sendAccountCreatedEmail(email, fullName, password, "professor", dept?.name);
     } catch (error) {
-      req.log.warn({ email }, "Faculty account created but welcome email failed to send");
+      req.log.error({ email, error }, "Failed to send welcome email");
+      // Continue without returning error to allow account creation to succeed
     }
 
     res.status(201).json({ 
