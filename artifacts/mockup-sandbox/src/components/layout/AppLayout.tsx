@@ -55,6 +55,7 @@ import {
   UserPlus,
 } from "lucide-react";
 
+import { LegalDisclaimerModal } from "@/components/LegalDisclaimerModal";
 import { useDepartment } from "@/lib/department-context";
 
 export type RoleType = "Student" | "Faculty" | "HOD";
@@ -558,6 +559,7 @@ export function AppLayout({
             </DialogContent>
           </Dialog>
           <GuidedTour open={isTourOpen} steps={tourSteps} onClose={closeTour} />
+          <LegalDisclaimerModal activeRole={activeRole} />
         </div>
       </div>
     </SidebarProvider>
