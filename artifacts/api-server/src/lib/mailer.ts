@@ -100,15 +100,30 @@ E-LogBook Support Team
 gothoslabs@gmail.com`;
   
   const htmlTemplate = `
-    <div style="font-family: Arial, sans-serif; padding: 20px;">
-      <h2>Your E-LogBook Account Has Been Created</h2>
-      <p>Hello ${fullName},</p>
-      <p>An account has been created for you (<strong>${title}</strong>).</p>
-      <p><strong>Login Email:</strong> ${email}</p>
-      <p><strong>Initial Password:</strong> <code style="font-family: monospace; background: #f4f4f4; padding: 2px 4px;">${password}</code></p>
-      <p>Please log in and change your password from your account settings as soon as possible.</p>
-    </div>
-  `;
+  <div style="font-family: Arial, sans-serif; padding: 20px;">
+    <h2>Your E-LogBook Account Has Been Created</h2>
+    <p>Hello ${fullName},</p>
+    <p>We are pleased to inform you that your account for the E-LogBook Application has been successfully created.</p>
+    <p>The E-LogBook is a secure digital platform designed to streamline record-keeping, improve data accuracy, and simplify daily logging, monitoring, and reporting. It replaces traditional paper-based logbooks with a centralized digital workflow that enables authorized users to record, review, and manage operational data efficiently.</p>
+    <h3>Your E-LogBook Account Credentials</h3>
+    <p><strong>Username:</strong> ${email}<br/>
+       <strong>Password:</strong> <code style="font-family: monospace; background: #f4f4f4; padding: 2px 4px;">${password}</code><br/>
+       <strong>Application URL:</strong> ${process.env.APP_URL || "https://elogbook.example.com"}</p>
+    <p>For security purposes, please do not share your login credentials with others. We highly recommend changing your password after your first login.</p>
+    <h3>Key Features</h3>
+    <ul>
+      <li>Centralized Digital Entry: Record, update, and review operational data through mobile and desktop devices.</li>
+      <li>Automated Audit Trails: Maintain timestamped records to support accountability, traceability, and data integrity.</li>
+      <li>Customizable Forms &amp; Workflows: Digital forms and workflows configured according to your department's specific requirements.</li>
+      <li>Dashboards &amp; Monitoring: Access relevant operational information through structured dashboards and real-time visualizations.</li>
+      <li>Instant Reporting: Generate structured reports in PDF and Excel formats for review and documentation.</li>
+    </ul>
+    <h3>Getting Started</h3>
+    <p>Please log in using the credentials provided above and verify that you can access the application successfully. If you encounter any issues with logging in, accessing a form, or using any feature of the platform, please contact us using the details below.</p>
+    <p>We look forward to working with your team and supporting a smooth transition to the E-LogBook platform.</p>
+    <p>Best regards,<br/>E-LogBook Support Team<br/>+91 9037382416<br/><a href="mailto:gothoslabs@gmail.com">gothoslabs@gmail.com</a></p>
+  </div>
+`;
 
   await transporter.sendMail({
     from: `"E-LogBook" <${process.env.EMAIL_USER}>`,
