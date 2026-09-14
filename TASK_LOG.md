@@ -318,5 +318,7 @@ merged before this session began. Verified directly via `gh pr view 28`.*
   `dispatch-07-fix-review-findings.md`, `handoff-original-332-lines-recovered.md`) — noticed,
   not touched, not part of this task's commit.
 
-**Commit** — pending
-**PR** — pending
+**Commit** — `8b34a61` "feat(admin): add admin dashboard frontend", on branch
+`feature/admin-dashboard-frontend`.
+**PR** — pending. Per this repo's standing developer instruction, Claude Code stops after
+committing; the developer pushes and opens the PR themselves.
