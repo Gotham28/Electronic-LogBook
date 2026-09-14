@@ -69,7 +69,35 @@ export const sendAccountCreatedEmail = async (email: string, fullName: string, p
   const deptDisplay = departmentName ? `, Department of ${departmentName}` : "";
   const title = `${roleDisplay}${deptDisplay}`;
 
-  const textTemplate = `Hello ${fullName},\n\nAn account has been created for you (${title}).\n\nLogin Email: ${email}\nInitial Password: ${password}\n\nPlease log in and change your password from your account settings as soon as possible.`;
+  const textTemplate = `Hello ${fullName},
+
+We are pleased to inform you that your account for the E-LogBook Application has been successfully created.
+
+The E-LogBook is a secure digital platform designed to streamline record-keeping, improve data accuracy, and simplify daily logging, monitoring, and reporting. It replaces traditional paper-based logbooks with a centralized digital workflow that enables authorized users to record, review, and manage operational data efficiently.
+
+Your E-LogBook Account Credentials:
+Username: ${email}
+Password: ${password}
+Application URL: ${process.env.APP_URL || "https://elogbook.example.com"}
+
+For security purposes, please do not share your login credentials with others. We highly recommend changing your password after your first login.
+
+Key Features:
+- Centralized Digital Entry: Record, update, and review operational data through mobile and desktop devices.
+- Automated Audit Trails: Maintain timestamped records to support accountability, traceability, and data integrity.
+- Customizable Forms & Workflows: Digital forms and workflows configured according to your department's specific requirements.
+- Dashboards & Monitoring: Access relevant operational information through structured dashboards and real-time visualizations.
+- Instant Reporting: Generate structured reports in PDF and Excel formats for review and documentation.
+
+Getting Started:
+Please log in using the credentials provided above and verify that you can access the application successfully. If you encounter any issues with logging in, accessing a form, or using any feature of the platform, please contact us using the details below.
+
+We look forward to working with your team and supporting a smooth transition to the E-LogBook platform.
+
+Best regards,
+E-LogBook Support Team
++91 9037382416
+gothoslabs@gmail.com`;
   
   const htmlTemplate = `
     <div style="font-family: Arial, sans-serif; padding: 20px;">
