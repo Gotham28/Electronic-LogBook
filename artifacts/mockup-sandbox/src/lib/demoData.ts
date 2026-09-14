@@ -188,9 +188,9 @@ export async function handleDemoRequest(method: string, path: string, body?: any
         }
       };
     }
-    if (path.match(/\/api\/students\/\d+\/postings$/)) return demoData.postings;
-    if (path.match(/\/api\/students\/\d+\/thesis$/)) return { data: null };
-    if (path.match(/\/api\/students\/\d+\/certifications$/)) return [];
+    if (path.match(/\/api\/students\/\d+\/postings$/)) return { data: demoData.postings };
+    if (path.match(/\/api\/students\/\d+\/thesis$/)) return { data: (demoData as any).thesis || null };
+    if (path.match(/\/api\/students\/\d+\/certifications$/)) return (demoData as any).certifications || [];
     if (path.match(/\/api\/students\/\d+\/case-logs$/)) return demoData.logs.cases;
     if (path.match(/\/api\/students\/\d+\/procedure-logs$/)) return demoData.logs.procedures;
     if (path.match(/\/api\/students\/\d+\/academic-logs$/)) return demoData.logs.academics;
@@ -208,9 +208,96 @@ export async function handleDemoRequest(method: string, path: string, body?: any
 
   // Mutations (optimistic in-memory updates so UI feels responsive)
   if (method === "POST" || method === "PATCH") {
-    if (path.includes("/case-logs") && body) demoData.logs.cases.unshift({ id: Math.random(), ...body, status: "pending" } as any);
-    if (path.includes("/procedure-logs") && body) demoData.logs.procedures.unshift({ id: Math.random(), ...body, status: "pending" } as any);
-    if (path.includes("/academic-logs") && body) demoData.logs.academics.unshift({ id: Math.random(), ...body, status: "pending" } as any);
+    if (path.includes("/case-logs") && body) {
+      const newCaseLog = {
+        id: Date.now(),
+        number: demoData.logs.cases.length + 1,
+        date: body.date,
+        patientUhid: body.patientUhid,
+        age: body.patientAge || "Unknown",
+        gender: body.patientGender || "Unknown",
+        chiefComplaints: body.chiefComplaints || "",
+        history: body.history || "",
+        examination: body.examination || "",
+        investigations: body.investigations || "",
+        diagnosisProvisional: body.diagnosisProvisional || "",
+        diagnosisFinal: body.diagnosisFinal || "",
+        diagnosis: body.diagnosisFinal || body.diagnosisProvisional || "",
+        differentialDiagnosis: body.differentialDiagnosis || "",
+        management: body.managementPlan || "",
+        status: "pending"
+      };
+      demoData.logs.cases.unshift(newCaseLog as any);
+      return { success: true, id: newCaseLog.id };
+    }
+
+    if (path.includes("/procedure-logs") && body) {
+      const newProcedureLog = {
+        id: Date.now(),
+        number: demoData.logs.procedures.length + 1,
+        date: body.date,
+        group: body.procedureGroup,
+        procedureGroup: body.procedureGroup,
+        patientUhid: body.patientUhid,
+        procedureName: body.procedureName,
+        age: body.patientAge || "Unknown",
+        experience: body.competencyLevel || "assisted",
+        verifiedCompetency: "No",
+        status: "pending"
+      };
+      demoData.logs.procedures.unshift(newProcedureLog as any);
+      return { success: true, id: newProcedureLog.id };
+    }
+
+    if (path.includes("/academic-logs") && body) {
+      const facultyObj = demoData.professors.find(p => p.id === Number(body.supervisorId));
+      const newAcademicLog = {
+        id: Date.now(),
+        number: demoData.logs.academics.length + 1,
+        date: body.date,
+        type: body.activityType,
+        activityType: body.activityType,
+        presentationType: body.presentationType || "N/A",
+        topic: body.topic,
+        faculty: facultyObj ? facultyObj.name : "Dr. Vivek Menon",
+        status: "pending"
+      };
+      demoData.logs.academics.unshift(newAcademicLog as any);
+      return { success: true, id: newAcademicLog.id };
+    }
+
+    if (path.includes("/postings") && body) {
+      const facultyObj = demoData.professors.find(p => p.id === Number(body.supervisorId));
+      const newPosting = {
+        id: Date.now(),
+        ward: body.ward,
+        unit: body.ward,
+        startDate: body.startDate,
+        endDate: body.endDate,
+        supervisorId: body.supervisorId,
+        supervisorName: facultyObj ? facultyObj.name : "Dr. Vivek Menon",
+        status: "completed"
+      };
+      demoData.postings.unshift(newPosting as any);
+      return { success: true, id: newPosting.id };
+    }
+
+    if (path.includes("/assessments") && body) {
+      const newAssessment = {
+        id: Date.now(),
+        number: demoData.assessments.length + 1,
+        examName: body.examName,
+        type: body.type,
+        date: body.date,
+        marks: Number(body.marks),
+        maximum: 100,
+        assessorId: 2,
+        assessorName: "Dr. Vivek Menon",
+        grade: Number(body.marks) >= 85 ? "A" : Number(body.marks) >= 70 ? "B" : "C"
+      };
+      demoData.assessments.unshift(newAssessment as any);
+      return { success: true, id: newAssessment.id };
+    }
     
     if (path.includes("/leave-records") && body) {
       const start = new Date(body.startDate);
@@ -218,7 +305,7 @@ export async function handleDemoRequest(method: string, path: string, body?: any
       const totalDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 3600 * 24)) + 1;
       
       const newLeave = {
-        id: Math.random(),
+        id: Date.now(),
         number: demoData.leaveRecords.length + 1,
         appliedOn: new Date().toISOString(),
         createdAt: new Date().toISOString(),
@@ -235,7 +322,36 @@ export async function handleDemoRequest(method: string, path: string, body?: any
       demoData.leaveRecords.unshift(newLeave as any);
       return { success: true, id: newLeave.id };
     }
-    return { success: true, id: Math.random() };
+
+    if (path.includes("/thesis") && body) {
+      (demoData as any).thesis = {
+        thesisTitle: body.thesisTitle || "",
+        guideId: body.guideId || null,
+        coGuideId: body.coGuideId || null,
+        protocolSubmissionDate: body.protocolSubmissionDate || null,
+        iecClearanceDate: body.iecClearanceDate || null,
+        dataCollectionStartDate: body.dataCollectionStartDate || null,
+        dataCollectionEndDate: body.dataCollectionEndDate || null,
+        submissionDate: body.submissionDate || null,
+      };
+      return { success: true, data: (demoData as any).thesis };
+    }
+
+    if (path.includes("/certifications") && body) {
+      if (!(demoData as any).certifications) (demoData as any).certifications = [];
+      const newCert = {
+        id: Date.now(),
+        title: body.title,
+        provider: body.provider,
+        issueDate: body.issueDate,
+        expiryDate: body.expiryDate,
+        certificateUrl: body.certificateUrl,
+      };
+      (demoData as any).certifications.unshift(newCert);
+      return { success: true, id: newCert.id };
+    }
+
+    return { success: true, id: Date.now() };
   }
 
   return { success: true };
