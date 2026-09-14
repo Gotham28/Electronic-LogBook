@@ -322,3 +322,95 @@ merged before this session began. Verified directly via `gh pr view 28`.*
 `feature/admin-dashboard-frontend`.
 **PR** — pending. Per this repo's standing developer instruction, Claude Code stops after
 committing; the developer pushes and opens the PR themselves.
+
+---
+
+### 2026-09-14 — Admin dashboard: compact layout + delete department
+
+**What changed**
+- Tightened the admin console's visual density on top of the prior entry's work: reduced
+  heading/body font sizes and padding/margin/gap across the top stat cards, the department
+  list cards, and the `DepartmentDetail` panel in `AdminPortal.tsx`. Pure Tailwind-class
+  changes — no behavior change.
+- Added the ability to delete a department: `DELETE /api/superadmin/departments/:id` in
+  `superadmin.ts`, hard-deleting (inside one transaction) the department's users, students,
+  assignments, assignment types, assignment recipients, department config, catalog, and
+  procedure types, then the department row itself — in FK-safe order (assignment_recipients
+  → assignments/assignment_types → students → users → configs/catalog/procedure_types →
+  department). Before any delete runs, an explicit pre-check queries 12 clinical/adjacent
+  tables (case_logs, procedure_logs, academic_logs, leave_records, postings, research,
+  assessments, attendance_logs, leave_applications, thesis_milestones, appraisals, audit)
+  for any row belonging to the department's own students/staff; if any exist, the delete is
+  refused with a `409` naming the specific tables and row counts, rather than relying only
+  on the database's own foreign-key constraints. A Postgres FK-violation catch (`23503`,
+  checked via `error.code ?? error.cause?.code` — Drizzle wraps driver errors in a
+  `DrizzleQueryError`, moving the SQLSTATE to `.cause.code`) remains as a defensive
+  fallback. Frontend: a destructive-styled delete action with a real confirmation dialog
+  (not `window.confirm`) naming the department and what will be removed, added to
+  `AdminPortal.tsx`/`apiClient.ts`.
+- Built across one interrupted dispatch (an Antigravity account-quota error cut off its own
+  `HANDOFF.md` before writing it, though its file edits landed correctly — verified
+  directly, not taken on claim) plus three fix rounds from a 4-lens code review
+  (scope/rules/evidence/blast-radius, run in parallel): round 1 fixed the FK-error-shape
+  detection bug (409 was coming back as 500); round 2 fixed two Critical bugs the review
+  found — the delete order violated FK constraints (users were deleted before
+  assignments/assignment_types, which reference `users.id`, so any department that had ever
+  used the Assignments feature would fail with a misleading "clinical data" message) and
+  the explicit clinical-data pre-check required by the task had never been built (the
+  `procedure_types` table has zero FK protection on its own, since `procedure_logs` stores
+  procedure names as free text) — plus a frontend crash on successful delete
+  (`selectedDeptId` wasn't cleared, so `DepartmentDetail` dereferenced a deleted
+  department) and a cross-department `assignment_recipients` cleanup gap; round 3 added two
+  regression tests that round 2's fixes were otherwise missing (a department with
+  assignments can now actually be deleted; cross-department assignment recipients are
+  cleaned up correctly).
+
+**Files**
+- `artifacts/api-server/src/routes/superadmin.ts` — new `DELETE /departments/:id`
+- `artifacts/api-server/tests/superadmin.test.ts` — 5 new tests (empty-department success,
+  404, 409-with-full-rollback-verification, assignments-present success, cross-department
+  cleanup)
+- `artifacts/mockup-sandbox/src/components/AdminPortal.tsx` — density pass + delete UI
+- `artifacts/mockup-sandbox/src/lib/apiClient.ts` — `deleteAdminDepartment(id)`
+- `HANDOFF.md` — Antigravity's dispatch reports (fix rounds 1–3; the original build dispatch
+  never got to write its own report before the quota error, as noted above)
+- `.agents/runs/dispatch-13` through `dispatch-18` (new — the six dispatch prompts)
+
+**Evidence**
+- `pnpm run typecheck` (`artifacts/api-server`): clean, no errors — run directly by Claude
+  Code, after each fix round.
+- `pnpm run typecheck` (`artifacts/mockup-sandbox`): clean, no errors — same.
+- `pnpm test` (`artifacts/api-server`): 79/79 passing, including all 5 new
+  delete-department tests — final run, by Claude Code directly, after the third fix round.
+- `git diff --stat` against `origin/main`: confirmed confined to the files listed above.
+- The two Critical bugs the review found were each independently re-verified by Claude Code
+  reading the actual diff against the real schema files, not taken on either dispatch's own
+  claim.
+
+**Left open**
+- No manual request/response API walkthrough was performed by Claude Code (create
+  department → add faculty/resident → delete → verify; then 404 on a nonexistent id).
+  Doing so would require running the dev server against whatever `DATABASE_URL` is
+  configured, which this repo's standing safety constraint forbids Claude Code from risking
+  (the local `.env` has previously pointed at the production database). The 79 automated
+  tests — run against an in-memory PGlite engine, not a real `DATABASE_URL` — are the
+  equivalent evidence available without that risk; the developer may still want to do this
+  walkthrough by hand before merging.
+- `subscription_plans.department_id` is not covered by the pre-check or explicitly handled
+  by the delete. This is safe today (no route creates a per-department plan row; only a
+  global `department_id IS NULL` plan is seeded), but if a per-department plan is ever
+  inserted directly, deleting that department would hit the generic FK-violation fallback
+  and report a misleading "clinical data" message rather than naming `subscription_plans`
+  specifically. Not fixed in this task.
+- Five untracked files from earlier, unrelated tasks remain uncommitted in the working tree
+  (`.agents/runs/dispatch-05-agents-md-6-testdb-carveout.md`, `dispatch-06-` and
+  `dispatch-07-fix-review-findings.md`, `handoff-original-332-lines-recovered.md`,
+  `review-package-handoff-combined.md`) — noticed, not touched, not part of this commit.
+- `.agy-jobs/*` directories (agy-bridge's own per-dispatch job artifacts) remain untracked
+  and are not part of this commit, consistent with prior sessions.
+
+**Commit** — `28d4efc` "feat(admin): compact dashboard layout and add delete-department",
+on branch `feature/admin-dashboard-frontend` (stacked on top of `8b34a61` above, which the
+developer had not yet pushed).
+**PR** — pending. Per this repo's standing developer instruction, Claude Code stops after
+committing; the developer pushes and opens the PR themselves.

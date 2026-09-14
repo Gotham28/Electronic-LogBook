@@ -1,7 +1,7 @@
 import { before, after, test } from "node:test";
 import assert from "node:assert/strict";
 import { setup, request, accounts as a, departmentIds, password } from "./support.js";
-import { engine, db, usersTable, studentsTable, caseLogsTable } from "./database.js";
+import { engine, db, usersTable, studentsTable, caseLogsTable, departmentsTable, departmentConfigsTable, departmentCatalogTable, procedureTypesTable, assignmentTypesTable, assignmentsTable, assignmentRecipientsTable } from "./database.js";
 import { eq, and, sql } from "drizzle-orm";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
@@ -43,6 +43,7 @@ test("HOD, professor, and student accounts get 403 on every superadmin route", a
     ["/superadmin/departments/" + departmentIds[0] + "/faculty", "POST"],
     ["/superadmin/departments/" + departmentIds[0] + "/students", "POST"],
     ["/superadmin/users/" + a.student0.id + "/deactivate", "POST"],
+    ["/superadmin/departments/" + departmentIds[0], "DELETE"],
   ];
   for (const role of ["hod0", "faculty0", "student0"] as const) {
     for (const [path, method] of routes) {
@@ -378,6 +379,7 @@ test("unauthenticated requests to superadmin routes get 401", async () => {
   assert.equal((await call("/superadmin/departments")).status, 401);
   assert.equal((await call("/superadmin/departments/" + departmentIds[0] + "/roster")).status, 401);
   assert.equal((await call("/superadmin/users/" + a.student0.id + "/deactivate", undefined, "POST", {})).status, 401);
+  assert.equal((await call("/superadmin/departments/" + departmentIds[0], undefined, "DELETE")).status, 401);
 });
 
 // =========================================================================
@@ -400,4 +402,259 @@ test("admin can deactivate faculty and their session is invalidated", async () =
 
   // Nonexistent user returns 404
   assert.equal((await call("/superadmin/users/999999/deactivate", "admin", "POST", {})).status, 404);
+});
+
+// =========================================================================
+// 14. Delete department — success (empty department with dependents)
+// =========================================================================
+test("admin can delete an empty department, cascading to users/config/catalog/procedure-types", async () => {
+  // Create a test department (provisionDepartment creates dept + HOD only
+  // via the API's .strict() body — config/catalog/procedure rows are NOT
+  // created by the API call, so we insert them directly)
+  const createRes = await call("/superadmin/departments", "admin", "POST", {
+    setup: { name: "Delete Test Dept", code: "DEL-TEST", hod: { fullName: "Delete HOD", email: "del-hod@example.test" } },
+    hodPassword: password,
+  });
+  assert.equal(createRes.status, 201);
+  const deptId = createRes.body.departmentId;
+  const hodId = createRes.body.hodId;
+
+  // Seed dependent rows directly in the test database
+  await db.insert(departmentConfigsTable).values({
+    departmentId: deptId, requiredCases: 5, requiredProcedures: 5, requiredAcademic: 5,
+  });
+  await db.insert(departmentCatalogTable).values({
+    departmentId: deptId, kind: "posting", name: "Delete test unit", value: "del-unit",
+  });
+  await db.insert(procedureTypesTable).values({
+    departmentId: deptId, name: "Delete test procedure", group: "Delete test group", required: 1,
+  });
+
+  // Verify the department and its dependents exist before delete
+  const [deptBefore] = await db.select().from(departmentsTable).where(eq(departmentsTable.id, deptId));
+  assert.ok(deptBefore, "Department should exist before delete");
+  const [hodBefore] = await db.select().from(usersTable).where(eq(usersTable.id, hodId));
+  assert.ok(hodBefore, "HOD user should exist before delete");
+  const configsBefore = await db.select().from(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, deptId));
+  assert.ok(configsBefore.length > 0, "Department configs should exist before delete");
+  const catalogBefore = await db.select().from(departmentCatalogTable).where(eq(departmentCatalogTable.departmentId, deptId));
+  assert.ok(catalogBefore.length > 0, "Department catalog should exist before delete");
+  const procTypesBefore = await db.select().from(procedureTypesTable).where(eq(procedureTypesTable.departmentId, deptId));
+  assert.ok(procTypesBefore.length > 0, "Procedure types should exist before delete");
+
+  // Delete the department
+  const deleteRes = await call("/superadmin/departments/" + deptId, "admin", "DELETE");
+  assert.equal(deleteRes.status, 200);
+  assert.ok(deleteRes.body.message);
+
+  // Verify everything was cleaned up
+  const [deptAfter] = await db.select().from(departmentsTable).where(eq(departmentsTable.id, deptId));
+  assert.equal(deptAfter, undefined, "Department should be gone after delete");
+  const [hodAfter] = await db.select().from(usersTable).where(eq(usersTable.id, hodId));
+  assert.equal(hodAfter, undefined, "HOD user should be gone after delete");
+  const configsAfter = await db.select().from(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, deptId));
+  assert.equal(configsAfter.length, 0, "Department configs should be gone after delete");
+  const catalogAfter = await db.select().from(departmentCatalogTable).where(eq(departmentCatalogTable.departmentId, deptId));
+  assert.equal(catalogAfter.length, 0, "Department catalog should be gone after delete");
+  const procTypesAfter = await db.select().from(procedureTypesTable).where(eq(procedureTypesTable.departmentId, deptId));
+  assert.equal(procTypesAfter.length, 0, "Procedure types should be gone after delete");
+});
+
+// =========================================================================
+// 15. Delete department — 404 on unknown department
+// =========================================================================
+test("delete department returns 404 for nonexistent id", async () => {
+  const res = await call("/superadmin/departments/999999", "admin", "DELETE");
+  assert.equal(res.status, 404);
+  assert.ok(res.body.message.match(/not found/i));
+});
+
+// =========================================================================
+// 16. Delete department — 409 FK-violation when clinical data exists
+//     Creates a department with a student who has a case_logs row. The
+//     delete attempt must return 409 and leave everything intact (the
+//     transaction rolled back).
+// =========================================================================
+test("delete department returns 409 when clinical data blocks the delete, and nothing is deleted", async () => {
+  // 1. Create a department with an HOD
+  const createRes = await call("/superadmin/departments", "admin", "POST", {
+    setup: { name: "FK Block Dept", code: "FK-BLOCK", hod: { fullName: "FK HOD", email: "fk-hod@example.test" } },
+    hodPassword: password,
+  });
+  assert.equal(createRes.status, 201);
+  const deptId = createRes.body.departmentId;
+  const hodId = createRes.body.hodId;
+
+  // 2. Create a student in that department
+  const stuRes = await call("/superadmin/departments/" + deptId + "/students", "admin", "POST", {
+    fullName: "FK Student", email: "fk-student@example.test", password,
+    registrationNumber: "FK-STU-001", batch: "2026", dateOfJoining: "2026-01-01", kuhsId: "FK-KUHS-001",
+  });
+  assert.equal(stuRes.status, 201);
+  const studentUserId = stuRes.body.student.id;
+
+  // 3. Look up the student profile id (studentsTable.id, not usersTable.id — §4)
+  const [studentProfile] = await db.select().from(studentsTable).where(eq(studentsTable.userId, studentUserId));
+  assert.ok(studentProfile, "Student profile should exist");
+
+  // 4. Insert a case_logs row referencing this student — this is the FK that
+  //    will block deletion of the student and therefore the department
+  await db.insert(caseLogsTable).values({
+    studentId: studentProfile.id,
+    date: "2026-09-10",
+    patientAge: "Child",
+    patientGender: "other",
+    diagnosisFinal: "FK block test",
+  });
+
+  // 5. Attempt to delete the department — should get 409
+  const deleteRes = await call("/superadmin/departments/" + deptId, "admin", "DELETE");
+  assert.equal(deleteRes.status, 409, "Expected 409 FK violation, got " + deleteRes.status);
+  assert.ok(deleteRes.body.message, "409 response should include an explanatory message");
+
+  // 6. Verify nothing was deleted — transaction should have rolled back
+  const [deptStillExists] = await db.select().from(departmentsTable).where(eq(departmentsTable.id, deptId));
+  assert.ok(deptStillExists, "Department should still exist after failed delete");
+
+  const [hodStillExists] = await db.select().from(usersTable).where(eq(usersTable.id, hodId));
+  assert.ok(hodStillExists, "HOD should still exist after failed delete");
+
+  const [studentStillExists] = await db.select().from(usersTable).where(eq(usersTable.id, studentUserId));
+  assert.ok(studentStillExists, "Student user should still exist after failed delete");
+
+  const [profileStillExists] = await db.select().from(studentsTable).where(eq(studentsTable.userId, studentUserId));
+  assert.ok(profileStillExists, "Student profile should still exist after failed delete");
+
+  const caseLogStillExists = await db.select().from(caseLogsTable).where(eq(caseLogsTable.studentId, studentProfile.id));
+  assert.ok(caseLogStillExists.length > 0, "Case log should still exist after failed delete");
+});
+
+// =========================================================================
+// 17. Delete department — success with assignments (proves delete-order fix)
+// =========================================================================
+test("admin can delete a department that has assignments (delete-order fix)", async () => {
+  const createRes = await call("/superadmin/departments", "admin", "POST", {
+    setup: { name: "Assignment Delete Dept", code: "ASG-DEL", hod: { fullName: "Asg HOD", email: "asghod@example.test" } },
+    hodPassword: password,
+  });
+  assert.equal(createRes.status, 201);
+  const deptId = createRes.body.departmentId;
+  const hodId = createRes.body.hodId;
+
+  // Insert assignment type
+  const [asgType] = await db.insert(assignmentTypesTable).values({
+    departmentId: deptId,
+    name: "Test Assignment Type",
+    description: "Type for delete-order fix",
+    createdBy: hodId,
+  }).returning();
+
+  // Insert assignment
+  const [asg] = await db.insert(assignmentsTable).values({
+    departmentId: deptId,
+    typeId: asgType.id,
+    facultyId: hodId,
+    title: "Test Assignment",
+    instructions: "Instructions",
+    dueAt: new Date(Date.now() + 86400000), // tomorrow
+  }).returning();
+
+  // Verify they exist
+  const [typeBefore] = await db.select().from(assignmentTypesTable).where(eq(assignmentTypesTable.id, asgType.id));
+  assert.ok(typeBefore, "Assignment type should exist before delete");
+  const [asgBefore] = await db.select().from(assignmentsTable).where(eq(assignmentsTable.id, asg.id));
+  assert.ok(asgBefore, "Assignment should exist before delete");
+
+  // Call delete
+  const deleteRes = await call("/superadmin/departments/" + deptId, "admin", "DELETE");
+  assert.equal(deleteRes.status, 200);
+
+  // Verify everything is gone
+  const [deptAfter] = await db.select().from(departmentsTable).where(eq(departmentsTable.id, deptId));
+  assert.equal(deptAfter, undefined, "Department should be gone");
+  const [hodAfter] = await db.select().from(usersTable).where(eq(usersTable.id, hodId));
+  assert.equal(hodAfter, undefined, "HOD should be gone");
+  const [typeAfter] = await db.select().from(assignmentTypesTable).where(eq(assignmentTypesTable.id, asgType.id));
+  assert.equal(typeAfter, undefined, "Assignment type should be gone");
+  const [asgAfter] = await db.select().from(assignmentsTable).where(eq(assignmentsTable.id, asg.id));
+  assert.equal(asgAfter, undefined, "Assignment should be gone");
+});
+
+// =========================================================================
+// 18. Delete department — cross-department assignment cleanup
+// =========================================================================
+test("delete department cleans up cross-department assignment recipients correctly", async () => {
+  // Create Dept A
+  const createA = await call("/superadmin/departments", "admin", "POST", {
+    setup: { name: "Dept A", code: "DEPT-A", hod: { fullName: "HOD A", email: "hoda@example.test" } },
+    hodPassword: password,
+  });
+  assert.equal(createA.status, 201);
+  const deptAId = createA.body.departmentId;
+  const hodAId = createA.body.hodId;
+
+  // Create Dept B
+  const createB = await call("/superadmin/departments", "admin", "POST", {
+    setup: { name: "Dept B", code: "DEPT-B", hod: { fullName: "HOD B", email: "hodb@example.test" } },
+    hodPassword: password,
+  });
+  assert.equal(createB.status, 201);
+  const deptBId = createB.body.departmentId;
+
+  // In Dept A: create assignment type and assignment
+  const [asgTypeA] = await db.insert(assignmentTypesTable).values({
+    departmentId: deptAId,
+    name: "Type A",
+    description: "Dept A Assignment Type",
+    createdBy: hodAId,
+  }).returning();
+
+  const [asgA] = await db.insert(assignmentsTable).values({
+    departmentId: deptAId,
+    typeId: asgTypeA.id,
+    facultyId: hodAId,
+    title: "Assignment A",
+    instructions: "For Dept B student",
+    dueAt: new Date(Date.now() + 86400000),
+  }).returning();
+
+  // Create student in Dept B
+  const stuB = await call("/superadmin/departments/" + deptBId + "/students", "admin", "POST", {
+    fullName: "Student B", email: "stub@example.test", password,
+    registrationNumber: "STU-B-001", batch: "2026", dateOfJoining: "2026-01-01", kuhsId: "KUHS-B-001",
+  });
+  assert.equal(stuB.status, 201);
+  const stuBUserId = stuB.body.student.id;
+  
+  const [stuBProfile] = await db.select().from(studentsTable).where(eq(studentsTable.userId, stuBUserId));
+  assert.ok(stuBProfile, "Dept B student profile should exist");
+
+  // Insert assignment_recipients row linking Dept A assignment to Dept B student
+  const [recipient] = await db.insert(assignmentRecipientsTable).values({
+    assignmentId: asgA.id,
+    studentId: stuBProfile.id,
+    status: "assigned",
+  }).returning();
+
+  // Call DELETE on Dept B
+  const deleteB = await call("/superadmin/departments/" + deptBId, "admin", "DELETE");
+  assert.equal(deleteB.status, 200);
+
+  // Verify Dept B is gone
+  const [deptBAfter] = await db.select().from(departmentsTable).where(eq(departmentsTable.id, deptBId));
+  assert.equal(deptBAfter, undefined, "Dept B should be gone");
+  const [stuBAfter] = await db.select().from(usersTable).where(eq(usersTable.id, stuBUserId));
+  assert.equal(stuBAfter, undefined, "Dept B student user should be gone");
+  const [recipientAfter] = await db.select().from(assignmentRecipientsTable).where(eq(assignmentRecipientsTable.id, recipient.id));
+  assert.equal(recipientAfter, undefined, "Cross-department assignment recipient row should be gone");
+
+  // Verify Dept A is still intact
+  const [deptAAfter] = await db.select().from(departmentsTable).where(eq(departmentsTable.id, deptAId));
+  assert.ok(deptAAfter, "Dept A should still exist");
+  const [hodAAfter] = await db.select().from(usersTable).where(eq(usersTable.id, hodAId));
+  assert.ok(hodAAfter, "Dept A HOD should still exist");
+  const [asgAAfter] = await db.select().from(assignmentsTable).where(eq(assignmentsTable.id, asgA.id));
+  assert.ok(asgAAfter, "Dept A assignment should still exist");
+  const [asgTypeAAfter] = await db.select().from(assignmentTypesTable).where(eq(assignmentTypesTable.id, asgTypeA.id));
+  assert.ok(asgTypeAAfter, "Dept A assignment type should still exist");
 });
