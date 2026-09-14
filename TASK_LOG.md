@@ -414,3 +414,39 @@ on branch `feature/admin-dashboard-frontend` (stacked on top of `8b34a61` above,
 developer had not yet pushed).
 **PR** — pending. Per this repo's standing developer instruction, Claude Code stops after
 committing; the developer pushes and opens the PR themselves.
+
+---
+
+### 2026-09-14 — Admin dashboard: fix missing outer page padding
+
+**What changed**
+- The developer pushed the above commit and QA'd it on the live site, reporting the layout
+  now felt "crowded, cards touch the boundaries." Root cause: `AdminPortal.tsx` renders
+  outside `AppLayout` (it bypasses that wrapper entirely, per the earlier "admin dashboard
+  frontend" entry above), so it never inherited `AppLayout`'s shared
+  `mx-auto w-full max-w-[1380px] px-4 md:px-6 lg:px-8` page-container convention that every
+  other portal gets automatically. Its root container had no horizontal padding at all, so
+  content touched the viewport edges at every width — the density pass just made this more
+  visible by tightening everything else. Fixed by applying `AppLayout`'s exact existing
+  convention directly to `AdminPortal`'s root container, rather than inventing a new value.
+
+**Files**
+- `artifacts/mockup-sandbox/src/components/AdminPortal.tsx` — one line, root container
+  `className` only
+- `HANDOFF.md` — Antigravity's dispatch report (appended)
+- `.agents/runs/dispatch-19-add-page-padding.md` (new)
+
+**Evidence**
+- `pnpm run typecheck` (`artifacts/mockup-sandbox`): clean, no errors — run directly by
+  Claude Code.
+- `git diff` confirmed a single-line class change, matching `AppLayout.tsx`'s own container
+  convention exactly (verified by Claude Code directly against that file, not taken on the
+  dispatch's claim alone).
+
+**Left open**
+- None.
+
+**Commit** — `0578591` "fix(admin): add missing outer page padding to admin console", on
+branch `feature/admin-dashboard-frontend`.
+**PR** — pending. Per this repo's standing developer instruction, Claude Code stops after
+committing; the developer pushes themselves.
