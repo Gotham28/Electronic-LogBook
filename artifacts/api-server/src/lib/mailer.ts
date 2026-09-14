@@ -85,6 +85,7 @@ For security purposes, please do not share your login credentials with others. W
 Key Features:
 - Digital Case Logging: Quickly record patient cases and procedures from any device.
 - Real-Time Tracking: Monitor resident progress and approvals in one place.
+- Strict Data Privacy: Designed with compliance in mind to keep resident and patient data secure.
 - Instant Reports: Generate ready-to-print PDF logbooks instantly.
 
 Getting Started:
@@ -112,6 +113,7 @@ gothoslabs@gmail.com`;
     <ul>
       <li><strong>Digital Case Logging:</strong> Quickly record patient cases and procedures from any device.</li>
       <li><strong>Real-Time Tracking:</strong> Monitor resident progress and approvals in one place.</li>
+      <li><strong>Strict Data Privacy:</strong> Designed with compliance in mind to keep resident and patient data secure.</li>
       <li><strong>Instant Reports:</strong> Generate ready-to-print PDF logbooks instantly.</li>
     </ul>
     <h3>Getting Started</h3>
