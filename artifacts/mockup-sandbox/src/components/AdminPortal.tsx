@@ -172,7 +172,7 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
   }
 
   return (
-    <div className="space-y-4 pb-8 font-sans">
+    <div className="mx-auto w-full max-w-[1380px] space-y-4 px-4 md:px-6 lg:px-8 pb-8 font-sans">
       {/* Topbar */}
       <div className="flex items-center justify-between border-b border-slate-200 pb-3">
         <div className="flex items-center gap-3">

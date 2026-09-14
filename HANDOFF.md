@@ -68,3 +68,17 @@ This ensures that the SQLSTATE is properly extracted whether it is wrapped in a 
 Drizzle implements nested transactions using Postgres savepoints (`SAVEPOINT spX`). Inside `drizzle-orm`, the transaction execution is wrapped in a try/catch block. If an operation (like the `DELETE` on `studentsTable`) throws an error (e.g., an FK violation), the Postgres transaction enters an aborted state. Drizzle catches this error immediately and successfully executes `ROLLBACK TO SAVEPOINT spX` (which Postgres allows even in an aborted state). 
 
 After rolling back the savepoint, Drizzle re-throws the error up to the route handler. Therefore, by the time our route handler catches the error and incorrectly returns a 500, the database state has already been cleanly rolled back. The partial deletion of `assignmentRecipientsTable` that occurred before the FK violation was safely reverted. No data corruption or partial state leaked into the database.
+
+---
+
+# Handoff Report: Admin Portal Padding Fix (2026-09-14)
+
+## Class Change
+File: `artifacts/mockup-sandbox/src/components/AdminPortal.tsx`, line 175
+Original: `<div className="space-y-4 pb-8 font-sans">`
+Updated: `<div className="mx-auto w-full max-w-[1380px] space-y-4 px-4 md:px-6 lg:px-8 pb-8 font-sans">`
+
+## Rationale
+I inspected `Dashboard.tsx`, `HODPortal.tsx`, and `ProfessorPortal.tsx`. None of these components declare their own outer horizontal padding on their root containers. Instead, they rely on a shared wrapping component, `AppLayout.tsx`, which wraps its children in a `<main className="mx-auto w-full max-w-[1380px] flex-1 p-4 md:p-6 lg:p-8">` container.
+
+Since `AdminPortal` is rendered directly in `App.tsx` (without the `AppLayout` wrapper), it was completely missing this standard horizontal margin constraint. Rather than inventing a new padding value, I matched the exact container convention used by `AppLayout` (`mx-auto w-full max-w-[1380px]` and `px-4 md:px-6 lg:px-8`) directly on `AdminPortal`'s root `<div>`. This prevents the content from touching the viewport edges and ensures the admin console maintains a consistent width and padding with the rest of the app.
