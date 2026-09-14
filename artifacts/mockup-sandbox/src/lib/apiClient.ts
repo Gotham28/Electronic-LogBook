@@ -120,3 +120,50 @@ export function apiPatch<T = any>(path: string, body?: any, options?: RequestIni
 export function apiDelete<T = any>(path: string, options?: RequestInit): Promise<T> {
   return fetchWithAuth(path, { ...options, method: "DELETE" });
 }
+
+export type AdminDepartment = {
+  id: number;
+  name: string;
+  code: string;
+  hod: { id: number; fullName: string; email: string } | null;
+  facultyCount?: number;
+  residentCount?: number;
+  pendingCount?: number;
+};
+
+export type AdminUserRow = {
+  id: number;
+  fullName: string;
+  email: string;
+  role: string;
+  status: string;
+};
+
+export function getAdminDepartments(): Promise<AdminDepartment[]> {
+  return apiGet("/api/superadmin/departments");
+}
+
+export function createAdminDepartment(data: { setup: { name: string; code: string; description?: string; hod: { fullName: string; email: string } }; hodPassword: string }) {
+  return apiPost("/api/superadmin/departments", data);
+}
+
+export function getAdminDepartmentRoster(id: number): Promise<AdminUserRow[]> {
+  return apiGet(`/api/superadmin/departments/${id}/roster`);
+}
+
+export function replaceAdminHod(departmentId: number, incomingUserId: number) {
+  return apiPost(`/api/superadmin/departments/${departmentId}/replace-hod`, { incomingUserId });
+}
+
+export function createAdminFaculty(departmentId: number, data: { fullName: string; email: string; password: string }) {
+  return apiPost(`/api/superadmin/departments/${departmentId}/faculty`, data);
+}
+
+export function createAdminStudent(departmentId: number, data: { fullName: string; email: string; password: string; registrationNumber: string; batch: string; dateOfJoining: string; kuhsId: string }) {
+  return apiPost(`/api/superadmin/departments/${departmentId}/students`, data);
+}
+
+export function deactivateAdminUser(userId: number) {
+  return apiPost(`/api/superadmin/users/${userId}/deactivate`);
+}
+

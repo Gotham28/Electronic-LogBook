@@ -4,6 +4,7 @@ import { AppLayout, type RoleType } from "@/components/layout/AppLayout";
 import { Dashboard } from "@/components/Dashboard";
 import { ProfessorPortal } from "@/components/ProfessorPortal";
 import { HODPortal } from "@/components/HODPortal";
+import { AdminPortal } from "@/components/AdminPortal";
 import { LoginPage } from "@/components/LoginPage";
 import { RegistrationPage } from "@/components/RegistrationPage";
 import { CaseLogsPage } from "@/components/pages/CaseLogsPage";
@@ -184,6 +185,21 @@ function App() {
           onSignIn={() => {
             window.sessionStorage.setItem("elogbook-authenticated", "true");
             setIsAuthenticated(true);
+          }}
+        />
+        <Toaster position="top-right" richColors />
+      </>
+    );
+  }
+
+  if (currentUser?.role === "admin") {
+    return (
+      <>
+        <AdminPortal
+          onSignOut={() => {
+            void apiPost("/api/auth/logout", {}).catch(() => {});
+            clearSession();
+            setIsAuthenticated(false);
           }}
         />
         <Toaster position="top-right" richColors />
