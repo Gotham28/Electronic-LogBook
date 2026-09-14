@@ -244,6 +244,7 @@ would not wait on this branch.
   written, since `HANDOFF.md` is Antigravity's own report artifact, not Claude Code's to
   author.
 
-**Commit** — pending — see below.
+**Commit** — `9f6d268` "feat(admin): add college-level admin role backend API", on branch
+`feature/admin-role-backend-api`.
 **PR** — pending. Per this repo's standing developer instruction, Claude Code stops after
 committing; the developer pushes and opens the PR themselves.
