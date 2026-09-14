@@ -10,6 +10,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "db:migrate": "tsx --env-file-if-exists=../../.env src/migrate.ts",
     "db:provision-department": "tsx --env-file-if-exists=../../.env src/provision-department.ts",
+    "db:provision-admin": "tsx --env-file-if-exists=../../.env src/provision-admin.ts",
     "test": "tsx --tsconfig tests/tsconfig.json --test --test-concurrency=1 tests/*.test.ts",
     "test:preview": "tsx --tsconfig tests/tsconfig.json tests/preview.ts"
   },

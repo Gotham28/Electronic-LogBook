@@ -168,3 +168,83 @@ would not wait on this branch.
 **Commit** — `35e7eb4` "docs: apply approved documentation-accuracy audit fixes", merged as
 `2567e925` via PR #23, on `main`.
 **PR** — [#23](https://github.com/Gotham28/Electronic-LogBook/pull/23), merged 2026-09-13.
+
+---
+
+### 2026-09-14 — Admin role backend API (task 1 of 2)
+
+**What changed**
+- Added a college-level admin role above HOD, with its own authorization-gated backend API.
+  Admin can: list departments with their current HOD; create a department + HOD (reusing
+  `provisionDepartment()`); replace a department's HOD in one transaction (demotes the
+  outgoing HOD to professor, promotes the incoming professor, bumps both accounts'
+  `sessionVersion`); view a department's roster as plain user rows (deliberately no
+  `studentsTable` join, to avoid conflating the two ID systems per `AGENTS.md` §4); create
+  faculty or students in any department (a student created this way lands `pending`, in the
+  normal HOD approval queue — student approval itself stays HOD-only, untouched); and
+  soft-deactivate a student or faculty account in any department (same pattern as the
+  existing HOD-side deactivation — status set to `rejected`, session revoked, records
+  retained). Admin cannot approve students and cannot deactivate another admin or an HOD
+  (HOD removal only happens through the explicit replace-HOD endpoint).
+- Added a CLI bootstrap script for the first admin account, reading `ADMIN_EMAIL` /
+  `ADMIN_INITIAL_PASSWORD` from the environment and failing closed (naming the missing
+  variable) if either is absent — no hardcoded fallback, no public signup path can create an
+  admin (confirmed: `/auth/register`'s schema is `.strict()` with a hardcoded `role:
+  "student"`, so a `role` field in the request body is rejected before the handler runs).
+- Built via two Antigravity dispatches (Opus-tier — the `AGENTS.md` §3 ownership-boundary
+  trigger fired as expected, since this role's entire purpose is legitimate cross-department
+  access). Dispatch 08 built the feature; a code-review (scope/rules/evidence/blast-radius
+  lenses) found one Critical typecheck error, two Major findings (the "transactional HOD
+  swap" test didn't actually force a mid-transaction failure; five success-path logs used
+  `.error()` instead of `.info()`), and three Minor findings. Dispatch 09 fixed all of them —
+  verified directly against the code, not taken on the dispatch's own claim, since dispatch
+  09's job hit an Antigravity account-quota error before it could write its own `HANDOFF.md`
+  update (its file edits landed correctly regardless; the quota error only cut off its final
+  report-writing step).
+- This is task 1 of 2. The admin dashboard frontend (`artifacts/mockup-sandbox`) is a
+  separate, not-yet-scoped follow-up task.
+
+**Files**
+- `artifacts/api-server/src/routes/superadmin.ts` (new) — the admin router
+- `artifacts/api-server/src/provision-admin.ts` (new) — CLI bootstrap script
+- `artifacts/api-server/tests/superadmin.test.ts` (new) — 14 tests, including a genuine
+  forced-mid-transaction-failure rollback test added in the fix round
+- `artifacts/api-server/src/routes/index.ts` — mounts the new router at `/superadmin`
+- `.env.example` — documents `ADMIN_EMAIL` / `ADMIN_INITIAL_PASSWORD` (names only)
+- `artifacts/api-server/package.json` — adds a `db:provision-admin` script
+- `.agents/runs/dispatch-08-admin-role-backend-api.md`,
+  `.agents/runs/dispatch-09-fix-review-findings.md` (new — the two dispatch prompts)
+
+**Not touched** (confirmed byte-for-byte unchanged throughout both dispatches)
+- `artifacts/api-server/src/routes/admin.ts` (the HOD router), `lib/department-provisioning.ts`,
+  `lib/validation.ts`, `lib/mailer.ts`, `lib/db/src/schema/users.ts`, the
+  `users_one_approved_hod_per_department` unique index, and both student-approval endpoints.
+
+**Evidence**
+- `pnpm run typecheck` (in `artifacts/api-server`): clean, no errors, after the dispatch-09
+  fix (was failing with TS2345 on `superadmin.ts:145` after dispatch 08).
+- `pnpm test` (in `artifacts/api-server`): 74/74 passing, including all 14 new tests (role
+  gating on every new route; admin refused on HOD-only approve/reject; department list;
+  department+HOD creation; roster shape with no `studentId` exposed; faculty/student
+  creation; a genuine forced-failure test proving the HOD-swap transaction actually rolls
+  back both writes, not just an HTTP-level rejection; deactivation retains records; admin
+  cannot deactivate another admin or HOD; registration cannot create an admin role;
+  unauthenticated 401; faculty deactivation invalidates the session). Runs against an
+  in-memory PGlite engine, not a real `DATABASE_URL` — `AGENTS.md` §6.1's test-database
+  conditions don't apply to this run.
+- `git diff --stat` against `origin/main`: confirmed confined to exactly the files listed
+  above. No schema or migration file touched.
+
+**Left open**
+- The admin dashboard frontend (task 2 of 2) is not yet scoped.
+- `HANDOFF.md` at the repo root reflects only dispatch 08's report — dispatch 09's own
+  report-writing step was cut off by the Antigravity quota error described above. Its actual
+  file changes were independently verified (see Evidence) and are not in question; the
+  document itself just wasn't regenerated to describe them. Left as-is rather than hand-
+  written, since `HANDOFF.md` is Antigravity's own report artifact, not Claude Code's to
+  author.
+
+**Commit** — `9f6d268` "feat(admin): add college-level admin role backend API", on branch
+`feature/admin-role-backend-api`.
+**PR** — pending. Per this repo's standing developer instruction, Claude Code stops after
+committing; the developer pushes and opens the PR themselves.
