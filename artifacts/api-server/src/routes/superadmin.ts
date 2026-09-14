@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { db, usersTable, departmentsTable, studentsTable } from "@workspace/db";
-import { eq, and, sql } from "drizzle-orm";
+import { db, usersTable, departmentsTable, studentsTable, departmentConfigsTable, departmentCatalogTable, procedureTypesTable, assignmentTypesTable, assignmentsTable, assignmentRecipientsTable, caseLogsTable, procedureLogsTable, academicLogsTable, leaveRecordsTable, postingsTable, researchTable, assessmentsTable, attendanceLogsTable, leaveApplicationsTable, thesisMilestonesTable, appraisalsTable, auditTable } from "@workspace/db";
+import { eq, and, sql, inArray, or } from "drizzle-orm";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { requireAuth, requireRole } from "../middlewares/auth.js";
@@ -153,6 +153,154 @@ router.post("/departments/:id/replace-hod", validate(replaceHodBody), async (req
     res.json({ message: "HOD replaced successfully", demotedId: result.demotedId, promotedId: result.promotedId });
   } catch (error) {
     req.log.error({ departmentId, userId: req.user!.id, status: 500 }, "Error replacing HOD");
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// DELETE /api/superadmin/departments/:id — hard-delete a department
+//
+// Deletes the department and all rows directly scoped to it: users,
+// department_configs, department_catalog, procedure_types, assignment_types,
+// and assignments. Everything runs in a single transaction so either all
+// rows are removed or none are.
+//
+// If any of these deletes trips a FK constraint deeper in the graph
+// (e.g. a user is referenced by case_logs, procedure_logs, academic_logs,
+// leave_records, postings, research, assessments, attendance, appraisals,
+// or audit rows), Postgres returns error code 23503 and the transaction
+// rolls back cleanly. The client receives a 409 explaining why. This is
+// the expected, correct outcome for any department with real clinical
+// activity — it is not a bug to engineer around.
+// ---------------------------------------------------------------------------
+router.delete("/departments/:id", async (req, res) => {
+  const departmentId = Number(req.params.id);
+  try {
+    await db.transaction(async (tx) => {
+      // 1. Verify the department exists
+      const [dept] = await tx.select({ id: departmentsTable.id }).from(departmentsTable)
+        .where(eq(departmentsTable.id, departmentId)).limit(1);
+      if (!dept) {
+        // Throw a sentinel to exit the transaction and return 404 below.
+        const err: any = new Error("Department not found");
+        err.statusOverride = 404;
+        throw err;
+      }
+
+      // 2. Collect user IDs, student IDs, and assignment IDs in this department
+      const deptUsers = await tx.select({ id: usersTable.id }).from(usersTable)
+        .where(eq(usersTable.departmentId, departmentId));
+      const userIds = deptUsers.map((u) => u.id);
+
+      let studentIds: number[] = [];
+      if (userIds.length > 0) {
+        const studentRows = await tx.select({ id: studentsTable.id }).from(studentsTable)
+          .where(inArray(studentsTable.userId, userIds));
+        studentIds = studentRows.map((s) => s.id);
+      }
+
+      const deptAssignments = await tx.select({ id: assignmentsTable.id }).from(assignmentsTable)
+        .where(eq(assignmentsTable.departmentId, departmentId));
+      const assignmentIds = deptAssignments.map((a) => a.id);
+
+      // 3. Delete in FK-safe order:
+      //    assignment_recipients → assignments → assignment_types → students → users → config/catalog/procs → department
+      //
+      //    assignment_recipients references assignments.id, students.id, and
+      //    users.id (via reviewedBy), so it must go before all three.
+      //    students references users.id, so it goes before users.
+      //    assignments references assignment_types.id, so assignments before types.
+      //    Both assignments and assignment_types reference users.id, so they go before users.
+      //    Everything references departments.id, so department is last.
+
+      const conflicts: string[] = [];
+      if (studentIds.length > 0 || userIds.length > 0) {
+        const checkTable = async (tableName: string, table: any, uFields: any[], sFields: any[]) => {
+          const conditions = [];
+          if (studentIds.length > 0) {
+            for (const field of sFields) conditions.push(inArray(field, studentIds));
+          }
+          if (userIds.length > 0) {
+            for (const field of uFields) conditions.push(inArray(field, userIds));
+          }
+          if (conditions.length === 0) return;
+
+          const [result] = await tx.select({ count: sql<number>`cast(count(*) as integer)` }).from(table).where(or(...conditions));
+          if (result && result.count > 0) {
+            conflicts.push(`${tableName} (${result.count} rows)`);
+          }
+        };
+
+        await checkTable("case_logs", caseLogsTable, [caseLogsTable.supervisorId, caseLogsTable.reviewedBy], [caseLogsTable.studentId]);
+        await checkTable("procedure_logs", procedureLogsTable, [procedureLogsTable.supervisorId, procedureLogsTable.reviewedBy], [procedureLogsTable.studentId]);
+        await checkTable("academic_logs", academicLogsTable, [academicLogsTable.supervisorId, academicLogsTable.reviewedBy], [academicLogsTable.studentId]);
+        await checkTable("leave_records", leaveRecordsTable, [leaveRecordsTable.reviewedBy], [leaveRecordsTable.studentId]);
+        await checkTable("postings", postingsTable, [postingsTable.supervisorId], [postingsTable.studentId]);
+        await checkTable("research", researchTable, [researchTable.guideId, researchTable.coGuideId], [researchTable.studentId]);
+        await checkTable("assessments", assessmentsTable, [assessmentsTable.assessorId], [assessmentsTable.studentId]);
+        await checkTable("attendance_logs", attendanceLogsTable, [attendanceLogsTable.verifiedBy], [attendanceLogsTable.studentId]);
+        await checkTable("leave_applications", leaveApplicationsTable, [leaveApplicationsTable.approvedBy], [leaveApplicationsTable.studentId]);
+        await checkTable("thesis_milestones", thesisMilestonesTable, [thesisMilestonesTable.guideId, thesisMilestonesTable.coGuideId], [thesisMilestonesTable.studentId]);
+        await checkTable("appraisals", appraisalsTable, [appraisalsTable.evaluatorId], [appraisalsTable.studentId]);
+        await checkTable("audit", auditTable, [auditTable.performedById], []);
+      }
+
+      if (conflicts.length > 0) {
+        const err: any = new Error("Clinical data conflict");
+        err.statusOverride = 409;
+        err.conflictMessage = `Cannot delete department due to existing clinical data: ${conflicts.join(", ")}`;
+        throw err;
+      }
+
+      if (assignmentIds.length > 0) {
+        await tx.delete(assignmentRecipientsTable).where(inArray(assignmentRecipientsTable.assignmentId, assignmentIds));
+      }
+
+      if (studentIds.length > 0) {
+        await tx.delete(assignmentRecipientsTable).where(inArray(assignmentRecipientsTable.studentId, studentIds));
+      }
+
+      await tx.delete(assignmentsTable).where(eq(assignmentsTable.departmentId, departmentId));
+      await tx.delete(assignmentTypesTable).where(eq(assignmentTypesTable.departmentId, departmentId));
+
+      if (studentIds.length > 0) {
+        await tx.delete(studentsTable).where(inArray(studentsTable.id, studentIds));
+      }
+
+      if (userIds.length > 0) {
+        await tx.delete(usersTable).where(eq(usersTable.departmentId, departmentId));
+      }
+
+      await tx.delete(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, departmentId));
+      await tx.delete(departmentCatalogTable).where(eq(departmentCatalogTable.departmentId, departmentId));
+      await tx.delete(procedureTypesTable).where(eq(procedureTypesTable.departmentId, departmentId));
+
+      // 4. Delete the department row itself
+      await tx.delete(departmentsTable).where(eq(departmentsTable.id, departmentId));
+    });
+
+    req.log.info({ departmentId, status: 200 }, "Department deleted");
+    res.json({ message: "Department and all associated data deleted" });
+  } catch (error: any) {
+    if (error.statusOverride === 404) {
+      req.log.info({ departmentId, status: 404 }, "Department delete: not found");
+      res.status(404).json({ message: "Department not found" });
+      return;
+    }
+    if (error.statusOverride === 409) {
+      req.log.info({ departmentId, status: 409 }, "Department delete blocked by pre-check");
+      res.status(409).json({ message: error.conflictMessage });
+      return;
+    }
+    const pgErrorCode = error.code ?? error.cause?.code;
+    if (pgErrorCode === "23503") {
+      req.log.info({ departmentId, status: 409 }, "Department delete blocked by FK constraint");
+      res.status(409).json({
+        message: "This department has faculty, residents, or records that reference clinical data and cannot be deleted. Remove or reassign them first.",
+      });
+      return;
+    }
+    req.log.error({ departmentId, userId: req.user!.id, status: 500 }, "Error deleting department");
     res.status(500).json({ message: "Internal server error" });
   }
 });

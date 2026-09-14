@@ -167,3 +167,7 @@ export function deactivateAdminUser(userId: number) {
   return apiPost(`/api/superadmin/users/${userId}/deactivate`);
 }
 
+export function deleteAdminDepartment(id: number) {
+  return apiDelete(`/api/superadmin/departments/${id}`);
+}
+
