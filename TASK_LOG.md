@@ -246,5 +246,79 @@ would not wait on this branch.
 
 **Commit** — `9f6d268` "feat(admin): add college-level admin role backend API", on branch
 `feature/admin-role-backend-api`.
+**PR** — [#28](https://github.com/Gotham28/Electronic-LogBook/pull/28), opened and merged
+2026-09-14 (merge commit `ae2c887`). *Correction, 2026-09-14, made during task 2's close-out
+sweep: this line previously read "pending," which was stale — the PR was in fact opened and
+merged before this session began. Verified directly via `gh pr view 28`.*
+
+---
+
+### 2026-09-14 — Admin dashboard frontend (task 2 of 2)
+
+**What changed**
+- Built the admin console page approved in the "E-Logbook Admin" mockup, wired to the
+  `/api/superadmin/*` backend from task 1: department list with live faculty/resident/pending
+  counts, create-department-with-HOD, replace-HOD, add-faculty, add-resident, and deactivate
+  (blocked on the HOD's own row, matching the backend's 403 rule).
+- Three Antigravity dispatches. The first build typechecked and built clean but had four
+  request-payload mismatches against the backend's `.strict()` Zod schemas (missing
+  `hodPassword`, wrong Replace-HOD field, missing faculty/resident `password` and four missing
+  resident fields) — caught by direct field-by-field comparison against
+  `artifacts/api-server/src/routes/superadmin.ts`, not by typecheck, and fixed in a second
+  dispatch. A formal 4-lens code review (scope/rules/evidence/blast-radius, run in parallel)
+  then found two Critical bugs the first two rounds missed: the admin console was completely
+  unreachable at runtime (`App.tsx` wrapped every role in `DepartmentProvider`, which never
+  resolves for an admin account's `departmentId: null`), and a per-department roster-fetch
+  failure silently rendered as a fake `0` count instead of a visible error (`AGENTS.md` §7). A
+  third dispatch fixed both: Admin now renders as its own standalone branch bypassing
+  `DepartmentProvider`/`AppLayout` entirely (avoiding a wider fix that would have touched
+  `useDepartment()`'s 6 other call sites, including `HODPortal.tsx`, which this task forbade
+  editing), and a failed department now shows a distinct "Data unavailable" indicator.
+- One task-file wording correction, no code change needed: "Replace HOD" was originally
+  specified to hit the real API with no client-side check; the real endpoint takes a numeric
+  `incomingUserId`, not an email, so resolving the typed email against the already-loaded
+  roster is structurally required. Only that existence check is client-side — the real
+  role/status/department validation still happens server-side on the resolved id.
+- Manually QA'd by the developer directly against the live production database (their explicit
+  choice, using fake test data), per the checklist in `CURRENT_TASK.md`: confirmed working.
+
+**Files**
+- `artifacts/mockup-sandbox/src/components/AdminPortal.tsx` (new)
+- `artifacts/mockup-sandbox/src/lib/apiClient.ts` — 7 typed `/api/superadmin/*` calls added
+- `artifacts/mockup-sandbox/src/App.tsx` — standalone admin render branch
+- `artifacts/mockup-sandbox/src/components/layout/AppLayout.tsx` — touched then fully reverted
+  to its original state (confirmed via `git diff`, no net change)
+- `HANDOFF.md` — Antigravity's dispatch-12 report
+- `.agents/runs/dispatch-10-admin-dashboard-frontend.md`,
+  `.agents/runs/dispatch-11-fix-review-findings.md`,
+  `.agents/runs/dispatch-12-fix-review-findings.md` (new — the three dispatch prompts)
+
+**Evidence**
+- `pnpm run typecheck` (in `artifacts/mockup-sandbox`): clean, no errors — run directly by
+  Claude Code, both after the payload fixes and again after the Critical fixes.
+- `pnpm run build` (in `artifacts/mockup-sandbox`): clean, no errors — same, both passes.
+- `git diff --stat` against `origin/main`: confirmed confined to the files listed above; no
+  file under `artifacts/api-server/**` touched.
+- Payload shapes for all 5 write endpoints re-verified field-for-field against the actual
+  backend Zod schemas by Claude Code directly (not taken on either dispatch's own claim).
+- No automated frontend test suite exists for `mockup-sandbox`; verification beyond
+  typecheck/build was the 4-lens code review plus the developer's own manual walkthrough
+  against production, both described above.
+
+**Left open**
+- Three minor code-review findings, not blocking: a stray leftover comment in
+  `AdminPortal.tsx`; the per-department roster fetch is N+1 (one call per department, no
+  pagination) — fine at current pilot scale; `HANDOFF.md` overstates that the optional
+  `description` field is handled end-to-end (no UI field exists for it — harmless, the field
+  is optional).
+- Supersedes the "not yet scoped" line in this file's 2026-09-14 admin-backend entry above —
+  task 2 of 2 is now built, reviewed, and QA'd.
+- Three untracked files from an earlier, unrelated task remain uncommitted in the working
+  tree (`.agents/runs/dispatch-05-agents-md-6-testdb-carveout.md`, `dispatch-06-` and
+  `dispatch-07-fix-review-findings.md`, `handoff-original-332-lines-recovered.md`) — noticed,
+  not touched, not part of this task's commit.
+
+**Commit** — `8b34a61` "feat(admin): add admin dashboard frontend", on branch
+`feature/admin-dashboard-frontend`.
 **PR** — pending. Per this repo's standing developer instruction, Claude Code stops after
 committing; the developer pushes and opens the PR themselves.
