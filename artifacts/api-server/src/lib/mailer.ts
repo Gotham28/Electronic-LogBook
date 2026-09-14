@@ -78,16 +78,14 @@ The E-LogBook is a secure digital platform designed to streamline record-keeping
 Your E-LogBook Account Credentials:
 Username: ${email}
 Password: ${password}
-Application URL: ${process.env.APP_URL || "https://elogbook.example.com"}
+Application URL: ${process.env.APP_URL || "https://www.elogbookgothos.in"}
 
 For security purposes, please do not share your login credentials with others. We highly recommend changing your password after your first login.
 
 Key Features:
-- Centralized Digital Entry: Record, update, and review operational data through mobile and desktop devices.
-- Automated Audit Trails: Maintain timestamped records to support accountability, traceability, and data integrity.
-- Customizable Forms & Workflows: Digital forms and workflows configured according to your department's specific requirements.
-- Dashboards & Monitoring: Access relevant operational information through structured dashboards and real-time visualizations.
-- Instant Reporting: Generate structured reports in PDF and Excel formats for review and documentation.
+- Digital Case Logging: Quickly record patient cases and procedures from any device.
+- Real-Time Tracking: Monitor resident progress and approvals in one place.
+- Instant Reports: Generate ready-to-print PDF logbooks instantly.
 
 Getting Started:
 Please log in using the credentials provided above and verify that you can access the application successfully. If you encounter any issues with logging in, accessing a form, or using any feature of the platform, please contact us using the details below.
@@ -108,15 +106,13 @@ gothoslabs@gmail.com`;
     <h3>Your E-LogBook Account Credentials</h3>
     <p><strong>Username:</strong> ${email}<br/>
        <strong>Password:</strong> <code style="font-family: monospace; background: #f4f4f4; padding: 2px 4px;">${password}</code><br/>
-       <strong>Application URL:</strong> ${process.env.APP_URL || "https://elogbook.example.com"}</p>
+       <strong>Application URL:</strong> <a href="${process.env.APP_URL || "https://www.elogbookgothos.in"}">${process.env.APP_URL || "https://www.elogbookgothos.in"}</a></p>
     <p>For security purposes, please do not share your login credentials with others. We highly recommend changing your password after your first login.</p>
     <h3>Key Features</h3>
     <ul>
-      <li>Centralized Digital Entry: Record, update, and review operational data through mobile and desktop devices.</li>
-      <li>Automated Audit Trails: Maintain timestamped records to support accountability, traceability, and data integrity.</li>
-      <li>Customizable Forms &amp; Workflows: Digital forms and workflows configured according to your department's specific requirements.</li>
-      <li>Dashboards &amp; Monitoring: Access relevant operational information through structured dashboards and real-time visualizations.</li>
-      <li>Instant Reporting: Generate structured reports in PDF and Excel formats for review and documentation.</li>
+      <li><strong>Digital Case Logging:</strong> Quickly record patient cases and procedures from any device.</li>
+      <li><strong>Real-Time Tracking:</strong> Monitor resident progress and approvals in one place.</li>
+      <li><strong>Instant Reports:</strong> Generate ready-to-print PDF logbooks instantly.</li>
     </ul>
     <h3>Getting Started</h3>
     <p>Please log in using the credentials provided above and verify that you can access the application successfully. If you encounter any issues with logging in, accessing a form, or using any feature of the platform, please contact us using the details below.</p>
