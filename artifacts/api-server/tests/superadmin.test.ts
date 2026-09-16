@@ -156,9 +156,9 @@ test("admin can create faculty in any department", async () => {
 });
 
 // =========================================================================
-// 7. Admin can create a student (status: pending)
+// 7. Admin can create a student (auto-approved)
 // =========================================================================
-test("admin can create student in any department (pending status)", async () => {
+test("admin can create student in any department (auto-approved)", async () => {
   const res = await call("/superadmin/departments/" + departmentIds[2] + "/students", "admin", "POST", {
     fullName: "Admin-Created Student", email: "admin-stu@example.test", password,
     registrationNumber: "ADMIN-STU-001", batch: "2026", dateOfJoining: "2026-01-01", kuhsId: "UNIV-ADMIN-001",
@@ -166,9 +166,9 @@ test("admin can create student in any department (pending status)", async () => 
   assert.equal(res.status, 201);
   assert.equal(res.body.student.departmentId, departmentIds[2]);
 
-  // Verify the student is pending
+  // Verify the student is approved
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, res.body.student.id));
-  assert.equal(user.status, "pending");
+  assert.equal(user.status, "approved");
   assert.equal(user.role, "student");
 
   // Verify student profile row was created

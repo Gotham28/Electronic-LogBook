@@ -702,3 +702,60 @@ on branch `feature/hard-delete-students-faculty` (cut fresh off `main` @ `82fa33
 form", on branch `fix/superadmin-add-resident-form-defaults` (cut fresh off `main` @
 `b28e3b5`).
 **PR** — [#35](https://github.com/Gotham28/Electronic-LogBook/pull/35).
+
+### 2026-09-16 — Auto-approve students created via the superadmin console
+
+**What changed**
+- Developer hit `402 "This student has not completed payment and cannot be approved yet"`
+  trying to approve a student created via the superadmin "Add Resident" form (the one fixed
+  for blank-defaults in the entry above, PR #35). Root-caused directly:
+  `superadmin.ts`'s `POST /departments/:id/students` created students with `status:
+  "pending"`, intending them to enter the HOD's approval queue, but never created a
+  `paymentsTable` row — and `admin.ts`'s `POST /students/:id/approve` hard-requires a `paid`
+  payment row before approving anyone. Every student created via this route was therefore
+  permanently stuck pending, with no path to approval. Two pre-existing features that had
+  never been reconciled with each other.
+- Developer explicitly chose to make this route auto-approve on creation, matching the
+  already-shipped HOD-direct student creation feature (PR #32), over two alternatives
+  offered (skip the payment check specifically for admin-created students; or auto-create a
+  paid/waived payment row).
+- Changed `superadmin.ts`'s `POST /departments/:id/students` to insert `status: "approved"`
+  instead of `"pending"`, updated its success message and the comment above the route to
+  match. Updated `AdminPortal.tsx`'s matching success toast. Updated the existing test
+  (`"admin can create student in any department (pending status)"` →
+  `"...(auto-approved)"`, assertion changed to expect `"approved"`).
+- `POST /students/:id/approve` itself, the self-registration `/api/auth/register` flow, and
+  the HOD-direct creation route (PR #32) are all unchanged — this fix is entirely on the
+  creation side of this one route, not the approval/payment gate.
+
+**Files**
+- `artifacts/api-server/src/routes/superadmin.ts` — `POST /departments/:id/students` now
+  creates approved students
+- `artifacts/mockup-sandbox/src/components/AdminPortal.tsx` — updated success toast wording
+- `artifacts/api-server/tests/superadmin.test.ts` — updated/renamed test assertion
+- `HANDOFF.md` — Antigravity's dispatch report
+- `.agents/runs/dispatch-29-superadmin-resident-auto-approve.md` (new — the dispatch prompt)
+
+**Evidence**
+- `pnpm test` (`artifacts/api-server`): **86/86 passing** — run directly by Claude Code,
+  including the updated test now asserting `status === "approved"`.
+- Full diff read directly by Claude Code across all three files: confirmed exactly the
+  three named changes (status value, two message strings, one test assertion + rename) and
+  nothing else — the approve endpoint, payment gate, and self-registration flow all
+  confirmed untouched.
+- Given this is a small, fully-specified, directly-verified change mirroring an
+  already-reviewed precedent (PR #32's status/payment handling), Claude Code verified this
+  directly against the diff and test suite rather than dispatching a full 4-lens review —
+  noted plainly, same reasoning as the two auto-fill-defaults entries above.
+
+**Left open**
+- No manual browser smoke test performed by Claude Code (same standing reasoning as prior
+  entries). The developer should confirm end-to-end in the browser: create a resident via
+  the superadmin console, confirm it shows as approved immediately (not in the HOD's pending
+  queue), and that the account can log in right away.
+- As noted in the prior entry: worth a deliberate check for any other pre-existing student
+  creation/approval entry points in the app that might have the same class of gap. Not
+  investigated here — this task was scoped to the one confirmed-broken path.
+
+**Commit** — pending (recorded in a follow-up commit immediately after this one).
+**PR** — pending. Opened by Claude Code per this repo's standing rule.
