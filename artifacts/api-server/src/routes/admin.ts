@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { db, usersTable, studentsTable, departmentsTable, departmentConfigsTable, procedureTypesTable, caseLogsTable, procedureLogsTable, academicLogsTable, departmentCatalogTable, paymentsTable } from "@workspace/db";
-import { eq, and, count, inArray, sql } from "drizzle-orm";
+import { db, usersTable, studentsTable, departmentsTable, departmentConfigsTable, procedureTypesTable, caseLogsTable, procedureLogsTable, academicLogsTable, departmentCatalogTable, paymentsTable, leaveRecordsTable, leaveApplicationsTable, assessmentsTable, appraisalsTable, assignmentRecipientsTable, attendanceLogsTable, certificationsTable, postingsTable, thesisMilestonesTable, researchTable, auditTable, assignmentsTable, assignmentTypesTable } from "@workspace/db";
+import { eq, and, count, inArray, sql, or } from "drizzle-orm";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { requireAuth, requireRole, requireDepartment } from "../middlewares/auth.js";
@@ -581,6 +581,161 @@ router.patch("/department/catalog/:id", validate(z.object({ required: targetSche
     .where(and(eq(departmentCatalogTable.id, Number(req.params.id)), eq(departmentCatalogTable.departmentId, req.user!.departmentId!))).returning();
   if (!row) { res.status(404).json({ message: "Training option not found" }); return; }
   res.json(row);
+});
+
+// DELETE /api/admin/users/:id/hard
+// Permanently delete a student or professor and cascade through all their associated data
+router.delete("/users/:id/hard", async (req, res) => {
+  try {
+    const targetUserId = parseInt(req.params.id);
+    if (isNaN(targetUserId)) {
+      res.status(400).json({ message: "Invalid user ID" });
+      return;
+    }
+
+    const departmentId = req.user?.departmentId;
+    const [target] = await db.select().from(usersTable).where(eq(usersTable.id, targetUserId)).limit(1);
+
+    if (!target || target.departmentId !== departmentId || !["student", "professor"].includes(target.role)) {
+      res.status(403).json({ message: "Cannot hard-delete this user" });
+      return;
+    }
+
+    // Prevent removing yourself
+    if (target.id === req.user?.id) {
+      res.status(400).json({ message: "Cannot remove your own account" });
+      return;
+    }
+
+    const role = target.role;
+    let deletedCounts: any = {};
+
+    await db.transaction(async (tx) => {
+      if (role === "student") {
+        const [student] = await tx.select({ id: studentsTable.id }).from(studentsTable).where(eq(studentsTable.userId, targetUserId)).limit(1);
+        if (student) {
+          const studentId = student.id;
+
+          const _cases = await tx.delete(caseLogsTable).where(eq(caseLogsTable.studentId, studentId)).returning({ id: caseLogsTable.id });
+          deletedCounts.caseLogs = _cases.length;
+
+          const _procs = await tx.delete(procedureLogsTable).where(eq(procedureLogsTable.studentId, studentId)).returning({ id: procedureLogsTable.id });
+          deletedCounts.procedureLogs = _procs.length;
+
+          const _acad = await tx.delete(academicLogsTable).where(eq(academicLogsTable.studentId, studentId)).returning({ id: academicLogsTable.id });
+          deletedCounts.academicLogs = _acad.length;
+
+          const _leave = await tx.delete(leaveRecordsTable).where(eq(leaveRecordsTable.studentId, studentId)).returning({ id: leaveRecordsTable.id });
+          deletedCounts.leaveRecords = _leave.length;
+
+          const _leaveApp = await tx.delete(leaveApplicationsTable).where(eq(leaveApplicationsTable.studentId, studentId)).returning({ id: leaveApplicationsTable.id });
+          deletedCounts.leaveApplications = _leaveApp.length;
+
+          const _ass = await tx.delete(assessmentsTable).where(eq(assessmentsTable.studentId, studentId)).returning({ id: assessmentsTable.id });
+          deletedCounts.assessments = _ass.length;
+
+          const _appr = await tx.delete(appraisalsTable).where(eq(appraisalsTable.studentId, studentId)).returning({ id: appraisalsTable.id });
+          deletedCounts.appraisals = _appr.length;
+
+          const _asRec = await tx.delete(assignmentRecipientsTable).where(eq(assignmentRecipientsTable.studentId, studentId)).returning({ id: assignmentRecipientsTable.id });
+          deletedCounts.assignmentRecipients = _asRec.length;
+
+          const _att = await tx.delete(attendanceLogsTable).where(eq(attendanceLogsTable.studentId, studentId)).returning({ id: attendanceLogsTable.id });
+          deletedCounts.attendanceLogs = _att.length;
+
+          const _cert = await tx.delete(certificationsTable).where(eq(certificationsTable.studentId, studentId)).returning({ id: certificationsTable.id });
+          deletedCounts.certifications = _cert.length;
+
+          const _post = await tx.delete(postingsTable).where(eq(postingsTable.studentId, studentId)).returning({ id: postingsTable.id });
+          deletedCounts.postings = _post.length;
+
+          const _thes = await tx.delete(thesisMilestonesTable).where(eq(thesisMilestonesTable.studentId, studentId)).returning({ id: thesisMilestonesTable.id });
+          deletedCounts.thesisMilestones = _thes.length;
+
+          const _res = await tx.delete(researchTable).where(eq(researchTable.studentId, studentId)).returning({ id: researchTable.id });
+          deletedCounts.research = _res.length;
+
+          const _stud = await tx.delete(studentsTable).where(eq(studentsTable.id, studentId)).returning({ id: studentsTable.id });
+          deletedCounts.students = _stud.length;
+        }
+      } else {
+        const _cases = await tx.delete(caseLogsTable).where(or(eq(caseLogsTable.supervisorId, targetUserId), eq(caseLogsTable.reviewedBy, targetUserId))).returning({ id: caseLogsTable.id });
+        deletedCounts.caseLogs = _cases.length;
+
+        const _procs = await tx.delete(procedureLogsTable).where(or(eq(procedureLogsTable.supervisorId, targetUserId), eq(procedureLogsTable.reviewedBy, targetUserId))).returning({ id: procedureLogsTable.id });
+        deletedCounts.procedureLogs = _procs.length;
+
+        const _acad = await tx.delete(academicLogsTable).where(or(eq(academicLogsTable.supervisorId, targetUserId), eq(academicLogsTable.reviewedBy, targetUserId))).returning({ id: academicLogsTable.id });
+        deletedCounts.academicLogs = _acad.length;
+
+        const _leave = await tx.delete(leaveRecordsTable).where(eq(leaveRecordsTable.reviewedBy, targetUserId)).returning({ id: leaveRecordsTable.id });
+        deletedCounts.leaveRecords = _leave.length;
+
+        const _leaveApp = await tx.delete(leaveApplicationsTable).where(eq(leaveApplicationsTable.approvedBy, targetUserId)).returning({ id: leaveApplicationsTable.id });
+        deletedCounts.leaveApplications = _leaveApp.length;
+
+        const _ass = await tx.delete(assessmentsTable).where(eq(assessmentsTable.assessorId, targetUserId)).returning({ id: assessmentsTable.id });
+        deletedCounts.assessments = _ass.length;
+
+        const _appr = await tx.delete(appraisalsTable).where(eq(appraisalsTable.evaluatorId, targetUserId)).returning({ id: appraisalsTable.id });
+        deletedCounts.appraisals = _appr.length;
+
+        let totalAssignmentRecipients = 0;
+        const _asRec = await tx.delete(assignmentRecipientsTable).where(eq(assignmentRecipientsTable.reviewedBy, targetUserId)).returning({ id: assignmentRecipientsTable.id });
+        totalAssignmentRecipients += _asRec.length;
+
+        const _att = await tx.delete(attendanceLogsTable).where(eq(attendanceLogsTable.verifiedBy, targetUserId)).returning({ id: attendanceLogsTable.id });
+        deletedCounts.attendanceLogs = _att.length;
+
+        const _post = await tx.delete(postingsTable).where(eq(postingsTable.supervisorId, targetUserId)).returning({ id: postingsTable.id });
+        deletedCounts.postings = _post.length;
+
+        const _thes = await tx.delete(thesisMilestonesTable).where(or(eq(thesisMilestonesTable.guideId, targetUserId), eq(thesisMilestonesTable.coGuideId, targetUserId))).returning({ id: thesisMilestonesTable.id });
+        deletedCounts.thesisMilestones = _thes.length;
+
+        const _res = await tx.delete(researchTable).where(or(eq(researchTable.guideId, targetUserId), eq(researchTable.coGuideId, targetUserId))).returning({ id: researchTable.id });
+        deletedCounts.research = _res.length;
+
+        await tx.update(studentsTable).set({ mentorId: null }).where(eq(studentsTable.mentorId, targetUserId));
+
+        const _assignTypes = await tx.update(assignmentTypesTable).set({ createdBy: req.user!.id }).where(eq(assignmentTypesTable.createdBy, targetUserId)).returning({ id: assignmentTypesTable.id });
+        deletedCounts.assignmentTypesReassigned = _assignTypes.length;
+
+        const assignments = await tx.select({ id: assignmentsTable.id }).from(assignmentsTable).where(eq(assignmentsTable.facultyId, targetUserId));
+        const assignmentIds = assignments.map(a => a.id);
+        if (assignmentIds.length > 0) {
+          const _asRec2 = await tx.delete(assignmentRecipientsTable).where(inArray(assignmentRecipientsTable.assignmentId, assignmentIds)).returning({ id: assignmentRecipientsTable.id });
+          totalAssignmentRecipients += _asRec2.length;
+        }
+        deletedCounts.assignmentRecipients = totalAssignmentRecipients;
+
+        const _assignments = await tx.delete(assignmentsTable).where(eq(assignmentsTable.facultyId, targetUserId)).returning({ id: assignmentsTable.id });
+        deletedCounts.assignments = _assignments.length;
+      }
+
+      const _audit = await tx.delete(auditTable).where(eq(auditTable.performedById, targetUserId)).returning({ id: auditTable.id });
+      deletedCounts.audit = _audit.length;
+
+      const _payments = await tx.delete(paymentsTable).where(eq(paymentsTable.userId, targetUserId)).returning({ id: paymentsTable.id });
+      deletedCounts.payments = _payments.length;
+
+      const _users = await tx.delete(usersTable).where(eq(usersTable.id, targetUserId)).returning({ id: usersTable.id });
+      deletedCounts.users = _users.length;
+    });
+
+    req.log.info({ targetUserId, departmentId, status: 200 }, "Account hard-deleted by HOD");
+    res.json({ message: "Account and associated records permanently deleted", deletedRecords: deletedCounts });
+
+  } catch (error: any) {
+    const pgErrorCode = error.code ?? error.cause?.code;
+    if (pgErrorCode === "23503") {
+      req.log.error({ targetUserId: parseInt(req.params.id), departmentId: req.user!.departmentId, status: 409 }, "Hard-delete blocked by FK constraint");
+      res.status(409).json({ message: "Hard-delete failed due to related data conflict" });
+      return;
+    }
+    req.log.error({ targetUserId: parseInt(req.params.id), departmentId: req.user!.departmentId, status: 500 }, "Error hard-deleting user");
+    res.status(500).json({ message: "Internal server error" });
+  }
 });
 
 export default router;
