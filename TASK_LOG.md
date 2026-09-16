@@ -701,4 +701,4 @@ on branch `feature/hard-delete-students-faculty` (cut fresh off `main` @ `82fa33
 **Commit** — `d2f14c0` "fix(admin): auto-fill test defaults on the superadmin Add Resident
 form", on branch `fix/superadmin-add-resident-form-defaults` (cut fresh off `main` @
 `b28e3b5`).
-**PR** — pending. Opened by Claude Code per this repo's standing rule.
+**PR** — [#35](https://github.com/Gotham28/Electronic-LogBook/pull/35).
