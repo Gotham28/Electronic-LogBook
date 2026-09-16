@@ -4,7 +4,7 @@ import { eq, and, count, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { requireAuth, requireRole, requireDepartment } from "../middlewares/auth.js";
-import { completionPercent, configSchema, emailSchema, nameSchema, passwordSchema, targetSchema, validate } from "../lib/validation.js";
+import { completionPercent, configSchema, dateSchema, emailSchema, nameSchema, passwordSchema, targetSchema, validate } from "../lib/validation.js";
 import { sendAccountCreatedEmail } from "../lib/mailer.js";
 
 const router = Router();
@@ -229,6 +229,83 @@ router.post("/professors", validate(z.object({ fullName: nameSchema, email: emai
     // message carries the SQL plus every bound parameter - including the new professor's
     // passwordHash. Id and status code only, matching app.ts:96.
     req.log.error({ departmentId: req.user!.departmentId, status: 500 }, "Error creating professor");
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// POST /api/admin/students
+// Create a new student account
+router.post("/students", validate(z.object({
+  fullName: nameSchema,
+  email: emailSchema,
+  password: passwordSchema,
+  registrationNumber: nameSchema,
+  batch: z.string().trim().min(1).max(40),
+  dateOfJoining: dateSchema,
+  kuhsId: nameSchema
+}).strict()), async (req, res) => {
+  try {
+    const { fullName, email, password, registrationNumber, batch, dateOfJoining, kuhsId } = req.body;
+
+    if (!fullName || !email || !password || !registrationNumber || !batch || !dateOfJoining || !kuhsId) {
+      res.status(400).json({ message: "All fields are required" });
+      return;
+    }
+
+    const existingUser = await db.select().from(usersTable).where(eq(usersTable.email, email)).limit(1);
+    if (existingUser.length > 0) {
+      res.status(400).json({ message: "Email already registered" });
+      return;
+    }
+
+    const passwordHash = await bcrypt.hash(password, 12);
+
+    const [dept] = await db.select({ name: departmentsTable.name }).from(departmentsTable)
+      .where(eq(departmentsTable.id, req.user!.departmentId!)).limit(1);
+
+    const newStudent = await db.transaction(async (tx) => {
+      const [user] = await tx.insert(usersTable).values({
+        fullName,
+        email,
+        passwordHash,
+        role: "student",
+        status: "approved", // Students created by HOD are auto-approved
+        departmentId: req.user!.departmentId!
+      }).returning();
+      
+      await tx.insert(studentsTable).values({
+        userId: user.id,
+        registrationNumber,
+        batch,
+        dateOfJoining,
+        kuhsId,
+        specialty: dept?.name || ""
+      });
+
+      return user;
+    });
+
+    try {
+      await sendAccountCreatedEmail(email, fullName, password, "student", dept?.name);
+    } catch (error) {
+      req.log.error({ email, error }, "Failed to send welcome email");
+      // Continue without returning error to allow account creation to succeed
+    }
+
+    res.status(201).json({ 
+      message: "Student account created successfully",
+      student: {
+        id: newStudent.id,
+        fullName: newStudent.fullName,
+        email: newStudent.email,
+        departmentId: newStudent.departmentId
+      }
+    });
+  } catch (error) {
+    // Never the error object itself: a failed insert throws DrizzleQueryError, whose
+    // message carries the SQL plus every bound parameter - including the new student's
+    // passwordHash. Id and status code only.
+    req.log.error({ departmentId: req.user!.departmentId, status: 500 }, "Error creating student");
     res.status(500).json({ message: "Internal server error" });
   }
 });

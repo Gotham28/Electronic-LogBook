@@ -111,6 +111,10 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
   const [profForm, setProfForm] = React.useState({ fullName: "", email: "", password: "" });
   const [creatingProf, setCreatingProf] = React.useState(false);
 
+  // Student Form State
+  const [studentForm, setStudentForm] = React.useState({ fullName: "", email: "", password: "", registrationNumber: "", batch: "", dateOfJoining: "", kuhsId: "" });
+  const [creatingStudent, setCreatingStudent] = React.useState(false);
+
   // Leave approvals
   const [leaves, setLeaves] = React.useState<LeaveRequest[]>([]);
 
@@ -240,6 +244,23 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
       toast.error(err.message || "Failed to create faculty account");
     } finally {
       setCreatingProf(false);
+    }
+  };
+
+  const handleCreateStudent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCreatingStudent(true);
+    try {
+      await apiPost("/api/admin/students", {
+        ...studentForm
+      });
+      toast.success("Student account created successfully");
+      setStudentForm({ fullName: "", email: "", password: "", registrationNumber: "", batch: "", dateOfJoining: "", kuhsId: "" });
+      setRoster(null); // Refreshes roster
+    } catch (err: any) {
+      toast.error(err.message || "Failed to create student account");
+    } finally {
+      setCreatingStudent(false);
     }
   };
 
@@ -468,6 +489,53 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
         </TabsContent>
 
         <TabsContent value="student-access" className="space-y-4 pt-4">
+          <Card className="max-w-2xl">
+            <CardHeader className="border-b border-teal-100">
+              <CardTitle className="text-xl">Add Student</CardTitle>
+            </CardHeader>
+            <CardContent className="p-5">
+              <form onSubmit={handleCreateStudent} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="stu-name">Full Name</Label>
+                    <Input id="stu-name" value={studentForm.fullName} onChange={(e) => setStudentForm({...studentForm, fullName: e.target.value})} required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="stu-email">Email Address</Label>
+                    <Input id="stu-email" type="email" value={studentForm.email} onChange={(e) => setStudentForm({...studentForm, email: e.target.value})} required />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="stu-reg">Registration Number</Label>
+                    <Input id="stu-reg" value={studentForm.registrationNumber} onChange={(e) => setStudentForm({...studentForm, registrationNumber: e.target.value})} required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="stu-batch">Batch (e.g. 2024)</Label>
+                    <Input id="stu-batch" value={studentForm.batch} onChange={(e) => setStudentForm({...studentForm, batch: e.target.value})} required />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="stu-kuhs">KUHS ID</Label>
+                    <Input id="stu-kuhs" value={studentForm.kuhsId} onChange={(e) => setStudentForm({...studentForm, kuhsId: e.target.value})} required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="stu-doj">Date of Joining</Label>
+                    <Input id="stu-doj" type="date" value={studentForm.dateOfJoining} onChange={(e) => setStudentForm({...studentForm, dateOfJoining: e.target.value})} required />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="stu-pass">Initial Password</Label>
+                  <Input id="stu-pass" type="password" value={studentForm.password} onChange={(e) => setStudentForm({...studentForm, password: e.target.value})} minLength={8} required />
+                </div>
+                <Button type="submit" disabled={creatingStudent} className="w-full">
+                  <UserPlus className="h-4 w-4 mr-2" /> {creatingStudent ? "Creating..." : "Create Student Account"}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader className="border-b border-teal-100">
               <CardTitle className="text-xl">Pending Student Approvals</CardTitle>

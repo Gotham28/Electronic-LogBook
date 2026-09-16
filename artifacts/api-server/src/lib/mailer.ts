@@ -56,7 +56,7 @@ export const sendPasswordResetEmail = async (email: string, otp: string) => {
   });
 };
 
-export const sendAccountCreatedEmail = async (email: string, fullName: string, password: string, role: "hod" | "professor", departmentName?: string) => {
+export const sendAccountCreatedEmail = async (email: string, fullName: string, password: string, role: "hod" | "professor" | "student", departmentName?: string) => {
   const transporter = nodemailer.createTransport({
     service: "gmail",
     auth: {
@@ -65,7 +65,7 @@ export const sendAccountCreatedEmail = async (email: string, fullName: string, p
     },
   });
 
-  const roleDisplay = role === "hod" ? "HOD" : "Faculty";
+  const roleDisplay = role === "hod" ? "HOD" : role === "student" ? "Student" : "Faculty";
   const deptDisplay = departmentName ? `, Department of ${departmentName}` : "";
   const title = `${roleDisplay}${deptDisplay}`;
 
