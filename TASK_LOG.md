@@ -642,6 +642,7 @@ to ride along — opened as its own PR instead of "same PR" as originally writte
   `review-package-handoff-combined.md`, every `.agy-jobs/*` directory) — noticed, not
   touched, not part of this commit.
 
-**Commit** — pending (recorded in a follow-up commit immediately after this one).
+**Commit** — `2c22021` "feat(admin): let HODs permanently delete student and faculty accounts",
+on branch `feature/hard-delete-students-faculty` (cut fresh off `main` @ `82fa330`).
 **PR** — pending. Opened by Claude Code per this repo's now-updated standing rule (plain
 `git push` and PR-opening permitted since 2026-09-16).
