@@ -760,4 +760,4 @@ form", on branch `fix/superadmin-add-resident-form-defaults` (cut fresh off `mai
 **Commit** — `47b0f45` "fix(admin): auto-approve students created via the superadmin
 console", on branch `fix/superadmin-resident-auto-approve` (cut fresh off `main` @
 `ef6c740`).
-**PR** — pending. Opened by Claude Code per this repo's standing rule.
+**PR** — [#36](https://github.com/Gotham28/Electronic-LogBook/pull/36).
