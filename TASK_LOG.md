@@ -644,5 +644,4 @@ to ride along — opened as its own PR instead of "same PR" as originally writte
 
 **Commit** — `2c22021` "feat(admin): let HODs permanently delete student and faculty accounts",
 on branch `feature/hard-delete-students-faculty` (cut fresh off `main` @ `82fa330`).
-**PR** — pending. Opened by Claude Code per this repo's now-updated standing rule (plain
-`git push` and PR-opening permitted since 2026-09-16).
+**PR** — [#34](https://github.com/Gotham28/Electronic-LogBook/pull/34).
