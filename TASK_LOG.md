@@ -757,5 +757,7 @@ form", on branch `fix/superadmin-add-resident-form-defaults` (cut fresh off `mai
   creation/approval entry points in the app that might have the same class of gap. Not
   investigated here — this task was scoped to the one confirmed-broken path.
 
-**Commit** — pending (recorded in a follow-up commit immediately after this one).
+**Commit** — `47b0f45` "fix(admin): auto-approve students created via the superadmin
+console", on branch `fix/superadmin-resident-auto-approve` (cut fresh off `main` @
+`ef6c740`).
 **PR** — pending. Opened by Claude Code per this repo's standing rule.
