@@ -486,6 +486,7 @@ committing; the developer pushes and opens the PR themselves.
   `review-package-handoff-combined.md`, every `.agy-jobs/*` directory) — noticed, not
   touched, not part of this commit.
 
-**Commit** — pending (recorded in a follow-up commit immediately after this one).
+**Commit** — `1f9034a` "feat(admin): let HODs create pre-approved students directly", on
+branch `feature/hod-direct-student-creation` (cut fresh off `main` @ `e3086ff`).
 **PR** — pending. Per this repo's standing developer instruction, Claude Code stops after
 committing; the developer pushes and opens the PR themselves.
