@@ -414,3 +414,78 @@ on branch `feature/admin-dashboard-frontend` (stacked on top of `8b34a61` above,
 developer had not yet pushed).
 **PR** — pending. Per this repo's standing developer instruction, Claude Code stops after
 committing; the developer pushes and opens the PR themselves.
+
+### 2026-09-16 — Add HOD-direct student creation
+
+**What changed**
+- Added `POST /api/admin/students` to `admin.ts`: lets an HOD create an already-approved
+  student account in their own department directly, bypassing the self-registration
+  email-OTP + payment flow entirely (no `paymentsTable` row is created). Mirrors the
+  existing `POST /professors` handler: validates `{ fullName, email, password,
+  registrationNumber, batch, dateOfJoining, kuhsId }`, rejects a duplicate email, hashes the
+  password with `bcrypt.hash(password, 12)`, and inserts `usersTable` (`role: "student"`,
+  `status: "approved"`, `departmentId: req.user!.departmentId!`) then `studentsTable`
+  (`userId` linked to the new `usersTable.id` — never `studentsTable.id`) inside one
+  transaction, mirroring `/register`'s own linkage exactly. Sends the existing welcome email
+  on a try/catch-and-continue basis; logs only `{ departmentId, status: 500 }` on failure,
+  never the raw error (which could carry the bound `passwordHash`).
+- Widened `sendAccountCreatedEmail`'s `role` parameter in `mailer.ts` from
+  `"hod" | "professor"` to include `"student"`, with its own `"Student"` display label.
+- Added an "Add Student" form to `HODPortal.tsx` (the real HOD dashboard, despite the
+  `mockup-sandbox` folder name), mirroring the existing "Add Faculty" card, calling the new
+  endpoint and refreshing the roster on success.
+- Scoped generically to `req.user!.departmentId!` throughout — not hardcoded to any one
+  department — even though the immediate need was a Dermatology student.
+- Built across two dispatches: dispatch 20 (feature build) first hit an Antigravity account
+  quota error on `Claude Sonnet 4.6 (Thinking)` with zero files touched, then succeeded on
+  retry with `Gemini 3.1 Pro (High)` (developer's explicit choice, trading off the
+  originally-scoped Sonnet-tier review confidence for speed); dispatch 21 fixed one review
+  finding — a new test referenced `studentsTable` without importing it. A 4-lens code
+  review (scope/rules/evidence/blast-radius, run in parallel) returned no Critical or Major
+  findings; verdict accept as-is.
+
+**Files**
+- `artifacts/api-server/src/routes/admin.ts` — new `POST /students`
+- `artifacts/api-server/src/lib/mailer.ts` — widened `sendAccountCreatedEmail` role type
+- `artifacts/mockup-sandbox/src/components/HODPortal.tsx` — new "Add Student" form
+- `artifacts/api-server/tests/access.test.ts` — 1 new test (401/403/201/400-duplicate,
+  plus assertions that `studentsTable.userId` links to the new `usersTable.id` and that no
+  `paymentsTable` row was created)
+- `HANDOFF.md` — Antigravity's dispatch reports
+- `.agents/runs/dispatch-20-hod-direct-student-creation.md`,
+  `.agents/runs/dispatch-21-fix-missing-import.md` (new — both dispatch prompts)
+
+**Evidence**
+- `pnpm test` (`artifacts/api-server`): before the dispatch-21 fix, 79/80 passing —
+  `ReferenceError: studentsTable is not defined` at `tests/access.test.ts:101:47`. After the
+  fix: `tests 80`, `pass 80`, `fail 0` — run directly by Claude Code, twice, plus a third,
+  fully independent run by the evidence-lens reviewer with the same result.
+- Four-case evidence (401 unauthenticated, 403 wrong-role, 400 duplicate email, 201 valid
+  HOD create) is exercised as individual status-code assertions inside the new automated
+  test, not as separately pasted request/response text — flagged as a Minor evidence-format
+  gap by the review's evidence lens, since the underlying behavior was independently
+  re-verified (by Claude Code and by the evidence-lens reviewer, both running the suite
+  directly) rather than taken on the dispatch's own claim.
+- `git diff --name-only e3086ff -- artifacts lib HANDOFF.md`: confirmed confined to exactly
+  the 5 files listed above.
+
+**Left open**
+- Two Minor findings from the rules lens, both pre-existing patterns copied verbatim from
+  the already-accepted `POST /professors` handler, not introduced by this task and not
+  fixed here per the one-feature-per-task rule: `admin.ts`'s `specialty: dept?.name || ""`
+  silently falls back to an empty string instead of erroring (currently unreachable, since
+  `requireDepartment` + the DB foreign key guarantee the department row exists for any
+  authenticated HOD); and the welcome-email failure handler logs the raw error object plus
+  the recipient's email rather than just an id/status.
+- `feature/admin-dashboard-frontend` has an orphaned, unmerged commit (`0578591`, "add
+  missing outer page padding") that landed after its own PR (#30) had already merged and
+  was never opened as its own PR. Noticed while pulling `main` for this task; not part of
+  this task's scope, not touched.
+- The same pile of untracked files from earlier, unrelated tasks remains in the working
+  tree (`.agents/runs/dispatch-05/06/07-*.md`, `handoff-original-332-lines-recovered.md`,
+  `review-package-handoff-combined.md`, every `.agy-jobs/*` directory) — noticed, not
+  touched, not part of this commit.
+
+**Commit** — pending (recorded in a follow-up commit immediately after this one).
+**PR** — pending. Per this repo's standing developer instruction, Claude Code stops after
+committing; the developer pushes and opens the PR themselves.

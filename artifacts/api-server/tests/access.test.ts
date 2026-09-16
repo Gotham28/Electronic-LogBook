@@ -1,7 +1,7 @@
 import { before, after, test } from "node:test";
 import assert from "node:assert/strict";
 import { setup, request, accounts as a, departmentIds, mail, password } from "./support.js";
-import { engine, db, usersTable, assignmentsTable, assignmentRecipientsTable, auditTable, subscriptionPlansTable, paymentsTable } from "./database.js";
+import { engine, db, usersTable, studentsTable, assignmentsTable, assignmentRecipientsTable, auditTable, subscriptionPlansTable, paymentsTable } from "./database.js";
 import { eq } from "drizzle-orm";
 import jwt from "jsonwebtoken";
 import { provisionDepartment } from "../src/lib/department-provisioning.js";
@@ -78,6 +78,33 @@ test("HOD-created faculty are bound to their HOD's department; client role or de
   assert.equal(created.status, 201);
   assert.equal(created.body.professor.departmentId, departmentIds[1]);
   assert.ok(!JSON.stringify(created.body).includes("passwordHash"));
+});
+
+test("HOD-created students are bound to their HOD's department and require no payment; duplicate emails are rejected", async () => {
+  const body = { fullName: "Direct student", email: "directstudent@example.test", password, registrationNumber: "DIR-001", batch: "2026", dateOfJoining: "2026-09-01", kuhsId: "KUHS-DIR-001" };
+  // 1. Unauthenticated/wrong-role
+  assert.equal((await call("/admin/students", "student1", "POST", body)).status, 403);
+  const unauth = await call("/admin/students", undefined, "POST", body);
+  assert.equal(unauth.status, 401);
+  
+  // 2. Authenticated HOD, valid body
+  const created = await call("/admin/students", "hod1", "POST", body);
+  assert.equal(created.status, 201);
+  assert.equal(created.body.student.departmentId, departmentIds[1]);
+  assert.ok(!JSON.stringify(created.body).includes("passwordHash"));
+  
+  // 3. Duplicate email check
+  const duplicate = await call("/admin/students", "hod1", "POST", body);
+  assert.equal(duplicate.status, 400);
+
+  // Validate studentsTable row exists and links to usersTable.id
+  const [studentRow] = await db.select().from(studentsTable).where(eq(studentsTable.registrationNumber, "DIR-001"));
+  assert.ok(studentRow);
+  assert.equal(studentRow.userId, created.body.student.id);
+
+  // Confirm no paymentsTable row exists
+  const [paymentRow] = await db.select().from(paymentsTable).where(eq(paymentsTable.userId, created.body.student.id));
+  assert.ok(!paymentRow);
 });
 
 test("assignment types and recipients cannot cross department boundaries; invalid batches roll back", async () => {
