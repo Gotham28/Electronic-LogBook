@@ -541,5 +541,6 @@ branch `feature/hod-direct-student-creation` (cut fresh off `main` @ `e3086ff`).
   values on page load before relying on this for real test-account creation.
 
 **Commit** — `f32920e` "feat(admin): auto-fill test defaults on the Add Student form".
-**PR** — [#32](https://github.com/Gotham28/Electronic-LogBook/pull/32) (same PR, additional
-commit).
+**PR** — [#33](https://github.com/Gotham28/Electronic-LogBook/pull/33). (PR #32 merged at
+2026-09-16T08:45:56Z, *before* this commit existed, so it landed on the same branch too late
+to ride along — opened as its own PR instead of "same PR" as originally written above.)
