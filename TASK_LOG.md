@@ -489,3 +489,58 @@ committing; the developer pushes and opens the PR themselves.
 **Commit** — `1f9034a` "feat(admin): let HODs create pre-approved students directly", on
 branch `feature/hod-direct-student-creation` (cut fresh off `main` @ `e3086ff`).
 **PR** — [#32](https://github.com/Gotham28/Electronic-LogBook/pull/32).
+
+### 2026-09-16 — Auto-fill test defaults on the Add Student form
+
+**What changed**
+- Follow-up to the entry above, same PR #32 (still open at the time). The developer tried
+  the new "Add Student" form and hit a 400 — `registrationNumber`, `batch`, `dateOfJoining`,
+  and `kuhsId` all came back as empty/invalid, because they'd left those four blank while
+  filling in only `fullName`/`email`/`password`, intending a quick test account. Asked for
+  those four to be pre-filled with generated defaults instead of typed every time.
+- Added `generateDefaultStudentForm()` to `HODPortal.tsx`: returns `registrationNumber:
+  TEST-<timestamp>`, `batch: <current year>`, `dateOfJoining: <today, YYYY-MM-DD>`,
+  `kuhsId: TEST-KUHS-<timestamp>` — and `fullName`/`email`/`password` still exactly `""`,
+  by explicit design (never auto-fill identity/credential fields). Wired into both the
+  `studentForm` state's initializer and the post-submit reset in `handleCreateStudent`, so
+  a second test account right after the first gets fresh (non-colliding) placeholder values
+  rather than needing a page reload.
+- Backend (`admin.ts`'s `POST /students` validation) is completely unchanged — these fields
+  are still required on the server; only the frontend's starting values changed.
+- First dispatch attempt halted itself: it read `AGENTS.md` §1's pull-before-task git ritual,
+  perceived a conflict with the sandbox constraint forbidding shell commands, and (correctly
+  per §12's "don't pick one" rule) reverted its own edits and stopped rather than deciding.
+  That was a real ambiguity in the dispatch prompt, not a bad read of the file — §1 is
+  Claude Code's own pre-dispatch step, already done before that job was sent, and the prompt
+  hadn't said so. Redispatched with that made explicit; second attempt succeeded cleanly.
+
+**Files**
+- `artifacts/mockup-sandbox/src/components/HODPortal.tsx` — new `generateDefaultStudentForm()`
+  helper, used by the `studentForm` initializer and the post-submit reset
+- `HANDOFF.md` — Antigravity's dispatch report
+- `.agents/runs/dispatch-22-autofill-student-form-defaults.md` (new — the dispatch prompt,
+  both attempts noted)
+
+**Evidence**
+- Full diff read directly by Claude Code: exactly 3 hunks in one file — the new helper
+  function, the `studentForm` initializer now calling it, and the post-submit reset now
+  calling it. `fullName`/`email`/`password` confirmed still `""` in the generated object.
+  No other file touched (`git diff --name-only` confined to `HODPortal.tsx` and `HANDOFF.md`).
+- No automated test added or changed — this is a UI default-value change with no new
+  branching logic to assert on beyond what reading the diff already confirms; the existing
+  `access.test.ts` coverage for `POST /students` itself is unaffected and unchanged.
+- Given the very small, fully-specified, zero-rule-trigger scope (confirmed against this
+  task's own Flags section: none), Claude Code verified this directly against the task
+  file's stated verification items rather than dispatching the full 4-lens review used for
+  the original feature — noted here plainly rather than silently skipped.
+
+**Left open**
+- No manual browser smoke test performed by Claude Code (per this repo's standing
+  constraint against risking a real `DATABASE_URL`, same reasoning as previous entries) —
+  the developer should confirm in the browser that the four fields now show generated
+  values on page load before relying on this for real test-account creation.
+
+**Commit** — `f32920e` "feat(admin): auto-fill test defaults on the Add Student form".
+**PR** — [#33](https://github.com/Gotham28/Electronic-LogBook/pull/33). (PR #32 merged at
+2026-09-16T08:45:56Z, *before* this commit existed, so it landed on the same branch too late
+to ride along — opened as its own PR instead of "same PR" as originally written above.)
