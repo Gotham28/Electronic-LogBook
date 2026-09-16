@@ -22,6 +22,18 @@ import {
   type AdminUserRow
 } from "@/lib/apiClient";
 
+function generateDefaultResidentForm() {
+  return {
+    fullName: "",
+    email: "",
+    password: "",
+    registrationNumber: `TEST-${Date.now()}`,
+    batch: `${new Date().getFullYear()}`,
+    dateOfJoining: new Date().toISOString().slice(0, 10),
+    kuhsId: `TEST-KUHS-${Date.now()}`,
+  };
+}
+
 export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
   const [departments, setDepartments] = useState<AdminDepartment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -406,7 +418,7 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [addFormType, setAddFormType] = useState<"faculty" | "resident">("faculty");
-  const [addForm, setAddForm] = useState({ fullName: "", email: "", password: "", registrationNumber: "", batch: "", dateOfJoining: "", kuhsId: "" });
+  const [addForm, setAddForm] = useState(() => generateDefaultResidentForm());
   const [addingUser, setAddingUser] = useState(false);
   
   const [activeTab, setActiveTab] = useState("faculty");
@@ -497,7 +509,7 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
         });
         toast.success("Resident account created (pending HOD approval)");
       }
-      setAddForm({ fullName: "", email: "", password: "", registrationNumber: "", batch: "", dateOfJoining: "", kuhsId: "" });
+      setAddForm(generateDefaultResidentForm());
       setShowAddForm(false);
       onRefresh(); // Refresh counts
       fetchRoster();
