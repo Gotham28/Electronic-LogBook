@@ -1,17 +1,9 @@
 # Handoff Report
 
-## Changes Made
+## Fix — assignment_types FK deadlock (Critical)
+**What changed**: 
+- In `artifacts/api-server/src/routes/admin.ts`, the hard-delete route for professors now reassigns `assignmentTypesTable` rows (`createdBy = targetUserId`) to the HOD driving the deletion (`req.user!.id`). We also added an informational metric `deletedCounts.assignmentTypesReassigned`.
+- In `artifacts/api-server/tests/hard-delete.test.ts`, updated the cascade deletion test to query the preserved `assignment_types` by `id` rather than the stale `createdBy` ID, and asserted that its `createdBy` now points to the HOD (`a.hod2.id`).
 
-- **`artifacts/mockup-sandbox/src/components/HODPortal.tsx`**:
-  - Added the `generateDefaultStudentForm()` helper function to return placeholder defaults dynamically for `registrationNumber`, `batch`, `dateOfJoining`, and `kuhsId`. Identity and authentication fields (`fullName`, `email`, `password`) are intentionally left blank as explicitly requested.
-  - Replaced the initial value of the `studentForm` state to initialize with `React.useState(() => generateDefaultStudentForm())`, which populates the form upon component mount.
-  - Modified the state reset in the `handleCreateStudent` success path to call `setStudentForm(generateDefaultStudentForm())`, providing fresh default values (since they are generated via `Date.now()`) after every successful student creation.
-
-## Rationale
-These changes accelerate testing of the "Add Student" functionality by auto-populating fields that are required by the backend, without compromising real identity fields which should always be explicitly filled.
-
-## Constraints Met
-- Executed exclusively via file tools. No shell commands were run, fully respecting the sandbox constraint.
-- The `fullName`, `email`, and `password` fields remain blank (`""`) in the auto-generated object.
-- Backend schema and validation logic in `artifacts/api-server/src/routes/admin.ts` were untouched.
-- Other forms inside `HODPortal.tsx` were kept strictly intact.
+**Why**:
+Assignment types are department-level catalog data. Deleting them caused data loss, which was addressed in a prior fix, but omitting the deletion completely caused a foreign key constraint violation (`assignment_types_created_by_users_id_fk`) and deadlocked the transaction since `createdBy` is `NOT NULL` and still referenced the deleted user. Reassigning `createdBy` to the HOD permanently anchors the shared catalog data while allowing the professor's account to be safely deleted.

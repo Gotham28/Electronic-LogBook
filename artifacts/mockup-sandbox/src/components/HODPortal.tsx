@@ -15,6 +15,7 @@ import {
   BookOpen,
   GraduationCap,
   Search,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -113,6 +114,10 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
   const [roster, setRoster] = React.useState<{ students: any[]; professors: any[] } | null>(null);
   const [rosterLoading, setRosterLoading] = React.useState(false);
   const [rosterError, setRosterError] = React.useState<string | null>(null);
+
+  const [userToDelete, setUserToDelete] = React.useState<{id: number, name: string, role: string} | null>(null);
+  const [deletingUser, setDeletingUser] = React.useState(false);
+  const [deleteUserError, setDeleteUserError] = React.useState<string | null>(null);
 
   // Roster Filters
   const [searchQuery, setSearchQuery] = React.useState("");
@@ -230,6 +235,30 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
       await fetchRoster();
     } catch (err: any) {
       toast.error(err.message || "Failed to remove user");
+    }
+  };
+
+  const handleHardDeleteUser = async () => {
+    if (!userToDelete) return;
+    setDeletingUser(true);
+    setDeleteUserError(null);
+    try {
+      const res: any = await apiDelete(`/api/admin/users/${userToDelete.id}/hard`);
+      
+      let deletedCount = 0;
+      if (res?.deletedRecords) {
+        deletedCount = Object.values(res.deletedRecords).reduce((acc: number, val: any) => acc + (typeof val === 'number' ? val : 0), 0) as number;
+      }
+      
+      const summary = deletedCount > 0 ? ` (${deletedCount} related records removed)` : "";
+      toast.success(`${userToDelete.name} permanently deleted${summary}`);
+      
+      setUserToDelete(null);
+      await fetchRoster();
+    } catch (err: any) {
+      setDeleteUserError(err.message || "Failed to permanently delete user");
+    } finally {
+      setDeletingUser(false);
     }
   };
 
@@ -366,6 +395,60 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
             </div>
           ) : (
             <>
+              {userToDelete && (
+                <Card className="border-rose-200 bg-rose-50/30 shadow-sm mb-6">
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-rose-100">
+                        <AlertTriangle className="h-4 w-4 text-rose-700" />
+                      </div>
+                      <div className="flex-1 space-y-3">
+                        <div>
+                          <h4 className="font-semibold text-rose-900">Permanently delete {userToDelete.name}?</h4>
+                          <p className="text-sm text-rose-800 mt-1 leading-relaxed">
+                            This will <strong>permanently delete</strong> the {userToDelete.role} and <strong>all</strong> of their associated data. This action is <strong>irreversible</strong>.
+                          </p>
+                          {userToDelete.role === "student" ? (
+                            <ul className="text-sm text-rose-800 mt-1 ml-4 list-disc space-y-0.5">
+                              <li>Their account and profile</li>
+                              <li>All of their clinical logs, case logs, and procedures</li>
+                              <li>Their assessments, appraisals, and attendance records</li>
+                              <li>Their leave records and applications</li>
+                              <li>Their thesis milestones and research records</li>
+                            </ul>
+                          ) : (
+                            <ul className="text-sm text-rose-800 mt-1 ml-4 list-disc space-y-0.5">
+                              <li>Their account and profile</li>
+                              <li>Any assignment types and assignments they created</li>
+                              <li><strong>Every clinical and academic record belonging to OTHER students</strong> where this faculty appears as reviewer, verifier, or supervisor</li>
+                              <li>Their assessments and appraisals of students</li>
+                            </ul>
+                          )}
+                        </div>
+
+                        {deleteUserError && (
+                          <div className="p-3 bg-rose-100 border border-rose-300 rounded-md text-sm text-rose-900 font-medium">
+                            {deleteUserError}
+                          </div>
+                        )}
+
+                        <div className="flex gap-2 justify-end">
+                          <Button type="button" variant="outline" onClick={() => { setUserToDelete(null); setDeleteUserError(null); }}>
+                            Cancel
+                          </Button>
+                          <Button
+                            onClick={handleHardDeleteUser}
+                            disabled={deletingUser}
+                            className="bg-rose-600 hover:bg-rose-700 text-white"
+                          >
+                            {deletingUser ? "Deleting..." : `Yes, permanently delete ${userToDelete.name}`}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <SummaryCard label="Approved students" value={roster?.students.filter((student) => student.status === "approved").length ?? 0} />
                 <SummaryCard label="Average progress" value={`${Math.round((roster?.students.reduce((sum, student) => sum + (student.completion || 0), 0) ?? 0) / Math.max(roster?.students.length ?? 0, 1))}%`} />
@@ -444,9 +527,14 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
                               <Badge variant={s.status === "approved" ? "default" : "secondary"} className="capitalize text-xs">{s.status}</Badge>
                             </TableCell>
                             <TableCell className="text-right">
-                              <Button size="sm" variant="outline" onClick={() => s.status === "rejected" ? reactivateUser(s.id, s.fullName) : removeUser(s.id, s.fullName)} className="text-rose-700 border-rose-200 hover:bg-rose-50">
-                                <XCircle className="h-4 w-4 mr-1" /> {s.status === "rejected" ? "Reactivate" : "Deactivate"}
-                              </Button>
+                              <div className="flex justify-end gap-2">
+                                <Button size="sm" variant="outline" onClick={() => s.status === "rejected" ? reactivateUser(s.id, s.fullName) : removeUser(s.id, s.fullName)} className="text-rose-700 border-rose-200 hover:bg-rose-50">
+                                  <XCircle className="h-4 w-4 mr-1" /> {s.status === "rejected" ? "Reactivate" : "Deactivate"}
+                                </Button>
+                                <Button size="sm" variant="outline" onClick={() => { setUserToDelete({ id: s.id, name: s.fullName, role: "student" }); setDeleteUserError(null); }} className="text-rose-700 border-rose-200 hover:bg-rose-50">
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                         ))}
@@ -485,9 +573,14 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
                               <Badge variant={p.status === "approved" ? "default" : "secondary"} className="capitalize text-xs">{p.status}</Badge>
                             </TableCell>
                             <TableCell className="text-right">
-                              <Button size="sm" variant="outline" onClick={() => p.status === "rejected" ? reactivateUser(p.id, p.fullName) : removeUser(p.id, p.fullName)} className="text-rose-700 border-rose-200 hover:bg-rose-50">
-                                <XCircle className="h-4 w-4 mr-1" /> {p.status === "rejected" ? "Reactivate" : "Deactivate"}
-                              </Button>
+                              <div className="flex justify-end gap-2">
+                                <Button size="sm" variant="outline" onClick={() => p.status === "rejected" ? reactivateUser(p.id, p.fullName) : removeUser(p.id, p.fullName)} className="text-rose-700 border-rose-200 hover:bg-rose-50">
+                                  <XCircle className="h-4 w-4 mr-1" /> {p.status === "rejected" ? "Reactivate" : "Deactivate"}
+                                </Button>
+                                <Button size="sm" variant="outline" onClick={() => { setUserToDelete({ id: p.id, name: p.fullName, role: "professor" }); setDeleteUserError(null); }} className="text-rose-700 border-rose-200 hover:bg-rose-50">
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                         ))}
