@@ -540,6 +540,6 @@ branch `feature/hod-direct-student-creation` (cut fresh off `main` @ `e3086ff`).
   the developer should confirm in the browser that the four fields now show generated
   values on page load before relying on this for real test-account creation.
 
-**Commit** — pending (recorded in a follow-up commit immediately after this one).
+**Commit** — `f32920e` "feat(admin): auto-fill test defaults on the Add Student form".
 **PR** — [#32](https://github.com/Gotham28/Electronic-LogBook/pull/32) (same PR, additional
 commit).
