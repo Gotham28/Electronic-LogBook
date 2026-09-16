@@ -76,6 +76,18 @@ const paths: Record<string, string> = {
   "procedures": "/requirements",
 };
 
+function generateDefaultStudentForm() {
+  return {
+    fullName: "",
+    email: "",
+    password: "",
+    registrationNumber: `TEST-${Date.now()}`,
+    batch: `${new Date().getFullYear()}`,
+    dateOfJoining: new Date().toISOString().slice(0, 10),
+    kuhsId: `TEST-KUHS-${Date.now()}`,
+  };
+}
+
 export function HODPortal({ activeTab }: { activeTab?: string }) {
   const [location, setLocation] = useLocation();
   const { department, hod } = useDepartment();
@@ -112,7 +124,7 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
   const [creatingProf, setCreatingProf] = React.useState(false);
 
   // Student Form State
-  const [studentForm, setStudentForm] = React.useState({ fullName: "", email: "", password: "", registrationNumber: "", batch: "", dateOfJoining: "", kuhsId: "" });
+  const [studentForm, setStudentForm] = React.useState(() => generateDefaultStudentForm());
   const [creatingStudent, setCreatingStudent] = React.useState(false);
 
   // Leave approvals
@@ -255,7 +267,7 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
         ...studentForm
       });
       toast.success("Student account created successfully");
-      setStudentForm({ fullName: "", email: "", password: "", registrationNumber: "", batch: "", dateOfJoining: "", kuhsId: "" });
+      setStudentForm(generateDefaultStudentForm());
       setRoster(null); // Refreshes roster
     } catch (err: any) {
       toast.error(err.message || "Failed to create student account");
