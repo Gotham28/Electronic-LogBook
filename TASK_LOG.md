@@ -645,3 +645,60 @@ to ride along — opened as its own PR instead of "same PR" as originally writte
 **Commit** — `2c22021` "feat(admin): let HODs permanently delete student and faculty accounts",
 on branch `feature/hard-delete-students-faculty` (cut fresh off `main` @ `82fa330`).
 **PR** — [#34](https://github.com/Gotham28/Electronic-LogBook/pull/34).
+
+### 2026-09-16 — Auto-fill defaults for the superadmin console's "Add Resident" form
+
+**What changed**
+- The developer reported the exact same "registrationNumber/batch/dateOfJoining/kuhsId
+  blank" 400 error a second time, after the 2026-09-16 "Auto-fill test defaults on the Add
+  Student form" entry above (PR #33) had already shipped and merged. Claude Code root-caused
+  this from the actual failing request URL in the report
+  (`/api/superadmin/departments/15/students`) rather than assuming it was the same form
+  again: this hits a completely different, pre-existing form —
+  `artifacts/mockup-sandbox/src/components/AdminPortal.tsx`'s `addForm` state,
+  `addFormType === "resident"`, `handleAddUser` — the superadmin console's own "add a
+  resident to any department" feature, distinct from the HOD dashboard's "Add Student" form
+  fixed earlier. `AdminPortal.tsx` had been explicitly out of scope / "Do NOT touch" in
+  every prior task this session that touched `HODPortal.tsx`, which is exactly why the
+  earlier fix never reached it.
+- Applied the identical fix pattern already shipped for `HODPortal.tsx`: added
+  `generateDefaultResidentForm()` to `AdminPortal.tsx`, wired into both the `addForm` state's
+  initializer and the post-submit reset in `handleAddUser`. `registrationNumber`/`batch`/
+  `dateOfJoining`/`kuhsId` now start pre-filled with generated placeholder defaults;
+  `fullName`/`email`/`password` stay exactly `""` in both places, same rule as before.
+  Backend (`superadmin.ts`'s `POST /departments/:id/students` validation) is completely
+  unchanged.
+
+**Files**
+- `artifacts/mockup-sandbox/src/components/AdminPortal.tsx` — new
+  `generateDefaultResidentForm()` helper, used by the `addForm` initializer and the
+  post-submit reset
+- `HANDOFF.md` — Antigravity's dispatch report
+- `.agents/runs/dispatch-28-autofill-admin-portal-resident-form.md` (new — the dispatch
+  prompt)
+
+**Evidence**
+- Full diff read directly by Claude Code: exactly 3 hunks in one file — the new helper
+  function, the `addForm` initializer now calling it, and the post-submit reset now calling
+  it. `fullName`/`email`/`password` confirmed still `""` in the generated object, and the
+  `faculty`/`resident` mode toggle logic and client-side validation check both confirmed
+  unchanged. No other file touched.
+- Given this is the identical, already-reviewed pattern from the prior `HODPortal.tsx` fix
+  applied to a second file with no new logic, Claude Code verified this directly against the
+  diff rather than dispatching a second full 4-lens review — noted plainly rather than
+  silently skipped, same reasoning as the original `HODPortal.tsx` auto-fill entry.
+
+**Left open**
+- No manual browser smoke test performed by Claude Code (same standing reasoning as prior
+  entries). The developer should confirm in the browser, against the superadmin console
+  specifically this time, that the four fields now show generated values on page load.
+- Worth asking the developer directly: are there any OTHER pre-existing "add student/add
+  resident" entry points in this app beyond these two (`HODPortal.tsx` and
+  `AdminPortal.tsx`) that might have the same latent issue? Not investigated here, since
+  this task was scoped narrowly to the one confirmed failing endpoint from the actual error
+  report, not a broader audit.
+
+**Commit** — `d2f14c0` "fix(admin): auto-fill test defaults on the superadmin Add Resident
+form", on branch `fix/superadmin-add-resident-form-defaults` (cut fresh off `main` @
+`b28e3b5`).
+**PR** — [#35](https://github.com/Gotham28/Electronic-LogBook/pull/35).
