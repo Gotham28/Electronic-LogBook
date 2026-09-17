@@ -442,8 +442,8 @@ router.post("/departments/:id/faculty", validate(createFacultyBody), async (req,
 });
 
 // ---------------------------------------------------------------------------
-// POST /api/superadmin/departments/:id/students — create a student (pending)
-// Status is "pending" so the student enters the department's HOD approval queue.
+// POST /api/superadmin/departments/:id/students — create a student (approved)
+// Status is "approved" so the student is immediately active.
 // Payment gate is untouched — this just creates the user + student profile row.
 // ---------------------------------------------------------------------------
 const createStudentBody = z.object({
@@ -475,7 +475,7 @@ router.post("/departments/:id/students", validate(createStudentBody), async (req
     const created = await db.transaction(async (tx) => {
       const [user] = await tx.insert(usersTable).values({
         fullName, email, passwordHash,
-        role: "student", status: "pending", departmentId: dept.id,
+        role: "student", status: "approved", departmentId: dept.id,
       }).returning({ id: usersTable.id });
       await tx.insert(studentsTable).values({
         userId: user.id, registrationNumber, batch,
@@ -485,7 +485,7 @@ router.post("/departments/:id/students", validate(createStudentBody), async (req
     });
 
     req.log.info({ createdId: created.id, departmentId, status: 201 }, "Student created by admin");
-    res.status(201).json({ message: "Student account created (pending HOD approval)", student: { id: created.id, fullName, email, departmentId } });
+    res.status(201).json({ message: "Student account created and approved", student: { id: created.id, fullName, email, departmentId } });
   } catch (error) {
     req.log.error({ departmentId, userId: req.user!.id, status: 500 }, "Error creating student");
     res.status(500).json({ message: "Internal server error" });

@@ -703,130 +703,61 @@ form", on branch `fix/superadmin-add-resident-form-defaults` (cut fresh off `mai
 `b28e3b5`).
 **PR** — [#35](https://github.com/Gotham28/Electronic-LogBook/pull/35).
 
-### 2026-09-17 — Mirror test department: settings-sharing, auto-provisioning, admin impersonation, and one-department-per-real-department UI
+### 2026-09-16 — Auto-approve students created via the superadmin console
 
 **What changed**
-- Built the "mirror test department" feature end to end, in five pieces on one branch,
-  because the developer's actual need only became clear through live use against
-  production data (no staging environment exists for this app):
-  1. **Settings-sharing base feature.** A department can be flagged `isTest = true` with a
-     `configSourceDepartmentId` pointing at a real department. `department-config-source.ts`
-     resolves a test department's `department_configs`/`procedure_types`/`department_catalog`
-     live from its real counterpart instead of duplicating rows, so the mirror's settings
-     never drift out of sync. Test departments are excluded from public registration
-     (`GET /api/departments`, `POST /api/auth/register`) and from a real HOD's own
-     department-scoped analytics. Schema: `lib/db/migrations/0004_mirror_test_department.sql`
-     adds `is_test` (`boolean not null default false`) and `config_source_department_id`
-     (self-referencing FK) to `departments`, with two check constraints — a mirror must be
-     `isTest = true`, and a department can't point at itself.
-  2. **Task A — auto-provisioning.** `provisionDepartment()` now also creates a paired
-     mirror (with 3 approved test accounts — hod/professor/student, `.invalid`-domain
-     emails, independent random passwords, the student getting its own `students` row) the
-     moment a real department is created, in a second transaction that can never block or
-     roll back the real department's own success. Extracted into a standalone, reusable
-     `provisionMirrorForRealDepartment()` function partway through, once a later piece
-     needed to call the same logic from a second call site.
-  3. **A follow-up delete-cascade fix.** `DELETE /departments/:id` had no awareness of a
-     department's mirror, so deleting a real department with a mirror hit a raw, uncaught FK
-     violation. `deleteDepartmentCascade` is now a shared helper called once for any mirror
-     (skipping the clinical-conflict check for mirrors specifically, since a mirror's own
-     test-authored data must never block deleting the real department it belongs to) and
-     once for the target department itself.
-  4. **Task C — admin impersonation.** `POST /superadmin/users/:id/impersonate` mints a
-     20-minute JWT for any approved hod/professor/student belonging to a department where
-     `isTest = true`, checked server-side from the target's own DB row — never from client
-     input. `sessionProfile()` (already used by `/auth/login`) is reused so the response
-     shape needs no new frontend parsing. Rate-limited per admin (a bounded in-process map,
-     matching this repo's existing login-throttling idiom). The admin portal opens the
-     result in a new browser tab via a one-time URL token param that the app reads once on
-     startup and strips.
-  5. **A backfill follow-up.** Auto-provisioning only fires on new department creation, so
-     every department that predates it had no mirror. `POST
-     /departments/backfill-test-departments` (admin-triggered, idempotent, safe to re-run)
-     loops every real department and provisions any missing mirror, isolating one
-     department's failure from the rest.
-  6. **Task D — collapse the admin UI to one card per real department.** The developer
-     tried the shipped feature live and found every mirror appearing as its own separate
-     department card (e.g. both "Radiology" and "Radiology (Test)"). `GET /departments` now
-     filters to real departments only and attaches each one's own `mirrorDepartmentId`
-     (looked up via a second query, same pattern as the existing HOD-attachment query in the
-     same handler). The admin portal's `DepartmentDetail` view gained a third "Test
-     accounts" tab that fetches and shows the paired mirror's 3 accounts with "Log in as"
-     buttons, replacing two now-dead conditional buttons that could only ever fire when
-     mirrors were listed as selectable departments in their own right.
-- Every piece went through Claude Code's own diff read plus a real `pnpm test` run before
-  being accepted, and every non-mechanical piece (base feature, Task A, Task C, Task D) also
-  went through a 4-lens (scope/rules/evidence/blast-radius) parallel review with fixes
-  dispatched back before acceptance. Task C got the closest scrutiny (Opus-tier review) since
-  it mints a session credential outside the normal login path.
+- Developer hit `402 "This student has not completed payment and cannot be approved yet"`
+  trying to approve a student created via the superadmin "Add Resident" form (the one fixed
+  for blank-defaults in the entry above, PR #35). Root-caused directly:
+  `superadmin.ts`'s `POST /departments/:id/students` created students with `status:
+  "pending"`, intending them to enter the HOD's approval queue, but never created a
+  `paymentsTable` row — and `admin.ts`'s `POST /students/:id/approve` hard-requires a `paid`
+  payment row before approving anyone. Every student created via this route was therefore
+  permanently stuck pending, with no path to approval. Two pre-existing features that had
+  never been reconciled with each other.
+- Developer explicitly chose to make this route auto-approve on creation, matching the
+  already-shipped HOD-direct student creation feature (PR #32), over two alternatives
+  offered (skip the payment check specifically for admin-created students; or auto-create a
+  paid/waived payment row).
+- Changed `superadmin.ts`'s `POST /departments/:id/students` to insert `status: "approved"`
+  instead of `"pending"`, updated its success message and the comment above the route to
+  match. Updated `AdminPortal.tsx`'s matching success toast. Updated the existing test
+  (`"admin can create student in any department (pending status)"` →
+  `"...(auto-approved)"`, assertion changed to expect `"approved"`).
+- `POST /students/:id/approve` itself, the self-registration `/api/auth/register` flow, and
+  the HOD-direct creation route (PR #32) are all unchanged — this fix is entirely on the
+  creation side of this one route, not the approval/payment gate.
 
 **Files**
-- `lib/db/migrations/0004_mirror_test_department.sql` (new), `lib/db/src/schema/users.ts`
-  (`isTest`/`configSourceDepartmentId` + check constraints), `lib/db/src/migrations.ts`
-- `artifacts/api-server/src/lib/department-provisioning.ts` (`provisionDepartment()`
-  extended; `provisionMirrorForRealDepartment()` extracted)
-- `artifacts/api-server/src/lib/department-config-source.ts` (new)
-- `artifacts/api-server/src/routes/superadmin.ts` — `GET /departments` (filter + join), new
-  `POST /departments/backfill-test-departments`, new `POST /users/:id/impersonate`,
-  `DELETE /departments/:id` (`deleteDepartmentCascade` extracted, mirror-aware)
-- `artifacts/api-server/src/routes/admin.ts`, `department.ts`, `professor.ts`, `student.ts`,
-  `auth.ts` — test-department exclusion/awareness in listings, registration, and analytics
-- `artifacts/mockup-sandbox/src/lib/apiClient.ts` — `AdminDepartment` type,
-  `impersonateAdminUser`, `backfillTestDepartments`
-- `artifacts/mockup-sandbox/src/components/AdminPortal.tsx` — "Provision test departments"
-  button, "Log in as" flow, the "Test accounts" tab, dead-code removal
-- `artifacts/mockup-sandbox/src/App.tsx` — one-time impersonation token pickup on startup
-- `artifacts/api-server/tests/mirror-department.test.ts`,
-  `tests/auto-provision.test.ts`, `tests/delete-cascade.test.ts`,
-  `tests/impersonation.test.ts`, `tests/backfill-test-departments.test.ts` (all new),
-  `tests/superadmin.test.ts`, `tests/migrations.test.ts` (extended)
-- `HANDOFF.md` — the full dispatch history for this branch (dispatches 30–42)
+- `artifacts/api-server/src/routes/superadmin.ts` — `POST /departments/:id/students` now
+  creates approved students
+- `artifacts/mockup-sandbox/src/components/AdminPortal.tsx` — updated success toast wording
+- `artifacts/api-server/tests/superadmin.test.ts` — updated/renamed test assertion
+- `HANDOFF.md` — Antigravity's dispatch report
+- `.agents/runs/dispatch-29-superadmin-resident-auto-approve.md` (new — the dispatch prompt)
 
 **Evidence**
-- Full backend suite, run directly by Claude Code after every accepted round, ended at
-  111/111 passing with zero regressions (`pnpm test` in `artifacts/api-server`).
-- `tsc -p tsconfig.json --noEmit` in `artifacts/mockup-sandbox`: zero errors on the final
-  state. One real regression (a dropped `deactivateAdminUser` import that would have broken
-  the Faculty/Residents "Deactivate" buttons) was caught this way mid-session and fixed
-  before acceptance — noted here because it's exactly the kind of thing a dispatch's own
-  self-report did not catch.
-- Task C's authorization boundary was proven with the full four-case matrix: unauthenticated
-  → 401; authenticated non-admin → 403; admin targeting a user in a REAL department → 403
-  (the case that must never succeed); admin targeting a user in a test department → 200 with
-  a token that round-trips through a real `GET /auth/me` call; nonexistent user → 404; token
-  expiry pinned at 20 minutes; token dies the moment the target's `sessionVersion` changes.
-- `requireAuth` (`middlewares/auth.ts`) was confirmed, by direct read and independently by a
-  review lens, to only ever read `.id`/`.sessionVersion`/`.scope` off a decoded JWT and
-  re-resolve everything else fresh from the DB — so the impersonation token's extra
-  `impersonatedBy` claim is inert to it, and that file was never modified.
-- Live, manual verification against the actual production database this session: creating a
-  real department (id 18) produced its mirror and 3 approved test accounts; running the
-  backfill button against pre-existing departments produced mirrors for them too; clicking
-  "Log in as" opened a new tab signed in as the target test account.
-- A migration-not-applied bug (`provisionDepartment()`'s bare `.select()`/`.returning()`
-  calls throwing "column does not exist" because migration 0004 hadn't been run against
-  production yet) was root-caused by Claude Code from server logs and the developer's own
-  reproduction, but the actual `pnpm run db:migrate` command was run by the developer
-  themselves — Claude Code never runs any database-connecting command, by standing rule.
+- `pnpm test` (`artifacts/api-server`): **86/86 passing** — run directly by Claude Code,
+  including the updated test now asserting `status === "approved"`.
+- Full diff read directly by Claude Code across all three files: confirmed exactly the
+  three named changes (status value, two message strings, one test assertion + rename) and
+  nothing else — the approve endpoint, payment gate, and self-registration flow all
+  confirmed untouched.
+- Given this is a small, fully-specified, directly-verified change mirroring an
+  already-reviewed precedent (PR #32's status/payment handling), Claude Code verified this
+  directly against the diff and test suite rather than dispatching a full 4-lens review —
+  noted plainly, same reasoning as the two auto-fill-defaults entries above.
 
 **Left open**
-- Two existing department rows look test-related by name — "Radiology (Test)" (`TEST-18`)
-  and a separate "Test Department" (`TEST`) — but this session had no way to check their
-  actual `isTest`/`configSourceDepartmentId` values directly (the standing no-database-command
-  rule). The new filtering in Task D is boolean/FK-driven, not name-pattern-based, so it
-  behaves correctly either way, but if either turns out to be an orphaned mirror (`isTest =
-  true` with no `configSourceDepartmentId` pointing at a live real department), it will have
-  no in-app path left to reach it after this ships. Worth a quick manual check.
-- One dispatch (42, a small test-assertion fix) self-reported writing a `HANDOFF.md` section
-  that isn't actually present in the file — the code change itself was independently
-  verified correct (direct diff read, full passing test run), so this is a documentation gap
-  only, noted here rather than silently left unrecorded.
-- No bulk-import/seeding mechanism exists for test clinical data by design — the intended
-  workflow is an admin impersonating a test account and using the existing student/professor
-  log-creation forms, confirmed with the developer during scoping rather than building a new
-  ingestion path.
+- No manual browser smoke test performed by Claude Code (same standing reasoning as prior
+  entries). The developer should confirm end-to-end in the browser: create a resident via
+  the superadmin console, confirm it shows as approved immediately (not in the HOD's pending
+  queue), and that the account can log in right away.
+- As noted in the prior entry: worth a deliberate check for any other pre-existing student
+  creation/approval entry points in the app that might have the same class of gap. Not
+  investigated here — this task was scoped to the one confirmed-broken path.
 
-**Commit** — `e8f4723` "feat(admin): mirror test departments with auto-provisioning and
-impersonation", on branch `feature/mirror-test-department` (cut fresh off `main` @
+**Commit** — `47b0f45` "fix(admin): auto-approve students created via the superadmin
+console", on branch `fix/superadmin-resident-auto-approve` (cut fresh off `main` @
 `ef6c740`).
-**PR** — [#37](https://github.com/Gotham28/Electronic-LogBook/pull/37).
+**PR** — [#36](https://github.com/Gotham28/Electronic-LogBook/pull/36).

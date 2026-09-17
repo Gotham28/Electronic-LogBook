@@ -558,7 +558,7 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
           dateOfJoining: addForm.dateOfJoining,
           kuhsId: addForm.kuhsId
         });
-        toast.success("Resident account created (pending HOD approval)");
+        toast.success("Resident account created and approved");
       }
       setAddForm(generateDefaultResidentForm());
       setShowAddForm(false);
