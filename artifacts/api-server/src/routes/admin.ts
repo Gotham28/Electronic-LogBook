@@ -5,6 +5,7 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { requireAuth, requireRole, requireDepartment } from "../middlewares/auth.js";
 import { completionPercent, configSchema, dateSchema, emailSchema, nameSchema, passwordSchema, targetSchema, validate } from "../lib/validation.js";
+import { resolveConfigDepartmentId } from "../lib/department-config-source.js";
 import { sendAccountCreatedEmail } from "../lib/mailer.js";
 
 const router = Router();
@@ -393,7 +394,8 @@ router.get("/department/config", async (req, res) => {
       return;
     }
 
-    const [config] = await db.select().from(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, departmentId));
+    const configSourceId = await resolveConfigDepartmentId(departmentId);
+    const [config] = await db.select().from(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, configSourceId));
     res.json(config || null);
   } catch (error) {
     req.log.error({ departmentId: req.user!.departmentId, status: 500 }, "Error fetching department config");
@@ -407,6 +409,12 @@ router.post("/department/config", validate(configSchema), async (req, res) => {
     const departmentId = req.user?.departmentId;
     if (!departmentId) {
       res.status(400).json({ message: "No department assigned" });
+      return;
+    }
+
+    const [dept] = await db.select({ configSourceDepartmentId: departmentsTable.configSourceDepartmentId }).from(departmentsTable).where(eq(departmentsTable.id, departmentId));
+    if (dept?.configSourceDepartmentId !== null) {
+      res.status(403).json({ message: "Test departments cannot modify mirrored settings" });
       return;
     }
 
@@ -453,7 +461,8 @@ router.get("/department/procedures", async (req, res) => {
       return;
     }
 
-    const procedures = await db.select().from(procedureTypesTable).where(eq(procedureTypesTable.departmentId, departmentId));
+    const configSourceId = await resolveConfigDepartmentId(departmentId);
+    const procedures = await db.select().from(procedureTypesTable).where(eq(procedureTypesTable.departmentId, configSourceId));
     res.json(procedures);
   } catch (error) {
     req.log.error({ departmentId: req.user!.departmentId, status: 500 }, "Error fetching procedures");
@@ -467,6 +476,12 @@ router.post("/department/procedures", validate(z.object({ name: nameSchema, grou
     const departmentId = req.user?.departmentId;
     if (!departmentId) {
       res.status(400).json({ message: "No department assigned" });
+      return;
+    }
+
+    const [dept] = await db.select({ configSourceDepartmentId: departmentsTable.configSourceDepartmentId }).from(departmentsTable).where(eq(departmentsTable.id, departmentId));
+    if (dept?.configSourceDepartmentId !== null) {
+      res.status(403).json({ message: "Test departments cannot modify mirrored settings" });
       return;
     }
 
@@ -514,6 +529,7 @@ router.get("/roster", async (req, res) => {
       .where(and(eq(usersTable.role, "student"), eq(usersTable.departmentId, departmentId)))
       .orderBy(usersTable.fullName);
 
+    const configSourceId = await resolveConfigDepartmentId(departmentId);
     const [caseCountRows, procedureCountRows, academicCountRows, configs] = await Promise.all([
       db.select({ studentId: caseLogsTable.studentId, value: count() }).from(caseLogsTable)
         .where(eq(caseLogsTable.status, "verified")).groupBy(caseLogsTable.studentId),
@@ -521,7 +537,7 @@ router.get("/roster", async (req, res) => {
         .where(eq(procedureLogsTable.status, "verified")).groupBy(procedureLogsTable.studentId),
       db.select({ studentId: academicLogsTable.studentId, value: count() }).from(academicLogsTable)
         .where(eq(academicLogsTable.status, "verified")).groupBy(academicLogsTable.studentId),
-      db.select().from(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, departmentId)),
+      db.select().from(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, configSourceId)),
     ]);
     const toMap = (rows: Array<{ studentId: number; value: number }>) =>
       new Map(rows.map((row) => [row.studentId, Number(row.value)]));
@@ -565,11 +581,15 @@ router.get("/roster", async (req, res) => {
 
 router.post("/department/catalog", validate(z.object({ kind: z.enum(["posting", "academic"]), name: nameSchema,
   value: nameSchema, required: targetSchema, period: z.enum(["total", "month"]) }).strict()), async (req, res) => {
+  const [dept] = await db.select({ configSourceDepartmentId: departmentsTable.configSourceDepartmentId }).from(departmentsTable).where(eq(departmentsTable.id, req.user!.departmentId!));
+  if (dept?.configSourceDepartmentId !== null) { res.status(403).json({ message: "Test departments cannot modify mirrored settings" }); return; }
   const [row] = await db.insert(departmentCatalogTable).values({ ...req.body, departmentId: req.user!.departmentId! }).returning();
   res.status(201).json(row);
 });
 
 router.patch("/department/procedures/:id", validate(z.object({ required: targetSchema }).strict()), async (req, res) => {
+  const [dept] = await db.select({ configSourceDepartmentId: departmentsTable.configSourceDepartmentId }).from(departmentsTable).where(eq(departmentsTable.id, req.user!.departmentId!));
+  if (dept?.configSourceDepartmentId !== null) { res.status(403).json({ message: "Test departments cannot modify mirrored settings" }); return; }
   const [row] = await db.update(procedureTypesTable).set({ required: req.body.required })
     .where(and(eq(procedureTypesTable.id, Number(req.params.id)), eq(procedureTypesTable.departmentId, req.user!.departmentId!))).returning();
   if (!row) { res.status(404).json({ message: "Procedure not found" }); return; }
@@ -577,6 +597,8 @@ router.patch("/department/procedures/:id", validate(z.object({ required: targetS
 });
 
 router.patch("/department/catalog/:id", validate(z.object({ required: targetSchema, period: z.enum(["total", "month"]) }).strict()), async (req, res) => {
+  const [dept] = await db.select({ configSourceDepartmentId: departmentsTable.configSourceDepartmentId }).from(departmentsTable).where(eq(departmentsTable.id, req.user!.departmentId!));
+  if (dept?.configSourceDepartmentId !== null) { res.status(403).json({ message: "Test departments cannot modify mirrored settings" }); return; }
   const [row] = await db.update(departmentCatalogTable).set(req.body)
     .where(and(eq(departmentCatalogTable.id, Number(req.params.id)), eq(departmentCatalogTable.departmentId, req.user!.departmentId!))).returning();
   if (!row) { res.status(404).json({ message: "Training option not found" }); return; }

@@ -3,6 +3,7 @@ import { db, caseLogsTable, procedureLogsTable, academicLogsTable, studentsTable
 import { eq, and, inArray, count, or, isNull } from "drizzle-orm";
 import { requireAuth, requireRole, requireDepartment } from "../middlewares/auth.js";
 import { completionPercent } from "../lib/validation.js";
+import { resolveConfigDepartmentId } from "../lib/department-config-source.js";
 
 const router: IRouter = Router();
 
@@ -198,7 +199,8 @@ router.get("/:professorId/review-queue", async (req, res) => {
       const procMap = toMap(procCountRows as any);
       const acadMap = toMap(acadCountRows as any);
 
-      const [config] = await db.select().from(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, deptId));
+      const configSourceId = await resolveConfigDepartmentId(deptId);
+      const [config] = await db.select().from(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, configSourceId));
       const reqCases = config?.requiredCases ?? 0;
       const reqProcs = config?.requiredProcedures ?? 0;
       const reqAcad = config?.requiredAcademic ?? 0;

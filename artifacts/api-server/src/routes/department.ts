@@ -3,6 +3,7 @@ import { db, usersTable, departmentsTable, studentsTable, caseLogsTable, procedu
 import { eq, and, inArray, count, sql } from "drizzle-orm";
 import { requireAuth, requireDepartment, requireRole } from "../middlewares/auth.js";
 import { completionPercent, idSchema } from "../lib/validation.js";
+import { resolveConfigDepartmentId } from "../lib/department-config-source.js";
 
 const router: IRouter = Router();
 
@@ -11,7 +12,9 @@ router.get("/", async (_req, res) => {
   res.json(await db.select({ id: departmentsTable.id, name: departmentsTable.name, code: departmentsTable.code,
     programDurationMonths: departmentConfigsTable.programDurationMonths }).from(departmentsTable)
     .innerJoin(usersTable, and(eq(usersTable.departmentId, departmentsTable.id), eq(usersTable.role, "hod"), eq(usersTable.status, "approved")))
-    .leftJoin(departmentConfigsTable, eq(departmentConfigsTable.departmentId, departmentsTable.id)).orderBy(departmentsTable.name));
+    .leftJoin(departmentConfigsTable, eq(departmentConfigsTable.departmentId, departmentsTable.id))
+    .where(eq(departmentsTable.isTest, false))
+    .orderBy(departmentsTable.name));
 });
 
 router.use(requireAuth, requireRole(["student", "professor", "hod"]), requireDepartment);
@@ -23,17 +26,23 @@ router.use("/:departmentId", (req, res, next) => {
 });
 
 router.get("/:departmentId/catalog", async (req, res) => {
-  const departmentId = req.user!.departmentId!;
-  const [department, hod, config, procedures, catalog] = await Promise.all([
-    db.select().from(departmentsTable).where(eq(departmentsTable.id, departmentId)).limit(1),
-    db.select({ id: usersTable.id, name: usersTable.fullName }).from(usersTable)
-      .where(and(eq(usersTable.departmentId, departmentId), eq(usersTable.role, "hod"), eq(usersTable.status, "approved"))).limit(1),
-    db.select().from(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, departmentId)).limit(1),
-    db.select().from(procedureTypesTable).where(eq(procedureTypesTable.departmentId, departmentId)).orderBy(procedureTypesTable.name),
-    db.select().from(departmentCatalogTable).where(eq(departmentCatalogTable.departmentId, departmentId)).orderBy(departmentCatalogTable.name),
-  ]);
-  res.json({ department: department[0], hod: hod[0] || null, config: config[0] || null, procedures,
-    postings: catalog.filter((item) => item.kind === "posting"), academics: catalog.filter((item) => item.kind === "academic") });
+  try {
+    const departmentId = req.user!.departmentId!;
+    const configSourceId = await resolveConfigDepartmentId(departmentId);
+    const [department, hod, config, procedures, catalog] = await Promise.all([
+      db.select({ id: departmentsTable.id, name: departmentsTable.name, code: departmentsTable.code }).from(departmentsTable).where(eq(departmentsTable.id, departmentId)).limit(1),
+      db.select({ id: usersTable.id, name: usersTable.fullName }).from(usersTable)
+        .where(and(eq(usersTable.departmentId, departmentId), eq(usersTable.role, "hod"), eq(usersTable.status, "approved"))).limit(1),
+      db.select().from(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, configSourceId)).limit(1),
+      db.select().from(procedureTypesTable).where(eq(procedureTypesTable.departmentId, configSourceId)).orderBy(procedureTypesTable.name),
+      db.select().from(departmentCatalogTable).where(eq(departmentCatalogTable.departmentId, configSourceId)).orderBy(departmentCatalogTable.name),
+    ]);
+    res.json({ department: department[0], hod: hod[0] || null, config: config[0] || null, procedures,
+      postings: catalog.filter((item) => item.kind === "posting"), academics: catalog.filter((item) => item.kind === "academic") });
+  } catch (error) {
+    req.log.error({ departmentId: req.params.departmentId, status: 500 }, "Error resolving config department");
+    res.status(500).json({ message: "Internal server error" });
+  }
 });
 
 function computeCompletion(cases: number, procs: number, acad: number, reqCases: number, reqProcs: number, reqAcad: number) {
@@ -49,7 +58,8 @@ router.get("/:departmentId/config", async (req, res) => {
       return;
     }
 
-    const [config] = await db.select().from(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, departmentId));
+    const configSourceId = await resolveConfigDepartmentId(departmentId);
+    const [config] = await db.select().from(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, configSourceId));
     res.json(config || null);
   } catch (error) {
     req.log.error({ departmentId: req.params.departmentId, status: 500 }, "Error fetching department config");
@@ -101,6 +111,8 @@ router.get("/:departmentId/analytics", requireRole(["hod"]), async (req, res) =>
       res.status(404).json({ message: "Department not found" });
       return;
     }
+
+    const configSourceId = await resolveConfigDepartmentId(departmentId);
 
     // All students in this department (via users.departmentId)
     const studentsInDept = await db
@@ -182,7 +194,7 @@ router.get("/:departmentId/analytics", requireRole(["hod"]), async (req, res) =>
       const procMap = toMap(procRows2 as any);
       const acadMap = toMap(acadRows as any);
 
-      const [config] = await db.select().from(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, departmentId));
+      const [config] = await db.select().from(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, configSourceId));
       const reqCases = config?.requiredCases ?? 0;
       const reqProcs = config?.requiredProcedures ?? 0;
       const reqAcad = config?.requiredAcademic ?? 0;
@@ -199,7 +211,7 @@ router.get("/:departmentId/analytics", requireRole(["hod"]), async (req, res) =>
     // Status field: since there's no separate registration status column yet,
     // we treat all students as "Active" (they are in the DB = admitted).
     // Future: add a status column to studentsTable.
-    const [program] = await db.select().from(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, departmentId));
+    const [program] = await db.select().from(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, configSourceId));
     const students = studentsInDept.map((s, i) => ({
       number:             i + 1,
       name:               s.fullName,

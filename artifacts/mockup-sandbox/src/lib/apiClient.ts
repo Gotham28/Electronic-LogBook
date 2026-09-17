@@ -129,6 +129,7 @@ export type AdminDepartment = {
   facultyCount?: number;
   residentCount?: number;
   pendingCount?: number;
+  mirrorDepartmentId: number | null;
 };
 
 export type AdminUserRow = {
@@ -165,6 +166,14 @@ export function createAdminStudent(departmentId: number, data: { fullName: strin
 
 export function deactivateAdminUser(userId: number) {
   return apiPost(`/api/superadmin/users/${userId}/deactivate`);
+}
+
+export function impersonateAdminUser(userId: number) {
+  return apiPost(`/api/superadmin/users/${userId}/impersonate`);
+}
+
+export function backfillTestDepartments(): Promise<{ provisioned: number[]; skipped: number[]; failed: { departmentId: number; message: string }[] }> {
+  return apiPost("/api/superadmin/departments/backfill-test-departments");
 }
 
 export function deleteAdminDepartment(id: number) {

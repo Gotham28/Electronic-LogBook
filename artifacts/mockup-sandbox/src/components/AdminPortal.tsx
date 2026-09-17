@@ -16,8 +16,10 @@ import {
   replaceAdminHod, 
   createAdminFaculty, 
   createAdminStudent, 
-  deactivateAdminUser,
   deleteAdminDepartment,
+  impersonateAdminUser,
+  backfillTestDepartments,
+  deactivateAdminUser,
   type AdminDepartment,
   type AdminUserRow
 } from "@/lib/apiClient";
@@ -137,6 +139,30 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
     }
   };
 
+  const [backfilling, setBackfilling] = useState(false);
+
+  const handleBackfillTestDepartments = async () => {
+    setBackfilling(true);
+    try {
+      const result = await backfillTestDepartments();
+      if (result.provisioned.length > 0) {
+        toast.success(`Provisioned ${result.provisioned.length} test department${result.provisioned.length === 1 ? '' : 's'}`);
+      } else if (result.failed.length === 0) {
+        toast.success("All departments already have a test department");
+      }
+      
+      if (result.failed.length > 0) {
+        toast.error(`Failed to provision ${result.failed.length} test department${result.failed.length === 1 ? '' : 's'}`);
+      }
+      
+      fetchDepartments();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to provision test departments");
+    } finally {
+      setBackfilling(false);
+    }
+  };
+
   const stats = useMemo(() => {
     let deptsWithNoHod = 0;
     let totalFaculty = 0;
@@ -202,6 +228,9 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
               Sign out
             </Button>
           )}
+          <Button variant="outline" onClick={handleBackfillTestDepartments} disabled={backfilling} className="border-slate-200 text-slate-700">
+            {backfilling ? "Provisioning..." : "Provision test departments"}
+          </Button>
           <Button onClick={() => setShowNewDeptPanel(!showNewDeptPanel)} className="bg-teal-600 hover:bg-teal-700">
             <Plus className="mr-2 h-4 w-4" /> New department
           </Button>
@@ -411,6 +440,10 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [mirrorRoster, setMirrorRoster] = useState<AdminUserRow[]>([]);
+  const [mirrorLoading, setMirrorLoading] = useState(false);
+  const [mirrorError, setMirrorError] = useState<string | null>(null);
+
   const [showReplaceHod, setShowReplaceHod] = useState(false);
   const [replaceHodEmail, setReplaceHodEmail] = useState("");
   const [replacingHod, setReplacingHod] = useState(false);
@@ -429,12 +462,13 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
 
   useEffect(() => {
     fetchRoster();
+    fetchMirrorRoster();
     setShowReplaceHod(false);
     setReplaceHodError(null);
     setShowAddForm(false);
     setShowDeleteConfirm(false);
     setDeleteError(null);
-  }, [department.id]);
+  }, [department.id, department.mirrorDepartmentId]);
 
   const fetchRoster = async () => {
     setLoading(true);
@@ -446,6 +480,23 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
       setError(err.message || "Failed to load roster");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchMirrorRoster = async () => {
+    if (!department.mirrorDepartmentId) {
+      setMirrorRoster([]);
+      return;
+    }
+    setMirrorLoading(true);
+    setMirrorError(null);
+    try {
+      const data = await getAdminDepartmentRoster(department.mirrorDepartmentId);
+      setMirrorRoster(data);
+    } catch (err: any) {
+      setMirrorError(err.message || "Failed to load test accounts");
+    } finally {
+      setMirrorLoading(false);
     }
   };
 
@@ -544,6 +595,17 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
       setDeleteError(err.message || "Failed to delete department");
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const handleImpersonate = async (userId: number) => {
+    try {
+      const result = await impersonateAdminUser(userId);
+      if (result.token) {
+        window.open(`/?impersonationToken=${result.token}`, '_blank');
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to log in as user");
     }
   };
 
@@ -692,6 +754,9 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
                 <TabsTrigger value="residents" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
                   Residents ({residents.length})
                 </TabsTrigger>
+                <TabsTrigger value="test-accounts" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                  Test accounts
+                </TabsTrigger>
               </TabsList>
               <Button variant="ghost" size="sm" onClick={() => { setShowAddForm(!showAddForm); setAddFormType(activeTab as any); }} className="text-teal-700 hover:text-teal-800 hover:bg-teal-50">
                 <Plus className="h-4 w-4 mr-1" /> Add
@@ -775,15 +840,17 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
                           )}
                         </TableCell>
                         <TableCell className="text-right">
-                          {u.role === "hod" ? (
-                            <span className="text-xs text-slate-400 font-medium">Use 'Replace HOD' above</span>
-                          ) : u.status === "rejected" ? (
-                            <span className="text-xs text-slate-400 font-medium">Deactivated</span>
-                          ) : (
-                            <Button size="sm" variant="outline" onClick={() => handleDeactivate(u.id, u.role)} className="text-rose-700 border-rose-200 hover:bg-rose-50 h-8 px-3">
-                              Deactivate
-                            </Button>
-                          )}
+                          <div className="flex justify-end gap-2">
+                            {u.role === "hod" ? (
+                              <span className="text-xs text-slate-400 font-medium self-center">Use 'Replace HOD' above</span>
+                            ) : u.status === "rejected" ? (
+                              <span className="text-xs text-slate-400 font-medium self-center">Deactivated</span>
+                            ) : (
+                              <Button size="sm" variant="outline" onClick={() => handleDeactivate(u.id, u.role)} className="text-rose-700 border-rose-200 hover:bg-rose-50 h-8 px-3">
+                                Deactivate
+                              </Button>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -828,13 +895,69 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">
-                          {u.status === "rejected" ? (
-                            <span className="text-xs text-slate-400 font-medium">Deactivated</span>
-                          ) : (
-                            <Button size="sm" variant="outline" onClick={() => handleDeactivate(u.id, u.role)} className="text-rose-700 border-rose-200 hover:bg-rose-50 h-8 px-3">
-                              Deactivate
-                            </Button>
-                          )}
+                          <div className="flex justify-end gap-2">
+                            {u.status === "rejected" ? (
+                              <span className="text-xs text-slate-400 font-medium self-center">Deactivated</span>
+                            ) : (
+                              <Button size="sm" variant="outline" onClick={() => handleDeactivate(u.id, u.role)} className="text-rose-700 border-rose-200 hover:bg-rose-50 h-8 px-3">
+                                Deactivate
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </TabsContent>
+
+            <TabsContent value="test-accounts" className="m-0 border-none outline-none">
+              {!department.mirrorDepartmentId ? (
+                <p className="p-8 text-center text-sm text-slate-500">
+                  No test department has been provisioned for {department.name} yet. Use "Provision test departments" above to create one.
+                </p>
+              ) : mirrorLoading ? (
+                <div className="flex h-40 items-center justify-center bg-white"><div className="animate-spin rounded-full border-4 border-slate-300 border-t-teal-600 h-8 w-8" /></div>
+              ) : mirrorError ? (
+                <div className="flex h-40 flex-col items-center justify-center space-y-4 text-center rounded-xl border border-rose-100 bg-rose-50" role="alert">
+                  <p className="text-sm font-medium text-rose-700">{mirrorError}</p>
+                  <Button onClick={fetchMirrorRoster} variant="outline" size="sm">Try again</Button>
+                </div>
+              ) : !mirrorRoster.length ? (
+                <p className="p-8 text-center text-sm text-slate-500">No test accounts in this department.</p>
+              ) : (
+                <Table>
+                  <TableHeader className="bg-white">
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead>Name</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Role</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {mirrorRoster.map(u => (
+                      <TableRow key={u.id}>
+                        <TableCell className="font-semibold text-slate-900">{u.fullName}</TableCell>
+                        <TableCell className="text-slate-500 text-sm">{u.email}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="capitalize">{u.role}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={u.status === "approved" ? "default" : "secondary"} className={`rounded-full ${u.status === 'approved' ? 'bg-slate-900' : ''}`}>
+                            {u.status === "rejected" ? "Deactivated" : u.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            {u.status === "approved" && (
+                              <Button size="sm" variant="outline" onClick={() => handleImpersonate(u.id)} className="h-8 px-3">
+                                Log in as
+                              </Button>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}

@@ -66,22 +66,47 @@ test("admin account gets 403 on HOD-only student approve/reject routes", async (
 // =========================================================================
 // 3. Admin can list departments with HODs
 // =========================================================================
-test("admin can list all departments with their current HOD", async () => {
+test("admin can list all departments with their current HOD and mirror test department ids", async () => {
+  // Backfill to ensure some mirrors exist
+  const backfillRes = await call("/superadmin/departments/backfill-test-departments", "admin", "POST", {});
+  assert.equal(backfillRes.status, 200);
+
   const res = await call("/superadmin/departments", "admin");
   assert.equal(res.status, 200);
   assert.ok(Array.isArray(res.body));
   assert.ok(res.body.length >= 3);
-  // Each department has an hod field (may be null or an object with id, fullName, email)
+  
+  const failedDeptIds = new Set((backfillRes.body.failed || []).map((f: any) => f.departmentId));
+
+  // Each department has an hod field and mirrorDepartmentId
   for (const dept of res.body) {
     assert.ok(dept.id);
     assert.ok(dept.name);
     assert.ok(dept.code);
+    assert.strictEqual(dept.isTest, undefined, "isTest should not be returned");
+    if (failedDeptIds.has(dept.id)) {
+      assert.ok(dept.mirrorDepartmentId === null || typeof dept.mirrorDepartmentId === "number", "mirrorDepartmentId should be null or number for failed seed departments");
+    } else {
+      assert.ok(typeof dept.mirrorDepartmentId === "number", "mirrorDepartmentId should be a number after backfilling");
+    }
     if (dept.hod) {
       assert.ok(dept.hod.id);
       assert.ok(dept.hod.fullName);
       assert.ok(dept.hod.email);
     }
   }
+
+  // Create a new department and confirm it gets a mirror automatically, per Task A's auto-provisioning
+  const createRes = await call("/superadmin/departments", "admin", "POST", {
+    setup: { name: "No Mirror Dept", code: "NO-MIRROR", hod: { fullName: "No Mirror", email: "nomirror@example.test" } },
+    hodPassword: password,
+  });
+  assert.equal(createRes.status, 201);
+  
+  const res2 = await call("/superadmin/departments", "admin");
+  const newDept = res2.body.find((d: any) => d.id === createRes.body.departmentId);
+  assert.ok(newDept);
+  assert.ok(typeof newDept.mirrorDepartmentId === "number", "a freshly created department should already have a mirror, per provisionDepartment()'s synchronous auto-provisioning");
 });
 
 // =========================================================================

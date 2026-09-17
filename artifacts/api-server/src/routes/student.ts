@@ -9,15 +9,17 @@ import { requireAuth, requireRole, requireDepartment } from "../middlewares/auth
 import { studentAccess } from "../middlewares/student-access.js";
 import { z } from "zod";
 import { dateSchema, idSchema, nameSchema, validate } from "../lib/validation.js";
+import { resolveConfigDepartmentId } from "../lib/department-config-source.js";
 
 const router: IRouter = Router();
 router.use(requireAuth, requireRole(["student", "professor", "hod"]), requireDepartment);
 
 router.get("/requirements", async (req, res) => {
   const departmentId = req.user!.departmentId!;
+  const configSourceId = await resolveConfigDepartmentId(departmentId);
   const [procedureRequirements, academicRequirements] = await Promise.all([
-    db.select().from(procedureTypesTable).where(eq(procedureTypesTable.departmentId, departmentId)),
-    db.select().from(departmentCatalogTable).where(and(eq(departmentCatalogTable.departmentId, departmentId), eq(departmentCatalogTable.kind, "academic"))),
+    db.select().from(procedureTypesTable).where(eq(procedureTypesTable.departmentId, configSourceId)),
+    db.select().from(departmentCatalogTable).where(and(eq(departmentCatalogTable.departmentId, configSourceId), eq(departmentCatalogTable.kind, "academic"))),
   ]);
   res.json({ procedureRequirements, academicRequirements });
 });
@@ -89,7 +91,8 @@ router.get("/:studentId/dashboard", requireAuth, async (req, res) => {
     const procs = calcCounts(procLogsCounts);
     const acads = calcCounts(acadLogsCounts);
 
-    const [config] = await db.select().from(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, student.departmentId!));
+    const configSourceId = await resolveConfigDepartmentId(student.departmentId!);
+    const [config] = await db.select().from(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, configSourceId));
     const reqCases = config?.requiredCases ?? 0;
     const reqProcs = config?.requiredProcedures ?? 0;
     const reqAcad = config?.requiredAcademic ?? 0;
@@ -237,8 +240,9 @@ router.get("/:studentId/postings", async (req, res) => {
       .where(postingsFilter)
       .orderBy(desc(postingsTable.createdAt));
       
+    const configSourceId = await resolveConfigDepartmentId(req.user!.departmentId!);
     const options = await db.select({ name: departmentCatalogTable.value }).from(departmentCatalogTable)
-      .where(and(eq(departmentCatalogTable.departmentId, req.user!.departmentId!), eq(departmentCatalogTable.kind, "posting")));
+      .where(and(eq(departmentCatalogTable.departmentId, configSourceId), eq(departmentCatalogTable.kind, "posting")));
     res.json({ options: options.map((item) => item.name), data });
   } catch (error) {
     req.log.error({ studentId: req.params.studentId, status: 500 }, "Error fetching postings");
@@ -251,8 +255,9 @@ router.post("/:studentId/postings", validate(z.object({ ward: nameSchema, startD
   try {
     const studentId = parseInt(String(req.params.studentId), 10);
     const { ward, postingName, startDate, endDate, supervisorId } = req.body;
+    const configSourceId = await resolveConfigDepartmentId(req.user!.departmentId!);
     const [option] = await db.select({ id: departmentCatalogTable.id }).from(departmentCatalogTable).where(and(
-      eq(departmentCatalogTable.departmentId, req.user!.departmentId!), eq(departmentCatalogTable.kind, "posting"), eq(departmentCatalogTable.value, ward))).limit(1);
+      eq(departmentCatalogTable.departmentId, configSourceId), eq(departmentCatalogTable.kind, "posting"), eq(departmentCatalogTable.value, ward))).limit(1);
     if (!option || !(await validateSupervisor(Number(supervisorId), req.user!.departmentId!))) {
       res.status(400).json({ message: "Select a posting and supervisor from your department" }); return;
     }
@@ -334,7 +339,8 @@ router.get("/:studentId/leave-balance", requireAuth, async (req, res) => {
       }
     }
 
-    const [config] = await db.select().from(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, caller.departmentId!));
+    const configSourceId = await resolveConfigDepartmentId(caller.departmentId!);
+    const [config] = await db.select().from(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, configSourceId));
     res.json({
       casual: { used: casualUsed, total: config?.casualLeaveAllowance ?? null },
       academic: { used: academicUsed, total: config?.academicLeaveAllowance ?? null }
@@ -620,8 +626,9 @@ router.post("/:studentId/procedure-logs", validate(z.object({ supervisorId: idSc
       return;
     }
 
+    const configSourceId = await resolveConfigDepartmentId(req.user!.departmentId!);
     const [option] = await db.select({ id: procedureTypesTable.id }).from(procedureTypesTable).where(and(
-      eq(procedureTypesTable.departmentId, req.user!.departmentId!), eq(procedureTypesTable.name, procedureName), eq(procedureTypesTable.group, procedureGroup))).limit(1);
+      eq(procedureTypesTable.departmentId, configSourceId), eq(procedureTypesTable.name, procedureName), eq(procedureTypesTable.group, procedureGroup))).limit(1);
     if (!option) { res.status(400).json({ message: "Select a procedure from your department" }); return; }
     const [inserted] = await db.insert(procedureLogsTable).values({
       studentId, supervisorId: supervisorIdNum, procedureGroup, procedureName, date, 
@@ -645,8 +652,9 @@ router.post("/:studentId/academic-logs", validate(z.object({ supervisorId: idSch
       return;
     }
 
+    const configSourceId = await resolveConfigDepartmentId(req.user!.departmentId!);
     const [option] = await db.select({ id: departmentCatalogTable.id }).from(departmentCatalogTable).where(and(
-      eq(departmentCatalogTable.departmentId, req.user!.departmentId!), eq(departmentCatalogTable.kind, "academic"), eq(departmentCatalogTable.value, activityType))).limit(1);
+      eq(departmentCatalogTable.departmentId, configSourceId), eq(departmentCatalogTable.kind, "academic"), eq(departmentCatalogTable.value, activityType))).limit(1);
     if (!option) { res.status(400).json({ message: "Select an academic activity from your department" }); return; }
     const [inserted] = await db.insert(academicLogsTable).values({
       studentId, supervisorId: supervisorIdNum, activityType, presentationType: req.body.presentationType, 
