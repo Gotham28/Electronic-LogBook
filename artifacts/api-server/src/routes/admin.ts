@@ -579,7 +579,7 @@ router.get("/roster", async (req, res) => {
   }
 });
 
-router.post("/department/catalog", validate(z.object({ kind: z.enum(["posting", "academic"]), name: nameSchema,
+router.post("/department/catalog", validate(z.object({ kind: z.enum(["posting", "academic", "case_category"]), name: nameSchema,
   value: nameSchema, required: targetSchema, period: z.enum(["total", "month"]) }).strict()), async (req, res) => {
   const [dept] = await db.select({ configSourceDepartmentId: departmentsTable.configSourceDepartmentId }).from(departmentsTable).where(eq(departmentsTable.id, req.user!.departmentId!));
   if (dept?.configSourceDepartmentId !== null) { res.status(403).json({ message: "Test departments cannot modify mirrored settings" }); return; }

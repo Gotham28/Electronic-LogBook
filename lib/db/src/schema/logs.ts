@@ -22,6 +22,7 @@ export const caseLogsTable = pgTable("case_logs", {
   managementPlan: text("management_plan"),
   outcome: text("outcome"),
   learningPoints: text("learning_points"),
+  category: text("category"),
   status: text("status", { enum: ["pending", "verified", "rejected"] }).default("pending"),
   facultyRemarks: text("faculty_remarks"),
   facultyGrade: text("faculty_grade"),
