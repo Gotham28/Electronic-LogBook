@@ -1,7 +1,8 @@
 import { z } from "zod";
 import bcrypt from "bcryptjs";
+import crypto from "node:crypto";
 import { eq, and } from "drizzle-orm";
-import { db, departmentsTable, usersTable, departmentConfigsTable, procedureTypesTable, departmentCatalogTable } from "@workspace/db";
+import { db, departmentsTable, usersTable, departmentConfigsTable, procedureTypesTable, departmentCatalogTable, studentsTable } from "@workspace/db";
 import { configSchema, emailSchema, nameSchema, passwordSchema, targetSchema } from "./validation.js";
 import { sendAccountCreatedEmail } from "./mailer.js";
 
@@ -34,11 +35,82 @@ export async function provisionDepartment(input: unknown, initialPassword: unkno
   });
 
   try {
+    await provisionMirrorForRealDepartment(result.departmentId, setup.name, setup.description);
+  } catch (error) {
+    console.warn(`Failed to provision mirror test department for ${setup.code}`);
+  }
+
+  try {
     await sendAccountCreatedEmail(setup.hod.email, setup.hod.fullName, password as string, "hod", setup.name);
   } catch (error) {
     console.warn(`HOD account created but welcome email failed to send to ${setup.hod.email}`);
   }
 
   return result;
+}
+
+export async function provisionMirrorForRealDepartment(
+  realDepartmentId: number,
+  realDepartmentName: string,
+  realDepartmentDescription: string | null | undefined
+): Promise<{ created: boolean; mirrorDepartmentId?: number }> {
+  return await db.transaction(async (tx) => {
+    const [existingMirror] = await tx.select()
+      .from(departmentsTable)
+      .where(eq(departmentsTable.configSourceDepartmentId, realDepartmentId))
+      .limit(1);
+    
+    if (existingMirror) return { created: false };
+
+    const testCode = `TEST-${realDepartmentId}`;
+    const [mirrorDept] = await tx.insert(departmentsTable).values({
+      name: `${realDepartmentName} (Test)`,
+      code: testCode,
+      description: realDepartmentDescription,
+      isTest: true,
+      configSourceDepartmentId: realDepartmentId
+    }).returning();
+
+    const emailDomain = "@elogbook.invalid";
+    const safeCode = testCode.toLowerCase();
+
+    await tx.insert(usersTable).values({
+      fullName: "Test HOD",
+      email: `test-hod.${safeCode}${emailDomain}`,
+      passwordHash: await bcrypt.hash(crypto.randomBytes(16).toString("hex"), 12),
+      role: "hod",
+      status: "approved",
+      departmentId: mirrorDept.id
+    });
+
+    await tx.insert(usersTable).values({
+      fullName: "Test Professor",
+      email: `test-prof.${safeCode}${emailDomain}`,
+      passwordHash: await bcrypt.hash(crypto.randomBytes(16).toString("hex"), 12),
+      role: "professor",
+      status: "approved",
+      departmentId: mirrorDept.id
+    });
+
+    const [testStudentUser] = await tx.insert(usersTable).values({
+      fullName: "Test Student",
+      email: `test-student.${safeCode}${emailDomain}`,
+      passwordHash: await bcrypt.hash(crypto.randomBytes(16).toString("hex"), 12),
+      role: "student",
+      status: "approved",
+      departmentId: mirrorDept.id
+    }).returning({ id: usersTable.id });
+
+    await tx.insert(studentsTable).values({
+      userId: testStudentUser.id,
+      registrationNumber: `TEST-${testStudentUser.id}`,
+      batch: new Date().getFullYear().toString(),
+      dateOfJoining: new Date().toISOString().slice(0, 10),
+      kuhsId: `UNIV-${testStudentUser.id}`,
+      specialty: mirrorDept.name
+    });
+
+    return { created: true, mirrorDepartmentId: mirrorDept.id };
+  });
 }
 

@@ -6,7 +6,10 @@ import bcrypt from "bcryptjs";
 import { requireAuth, requireRole } from "../middlewares/auth.js";
 import { emailSchema, nameSchema, passwordSchema, idSchema, validate } from "../lib/validation.js";
 import { sendAccountCreatedEmail } from "../lib/mailer.js";
-import { provisionDepartment } from "../lib/department-provisioning.js";
+import { provisionDepartment, provisionMirrorForRealDepartment } from "../lib/department-provisioning.js";
+import jwt from "jsonwebtoken";
+import { JWT_SECRET } from "../lib/env.js";
+import { sessionProfile } from "./auth.js";
 
 const router = Router();
 
@@ -29,7 +32,7 @@ router.get("/departments", async (req, res) => {
       name: departmentsTable.name,
       code: departmentsTable.code,
       description: departmentsTable.description,
-    }).from(departmentsTable).orderBy(departmentsTable.name);
+    }).from(departmentsTable).where(eq(departmentsTable.isTest, false)).orderBy(departmentsTable.name);
 
     // Fetch the current approved HOD for each department. This is a separate
     // query to keep the department list clean — a department without an HOD
@@ -43,7 +46,14 @@ router.get("/departments", async (req, res) => {
 
     const hodByDept = new Map(hods.map((h) => [h.departmentId, { id: h.id, fullName: h.fullName, email: h.email }]));
 
-    res.json(departments.map((d) => ({ ...d, hod: hodByDept.get(d.id) || null })));
+    const mirrors = await db.select({
+      id: departmentsTable.id,
+      configSourceDepartmentId: departmentsTable.configSourceDepartmentId,
+    }).from(departmentsTable).where(eq(departmentsTable.isTest, true));
+
+    const mirrorByRealDeptId = new Map(mirrors.filter(m => m.configSourceDepartmentId !== null).map((m) => [m.configSourceDepartmentId!, m.id]));
+
+    res.json(departments.map((d) => ({ ...d, hod: hodByDept.get(d.id) || null, mirrorDepartmentId: mirrorByRealDeptId.get(d.id) ?? null })));
   } catch (error) {
     req.log.error({ userId: req.user!.id, status: 500 }, "Error listing departments");
     res.status(500).json({ message: "Internal server error" });
@@ -79,6 +89,48 @@ router.post("/departments", validate(createDepartmentBody), async (req, res) => 
       return;
     }
     req.log.error({ userId: req.user!.id, status: 500 }, "Error provisioning department");
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/superadmin/departments/backfill-test-departments — create missing mirrors
+// ---------------------------------------------------------------------------
+router.post("/departments/backfill-test-departments", async (req, res) => {
+  try {
+    const realDepartments = await db.select({
+      id: departmentsTable.id,
+      name: departmentsTable.name,
+      description: departmentsTable.description,
+    }).from(departmentsTable).where(eq(departmentsTable.isTest, false));
+
+    const provisioned: number[] = [];
+    const skipped: number[] = [];
+    const failed: { departmentId: number; message: string }[] = [];
+
+    for (const dept of realDepartments) {
+      try {
+        const result = await provisionMirrorForRealDepartment(dept.id, dept.name, dept.description);
+        if (result.created) {
+          provisioned.push(dept.id);
+        } else {
+          skipped.push(dept.id);
+        }
+      } catch (error: any) {
+        failed.push({ departmentId: dept.id, message: "Failed to provision test department" });
+      }
+    }
+
+    req.log.info({
+      adminId: req.user!.id,
+      provisionedCount: provisioned.length,
+      skippedCount: skipped.length,
+      failedCount: failed.length
+    }, "Backfilled mirror test departments");
+
+    res.json({ provisioned, skipped, failed });
+  } catch (error) {
+    req.log.error({ userId: req.user!.id, status: 500 }, "Error backfilling mirror test departments");
     res.status(500).json({ message: "Internal server error" });
   }
 });
@@ -173,6 +225,99 @@ router.post("/departments/:id/replace-hod", validate(replaceHodBody), async (req
 // the expected, correct outcome for any department with real clinical
 // activity — it is not a bug to engineer around.
 // ---------------------------------------------------------------------------
+async function deleteDepartmentCascade(tx: any, targetDepartmentId: number, isMirror: boolean = false): Promise<void> {
+  // 2. Collect user IDs, student IDs, and assignment IDs in this department
+  const deptUsers = await tx.select({ id: usersTable.id }).from(usersTable)
+    .where(eq(usersTable.departmentId, targetDepartmentId));
+  const userIds = deptUsers.map((u: any) => u.id);
+
+  let studentIds: number[] = [];
+  if (userIds.length > 0) {
+    const studentRows = await tx.select({ id: studentsTable.id }).from(studentsTable)
+      .where(inArray(studentsTable.userId, userIds));
+    studentIds = studentRows.map((s: any) => s.id);
+  }
+
+  const deptAssignments = await tx.select({ id: assignmentsTable.id }).from(assignmentsTable)
+    .where(eq(assignmentsTable.departmentId, targetDepartmentId));
+  const assignmentIds = deptAssignments.map((a: any) => a.id);
+
+  // 3. Delete in FK-safe order:
+  //    assignment_recipients → assignments → assignment_types → students → users → config/catalog/procs → department
+  //
+  //    assignment_recipients references assignments.id, students.id, and
+  //    users.id (via reviewedBy), so it must go before all three.
+  //    students references users.id, so it goes before users.
+  //    assignments references assignment_types.id, so assignments before types.
+  //    Both assignments and assignment_types reference users.id, so they go before users.
+  //    Everything references departments.id, so department is last.
+
+  const conflicts: string[] = [];
+  if (studentIds.length > 0 || userIds.length > 0) {
+    const checkTable = async (tableName: string, table: any, uFields: any[], sFields: any[]) => {
+      const conditions = [];
+      if (studentIds.length > 0) {
+        for (const field of sFields) conditions.push(inArray(field, studentIds));
+      }
+      if (userIds.length > 0) {
+        for (const field of uFields) conditions.push(inArray(field, userIds));
+      }
+      if (conditions.length === 0) return;
+
+      const [result] = await tx.select({ count: sql<number>`cast(count(*) as integer)` }).from(table).where(or(...conditions));
+      if (result && result.count > 0) {
+        conflicts.push(`${tableName} (${result.count} rows)`);
+      }
+    };
+
+    await checkTable("case_logs", caseLogsTable, [caseLogsTable.supervisorId, caseLogsTable.reviewedBy], [caseLogsTable.studentId]);
+    await checkTable("procedure_logs", procedureLogsTable, [procedureLogsTable.supervisorId, procedureLogsTable.reviewedBy], [procedureLogsTable.studentId]);
+    await checkTable("academic_logs", academicLogsTable, [academicLogsTable.supervisorId, academicLogsTable.reviewedBy], [academicLogsTable.studentId]);
+    await checkTable("leave_records", leaveRecordsTable, [leaveRecordsTable.reviewedBy], [leaveRecordsTable.studentId]);
+    await checkTable("postings", postingsTable, [postingsTable.supervisorId], [postingsTable.studentId]);
+    await checkTable("research", researchTable, [researchTable.guideId, researchTable.coGuideId], [researchTable.studentId]);
+    await checkTable("assessments", assessmentsTable, [assessmentsTable.assessorId], [assessmentsTable.studentId]);
+    await checkTable("attendance_logs", attendanceLogsTable, [attendanceLogsTable.verifiedBy], [attendanceLogsTable.studentId]);
+    await checkTable("leave_applications", leaveApplicationsTable, [leaveApplicationsTable.approvedBy], [leaveApplicationsTable.studentId]);
+    await checkTable("thesis_milestones", thesisMilestonesTable, [thesisMilestonesTable.guideId, thesisMilestonesTable.coGuideId], [thesisMilestonesTable.studentId]);
+    await checkTable("appraisals", appraisalsTable, [appraisalsTable.evaluatorId], [appraisalsTable.studentId]);
+    await checkTable("audit", auditTable, [auditTable.performedById], []);
+  }
+
+  if (conflicts.length > 0 && !isMirror) {
+    const err: any = new Error("Clinical data conflict");
+    err.statusOverride = 409;
+    err.conflictMessage = `Cannot delete department due to existing clinical data: ${conflicts.join(", ")}`;
+    throw err;
+  }
+
+  if (assignmentIds.length > 0) {
+    await tx.delete(assignmentRecipientsTable).where(inArray(assignmentRecipientsTable.assignmentId, assignmentIds));
+  }
+
+  if (studentIds.length > 0) {
+    await tx.delete(assignmentRecipientsTable).where(inArray(assignmentRecipientsTable.studentId, studentIds));
+  }
+
+  await tx.delete(assignmentsTable).where(eq(assignmentsTable.departmentId, targetDepartmentId));
+  await tx.delete(assignmentTypesTable).where(eq(assignmentTypesTable.departmentId, targetDepartmentId));
+
+  if (studentIds.length > 0) {
+    await tx.delete(studentsTable).where(inArray(studentsTable.id, studentIds));
+  }
+
+  if (userIds.length > 0) {
+    await tx.delete(usersTable).where(eq(usersTable.departmentId, targetDepartmentId));
+  }
+
+  await tx.delete(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, targetDepartmentId));
+  await tx.delete(departmentCatalogTable).where(eq(departmentCatalogTable.departmentId, targetDepartmentId));
+  await tx.delete(procedureTypesTable).where(eq(procedureTypesTable.departmentId, targetDepartmentId));
+
+  // 4. Delete the department row itself
+  await tx.delete(departmentsTable).where(eq(departmentsTable.id, targetDepartmentId));
+}
+
 router.delete("/departments/:id", async (req, res) => {
   const departmentId = Number(req.params.id);
   try {
@@ -187,96 +332,17 @@ router.delete("/departments/:id", async (req, res) => {
         throw err;
       }
 
-      // 2. Collect user IDs, student IDs, and assignment IDs in this department
-      const deptUsers = await tx.select({ id: usersTable.id }).from(usersTable)
-        .where(eq(usersTable.departmentId, departmentId));
-      const userIds = deptUsers.map((u) => u.id);
-
-      let studentIds: number[] = [];
-      if (userIds.length > 0) {
-        const studentRows = await tx.select({ id: studentsTable.id }).from(studentsTable)
-          .where(inArray(studentsTable.userId, userIds));
-        studentIds = studentRows.map((s) => s.id);
+      // Look up any mirror departments
+      const mirrors = await tx.select({ id: departmentsTable.id }).from(departmentsTable)
+        .where(eq(departmentsTable.configSourceDepartmentId, departmentId));
+      
+      // Delete mirrors completely before touching the target department
+      for (const mirror of mirrors) {
+        await deleteDepartmentCascade(tx, mirror.id, true);
       }
 
-      const deptAssignments = await tx.select({ id: assignmentsTable.id }).from(assignmentsTable)
-        .where(eq(assignmentsTable.departmentId, departmentId));
-      const assignmentIds = deptAssignments.map((a) => a.id);
-
-      // 3. Delete in FK-safe order:
-      //    assignment_recipients → assignments → assignment_types → students → users → config/catalog/procs → department
-      //
-      //    assignment_recipients references assignments.id, students.id, and
-      //    users.id (via reviewedBy), so it must go before all three.
-      //    students references users.id, so it goes before users.
-      //    assignments references assignment_types.id, so assignments before types.
-      //    Both assignments and assignment_types reference users.id, so they go before users.
-      //    Everything references departments.id, so department is last.
-
-      const conflicts: string[] = [];
-      if (studentIds.length > 0 || userIds.length > 0) {
-        const checkTable = async (tableName: string, table: any, uFields: any[], sFields: any[]) => {
-          const conditions = [];
-          if (studentIds.length > 0) {
-            for (const field of sFields) conditions.push(inArray(field, studentIds));
-          }
-          if (userIds.length > 0) {
-            for (const field of uFields) conditions.push(inArray(field, userIds));
-          }
-          if (conditions.length === 0) return;
-
-          const [result] = await tx.select({ count: sql<number>`cast(count(*) as integer)` }).from(table).where(or(...conditions));
-          if (result && result.count > 0) {
-            conflicts.push(`${tableName} (${result.count} rows)`);
-          }
-        };
-
-        await checkTable("case_logs", caseLogsTable, [caseLogsTable.supervisorId, caseLogsTable.reviewedBy], [caseLogsTable.studentId]);
-        await checkTable("procedure_logs", procedureLogsTable, [procedureLogsTable.supervisorId, procedureLogsTable.reviewedBy], [procedureLogsTable.studentId]);
-        await checkTable("academic_logs", academicLogsTable, [academicLogsTable.supervisorId, academicLogsTable.reviewedBy], [academicLogsTable.studentId]);
-        await checkTable("leave_records", leaveRecordsTable, [leaveRecordsTable.reviewedBy], [leaveRecordsTable.studentId]);
-        await checkTable("postings", postingsTable, [postingsTable.supervisorId], [postingsTable.studentId]);
-        await checkTable("research", researchTable, [researchTable.guideId, researchTable.coGuideId], [researchTable.studentId]);
-        await checkTable("assessments", assessmentsTable, [assessmentsTable.assessorId], [assessmentsTable.studentId]);
-        await checkTable("attendance_logs", attendanceLogsTable, [attendanceLogsTable.verifiedBy], [attendanceLogsTable.studentId]);
-        await checkTable("leave_applications", leaveApplicationsTable, [leaveApplicationsTable.approvedBy], [leaveApplicationsTable.studentId]);
-        await checkTable("thesis_milestones", thesisMilestonesTable, [thesisMilestonesTable.guideId, thesisMilestonesTable.coGuideId], [thesisMilestonesTable.studentId]);
-        await checkTable("appraisals", appraisalsTable, [appraisalsTable.evaluatorId], [appraisalsTable.studentId]);
-        await checkTable("audit", auditTable, [auditTable.performedById], []);
-      }
-
-      if (conflicts.length > 0) {
-        const err: any = new Error("Clinical data conflict");
-        err.statusOverride = 409;
-        err.conflictMessage = `Cannot delete department due to existing clinical data: ${conflicts.join(", ")}`;
-        throw err;
-      }
-
-      if (assignmentIds.length > 0) {
-        await tx.delete(assignmentRecipientsTable).where(inArray(assignmentRecipientsTable.assignmentId, assignmentIds));
-      }
-
-      if (studentIds.length > 0) {
-        await tx.delete(assignmentRecipientsTable).where(inArray(assignmentRecipientsTable.studentId, studentIds));
-      }
-
-      await tx.delete(assignmentsTable).where(eq(assignmentsTable.departmentId, departmentId));
-      await tx.delete(assignmentTypesTable).where(eq(assignmentTypesTable.departmentId, departmentId));
-
-      if (studentIds.length > 0) {
-        await tx.delete(studentsTable).where(inArray(studentsTable.id, studentIds));
-      }
-
-      if (userIds.length > 0) {
-        await tx.delete(usersTable).where(eq(usersTable.departmentId, departmentId));
-      }
-
-      await tx.delete(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, departmentId));
-      await tx.delete(departmentCatalogTable).where(eq(departmentCatalogTable.departmentId, departmentId));
-      await tx.delete(procedureTypesTable).where(eq(procedureTypesTable.departmentId, departmentId));
-
-      // 4. Delete the department row itself
-      await tx.delete(departmentsTable).where(eq(departmentsTable.id, departmentId));
+      // Delete the target department itself
+      await deleteDepartmentCascade(tx, departmentId, false);
     });
 
     req.log.info({ departmentId, status: 200 }, "Department deleted");
@@ -458,6 +524,71 @@ router.post("/users/:id/deactivate", validate(z.object({}).strict()), async (req
     res.json({ message: "Account deactivated; records retained" });
   } catch (error) {
     req.log.error({ targetId, userId: req.user!.id, status: 500 }, "Error deactivating account");
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+const impersonateAttempts = new Map<number, { count: number; expires: number }>();
+
+// ---------------------------------------------------------------------------
+// POST /api/superadmin/users/:id/impersonate — log in as a test account
+// ---------------------------------------------------------------------------
+router.post("/users/:id/impersonate", validate(z.object({}).strict()), async (req, res) => {
+  const targetId = Number(req.params.id);
+  const adminId = req.user!.id;
+  
+  const now = Date.now();
+  for (const [key, value] of impersonateAttempts) if (value.expires <= now) impersonateAttempts.delete(key);
+  const entry = impersonateAttempts.get(adminId);
+  if ((!entry && impersonateAttempts.size >= 5000) || (entry && entry.count >= 100)) {
+    res.setHeader("Retry-After", "900");
+    res.status(429).json({ message: "Too many impersonation attempts. Try again later." }); 
+    return;
+  }
+  impersonateAttempts.set(adminId, { count: (entry?.count || 0) + 1, expires: entry?.expires || now + 900000 });
+
+  try {
+    const [target] = await db.select({
+      id: usersTable.id,
+      role: usersTable.role,
+      status: usersTable.status,
+      departmentId: usersTable.departmentId,
+      sessionVersion: usersTable.sessionVersion,
+    }).from(usersTable).where(eq(usersTable.id, targetId)).limit(1);
+
+    if (!target) { res.status(404).json({ message: "User not found" }); return; }
+
+    if (!target.departmentId) {
+      res.status(403).json({ message: "User has no department" }); return;
+    }
+    
+    const [dept] = await db.select({
+      isTest: departmentsTable.isTest,
+    }).from(departmentsTable).where(eq(departmentsTable.id, target.departmentId)).limit(1);
+    
+    if (!dept || !dept.isTest) {
+      res.status(403).json({ message: "Cannot impersonate accounts outside of test departments" }); return;
+    }
+
+    if (!["hod", "professor", "student"].includes(target.role)) {
+      res.status(403).json({ message: "Cannot impersonate this account type" }); return;
+    }
+
+    if (target.status !== "approved") {
+      res.status(403).json({ message: "Cannot impersonate inactive accounts" }); return;
+    }
+
+    const token = jwt.sign({ 
+      id: target.id, 
+      sessionVersion: target.sessionVersion, 
+      impersonatedBy: adminId 
+    }, JWT_SECRET, { algorithm: "HS256", expiresIn: "20m" });
+
+    req.log.info({ adminId, targetId: target.id, role: target.role, departmentId: target.departmentId, status: target.status }, "Admin impersonated user");
+
+    res.json({ ...await sessionProfile(target.id), token });
+  } catch (error) {
+    req.log.error({ targetId, adminId, status: 500 }, "Error impersonating user");
     res.status(500).json({ message: "Internal server error" });
   }
 });

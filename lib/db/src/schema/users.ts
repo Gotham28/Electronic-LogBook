@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, timestamp, uniqueIndex, check } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, timestamp, uniqueIndex, check, boolean, AnyPgColumn } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 
@@ -7,7 +7,12 @@ export const departmentsTable = pgTable("departments", {
   name: text("name").notNull(),
   code: text("code").notNull().unique(),
   description: text("description"),
-});
+  isTest: boolean("is_test").notNull().default(false),
+  configSourceDepartmentId: integer("config_source_department_id").references((): AnyPgColumn => departmentsTable.id),
+}, (table) => [
+  check("mirror_test_dept_source_requires_test", sql`${table.configSourceDepartmentId} IS NULL OR ${table.isTest} = true`),
+  check("mirror_test_dept_not_self", sql`${table.configSourceDepartmentId} <> ${table.id}`),
+]);
 
 export const insertDepartmentSchema = createInsertSchema(departmentsTable);
 export type InsertDepartment = typeof departmentsTable.$inferInsert;

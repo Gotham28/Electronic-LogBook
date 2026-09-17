@@ -18,7 +18,7 @@ import { PrintableLogbook } from "@/components/pages/PrintableLogbook";
 import { PrivacyPolicyPage } from "@/components/pages/PrivacyPolicyPage";
 import { GrievanceOfficerPage } from "@/components/pages/GrievanceOfficerPage";
 import { DataRightsPage } from "@/components/pages/DataRightsPage";
-import { getCurrentUser, clearSession, getToken } from "@/lib/session";
+import { getCurrentUser, clearSession, getToken, saveToken } from "@/lib/session";
 import { apiGet, apiPost } from "@/lib/apiClient";
 import { DepartmentProvider } from "@/lib/department-context";
 
@@ -140,11 +140,26 @@ function App() {
     () => window.sessionStorage.getItem("elogbook-authenticated") === "true"
   );
   const [authScreen, setAuthScreen] = useState<"login" | "register">("login");
-  const [checkingSession, setCheckingSession] = useState(!!getToken());
+  
+  const hasTokenInUrl = new URLSearchParams(window.location.search).has("impersonationToken");
+  const [checkingSession, setCheckingSession] = useState(!!getToken() || hasTokenInUrl);
+  
   useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const impersonationToken = urlParams.get("impersonationToken");
+    
+    if (impersonationToken) {
+      saveToken(impersonationToken);
+      urlParams.delete("impersonationToken");
+      const newUrl = window.location.pathname + (urlParams.toString() ? `?${urlParams.toString()}` : "") + window.location.hash;
+      window.history.replaceState(null, "", newUrl);
+    }
+
     if (!getToken()) { setIsAuthenticated(false); setCheckingSession(false); return; }
+    
     apiGet("/api/auth/me").then((user) => {
       sessionStorage.setItem("elogbook-user", JSON.stringify(user));
+      window.sessionStorage.setItem("elogbook-authenticated", "true");
       setIsAuthenticated(true);
     }).catch(() => { clearSession(); setIsAuthenticated(false); }).finally(() => setCheckingSession(false));
   }, []);

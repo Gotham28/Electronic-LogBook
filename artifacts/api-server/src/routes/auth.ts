@@ -105,7 +105,7 @@ router.post("/register", validate(registrationBody), async (req, res) => {
   const body = req.body as z.infer<typeof registrationBody>;
   const [department] = await db.select({ id: departmentsTable.id, name: departmentsTable.name }).from(departmentsTable)
     .innerJoin(usersTable, and(eq(usersTable.departmentId, departmentsTable.id), eq(usersTable.role, "hod"), eq(usersTable.status, "approved")))
-    .where(eq(departmentsTable.id, body.departmentId)).limit(1);
+    .where(and(eq(departmentsTable.id, body.departmentId), eq(departmentsTable.isTest, false))).limit(1);
   if (!department) { res.status(400).json({ message: "Choose an available department" }); return; }
   const [code] = await db.select().from(registrationOtpsTable).where(and(eq(registrationOtpsTable.email, body.email),
     eq(registrationOtpsTable.verified, true), gt(registrationOtpsTable.expiresAt, new Date()))).orderBy(desc(registrationOtpsTable.createdAt)).limit(1);
@@ -128,7 +128,7 @@ router.post("/register", validate(registrationBody), async (req, res) => {
   res.status(201).json({ message: "Registration successful. Pending your department HOD's approval.", paymentToken });
 });
 
-async function sessionProfile(id: number) {
+export async function sessionProfile(id: number) {
   const [row] = await db.select({ id: usersTable.id, name: usersTable.fullName, role: usersTable.role,
     departmentId: usersTable.departmentId, departmentName: departmentsTable.name, studentProfileId: studentsTable.id })
     .from(usersTable).leftJoin(departmentsTable, eq(usersTable.departmentId, departmentsTable.id))
