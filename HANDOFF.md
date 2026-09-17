@@ -1,15 +1,19 @@
-# Handoff Report
+# Handoff: Superadmin Resident Auto-Approve Fix
 
 ## Overview
-Added auto-fill defaults for the resident creation form in the superadmin `AdminPortal.tsx`, mirroring the existing pattern from `HODPortal.tsx`.
+This dispatch changes the superadmin-created resident flow to automatically approve students upon creation, avoiding the broken state where they are stuck pending due to missing payment records.
 
-## Changes Made
-- **`artifacts/mockup-sandbox/src/components/AdminPortal.tsx`**
-  - Added the helper function `generateDefaultResidentForm()` mirroring `generateDefaultStudentForm()`. It returns a default form state with `fullName`, `email`, and `password` correctly initialized to `""`, and auto-filled values for `registrationNumber`, `batch`, `dateOfJoining`, and `kuhsId`.
-  - Updated the `addForm` state initializer inside the `DepartmentDetail` component to use lazy initialization: `useState(() => generateDefaultResidentForm())`.
-  - Updated the reset logic in the success path of `handleAddUser` to use `setAddForm(generateDefaultResidentForm())` instead of manually setting everything to empty strings.
+## Changes by File
 
-## Notes
-- Adhered strictly to the sandbox constraints: no shell commands were executed.
-- Did not modify `HODPortal.tsx`, any backend routes or validation, or any other unrelated sections of `AdminPortal.tsx`.
-- Ensured `fullName`, `email`, and `password` remain completely empty (`""`) to prevent auto-filling sensitive identity and credential fields.
+### `artifacts/api-server/src/routes/superadmin.ts`
+- Updated the `POST /departments/:id/students` route to insert the user row with `status: "approved"` instead of `"pending"`.
+- Updated the success response message to `"Student account created and approved"`.
+- Updated the inline comment above the route to explain that the student is immediately active.
+
+### `artifacts/mockup-sandbox/src/components/AdminPortal.tsx`
+- In `handleAddUser`, updated the toast message for student creation to `"Resident account created and approved"` to match the new backend behavior.
+
+### `artifacts/api-server/tests/superadmin.test.ts`
+- Renamed the test from `"admin can create student in any department (pending status)"` to `"admin can create student in any department (auto-approved)"`.
+- Updated the test assertion to expect `assert.equal(user.status, "approved")` rather than `"pending"`.
+- Updated the inline comment block describing the test.
