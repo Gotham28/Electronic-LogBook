@@ -5,7 +5,7 @@ import { departmentsTable } from "./users.js";
 export const departmentCatalogTable = pgTable("department_catalog", {
   id: serial("id").primaryKey(),
   departmentId: integer("department_id").notNull().references(() => departmentsTable.id),
-  kind: text("kind", { enum: ["posting", "academic"] }).notNull(),
+  kind: text("kind", { enum: ["posting", "academic", "case_category"] }).notNull(),
   name: text("name").notNull(),
   value: text("value").notNull(),
   required: integer("required").notNull().default(0),

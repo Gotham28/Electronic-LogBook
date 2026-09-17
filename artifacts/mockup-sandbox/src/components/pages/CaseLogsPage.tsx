@@ -22,6 +22,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Kbd } from "@/components/ui/kbd";
 import { formatLogbookDate, todayForInput } from "@/lib/logbook-config";
+import { useDepartment } from "@/lib/department-context";
 
 type CaseLog = {
   number: number;
@@ -29,6 +30,7 @@ type CaseLog = {
   patientUhid: string;
   age: string;
   gender: string;
+  category: string;
   chiefComplaints: string;
   history: string;
   examination: string;
@@ -42,12 +44,12 @@ type CaseLog = {
   remarks: string;
 };
 
-
 const emptyForm = {
   date: todayForInput(),
   patientUhid: "",
   age: "",
   gender: "Male",
+  category: "",
   chiefComplaints: "",
   history: "",
   examination: "",
@@ -61,6 +63,7 @@ const emptyForm = {
 };
 
 export function CaseLogsPage() {
+  const [showAllCategories, setShowAllCategories] = React.useState(false);
   const [searchTerm, setSearchTerm] = React.useState("");
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [selectedLog, setSelectedLog] = React.useState<any | null>(null);
@@ -72,6 +75,20 @@ export function CaseLogsPage() {
   const user = React.useMemo(() => getCurrentUser(), []);
   const [professors, setProfessors] = React.useState<any[]>([]);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+
+  const { caseCategories } = useDepartment();
+
+  const totalRequired = React.useMemo(() => 
+    caseCategories?.reduce((acc: number, c: any) => acc + c.required, 0) || 50,
+  [caseCategories]);
+
+  const categoryProgress = React.useMemo(() => {
+    if (!caseCategories) return {};
+    return Object.fromEntries(caseCategories.map((cat: any) => [
+      cat.value,
+      caseLogs.filter((log) => log.category === cat.value).length,
+    ]));
+  }, [caseCategories, caseLogs]);
 
   const fetchLogs = React.useCallback(async () => {
     if (!user?.studentProfileId) {
@@ -105,6 +122,10 @@ export function CaseLogsPage() {
       toast.error("Please select a reviewing faculty member");
       return;
     }
+    if (!form.category) {
+      toast.error("Please select a category");
+      return;
+    }
     
     setIsSubmitting(true);
     try {
@@ -113,6 +134,7 @@ export function CaseLogsPage() {
         patientUhid: form.patientUhid,
         patientAge: form.age,
         patientGender: form.gender.toLowerCase(),
+        category: form.category,
         chiefComplaints: form.chiefComplaints,
         history: form.history,
         examination: form.examination,
@@ -152,10 +174,11 @@ export function CaseLogsPage() {
   }
 
   const search = searchTerm.toLowerCase();
-  const filteredLogs = caseLogs.filter((log) =>
-    [log.number, log.diagnosis, log.patientUhid, log.chiefComplaints]
-      .some((value) => String(value).toLowerCase().includes(search)),
-  );
+  const filteredLogs = caseLogs.filter((log) => {
+    const catName = caseCategories?.find((c: any) => c.value === log.category)?.name || log.category || "";
+    return [log.number, log.diagnosisProvisional, log.diagnosis, log.patientUhid, log.chiefComplaints, catName]
+      .some((value) => String(value).toLowerCase().includes(search));
+  });
 
   const setField = (field: keyof typeof form, value: string) => setForm({ ...form, [field]: value });
 
@@ -196,6 +219,18 @@ export function CaseLogsPage() {
                   </Select>
                 </Field>
               </div>
+              <Field label="Case category">
+                <Select value={form.category} onValueChange={(value) => setField("category", value)}>
+                  <SelectTrigger><SelectValue placeholder="Select a case category" /></SelectTrigger>
+                  <SelectContent>
+                    {caseCategories?.map((cat: any) => (
+                      <SelectItem key={cat.value} value={cat.value}>
+                        {cat.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
               <Field label="Chief complaints"><Textarea rows={2} value={form.chiefComplaints} onChange={(e) => setField("chiefComplaints", e.target.value)} /></Field>
               <Field label="Relevant history"><Textarea rows={3} value={form.history} onChange={(e) => setField("history", e.target.value)} /></Field>
               <Field label="Clinical examination"><Textarea rows={3} value={form.examination} onChange={(e) => setField("examination", e.target.value)} /></Field>
@@ -211,7 +246,7 @@ export function CaseLogsPage() {
                 <Select value={form.supervisorId} onValueChange={(value) => setField("supervisorId", value)}>
                   <SelectTrigger><SelectValue placeholder="Select a faculty member" /></SelectTrigger>
                   <SelectContent>
-                    {professors.map(p => <SelectItem key={p.id} value={String(p.id)}>{p.fullName}</SelectItem>)}
+                    {professors.map((p: any) => <SelectItem key={p.id} value={String(p.id)}>{p.fullName}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </Field>
@@ -227,18 +262,58 @@ export function CaseLogsPage() {
         </Dialog>
       </div>
 
+      {caseCategories && caseCategories.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-slate-700">Progress by category</h3>
+            <span className="text-xs text-slate-500">{caseLogs.length} of {totalRequired} total cases logged</span>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {caseCategories.slice(0, showAllCategories ? undefined : 8).map((cat: any) => {
+              const logged = categoryProgress[cat.value] ?? 0;
+              const pct = cat.required > 0 ? Math.min(Math.round((logged / cat.required) * 100), 100) : 0;
+              const done = logged >= cat.required;
+              return (
+                <div key={cat.value} className={`rounded-xl border p-4 ${done ? "border-emerald-200 bg-emerald-50/60" : "border-teal-100 bg-white"}`}>
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-xs font-semibold leading-snug text-slate-700">{cat.name}</p>
+                    {done && <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />}
+                  </div>
+                  <p className="mt-2 text-xl font-bold text-slate-900">{logged}<span className="text-sm font-normal text-slate-400">/{cat.required}</span></p>
+                  <div className="mt-2 h-1.5 w-full rounded-full bg-slate-100">
+                    <div
+                      className={`h-1.5 rounded-full transition-all ${done ? "bg-emerald-500" : "bg-teal-500"}`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {caseCategories.length > 8 && (
+            <div className="mt-1 flex justify-center">
+              <Button variant="ghost" size="sm" onClick={() => setShowAllCategories(!showAllCategories)} className="text-teal-700 hover:text-teal-800 hover:bg-teal-50/50">
+                {showAllCategories ? "Show less" : `Show all ${caseCategories.length} categories`}
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+
       <Card>
         <CardHeader className="flex flex-col justify-between gap-4 border-b border-teal-100 md:flex-row md:items-center">
           <div className="relative w-full max-w-md">
             <Search className="absolute left-3 top-3 h-4 w-4 text-teal-600" />
-            <Input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="h-11 pl-9 pr-24" placeholder="Search patient, UHID or diagnosis..." />
+            <Input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="h-11 pl-9 pr-24" placeholder="Search patient, UHID, category or diagnosis..." />
             <div className="pointer-events-none absolute right-3 top-2.5 flex items-center gap-1">
               <Kbd>Ctrl</Kbd>
               <span className="text-[10px] text-slate-400">+</span>
               <Kbd>K</Kbd>
             </div>
           </div>
-          <Badge variant="outline" className="w-fit border-teal-100 bg-teal-50 px-3 py-1 text-teal-800">{caseLogs.length} of 50 cases logged</Badge>
+          <Badge variant="outline" className="w-fit border-teal-100 bg-teal-50 px-3 py-1 text-teal-800">
+            {caseLogs.length} of {totalRequired} cases logged
+          </Badge>
         </CardHeader>
         <CardContent className="p-0">
           {loading ? (
@@ -264,18 +339,26 @@ export function CaseLogsPage() {
                   <TableHead>Date</TableHead>
                   <TableHead>Patient UHID</TableHead>
                   <TableHead>Age</TableHead>
+                  <TableHead>Category</TableHead>
                   <TableHead>Diagnosis</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Record</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredLogs.map((log) => (
+                {filteredLogs.map((log: any) => {
+                  const catName = caseCategories?.find((c: any) => c.value === log.category)?.name || log.category;
+                  return (
                   <TableRow key={log.id}>
                     <TableCell className="font-bold">{log.number}</TableCell>
                     <TableCell>{formatLogbookDate(log.date)}</TableCell>
                     <TableCell className="font-semibold text-teal-800">{log.patientUhid}</TableCell>
                     <TableCell>{log.patientAge || log.age}</TableCell>
+                    <TableCell>
+                      {catName
+                        ? <Badge variant="outline" className="border-teal-100 bg-teal-50 text-teal-800">{catName}</Badge>
+                        : <span className="text-slate-400 text-xs">—</span>}
+                    </TableCell>
                     <TableCell><p className="max-w-sm font-semibold text-slate-900">{log.diagnosisProvisional || log.diagnosis}</p></TableCell>
                     <TableCell>{statusBadge(log.status)}</TableCell>
                     <TableCell className="text-right">
@@ -289,7 +372,7 @@ export function CaseLogsPage() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
+                )})}
               </TableBody>
             </Table>
           )}
@@ -306,6 +389,7 @@ export function CaseLogsPage() {
                 <DialogDescription>{selectedLog.patientUhid} • {selectedLog.patientAge || selectedLog.age} • {selectedLog.patientGender || selectedLog.gender}</DialogDescription>
               </DialogHeader>
               <div className="grid gap-4">
+                <Detail label="Category" value={caseCategories?.find((c: any) => c.value === selectedLog.category)?.name || selectedLog.category} />
                 <Detail label="Chief complaints" value={selectedLog.chiefComplaints} />
                 <Detail label="Relevant history" value={selectedLog.history} />
                 <Detail label="Clinical examination" value={selectedLog.examination} />

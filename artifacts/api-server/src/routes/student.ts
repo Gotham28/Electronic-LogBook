@@ -587,7 +587,7 @@ router.post("/:studentId/case-logs", validate(z.object({ supervisorId: idSchema,
   patientGender: z.enum(["male", "female", "other"]), diagnosisFinal: z.string().trim().min(1).max(8000),
   patientUhid: optionalText, chiefComplaints: optionalText, diagnosisProvisional: optionalText, history: optionalText,
   examination: optionalText, investigations: optionalText, differentialDiagnosis: optionalText, managementPlan: optionalText,
-  outcome: optionalText, learningPoints: optionalText }).strict()), async (req, res) => {
+  outcome: optionalText, learningPoints: optionalText, category: optionalText }).strict()), async (req, res) => {
   try {
     const studentId = parseInt(String(req.params.studentId), 10);
     const { supervisorId, date, patientAge, patientGender, diagnosisFinal } = req.body;
@@ -603,6 +603,7 @@ router.post("/:studentId/case-logs", validate(z.object({ supervisorId: idSchema,
       patientUhid: req.body.patientUhid,
       chiefComplaints: req.body.chiefComplaints,
       diagnosisProvisional: req.body.diagnosisProvisional,
+      category: req.body.category,
       history: req.body.history, 
       examination: req.body.examination, investigations: req.body.investigations, 
       differentialDiagnosis: req.body.differentialDiagnosis, managementPlan: req.body.managementPlan, 
