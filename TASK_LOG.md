@@ -826,5 +826,7 @@ form", on branch `fix/superadmin-add-resident-form-defaults` (cut fresh off `mai
   log-creation forms, confirmed with the developer during scoping rather than building a new
   ingestion path.
 
-**Commit** — `pending`.
-**PR** — `pending`.
+**Commit** — `e8f4723` "feat(admin): mirror test departments with auto-provisioning and
+impersonation", on branch `feature/mirror-test-department` (cut fresh off `main` @
+`ef6c740`).
+**PR** — [#37](https://github.com/Gotham28/Electronic-LogBook/pull/37).
