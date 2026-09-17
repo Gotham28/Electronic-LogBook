@@ -60,24 +60,30 @@ export function DepartmentSettings() {
         </div>
       </CardContent></Card>
     </div>
-    <Card><CardHeader><CardTitle>Postings and academic activities</CardTitle></CardHeader><CardContent className="space-y-6">
+    <Card><CardHeader><CardTitle>Training Catalog</CardTitle></CardHeader><CardContent className="space-y-6">
       <form className="grid items-end gap-4 md:grid-cols-4" onSubmit={(e) => { e.preventDefault(); void save(async () => {
         await apiPost("/api/admin/department/catalog", { ...entry, value: entry.name.trim(), required: entry.kind === "posting" ? 0 : Number(entry.required) });
         setEntry({ ...entry, name: "", required: "" });
       }, "Training option added"); }}>
-        <div className="space-y-2"><Label htmlFor="catalog-kind">Category</Label><select id="catalog-kind" className="h-11 w-full rounded-xl border bg-white px-3 text-sm" value={entry.kind} onChange={(e) => setEntry({ ...entry, kind: e.target.value })}><option value="posting">Posting / rotation</option><option value="academic">Academic activity</option></select></div>
+        <div className="space-y-2"><Label htmlFor="catalog-kind">Category</Label><select id="catalog-kind" className="h-11 w-full rounded-xl border bg-white px-3 text-sm" value={entry.kind} onChange={(e) => setEntry({ ...entry, kind: e.target.value })}><option value="posting">Posting / rotation</option><option value="academic">Academic activity</option><option value="case_category">Case Category</option></select></div>
         <div className="space-y-2"><Label htmlFor="catalog-name">Name</Label><Input id="catalog-name" required maxLength={160} value={entry.name} onChange={(e) => setEntry({ ...entry, name: e.target.value })} /></div>
-        {entry.kind === "academic" && <><div className="space-y-2"><Label htmlFor="catalog-required">Required count</Label><Input id="catalog-required" type="number" min={0} max={100000} required value={entry.required} onChange={(e) => setEntry({ ...entry, required: e.target.value })} /></div>
+        {(entry.kind === "academic" || entry.kind === "case_category") && <><div className="space-y-2"><Label htmlFor="catalog-required">Required count</Label><Input id="catalog-required" type="number" min={0} max={100000} required value={entry.required} onChange={(e) => setEntry({ ...entry, required: e.target.value })} /></div>
           <div className="space-y-2"><Label htmlFor="catalog-period">Period</Label><select id="catalog-period" className="h-11 w-full rounded-xl border bg-white px-3 text-sm" value={entry.period} onChange={(e) => setEntry({ ...entry, period: e.target.value })}><option value="total">Overall</option><option value="month">Per month</option></select></div></>}
         <Button disabled={busy} type="submit">Add training option</Button>
       </form>
-      <div className="grid gap-6 md:grid-cols-2"><section><h3 className="font-semibold">Postings / rotations</h3>{!data.postings.length && <p className="mt-2 text-sm text-slate-500">No postings configured.</p>}
+      <div className="grid gap-6 md:grid-cols-3"><section><h3 className="font-semibold">Postings / rotations</h3>{!data.postings.length && <p className="mt-2 text-sm text-slate-500">No postings configured.</p>}
         <ul className="mt-2 space-y-2 text-sm">{data.postings.map((item) => <li key={item.id} className="rounded-xl bg-slate-50 p-3">{item.name}</li>)}</ul></section>
         <section><h3 className="font-semibold">Academic activities</h3>{!data.academics.length && <p className="mt-2 text-sm text-slate-500">No academic activities configured.</p>}
           {data.academics.map((item) => <form key={item.id} className="mt-2 flex flex-wrap items-center gap-2 rounded-xl bg-slate-50 p-3" onSubmit={(e) => { e.preventDefault(); void save(() => apiPatch(`/api/admin/department/catalog/${item.id}`, { required: Number(academicTargets[item.id] ?? item.required), period: item.period }), "Academic target updated"); }}>
-            <span className="flex-1 text-sm">{item.name} ({item.period === "month" ? "per month" : "overall"})</span><Input className="w-24" type="number" min={0} max={100000} required aria-label={`Required count for ${item.name}`} value={academicTargets[item.id] ?? item.required} onChange={(e) => setAcademicTargets({ ...academicTargets, [item.id]: e.target.value })} /><Button size="sm" variant="outline" disabled={busy} type="submit">Save</Button>
+            <span className="flex-1 text-sm">{item.name} ({item.period === "month" ? "per month" : "overall"})</span><Input className="w-16" type="number" min={0} max={100000} required aria-label={`Required count for ${item.name}`} value={academicTargets[item.id] ?? item.required} onChange={(e) => setAcademicTargets({ ...academicTargets, [item.id]: e.target.value })} /><Button size="sm" variant="outline" disabled={busy} type="submit">Save</Button>
           </form>)}
-        </section></div>
+        </section>
+        <section><h3 className="font-semibold">Case Categories</h3>{!data.caseCategories?.length && <p className="mt-2 text-sm text-slate-500">No case categories configured.</p>}
+          {data.caseCategories?.map((item) => <form key={item.id} className="mt-2 flex flex-wrap items-center gap-2 rounded-xl bg-slate-50 p-3" onSubmit={(e) => { e.preventDefault(); void save(() => apiPatch(`/api/admin/department/catalog/${item.id}`, { required: Number(academicTargets[item.id] ?? item.required), period: item.period }), "Case target updated"); }}>
+            <span className="flex-1 text-sm">{item.name}</span><Input className="w-16" type="number" min={0} max={100000} required aria-label={`Required count for ${item.name}`} value={academicTargets[item.id] ?? item.required} onChange={(e) => setAcademicTargets({ ...academicTargets, [item.id]: e.target.value })} /><Button size="sm" variant="outline" disabled={busy} type="submit">Save</Button>
+          </form>)}
+        </section>
+        </div>
     </CardContent></Card>
   </div>;
 }
