@@ -1,5 +1,5 @@
 import * as React from "react";
-import { getCurrentUser } from "@/lib/session";
+import { getCurrentUser, isDemoMode } from "@/lib/session";
 import { apiGet } from "@/lib/apiClient";
 import { formatLogbookDate } from "@/lib/logbook-config";
 import { Printer, X } from "lucide-react";
@@ -28,6 +28,7 @@ class PrintErrorBoundary extends React.Component<{children: React.ReactNode}, {e
 
 export function PrintableLogbook() {
   const user = React.useMemo(() => getCurrentUser(), []);
+  const hideUhid = isDemoMode();
   const [data, setData] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -153,12 +154,12 @@ export function PrintableLogbook() {
       <Section title="2. Case Logs">
         {data.cases.length === 0 ? <p>No cases recorded.</p> : (
           <table className="w-full text-left border-collapse text-sm">
-            <thead><tr className="border-b border-black"><th className="py-2">Date</th><th>UHID / Age</th><th>Chief Complaint</th><th>Final Diagnosis</th><th>Status</th></tr></thead>
+            <thead><tr className="border-b border-black"><th className="py-2">Date</th><th>{hideUhid ? "Age / Gender" : "UHID / Age"}</th><th>Chief Complaint</th><th>Final Diagnosis</th><th>Status</th></tr></thead>
             <tbody>
               {data.cases.map((c: any) => (
                 <tr key={c.id} className="border-b border-gray-300">
                   <td className="py-2 whitespace-nowrap">{formatLogbookDate(c.date)}</td>
-                  <td>{[c.patientUhid, c.patientAge, c.patientGender].filter(Boolean).join(" / ")}</td>
+                  <td>{(hideUhid ? [c.patientAge, c.patientGender] : [c.patientUhid, c.patientAge, c.patientGender]).filter(Boolean).join(" / ")}</td>
                   <td>{c.chiefComplaints ?? "—"}</td>
                   <td>{c.diagnosisFinal || c.diagnosisProvisional || "—"}</td>
                   <td className="capitalize">{c.status}</td>

@@ -7,6 +7,11 @@ export interface UserSession {
   departmentId: number | null;
   departmentName: string | null;
   studentProfileId: number | null;
+  isDemoMode?: boolean;
+}
+
+export function isDemoMode(): boolean {
+  return Boolean(getCurrentUser()?.isDemoMode);
 }
 
 export function getCurrentUser(): UserSession | null {

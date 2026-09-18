@@ -2,7 +2,7 @@ import * as React from "react";
 import { AlertCircle, CheckCircle2, Clock, Eye, FileText, PlusCircle, Search, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { apiGet, apiPost, apiDelete } from "@/lib/apiClient";
-import { getCurrentUser } from "@/lib/session";
+import { getCurrentUser, isDemoMode } from "@/lib/session";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -73,6 +73,7 @@ export function CaseLogsPage() {
   const [form, setForm] = React.useState(emptyForm);
 
   const user = React.useMemo(() => getCurrentUser(), []);
+  const hideUhid = isDemoMode();
   const [professors, setProfessors] = React.useState<any[]>([]);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
@@ -176,8 +177,10 @@ export function CaseLogsPage() {
   const search = searchTerm.toLowerCase();
   const filteredLogs = caseLogs.filter((log) => {
     const catName = caseCategories?.find((c: any) => c.value === log.category)?.name || log.category || "";
-    return [log.number, log.diagnosisProvisional, log.diagnosis, log.patientUhid, log.chiefComplaints, catName]
-      .some((value) => String(value).toLowerCase().includes(search));
+    const searchFields = hideUhid
+      ? [log.number, log.diagnosisProvisional, log.diagnosis, log.chiefComplaints, catName]
+      : [log.number, log.diagnosisProvisional, log.diagnosis, log.patientUhid, log.chiefComplaints, catName];
+    return searchFields.some((value) => String(value).toLowerCase().includes(search));
   });
 
   const setField = (field: keyof typeof form, value: string) => setForm({ ...form, [field]: value });
@@ -208,9 +211,9 @@ export function CaseLogsPage() {
               <DialogDescription>Complete the clinical record before sending it to a faculty member.</DialogDescription>
             </DialogHeader>
             <form onSubmit={handleAddCase} className="space-y-5">
-              <div className="grid gap-4 sm:grid-cols-4">
+              <div className={`grid gap-4 ${hideUhid ? "sm:grid-cols-3" : "sm:grid-cols-4"}`}>
                 <Field label="Date"><Input type="date" value={form.date} onChange={(e) => setField("date", e.target.value)} required /></Field>
-                <Field label="Patient UHID"><Input value={form.patientUhid} onChange={(e) => setField("patientUhid", e.target.value)} placeholder="UHID-2026-…" /></Field>
+                {!hideUhid && <Field label="Patient UHID"><Input value={form.patientUhid} onChange={(e) => setField("patientUhid", e.target.value)} placeholder="UHID-2026-…" /></Field>}
                 <Field label="Age"><Input value={form.age} onChange={(e) => setField("age", e.target.value)} placeholder="e.g. 7 years" required /></Field>
                 <Field label="Gender">
                   <Select value={form.gender} onValueChange={(value) => setField("gender", value)}>
@@ -304,7 +307,7 @@ export function CaseLogsPage() {
         <CardHeader className="flex flex-col justify-between gap-4 border-b border-teal-100 md:flex-row md:items-center">
           <div className="relative w-full max-w-md">
             <Search className="absolute left-3 top-3 h-4 w-4 text-teal-600" />
-            <Input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="h-11 pl-9 pr-24" placeholder="Search patient, UHID, category or diagnosis..." />
+            <Input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="h-11 pl-9 pr-24" placeholder={hideUhid ? "Search category or diagnosis..." : "Search patient, UHID, category or diagnosis..."} />
             <div className="pointer-events-none absolute right-3 top-2.5 flex items-center gap-1">
               <Kbd>Ctrl</Kbd>
               <span className="text-[10px] text-slate-400">+</span>
@@ -328,7 +331,7 @@ export function CaseLogsPage() {
               </div>
               <div className="space-y-1 text-center">
                 <p className="text-base font-semibold text-slate-950">No cases found</p>
-                <p className="max-w-sm text-sm leading-6 text-slate-500">Try a different UHID, diagnosis, or case number, or clear the search to see all records.</p>
+                <p className="max-w-sm text-sm leading-6 text-slate-500">{hideUhid ? "Try a different diagnosis or case number, or clear the search to see all records." : "Try a different UHID, diagnosis, or case number, or clear the search to see all records."}</p>
               </div>
             </div>
           ) : (
@@ -337,7 +340,7 @@ export function CaseLogsPage() {
                 <TableRow>
                   <TableHead>Number</TableHead>
                   <TableHead>Date</TableHead>
-                  <TableHead>Patient UHID</TableHead>
+                  {!hideUhid && <TableHead>Patient UHID</TableHead>}
                   <TableHead>Age</TableHead>
                   <TableHead>Category</TableHead>
                   <TableHead>Diagnosis</TableHead>
@@ -352,7 +355,7 @@ export function CaseLogsPage() {
                   <TableRow key={log.id}>
                     <TableCell className="font-bold">{log.number}</TableCell>
                     <TableCell>{formatLogbookDate(log.date)}</TableCell>
-                    <TableCell className="font-semibold text-teal-800">{log.patientUhid}</TableCell>
+                    {!hideUhid && <TableCell className="font-semibold text-teal-800">{log.patientUhid}</TableCell>}
                     <TableCell>{log.patientAge || log.age}</TableCell>
                     <TableCell>
                       {catName
@@ -386,7 +389,7 @@ export function CaseLogsPage() {
               <DialogHeader>
                 <p className="page-eyebrow">Case number {selectedLog.number} • {formatLogbookDate(selectedLog.date)}</p>
                 <DialogTitle className="text-2xl">{selectedLog.diagnosisProvisional || selectedLog.diagnosis}</DialogTitle>
-                <DialogDescription>{selectedLog.patientUhid} • {selectedLog.patientAge || selectedLog.age} • {selectedLog.patientGender || selectedLog.gender}</DialogDescription>
+                <DialogDescription>{[hideUhid ? null : selectedLog.patientUhid, selectedLog.patientAge || selectedLog.age, selectedLog.patientGender || selectedLog.gender].filter(Boolean).join(" • ")}</DialogDescription>
               </DialogHeader>
               <div className="grid gap-4">
                 <Detail label="Category" value={caseCategories?.find((c: any) => c.value === selectedLog.category)?.name || selectedLog.category} />
