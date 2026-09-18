@@ -36,7 +36,7 @@ type ProcedureLog = {
 
 
 export function ProcedureLogsPage() {
-  const { procedures: PROCEDURE_REQUIREMENTS } = useDepartment();
+  const { procedures: PROCEDURE_REQUIREMENTS, competencyLevels } = useDepartment();
   const PROCEDURE_GROUPS = React.useMemo(() => Object.fromEntries([...new Set(PROCEDURE_REQUIREMENTS.map((p) => p.group))].map((group) => [group, PROCEDURE_REQUIREMENTS.filter((p) => p.group === group).map((p) => p.name)])), [PROCEDURE_REQUIREMENTS]);
   const REQUIRED_PROCEDURE_COUNT = PROCEDURE_REQUIREMENTS.reduce((sum, p) => sum + p.required, 0);
   const groupNames: Record<string, string> = Object.fromEntries(Object.keys(PROCEDURE_GROUPS).map((group) => [group, group]));
@@ -53,7 +53,7 @@ export function ProcedureLogsPage() {
     procedureName: "",
     patientUhid: "",
     age: "",
-    experience: "Observed / procedure seen",
+    experience: competencyLevels[0]?.value ?? "",
     supervisorId: "",
   });
   const loggedCounts = React.useMemo(
@@ -125,9 +125,7 @@ export function ProcedureLogsPage() {
         date: form.date,
         patientUhid: hideUhid ? "N/A" : form.patientUhid,
         patientAge: form.age,
-        competencyLevel: form.experience === "Observed / procedure seen" ? "observed" :
-          form.experience === "Assisted" ? "assisted" :
-          form.experience === "Performed under supervision" ? "performed_under_supervision" : "performed_independently",
+        competencyLevel: form.experience,
         supervisorId: form.supervisorId,
       };
       
@@ -141,7 +139,7 @@ export function ProcedureLogsPage() {
         procedureName: "",
         patientUhid: "",
         age: "",
-        experience: "Observed / procedure seen",
+        experience: competencyLevels[0]?.value ?? "",
         supervisorId: "",
       });
       toast.success(`Procedure submitted successfully`);
@@ -197,10 +195,7 @@ export function ProcedureLogsPage() {
                 <Select value={form.experience} onValueChange={(value) => setForm({ ...form, experience: value })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Observed / procedure seen">Observed / procedure seen</SelectItem>
-                    <SelectItem value="Assisted">Assisted</SelectItem>
-                    <SelectItem value="Performed under supervision">Performed under supervision</SelectItem>
-                    <SelectItem value="Performed independently">Performed independently</SelectItem>
+                    {competencyLevels.map((c) => <SelectItem key={c.id} value={c.value}>{c.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </Field>

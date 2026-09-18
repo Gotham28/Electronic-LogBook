@@ -579,7 +579,7 @@ router.get("/roster", async (req, res) => {
   }
 });
 
-router.post("/department/catalog", validate(z.object({ kind: z.enum(["posting", "academic", "case_category"]), name: nameSchema,
+router.post("/department/catalog", validate(z.object({ kind: z.enum(["posting", "academic", "case_category", "competency_level"]), name: nameSchema,
   value: nameSchema, required: targetSchema, period: z.enum(["total", "month"]) }).strict()), async (req, res) => {
   const [dept] = await db.select({ configSourceDepartmentId: departmentsTable.configSourceDepartmentId }).from(departmentsTable).where(eq(departmentsTable.id, req.user!.departmentId!));
   if (dept?.configSourceDepartmentId !== null) { res.status(403).json({ message: "Test departments cannot modify mirrored settings" }); return; }
@@ -756,6 +756,129 @@ router.delete("/users/:id/hard", async (req, res) => {
       return;
     }
     req.log.error({ targetUserId: parseInt(req.params.id), departmentId: req.user!.departmentId, status: 500 }, "Error hard-deleting user");
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// GET /department/catalog/:id/usage-count
+router.get("/department/catalog/:id/usage-count", async (req, res) => {
+  try {
+    const entryId = parseInt(req.params.id);
+    const departmentId = req.user?.departmentId;
+    
+    const [entry] = await db.select().from(departmentCatalogTable)
+      .where(and(eq(departmentCatalogTable.id, entryId), eq(departmentCatalogTable.departmentId, departmentId!))).limit(1);
+      
+    if (!entry) {
+      res.status(403).json({ message: "Catalog entry not found in your department" });
+      return;
+    }
+
+    let countRes;
+    if (entry.kind === "posting") {
+      [countRes] = await db.select({ count: count() })
+        .from(postingsTable)
+        .innerJoin(studentsTable, eq(postingsTable.studentId, studentsTable.id))
+        .innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
+        .where(and(eq(postingsTable.ward, entry.value), eq(usersTable.departmentId, departmentId!)));
+    } else if (entry.kind === "competency_level") {
+      [countRes] = await db.select({ count: count() })
+        .from(procedureLogsTable)
+        .innerJoin(studentsTable, eq(procedureLogsTable.studentId, studentsTable.id))
+        .innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
+        .where(and(eq(procedureLogsTable.competencyLevel, entry.value), eq(usersTable.departmentId, departmentId!)));
+    } else if (entry.kind === "case_category") {
+      [countRes] = await db.select({ count: count() })
+        .from(caseLogsTable)
+        .innerJoin(studentsTable, eq(caseLogsTable.studentId, studentsTable.id))
+        .innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
+        .where(and(eq(caseLogsTable.category, entry.value), eq(usersTable.departmentId, departmentId!)));
+    } else {
+      [countRes] = await db.select({ count: count() })
+        .from(academicLogsTable)
+        .innerJoin(studentsTable, eq(academicLogsTable.studentId, studentsTable.id))
+        .innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
+        .where(and(eq(academicLogsTable.activityType, entry.value), eq(usersTable.departmentId, departmentId!)));
+    }
+    
+    res.json({ count: countRes.count });
+  } catch (error) {
+    req.log.error({ entryId: req.params.id, status: 500 }, "Error getting catalog usage count");
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// DELETE /department/catalog/:id
+router.delete("/department/catalog/:id", async (req, res) => {
+  try {
+    const entryId = parseInt(req.params.id);
+    const departmentId = req.user?.departmentId;
+    
+    const [deleted] = await db.delete(departmentCatalogTable)
+      .where(and(eq(departmentCatalogTable.id, entryId), eq(departmentCatalogTable.departmentId, departmentId!)))
+      .returning();
+      
+    if (!deleted) {
+      res.status(403).json({ message: "Catalog entry not found in your department" });
+      return;
+    }
+    
+    res.json({ message: "Catalog entry deleted successfully" });
+  } catch (error) {
+    req.log.error({ entryId: req.params.id, status: 500 }, "Error deleting catalog entry");
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// GET /department/procedures/:id/usage-count
+router.get("/department/procedures/:id/usage-count", async (req, res) => {
+  try {
+    const entryId = parseInt(req.params.id);
+    const departmentId = req.user?.departmentId;
+    
+    const [entry] = await db.select().from(procedureTypesTable)
+      .where(and(eq(procedureTypesTable.id, entryId), eq(procedureTypesTable.departmentId, departmentId!))).limit(1);
+      
+    if (!entry) {
+      res.status(403).json({ message: "Procedure type not found in your department" });
+      return;
+    }
+
+    const [countRes] = await db.select({ count: count() })
+      .from(procedureLogsTable)
+      .innerJoin(studentsTable, eq(procedureLogsTable.studentId, studentsTable.id))
+      .innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
+      .where(and(
+        eq(procedureLogsTable.procedureName, entry.name),
+        eq(procedureLogsTable.procedureGroup, entry.group),
+        eq(usersTable.departmentId, departmentId!)
+      ));
+    
+    res.json({ count: countRes.count });
+  } catch (error) {
+    req.log.error({ entryId: req.params.id, status: 500 }, "Error getting procedure usage count");
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// DELETE /department/procedures/:id
+router.delete("/department/procedures/:id", async (req, res) => {
+  try {
+    const entryId = parseInt(req.params.id);
+    const departmentId = req.user?.departmentId;
+    
+    const [deleted] = await db.delete(procedureTypesTable)
+      .where(and(eq(procedureTypesTable.id, entryId), eq(procedureTypesTable.departmentId, departmentId!)))
+      .returning();
+      
+    if (!deleted) {
+      res.status(403).json({ message: "Procedure type not found in your department" });
+      return;
+    }
+    
+    res.json({ message: "Procedure type deleted successfully" });
+  } catch (error) {
+    req.log.error({ entryId: req.params.id, status: 500 }, "Error deleting procedure type");
     res.status(500).json({ message: "Internal server error" });
   }
 });
