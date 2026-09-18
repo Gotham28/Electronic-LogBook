@@ -453,7 +453,7 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
                 <SummaryCard label="Approved students" value={roster?.students.filter((student) => student.status === "approved").length ?? 0} />
                 <SummaryCard label="Average progress" value={`${Math.round((roster?.students.reduce((sum, student) => sum + (student.completion || 0), 0) ?? 0) / Math.max(roster?.students.length ?? 0, 1))}%`} />
                 <SummaryCard label="Faculty" value={roster?.professors.length ?? 0} />
-                <SummaryCard label="Awaiting approval" value={pendingStudents.length} />
+                <SummaryCard label="Awaiting approval" value={pendingStudents.length} error={studentsError} />
               </div>
               <Card>
                 <CardHeader className="border-b border-teal-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -759,8 +759,8 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
   );
 }
 
-function SummaryCard({ label, value }: { label: string; value: string | number }) {
-  return <Card className="border-slate-200 bg-white"><CardContent className="p-5"><p className="text-[10px] font-bold uppercase tracking-[.14em] text-slate-500">{label}</p><p className="mt-2 text-3xl font-semibold text-slate-950">{value}</p></CardContent></Card>;
+function SummaryCard({ label, value, error }: { label: string; value: string | number; error?: string | null }) {
+  return <Card className="border-slate-200 bg-white"><CardContent className="p-5"><p className="text-[10px] font-bold uppercase tracking-[.14em] text-slate-500">{label}</p>{error ? <p className="mt-2 text-sm font-medium text-red-500">{error}</p> : <p className="mt-2 text-3xl font-semibold text-slate-950">{value}</p>}</CardContent></Card>;
 }
 
 function CompletionRing({ value }: { value: number }) {
