@@ -1,7 +1,7 @@
 import * as React from "react";
 import { toast } from "sonner";
 import { apiPost, apiPatch, apiGet, apiDelete } from "@/lib/apiClient";
-import { Trash2, AlertTriangle } from "lucide-react";
+import { Trash2, AlertTriangle, ChevronDown, Search } from "lucide-react";
 import { useDepartment } from "@/lib/department-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,6 +13,74 @@ const configFields = [
   ["requiredAcademic", "Required academic activities", false], ["programDurationMonths", "Program duration (months)", true],
   ["casualLeaveAllowance", "Casual leave allowance (days)", true], ["academicLeaveAllowance", "Academic leave allowance (days)", true],
 ] as const;
+
+// Lists longer than this start collapsed and get a search box when expanded.
+const COLLAPSE_THRESHOLD = 5;
+
+function SearchableSection<T extends { id: number; name: string }>({
+  title, items, emptyText, renderItem,
+}: {
+  title: string;
+  items: T[];
+  emptyText: string;
+  renderItem: (item: T) => React.ReactNode;
+}) {
+  const [open, setOpen] = React.useState(() => items.length <= COLLAPSE_THRESHOLD);
+  const [query, setQuery] = React.useState("");
+  const q = query.trim().toLowerCase();
+  const visible = q ? items.filter((item) => item.name.toLowerCase().includes(q)) : items;
+  return (
+    <section>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className="flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2 text-left hover:bg-slate-50"
+      >
+        <span className="flex items-center gap-2 font-semibold">
+          {title}
+          {items.length > 0 && (
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+              {items.length}
+            </span>
+          )}
+        </span>
+        <ChevronDown className={`h-4 w-4 shrink-0 text-slate-500 transition-transform ${open ? "" : "-rotate-90"}`} />
+      </button>
+      {!items.length && <p className="mt-2 px-3 text-sm text-slate-500">{emptyText}</p>}
+      {open && items.length > 0 && (
+        <div className="mt-2 space-y-2 px-3">
+          {items.length > COLLAPSE_THRESHOLD && (
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={`Search ${title.toLowerCase()}...`}
+                aria-label={`Search ${title}`}
+                className="pl-9"
+              />
+            </div>
+          )}
+          {visible.length === 0 ? (
+            <p className="py-2 text-sm text-slate-500">No matches for &ldquo;{query.trim()}&rdquo;.</p>
+          ) : (
+            <>
+              {q && (
+                <p className="text-xs text-slate-500">
+                  Showing {visible.length} of {items.length}
+                </p>
+              )}
+              <ul className="max-h-80 space-y-2 overflow-y-auto pr-1 text-sm">
+                {visible.map((item) => <li key={item.id}>{renderItem(item)}</li>)}
+              </ul>
+            </>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
 
 export function DepartmentSettings() {
   const data = useDepartment();
@@ -50,7 +118,7 @@ export function DepartmentSettings() {
       try {
         await data.refresh();
       } catch (err: any) {
-        toast.warning("Deleted, but the list may be out of date \u2014 refresh the page");
+        toast.warning("Deleted, but the list may be out of date — refresh the page");
       }
       setDeleteTarget(null);
     } catch (err: any) {
@@ -73,7 +141,7 @@ export function DepartmentSettings() {
 
   return <div className="space-y-6">
     <p className="text-sm text-slate-500">Configure training for {data.department.name}. An empty optional allowance or duration means it has not been configured.</p>
-    
+
     {deleteTarget && (
       <Card className="border-rose-200 bg-rose-50/30 shadow-sm">
         <CardContent className="p-4">
@@ -149,13 +217,18 @@ export function DepartmentSettings() {
           <div className="space-y-2"><Label htmlFor="procedure-required">Required count</Label><Input id="procedure-required" type="number" required min={0} max={100000} value={procedure.required} onChange={(e) => setProcedure({ ...procedure, required: e.target.value })} /></div>
           <Button disabled={busy} type="submit">Add procedure type</Button>
         </form>
-        <div className="mt-6 space-y-3">{!data.procedures.length && <p className="text-sm text-slate-500">No procedure types configured.</p>}
-          {data.procedures.map((p) => <form key={p.id} className="flex flex-wrap items-end gap-2 border-t pt-3" onSubmit={(e) => { e.preventDefault(); void save(() => apiPatch(`/api/admin/department/procedures/${p.id}`, { required: Number(targets[p.id] ?? p.required) }), "Procedure target updated"); }}>
-            <div className="min-w-0 flex-1"><p className="text-sm font-medium">{p.name}</p><p className="text-xs text-slate-500">{p.group}</p></div>
-            <Input aria-label={`Required count for ${p.name}`} className="w-24" type="number" min={0} max={100000} required value={targets[p.id] ?? p.required} onChange={(e) => setTargets({ ...targets, [p.id]: e.target.value })} />
-            <Button variant="outline" size="sm" disabled={busy} type="submit">Save</Button>
-            <Button variant="outline" size="sm" type="button" disabled={busy || deleting} onClick={() => confirmDelete(p.id, "procedure", p.name)} className="text-rose-700 border-rose-200 hover:bg-rose-50 px-2"><Trash2 className="h-4 w-4" /></Button>
-          </form>)}
+        <div className="mt-6 border-t pt-4">
+          <SearchableSection
+            title="Configured procedure types"
+            items={data.procedures}
+            emptyText="No procedure types configured."
+            renderItem={(p) => <form className="flex flex-wrap items-end gap-2 rounded-xl bg-slate-50 p-3" onSubmit={(e) => { e.preventDefault(); void save(() => apiPatch(`/api/admin/department/procedures/${p.id}`, { required: Number(targets[p.id] ?? p.required) }), "Procedure target updated"); }}>
+              <div className="min-w-0 flex-1"><p className="text-sm font-medium">{p.name}</p><p className="text-xs text-slate-500">{p.group}</p></div>
+              <Input aria-label={`Required count for ${p.name}`} className="w-24" type="number" min={0} max={100000} required value={targets[p.id] ?? p.required} onChange={(e) => setTargets({ ...targets, [p.id]: e.target.value })} />
+              <Button variant="outline" size="sm" disabled={busy} type="submit">Save</Button>
+              <Button variant="outline" size="sm" type="button" disabled={busy || deleting} onClick={() => confirmDelete(p.id, "procedure", p.name)} className="text-rose-700 border-rose-200 hover:bg-rose-50 px-2"><Trash2 className="h-4 w-4" /></Button>
+            </form>}
+          />
         </div>
       </CardContent></Card>
     </div>
@@ -170,27 +243,56 @@ export function DepartmentSettings() {
           <div className="space-y-2"><Label htmlFor="catalog-period">Period</Label><select id="catalog-period" className="h-11 w-full rounded-xl border bg-white px-3 text-sm" value={entry.period} onChange={(e) => setEntry({ ...entry, period: e.target.value })}><option value="total">Overall</option><option value="month">Per month</option></select></div></>}
         <Button disabled={busy} type="submit">Add training option</Button>
       </form>
-      <div className="grid gap-6 md:grid-cols-2"><section><h3 className="font-semibold">Postings / rotations</h3>{!data.postings.length && <p className="mt-2 text-sm text-slate-500">No postings configured.</p>}
-        <ul className="mt-2 space-y-2 text-sm">{data.postings.map((item) => <li key={item.id} className="flex items-center gap-2 rounded-xl bg-slate-50 p-3"><span className="flex-1">{item.name}</span><Button variant="ghost" size="sm" type="button" disabled={busy || deleting} onClick={() => confirmDelete(item.id, "posting", item.name)} className="text-rose-700 hover:bg-rose-100 h-8 w-8 p-0"><Trash2 className="h-4 w-4" /></Button></li>)}</ul></section>
-        <section><h3 className="font-semibold">Academic activities</h3>{!data.academics.length && <p className="mt-2 text-sm text-slate-500">No academic activities configured.</p>}
-          {data.academics.map((item) => <form key={item.id} className="mt-2 flex flex-wrap items-center gap-2 rounded-xl bg-slate-50 p-3" onSubmit={(e) => { e.preventDefault(); void save(() => apiPatch(`/api/admin/department/catalog/${item.id}`, { required: Number(academicTargets[item.id] ?? item.required), period: item.period }), "Academic target updated"); }}>
+      <div className="grid gap-6 md:grid-cols-2">
+        <SearchableSection
+          title="Postings / rotations"
+          items={data.postings}
+          emptyText="No postings configured."
+          renderItem={(item) => <div className="flex items-center gap-2 rounded-xl bg-slate-50 p-3">
+            <span className="flex-1">{item.name}</span>
+            <Button variant="ghost" size="sm" type="button" disabled={busy || deleting} onClick={() => confirmDelete(item.id, "posting", item.name)} className="text-rose-700 hover:bg-rose-100 h-8 w-8 p-0"><Trash2 className="h-4 w-4" /></Button>
+          </div>}
+        />
+        <SearchableSection
+          title="Academic activities"
+          items={data.academics}
+          emptyText="No academic activities configured."
+          renderItem={(item) => <form className="flex flex-wrap items-center gap-2 rounded-xl bg-slate-50 p-3" onSubmit={(e) => { e.preventDefault(); void save(() => apiPatch(`/api/admin/department/catalog/${item.id}`, { required: Number(academicTargets[item.id] ?? item.required), period: item.period }), "Academic target updated"); }}>
             <span className="flex-1 text-sm">{item.name} ({item.period === "month" ? "per month" : "overall"})</span><Input className="w-24" type="number" min={0} max={100000} required aria-label={`Required count for ${item.name}`} value={academicTargets[item.id] ?? item.required} onChange={(e) => setAcademicTargets({ ...academicTargets, [item.id]: e.target.value })} /><Button size="sm" variant="outline" disabled={busy} type="submit">Save</Button>
             <Button variant="outline" size="sm" type="button" disabled={busy || deleting} onClick={() => confirmDelete(item.id, "academic", item.name)} className="text-rose-700 border-rose-200 hover:bg-rose-50 px-2"><Trash2 className="h-4 w-4" /></Button>
-          </form>)}
-        </section></div>
-      <div className="grid gap-6 md:grid-cols-2 mt-8 pt-8 border-t">
-        <section><h3 className="font-semibold">Case Categories</h3>{!data.caseCategories?.length && <p className="mt-2 text-sm text-slate-500">No case categories configured.</p>}
-          {data.caseCategories?.map((item) => <form key={item.id} className="mt-2 flex flex-wrap items-center gap-2 rounded-xl bg-slate-50 p-3" onSubmit={(e) => { e.preventDefault(); void save(() => apiPatch(`/api/admin/department/catalog/${item.id}`, { required: Number(academicTargets[item.id] ?? item.required), period: item.period }), "Case target updated"); }}>
-            <span className="flex-1 text-sm">{item.name}</span><Input className="w-16" type="number" min={0} max={100000} required aria-label={`Required count for ${item.name}`} value={academicTargets[item.id] ?? item.required} onChange={(e) => setAcademicTargets({ ...academicTargets, [item.id]: e.target.value })} /><Button size="sm" variant="outline" disabled={busy} type="submit">Save</Button>
-            <Button variant="outline" size="sm" type="button" disabled={busy || deleting} onClick={() => confirmDelete(item.id, "case_category", item.name)} className="text-rose-700 border-rose-200 hover:bg-rose-50 px-2"><Trash2 className="h-4 w-4" /></Button>
-          </form>)}
-        </section>
-        <section><h3 className="font-semibold">Experience levels</h3>{!data.competencyLevels?.length && <p className="mt-2 text-sm text-slate-500">No experience levels configured.</p>}
-          <ul className="mt-2 space-y-2 text-sm">{data.competencyLevels?.map((item) => <li key={item.id} className="flex items-center gap-2 rounded-xl bg-slate-50 p-3"><span className="flex-1">{item.name}</span><Button variant="ghost" size="sm" type="button" disabled={busy || deleting} onClick={() => confirmDelete(item.id, "competency_level", item.name)} className="text-rose-700 hover:bg-rose-100 h-8 w-8 p-0"><Trash2 className="h-4 w-4" /></Button></li>)}</ul></section>
+          </form>}
+        />
       </div>
       <div className="grid gap-6 md:grid-cols-2 mt-8 pt-8 border-t">
-        <section><h3 className="font-semibold">Leave types</h3>{!data.leaveTypes?.length && <p className="mt-2 text-sm text-slate-500">No leave types configured.</p>}
-          <ul className="mt-2 space-y-2 text-sm">{data.leaveTypes?.map((item) => <li key={item.id} className="flex items-center gap-2 rounded-xl bg-slate-50 p-3"><span className="flex-1">{item.name}</span><Button variant="ghost" size="sm" type="button" disabled={busy || deleting} onClick={() => confirmDelete(item.id, "leave_type", item.name)} className="text-rose-700 hover:bg-rose-100 h-8 w-8 p-0"><Trash2 className="h-4 w-4" /></Button></li>)}</ul></section>
+        <SearchableSection
+          title="Case Categories"
+          items={data.caseCategories ?? []}
+          emptyText="No case categories configured."
+          renderItem={(item) => <form className="flex flex-wrap items-center gap-2 rounded-xl bg-slate-50 p-3" onSubmit={(e) => { e.preventDefault(); void save(() => apiPatch(`/api/admin/department/catalog/${item.id}`, { required: Number(academicTargets[item.id] ?? item.required), period: item.period }), "Case target updated"); }}>
+            <span className="flex-1 text-sm">{item.name}</span><Input className="w-16" type="number" min={0} max={100000} required aria-label={`Required count for ${item.name}`} value={academicTargets[item.id] ?? item.required} onChange={(e) => setAcademicTargets({ ...academicTargets, [item.id]: e.target.value })} /><Button size="sm" variant="outline" disabled={busy} type="submit">Save</Button>
+            <Button variant="outline" size="sm" type="button" disabled={busy || deleting} onClick={() => confirmDelete(item.id, "case_category", item.name)} className="text-rose-700 border-rose-200 hover:bg-rose-50 px-2"><Trash2 className="h-4 w-4" /></Button>
+          </form>}
+        />
+        <SearchableSection
+          title="Experience levels"
+          items={data.competencyLevels ?? []}
+          emptyText="No experience levels configured."
+          renderItem={(item) => <div className="flex items-center gap-2 rounded-xl bg-slate-50 p-3">
+            <span className="flex-1">{item.name}</span>
+            <Button variant="ghost" size="sm" type="button" disabled={busy || deleting} onClick={() => confirmDelete(item.id, "competency_level", item.name)} className="text-rose-700 hover:bg-rose-100 h-8 w-8 p-0"><Trash2 className="h-4 w-4" /></Button>
+          </div>}
+        />
+      </div>
+      <div className="grid gap-6 md:grid-cols-2 mt-8 pt-8 border-t">
+        <SearchableSection
+          title="Leave types"
+          items={data.leaveTypes ?? []}
+          emptyText="No leave types configured."
+          renderItem={(item) => <div className="flex items-center gap-2 rounded-xl bg-slate-50 p-3">
+            <span className="flex-1">{item.name}</span>
+            <Button variant="ghost" size="sm" type="button" disabled={busy || deleting} onClick={() => confirmDelete(item.id, "leave_type", item.name)} className="text-rose-700 hover:bg-rose-100 h-8 w-8 p-0"><Trash2 className="h-4 w-4" /></Button>
+          </div>}
+        />
       </div>
     </CardContent></Card>
   </div>;
