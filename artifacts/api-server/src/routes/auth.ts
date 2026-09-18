@@ -5,7 +5,7 @@ import { db, usersTable, studentsTable, departmentsTable, registrationOtpsTable,
 import { eq, and, desc, gt, lt, sql } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { sendOtpEmail, sendPasswordResetEmail } from "../lib/mailer.js";
+import { sendOtpEmail, sendPasswordResetEmail, sendHODApprovalRequestEmail } from "../lib/mailer.js";
 import { requireAuth } from "../middlewares/auth.js";
 import { JWT_SECRET } from "../lib/env.js";
 import { dateSchema, emailSchema, idSchema, nameSchema, passwordSchema, validate } from "../lib/validation.js";
@@ -103,7 +103,12 @@ const registrationBody = z.object({ fullName: nameSchema, email: emailSchema, pa
 
 router.post("/register", validate(registrationBody), async (req, res) => {
   const body = req.body as z.infer<typeof registrationBody>;
-  const [department] = await db.select({ id: departmentsTable.id, name: departmentsTable.name }).from(departmentsTable)
+  const [department] = await db.select({ 
+    id: departmentsTable.id, 
+    name: departmentsTable.name,
+    hodEmail: usersTable.email,
+    hodName: usersTable.fullName
+  }).from(departmentsTable)
     .innerJoin(usersTable, and(eq(usersTable.departmentId, departmentsTable.id), eq(usersTable.role, "hod"), eq(usersTable.status, "approved")))
     .where(and(eq(departmentsTable.id, body.departmentId), eq(departmentsTable.isTest, false))).limit(1);
   if (!department) { res.status(400).json({ message: "Choose an available department" }); return; }
@@ -124,6 +129,11 @@ router.post("/register", validate(registrationBody), async (req, res) => {
     return user.id;
   });
   if (!createdUserId) { res.status(409).json({ message: "Verification has already been used" }); return; }
+  
+  sendHODApprovalRequestEmail(department.hodEmail, department.hodName, body.fullName, body.registrationNumber, department.name).catch((err) => {
+    console.error("Failed to send HOD approval request email:", err);
+  });
+
   const paymentToken = jwt.sign({ id: createdUserId, scope: "payment" }, JWT_SECRET, { expiresIn: "30m" });
   res.status(201).json({ message: "Registration successful. Pending your department HOD's approval.", paymentToken });
 });

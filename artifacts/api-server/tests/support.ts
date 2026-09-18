@@ -14,7 +14,8 @@ process.env.ALLOWED_ORIGINS = "http://localhost:5173";
 // Tests capture outbound codes; this transport is never part of the application bundle.
 export const mail = new Map<string, string>();
 nodemailer.createTransport = (() => ({ sendMail: async (message: any) => {
-  mail.set(message.to, message.text.match(/\b\d{6}\b/)[0]);
+  const match = message.text ? message.text.match(/\b\d{6}\b/) : null;
+  mail.set(message.to, match ? match[0] : "SENT");
   return { accepted: [message.to] };
 } })) as any;
 

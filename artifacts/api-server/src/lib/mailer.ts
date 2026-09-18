@@ -214,3 +214,50 @@ gothoslabs@gmail.com`;
     html: htmlTemplate,
   });
 };
+
+export const sendHODApprovalRequestEmail = async (
+  hodEmail: string,
+  hodName: string,
+  studentName: string,
+  studentReg: string,
+  departmentName: string
+) => {
+  const transporter = createTransporter();
+  const appUrl = process.env.APP_URL || "https://elogbookgothos.in";
+
+  const textTemplate = `Dear ${hodName},
+
+A new student, ${studentName} (${studentReg}), has registered for the ${departmentName} department and is awaiting your approval.
+
+Please log in to the E-Logbook application to review their registration.
+
+Application URL: ${appUrl}
+Go to the "Student Access" tab to approve or deny the request.
+
+Best regards,
+E-Logbook Support Team`;
+
+  const htmlTemplate = wrapEmail(
+    "Pending Student Approval",
+    `<p style="margin:0; font-size:22px; font-weight:bold; color:#0f172a;">Action Required: Pending Student Approval</p>
+     <p style="margin:16px 0 0; font-size:15px; line-height:1.7; color:#475569;">Dear ${hodName},</p>
+     <p style="margin:16px 0 0; font-size:15px; line-height:1.7; color:#475569;">A new student, <strong>${studentName}</strong> (Reg No: ${studentReg}), has registered for the ${departmentName} department and is awaiting your approval.</p>
+
+     <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:28px 0 12px;">
+       <tr>
+         <td style="background-color:#0f766e;">
+           <a href="${appUrl}/student-access" style="display:inline-block; padding:14px 28px; font-family:Arial, Helvetica, sans-serif; font-size:14px; font-weight:bold; color:#ffffff; text-decoration:none;">Review Registration</a>
+         </td>
+       </tr>
+     </table>
+     <p style="margin:16px 0 0; font-size:15px; line-height:1.7; color:#475569;">Please log in and go to the "Student Access" tab in your portal to approve or deny the request.</p>`
+  );
+
+  await transporter.sendMail({
+    from: `"E-LogBook" <${process.env.EMAIL_USER}>`,
+    to: hodEmail,
+    subject: "Action Required: Pending Student Approval",
+    text: textTemplate,
+    html: htmlTemplate,
+  });
+};
