@@ -28,7 +28,7 @@ const NONEXISTENT_STUDENT_ID = 999999999;
 test("SEC-01: GET /:studentId/leave-records — owning student and department HOD only", async () => {
   const base = "/students/" + a.student0.studentId + "/leave-records";
   const created = await call(base, "student0", "POST",
-    { startDate: "2026-09-01", endDate: "2026-09-03", leaveType: "Casual", reason: "Batch B evidence - leave" });
+    { startDate: "2026-09-01", endDate: "2026-09-03", leaveType: "casual", reason: "Batch B evidence - leave" });
   assert.equal(created.status, 201, "fixture: create a leave record for student0");
 
   const unauthenticated = await call(base);

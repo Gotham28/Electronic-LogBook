@@ -579,7 +579,7 @@ router.get("/roster", async (req, res) => {
   }
 });
 
-router.post("/department/catalog", validate(z.object({ kind: z.enum(["posting", "academic", "case_category", "competency_level"]), name: nameSchema,
+router.post("/department/catalog", validate(z.object({ kind: z.enum(["posting", "academic", "case_category", "competency_level", "leave_type"]), name: nameSchema,
   value: nameSchema, required: targetSchema, period: z.enum(["total", "month"]) }).strict()), async (req, res) => {
   const [dept] = await db.select({ configSourceDepartmentId: departmentsTable.configSourceDepartmentId }).from(departmentsTable).where(eq(departmentsTable.id, req.user!.departmentId!));
   if (dept?.configSourceDepartmentId !== null) { res.status(403).json({ message: "Test departments cannot modify mirrored settings" }); return; }
@@ -774,7 +774,7 @@ router.get("/department/catalog/:id/usage-count", async (req, res) => {
       return;
     }
 
-    let countRes;
+    let countRes: { count: number } = { count: 0 };
     if (entry.kind === "posting") {
       [countRes] = await db.select({ count: count() })
         .from(postingsTable)
@@ -793,12 +793,18 @@ router.get("/department/catalog/:id/usage-count", async (req, res) => {
         .innerJoin(studentsTable, eq(caseLogsTable.studentId, studentsTable.id))
         .innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
         .where(and(eq(caseLogsTable.category, entry.value), eq(usersTable.departmentId, departmentId!)));
-    } else {
+    } else if (entry.kind === "academic") {
       [countRes] = await db.select({ count: count() })
         .from(academicLogsTable)
         .innerJoin(studentsTable, eq(academicLogsTable.studentId, studentsTable.id))
         .innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
         .where(and(eq(academicLogsTable.activityType, entry.value), eq(usersTable.departmentId, departmentId!)));
+    } else if (entry.kind === "leave_type") {
+      [countRes] = await db.select({ count: count() })
+        .from(leaveRecordsTable)
+        .innerJoin(studentsTable, eq(leaveRecordsTable.studentId, studentsTable.id))
+        .innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
+        .where(and(eq(leaveRecordsTable.leaveType, entry.value), eq(usersTable.departmentId, departmentId!)));
     }
     
     res.json({ count: countRes.count });
@@ -814,6 +820,14 @@ router.delete("/department/catalog/:id", async (req, res) => {
     const entryId = parseInt(req.params.id);
     const departmentId = req.user?.departmentId;
     
+    const [entry] = await db.select().from(departmentCatalogTable)
+      .where(and(eq(departmentCatalogTable.id, entryId), eq(departmentCatalogTable.departmentId, departmentId!))).limit(1);
+
+    if (entry && entry.kind === "leave_type" && (entry.value === "casual" || entry.value === "academic")) {
+      res.status(403).json({ message: "This leave type is required for quota tracking and cannot be removed" });
+      return;
+    }
+
     const [deleted] = await db.delete(departmentCatalogTable)
       .where(and(eq(departmentCatalogTable.id, entryId), eq(departmentCatalogTable.departmentId, departmentId!)))
       .returning();

@@ -166,7 +166,7 @@ test("existing case, procedure, academic, posting and leave workflows work in ev
     assert.equal((await call(base + "/procedure-logs", "student" + index, "POST", { ...procedureBody, procedureName: "Unconfigured option" })).status, 400);
     assert.equal((await call(base + "/academic-logs", "student" + index, "POST", { supervisorId, activityType: "discussion-" + index, topic: "Synthetic learning", date: "2026-09-01" })).status, 201);
     assert.equal((await call(base + "/postings", "student" + index, "POST", { ward: "unit-" + index, supervisorId, startDate: "2026-09-01", endDate: "2026-09-03" })).status, 201);
-    const leave = await call(base + "/leave-records", "student" + index, "POST", { leaveType: "Casual", startDate: "2026-09-01", endDate: "2026-09-03", reason: "Synthetic leave test" });
+    const leave = await call(base + "/leave-records", "student" + index, "POST", { leaveType: "casual", startDate: "2026-09-01", endDate: "2026-09-03", reason: "Synthetic leave test" });
     assert.equal(leave.status, 201);
     const pendingLeaves = await call("/admin/leaves/pending", "hod" + index);
     assert.equal(pendingLeaves.body.length, 1);

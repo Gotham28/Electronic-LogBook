@@ -13,7 +13,7 @@ export type DepartmentData = {
   hod: { id: number; name: string } | null;
   config: DepartmentConfig | null;
   procedures: Array<{ id: number; name: string; group: string; required: number }>;
-  postings: CatalogItem[]; academics: CatalogItem[]; caseCategories: CatalogItem[]; competencyLevels: CatalogItem[];
+  postings: CatalogItem[]; academics: CatalogItem[]; caseCategories: CatalogItem[]; competencyLevels: CatalogItem[]; leaveTypes: CatalogItem[];
 };
 const DepartmentContext = React.createContext<(DepartmentData & { refresh: () => Promise<void> }) | null>(null);
 
@@ -24,7 +24,16 @@ export function DepartmentProvider({ departmentId, children }: { departmentId: n
     if (!departmentId) { setError("Your account has no department. Contact the database administrator."); return; }
     try {
       const result = await apiGet<DepartmentData>(`/api/departments/${departmentId}/catalog`);
-      setData(result); setError("");
+      setData({
+        ...result,
+        postings: result.postings || [],
+        academics: result.academics || [],
+        caseCategories: result.caseCategories || [],
+        competencyLevels: result.competencyLevels || [],
+        leaveTypes: result.leaveTypes || [],
+        procedures: result.procedures || []
+      });
+      setError("");
     } catch (err) { setError(err instanceof Error ? err.message : "Unable to load your department"); }
   }, [departmentId]);
   React.useEffect(() => { setData(null); void refresh(); }, [refresh]);

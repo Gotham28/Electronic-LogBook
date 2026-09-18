@@ -28,7 +28,7 @@ test("SEC-03: forced POST /:studentId/leave-records failure logs id and status o
   await db.execute(sql`ALTER TABLE leave_records ADD CONSTRAINT force_fail_sec03 CHECK (false) NOT VALID`);
   const secretReason = "SEC-03-EVIDENCE-MARKER-diabetes-mellitus-type-2-do-not-log";
   const response = await call("/students/" + a.student0.studentId + "/leave-records", "student0", "POST",
-    { startDate: "2026-09-01", endDate: "2026-09-03", leaveType: "Casual", reason: secretReason });
+    { startDate: "2026-09-01", endDate: "2026-09-03", leaveType: "casual", reason: secretReason });
   await db.execute(sql`ALTER TABLE leave_records DROP CONSTRAINT force_fail_sec03`);
 
   // The pino line this request produces prints to this process's own stdout above/below

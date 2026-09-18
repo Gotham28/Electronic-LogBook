@@ -40,7 +40,11 @@ export async function setup() {
       { departmentId: department.id, kind: "competency_level", name: "Observed", value: "observed" },
       { departmentId: department.id, kind: "competency_level", name: "Assisted", value: "assisted" },
       { departmentId: department.id, kind: "competency_level", name: "Performed under supervision", value: "performed_under_supervision" },
-      { departmentId: department.id, kind: "competency_level", name: "Performed independently", value: "performed_independently" }
+      { departmentId: department.id, kind: "competency_level", name: "Performed independently", value: "performed_independently" },
+      { departmentId: department.id, kind: "leave_type", name: "Casual Leave", value: "casual", period: "total" },
+      { departmentId: department.id, kind: "leave_type", name: "Academic Leave", value: "academic", period: "total" },
+      { departmentId: department.id, kind: "leave_type", name: "Medical Leave", value: "medical", period: "total" },
+      { departmentId: department.id, kind: "leave_type", name: "Maternity / Paternity Leave", value: "maternity_paternity", period: "total" }
     ]);
     for (const kind of ["hod", "faculty", "faculty2", "student", "student2", "pending"] as const) {
       const role = kind.startsWith("faculty") ? "professor" : kind === "hod" ? "hod" : "student";
