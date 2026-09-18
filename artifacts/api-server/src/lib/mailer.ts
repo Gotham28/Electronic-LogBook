@@ -1,23 +1,82 @@
 import nodemailer from "nodemailer";
 
-export const sendOtpEmail = async (email: string, otp: string) => {
-  const transporter = nodemailer.createTransport({
+function createTransporter() {
+  return nodemailer.createTransport({
     service: "gmail",
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_APP_PASSWORD,
     },
   });
+}
 
+function wrapEmail(title: string, innerHtml: string) {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>${title}</title>
+</head>
+<body style="margin:0; padding:0; background-color:#e8eef3;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#e8eef3;">
+    <tr>
+      <td align="center" style="padding:32px 16px;">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px; max-width:600px; background-color:#ffffff;">
+          <tr>
+            <td style="background-color:#0f766e; padding:28px 40px;">
+              <p style="margin:0; font-family:Arial, Helvetica, sans-serif; font-size:11px; letter-spacing:1.6px; text-transform:uppercase; color:#99f6e4;">Gothos Labs</p>
+              <p style="margin:8px 0 0; font-family:Arial, Helvetica, sans-serif; font-size:22px; font-weight:bold; color:#ffffff;">E-LogBook</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:36px 40px 8px; font-family:Arial, Helvetica, sans-serif;">
+              ${innerHtml}
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:24px 40px 32px; font-family:Arial, Helvetica, sans-serif; border-top:1px solid #e2e8f0; background-color:#f8fafc;">
+              <p style="margin:0; font-size:13px; font-weight:bold; color:#334155;">E-Logbook Support Team</p>
+              <p style="margin:6px 0 0; font-size:12px; color:#64748b; line-height:1.6;">
+                +91 9037382416 &nbsp;|&nbsp;
+                <a href="mailto:gothoslabs@gmail.com" style="color:#0f766e; text-decoration:none;">gothoslabs@gmail.com</a>
+              </p>
+              <p style="margin:16px 0 0; font-size:11px; color:#94a3b8;">This is an automated message. Please do not reply directly to this email.</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
+function credentialRow(label: string, valueHtml: string, last = false) {
+  const border = last ? "" : "border-bottom:1px solid #d1fae5;";
+  return `<tr>
+    <td style="padding:10px 0; ${border} width:34%; font-family:Arial, Helvetica, sans-serif; font-size:12px; color:#64748b; vertical-align:top;">${label}</td>
+    <td style="padding:10px 0; ${border} font-family:Arial, Helvetica, sans-serif; font-size:14px; color:#0f172a; font-weight:bold;">${valueHtml}</td>
+  </tr>`;
+}
+
+export const sendOtpEmail = async (email: string, otp: string) => {
+  const transporter = createTransporter();
   const textTemplate = `Your verification code is: ${otp}. It expires in 10 minutes.`;
-  const htmlTemplate = `
-    <div style="font-family: Arial, sans-serif; padding: 20px;">
-      <h2>E-LogBook Registration</h2>
-      <p>Your verification code is:</p>
-      <h1 style="color: #0d9488; letter-spacing: 5px;">${otp}</h1>
-      <p>This code will expire in 10 minutes.</p>
-    </div>
-  `;
+  const htmlTemplate = wrapEmail(
+    "E-LogBook Registration OTP",
+    `<p style="margin:0; font-size:22px; font-weight:bold; color:#0f172a;">Confirm your registration</p>
+     <p style="margin:12px 0 0; font-size:15px; line-height:1.7; color:#475569;">Use this one-time code to finish creating your E-LogBook account. It expires in 10 minutes.</p>
+     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:28px 0;">
+       <tr>
+         <td align="center" style="background-color:#f0fdfa; border:1px solid #99f6e4; padding:22px;">
+           <p style="margin:0; font-family:Arial, Helvetica, sans-serif; font-size:32px; font-weight:bold; letter-spacing:8px; color:#0f766e;">${otp}</p>
+         </td>
+       </tr>
+     </table>
+     <p style="margin:0; font-size:13px; color:#64748b; line-height:1.6;">If you did not request this code, you can ignore this email.</p>`
+  );
 
   await transporter.sendMail({
     from: `"E-LogBook" <${process.env.EMAIL_USER}>`,
@@ -29,23 +88,21 @@ export const sendOtpEmail = async (email: string, otp: string) => {
 };
 
 export const sendPasswordResetEmail = async (email: string, otp: string) => {
-  const transporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_APP_PASSWORD,
-    },
-  });
-
+  const transporter = createTransporter();
   const textTemplate = `Your password reset code is: ${otp}. It expires in 10 minutes.`;
-  const htmlTemplate = `
-    <div style="font-family: Arial, sans-serif; padding: 20px;">
-      <h2>E-LogBook Password Reset</h2>
-      <p>Your password reset code is:</p>
-      <h1 style="color: #0d9488; letter-spacing: 5px;">${otp}</h1>
-      <p>This code will expire in 10 minutes. If you did not request this, you can ignore this email.</p>
-    </div>
-  `;
+  const htmlTemplate = wrapEmail(
+    "E-LogBook Password Reset",
+    `<p style="margin:0; font-size:22px; font-weight:bold; color:#0f172a;">Reset your password</p>
+     <p style="margin:12px 0 0; font-size:15px; line-height:1.7; color:#475569;">Use this one-time code to reset your E-LogBook password. It expires in 10 minutes.</p>
+     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:28px 0;">
+       <tr>
+         <td align="center" style="background-color:#f0fdfa; border:1px solid #99f6e4; padding:22px;">
+           <p style="margin:0; font-family:Arial, Helvetica, sans-serif; font-size:32px; font-weight:bold; letter-spacing:8px; color:#0f766e;">${otp}</p>
+         </td>
+       </tr>
+     </table>
+     <p style="margin:0; font-size:13px; color:#64748b; line-height:1.6;">If you did not request a password reset, you can ignore this email.</p>`
+  );
 
   await transporter.sendMail({
     from: `"E-LogBook" <${process.env.EMAIL_USER}>`,
@@ -56,269 +113,98 @@ export const sendPasswordResetEmail = async (email: string, otp: string) => {
   });
 };
 
-export const sendAccountCreatedEmail = async (email: string, fullName: string, password: string, role: "hod" | "professor" | "student", departmentName?: string) => {
-  const transporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_APP_PASSWORD,
-    },
-  });
-
+export const sendAccountCreatedEmail = async (
+  email: string,
+  fullName: string,
+  password: string,
+  role: "hod" | "professor" | "student",
+  departmentName?: string
+) => {
+  const transporter = createTransporter();
   const roleDisplay = role === "hod" ? "HOD" : role === "student" ? "Student" : "Faculty";
-  const deptDisplay = departmentName ? `, Department of ${departmentName}` : "";
-  const title = `${roleDisplay}${deptDisplay}`;
+  const deptDisplay = departmentName ? `, ${departmentName}` : "";
   const appUrl = process.env.APP_URL || "https://elogbookgothos.in";
 
   const textTemplate = `Dear ${fullName},
 
 We are pleased to inform you that your account for the E-Logbook Application has been successfully created.
 
-The E-Logbook is a secure digital platform designed to streamline record-keeping, improve data accuracy, and simplify daily logging, monitoring, and reporting. It replaces traditional paper-based logbooks with a centralized digital workflow that enables authorized users to record, review, and manage operational data efficiently.
+The E-Logbook is a secure digital platform designed to streamline record-keeping, improve data accuracy, and simplify daily logging, monitoring, and reporting. It replaces traditional paper-based logbooks with a centralized digital workflow.
 
 Your E-Logbook Account Credentials
-Please use the following credentials to access the E-Logbook application:
+---
+Role:             ${roleDisplay}${deptDisplay}
+Username:         ${email}
+Password:         ${password}
+Application URL:  ${appUrl}
+---
 
-Username: ${email}
-Password: ${password}
-Application URL: ${appUrl}
+For security, please do not share your credentials. We strongly recommend changing your password after your first login.
 
-For security purposes, please do not share your login credentials with others. We highly recommend changing your password after your first login.
+Key Features:
+- Centralized Digital Entry: Record and review data from any device.
+- Automated Audit Trails: Timestamped records for accountability and traceability.
+- Customizable Forms & Workflows: Configured to your department's requirements.
+- Dashboards & Monitoring: Real-time visualizations of operational data.
+- Instant Reporting: Generate PDF and Excel reports on demand.
 
-Key Features
-The E-Logbook platform provides:
-- Centralized Digital Entry: Record, update, and review operational data through mobile and desktop devices.
-- Automated Audit Trails: Maintain timestamped records to support accountability, traceability, and data integrity.
-- Customizable Forms & Workflows: Digital forms and workflows configured according to your department's specific requirements.
-- Dashboards & Monitoring: Access relevant operational information through structured dashboards and real-time visualizations.
-- Instant Reporting: Generate structured reports in PDF and Excel formats for review and documentation.
-
-Getting Started
-Please log in using the credentials provided above and verify that you can access the application successfully. If you encounter any issues with logging in, accessing a form, or using any feature of the platform, please contact us using the details below.
-
-We look forward to working with your team and supporting a smooth transition to the E-Logbook platform.
+Getting Started:
+Log in with the credentials above. If you face any issues, contact us at the details below.
 
 Best regards,
 E-Logbook Support Team
 +91 9037382416
 gothoslabs@gmail.com`;
 
-  const htmlTemplate = `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml">
-  <head>
-    <title>E-Logbook Account Created</title>
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style type="text/css">
-      a{ outline:none; color:#5277ff; text-decoration:underline; }
-      a:hover{text-decoration:none !important;}
-      a[x-apple-data-detectors]{color:inherit !important; text-decoration:none !important;}
-      .rollover:hover, .button:hover{opacity:0.8;}
-      .rollover, .button{ -webkit-transition:all 0.3s ease; -moz-transition:all 0.3s ease; -ms-transition:all 0.3s ease; transition:all 0.3s ease; }
-      .rollover a:hover, .button a:hover{text-decoration: none !important;}
-      a img{border:none;}
-      table td{mso-line-height-rule:exactly;}
-      .ExternalClass, .ExternalClass a, .ExternalClass span, .ExternalClass b, .ExternalClass br, .ExternalClass p, .ExternalClass div{line-height:inherit;}
-      img{max-width: 100%; height: auto;}
-      @media only screen and (max-width:500px) {
-        table[class="flexible"]{width:100% !important;}
-        *[class="hide"]{display:none !important; width:0 !important; height:0 !important; padding:0 !important; font-size:0 !important; line-height:0 !important;}
-        td[class="heading"]{font-size: 26px !important; line-height: 32px !important;}
-        td[class="indent-01"] {padding-top: 34px !important;}
-        td[class="indent-02"] {padding-bottom: 44px !important;}
-        td[class="indent-03"]{border-top-width: 10px !important; padding-bottom: 0 !important;}
-        td[class="indent-04"]{padding-top: 36px !important; padding-bottom: 60px !important;}
-        td[class="height-01"] {height: 50px !important;}
-      }
-    </style>
-  </head>
-  <body style="margin:0; padding:0; -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%;" bgcolor="#f0f4f7">
-    <table style="min-width:320px;" width="100%" cellspacing="0" cellpadding="0" bgcolor="#f0f4f7">
-      <tbody>
-        <tr>
-          <td style="line-height:0;">
-            <div style="display:none; white-space:nowrap; font:15px/1px courier;">&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;</div>
-          </td>
-        </tr>
-        <!-- top blue header -->
-        <tr>
-          <td bgcolor="#184da1" valign="top" align="center">
-            <table class="flexible" style="margin: 0 auto;" width="630" align="center" cellpadding="0" cellspacing="0">
-              <tbody>
-                <tr>
-                  <td style="padding: 0 15px;" valign="top">
-                    <table width="100%" cellpadding="0" cellspacing="0">
-                      <tbody>
-                        <tr>
-                          <td class="indent-01" style="padding: 48px 20px 31px;" align="center" valign="top">
-                            <a style="text-decoration: none; color: #ffffff; font-size: 26px; font-weight: bold; font-family: Arial, Helvetica, sans-serif;">
-                              E-LogBook
-                            </a>
-                          </td>
-                        </tr>
-                        <!-- white card top -->
-                        <tr>
-                          <td style="box-shadow: 0 3px 13px rgba(0,0,0,0.05); border-radius: 5px 5px 0 0; border-bottom: 1px solid #ffffff;" bgcolor="#ffffff" valign="top">
-                            <table width="100%" cellspacing="0" cellpadding="0">
-                              <tbody>
-                                <tr>
-                                  <td style="padding: 34px 20px 6px;" align="center" valign="top">
-                                    <table class="flexible" style="margin: 0 auto;" align="center" width="476" cellpadding="0" cellspacing="0">
-                                      <tbody>
-                                        <tr>
-                                          <td valign="top">
-                                            <table width="100%" cellpadding="0" cellspacing="0">
-                                              <tbody>
-                                                <!-- badge -->
-                                                <tr>
-                                                  <td style="padding-bottom: 21px;" valign="top">
-                                                    <table style="margin: 0 auto;" cellpadding="0" cellspacing="0" align="center">
-                                                      <tbody>
-                                                        <tr>
-                                                          <td style="border-radius: 100px; font: bold 10px/13px Arial, Helvetica, sans-serif; color: #68778d; text-transform: uppercase;" align="center" bgcolor="#edf1f3">
-                                                            <span style="display: block; padding: 6px 18px;">Welcome</span>
-                                                          </td>
-                                                        </tr>
-                                                      </tbody>
-                                                    </table>
-                                                  </td>
-                                                </tr>
-                                                <!-- heading -->
-                                                <tr>
-                                                  <td class="indent-02" style="padding-bottom: 30px;" valign="top">
-                                                    <table width="100%" cellpadding="0" cellspacing="0">
-                                                      <tbody>
-                                                        <tr>
-                                                          <td class="heading" style="font: bold 28px/34px Arial, Helvetica, sans-serif; color: #353d58;" align="center">
-                                                            Welcome to E-LogBook!
-                                                          </td>
-                                                        </tr>
-                                                      </tbody>
-                                                    </table>
-                                                  </td>
-                                                </tr>
-                                                <!-- intro text -->
-                                                <tr>
-                                                  <td style="font: 16px/28px Arial, Helvetica, sans-serif; color: #475171; padding-bottom: 20px;">
-                                                    Dear <strong>${fullName}</strong>,
-                                                    <br><br>
-                                                    We are pleased to inform you that your account for the E-Logbook Application has been successfully created.
-                                                    <br><br>
-                                                    The E-Logbook is a secure digital platform designed to streamline record-keeping, improve data accuracy, and simplify daily logging, monitoring, and reporting. It replaces traditional paper-based logbooks with a centralized digital workflow that enables authorized users to record, review, and manage operational data efficiently.
-                                                    <br><br>
-                                                    <strong>Your E-Logbook Account Credentials</strong><br>
-                                                    Please use the following credentials to access the E-Logbook application:
-                                                    <br><br>
-                                                    <strong>Username:</strong> ${email}<br>
-                                                    <strong>Password:</strong> <code style="font-family: monospace; background: #f4f4f4; padding: 2px 6px; border-radius: 3px;">${password}</code><br>
-                                                    <strong>Application URL:</strong> <a href="${appUrl}" style="color: #184da1;">${appUrl}</a>
-                                                    <br><br>
-                                                    For security purposes, please do not share your login credentials with others. We highly recommend changing your password after your first login.
-                                                  </td>
-                                                </tr>
-                                              </tbody>
-                                            </table>
-                                          </td>
-                                        </tr>
-                                      </tbody>
-                                    </table>
-                                  </td>
-                                </tr>
-                                <tr>
-                                  <td style="border-bottom: 8px solid #f0f4f7; font-size: 0; line-height: 0;" height="1" bgcolor="#ffffff">&nbsp;</td>
-                                </tr>
-                              </tbody>
-                            </table>
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </td>
-        </tr>
-        <!-- white card bottom -->
-        <tr>
-          <td align="center" valign="top">
-            <table class="flexible" style="margin: 0 auto;" width="630" align="center" cellpadding="0" cellspacing="0">
-              <tbody>
-                <tr>
-                  <td style="padding: 0 15px;" valign="top">
-                    <table width="100%" cellpadding="0" cellspacing="0">
-                      <tbody>
-                        <tr>
-                          <td style="border-top: 8px solid #f0f4f7; font-size: 0; line-height: 0;" height="1" bgcolor="#ffffff">&nbsp;</td>
-                        </tr>
-                        <tr>
-                          <td valign="top">
-                            <table width="100%" cellpadding="0" cellspacing="0">
-                              <tbody>
-                                <tr>
-                                  <td style="padding: 0 20px;" bgcolor="#ffffff" align="center" valign="top">
-                                    <table class="flexible" style="margin: 0 auto;" align="center" width="476" cellpadding="0" cellspacing="0">
-                                      <tbody>
-                                        <tr>
-                                          <td style="font: 16px/28px Arial, Helvetica, sans-serif; color: #475171; padding-bottom: 24px;">
-                                            <strong>Key Features</strong><br>
-                                            The E-Logbook platform provides:
-                                            <ul style="padding-left: 20px; margin: 10px 0 20px 0;">
-                                              <li><strong>Centralized Digital Entry:</strong> Record, update, and review operational data through mobile and desktop devices.</li>
-                                              <li><strong>Automated Audit Trails:</strong> Maintain timestamped records to support accountability, traceability, and data integrity.</li>
-                                              <li><strong>Customizable Forms &amp; Workflows:</strong> Digital forms and workflows configured according to your department's specific requirements.</li>
-                                              <li><strong>Dashboards &amp; Monitoring:</strong> Access relevant operational information through structured dashboards and real-time visualizations.</li>
-                                              <li><strong>Instant Reporting:</strong> Generate structured reports in PDF and Excel formats for review and documentation.</li>
-                                            </ul>
-                                            <strong>Getting Started</strong><br><br>
-                                            Please log in using the credentials provided above and verify that you can access the application successfully. If you encounter any issues with logging in, accessing a form, or using any feature of the platform, please contact us using the details below.
-                                            <br><br>
-                                            We look forward to working with your team and supporting a smooth transition to the E-Logbook platform.
-                                            <br><br>
-                                            Best regards,<br>
-                                            E-Logbook Support Team<br>
-                                            +91 9037382416<br>
-                                            <a href="mailto:gothoslabs@gmail.com" style="color: #184da1;">gothoslabs@gmail.com</a>
-                                          </td>
-                                        </tr>
-                                      </tbody>
-                                    </table>
-                                  </td>
-                                </tr>
-                                <!-- card bottom rounding -->
-                                <tr>
-                                  <td class="height-01" style="border-radius: 0 0 5px 5px; font-size: 1px; line-height: 1px; border-top: 1px solid #f0f4f7;" height="60" bgcolor="#ffffff">&nbsp;</td>
-                                </tr>
-                                <!-- footer -->
-                                <tr>
-                                  <td class="indent-04" style="padding: 40px 20px 60px;" valign="top">
-                                    <table width="100%" cellpadding="0" cellspacing="0">
-                                      <tbody>
-                                        <tr>
-                                          <td style="font: italic 10px/12px Arial, Helvetica, sans-serif; color: #939ca5; padding: 0 0 10px;" align="center">
-                                            Improving record-keeping and data accuracy in medical education
-                                          </td>
-                                        </tr>
-                                      </tbody>
-                                    </table>
-                                  </td>
-                                </tr>
-                              </tbody>
-                            </table>
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-  </body>
-</html>`;
+  const featureRows = [
+    ["Centralized Digital Entry", "Record and review clinical data from any device, anytime."],
+    ["Automated Audit Trails", "Timestamped records support accountability and traceability."],
+    ["Customizable Forms", "Workflows configured to your department's specific requirements."],
+    ["Dashboards & Monitoring", "Structured dashboards and real-time data visualizations."],
+    ["Instant Reporting", "Generate PDF and Excel reports on demand."],
+  ].map(([title, desc], index, list) => {
+    const border = index === list.length - 1 ? "" : "border-bottom:1px solid #e2e8f0;";
+    return `<tr>
+      <td style="padding:12px 0; ${border}">
+        <p style="margin:0; font-family:Arial, Helvetica, sans-serif; font-size:14px; font-weight:bold; color:#0f172a;">${title}</p>
+        <p style="margin:4px 0 0; font-family:Arial, Helvetica, sans-serif; font-size:13px; color:#64748b; line-height:1.5;">${desc}</p>
+      </td>
+    </tr>`;
+  }).join("");
+
+  const htmlTemplate = wrapEmail(
+    "E-Logbook — Account Created",
+    `<p style="margin:0; font-size:22px; font-weight:bold; color:#0f172a;">Welcome, ${fullName}</p>
+     <p style="margin:8px 0 0; font-size:12px; letter-spacing:0.4px; text-transform:uppercase; color:#0f766e;">${roleDisplay}${deptDisplay}</p>
+     <p style="margin:16px 0 0; font-size:15px; line-height:1.7; color:#475569;">Your E-Logbook account has been created. Use the credentials below to log in and start recording your clinical work.</p>
+
+     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:28px 0 8px; background-color:#f0fdfa; border:1px solid #99f6e4;">
+       <tr>
+         <td style="padding:22px 24px;">
+           <p style="margin:0 0 12px; font-family:Arial, Helvetica, sans-serif; font-size:11px; font-weight:bold; letter-spacing:1px; text-transform:uppercase; color:#0f766e;">Your login credentials</p>
+           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+             ${credentialRow("Role", `${roleDisplay}${deptDisplay}`)}
+             ${credentialRow("Username", email)}
+             ${credentialRow("Password", `<span style="font-family:Consolas, Courier, monospace; background-color:#ccfbf1; padding:4px 8px;">${password}</span>`)}
+             ${credentialRow("App URL", `<a href="${appUrl}" style="color:#0f766e; text-decoration:none;">${appUrl}</a>`, true)}
+           </table>
+           <p style="margin:16px 0 0; font-family:Arial, Helvetica, sans-serif; font-size:12px; color:#64748b; line-height:1.6;">Please change your password on first login and do not share these credentials.</p>
+         </td>
+       </tr>
+     </table>
+
+     <p style="margin:24px 0 0; font-size:15px; line-height:1.7; color:#334155;">The E-Logbook replaces paper logbooks with a secure digital workflow for recording, reviewing, and reporting clinical work.</p>
+     <p style="margin:24px 0 8px; font-size:12px; font-weight:bold; letter-spacing:0.8px; text-transform:uppercase; color:#0f172a;">What you can do</p>
+     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${featureRows}</table>
+
+     <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:28px 0 12px;">
+       <tr>
+         <td style="background-color:#0f766e;">
+           <a href="${appUrl}" style="display:inline-block; padding:14px 28px; font-family:Arial, Helvetica, sans-serif; font-size:14px; font-weight:bold; color:#ffffff; text-decoration:none;">Log in to E-LogBook</a>
+         </td>
+       </tr>
+     </table>`
+  );
 
   await transporter.sendMail({
     from: `"E-LogBook" <${process.env.EMAIL_USER}>`,

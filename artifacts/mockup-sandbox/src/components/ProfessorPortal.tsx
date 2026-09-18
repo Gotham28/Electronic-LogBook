@@ -55,9 +55,10 @@ import {
 } from "lucide-react";
 import { formatLogbookDate } from "@/lib/logbook-config";
 import { apiGet, apiPatch, apiPost } from "@/lib/apiClient";
-import { getCurrentUser } from "@/lib/session";
+import { getCurrentUser, isDemoMode } from "@/lib/session";
 
 export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; embedded?: boolean }) {
+  const hideUhid = isDemoMode();
   const [location, setLocation] = useLocation();
   const [data, setData] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
@@ -316,7 +317,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                       {currentItem.patientInfo && (
                         <p className="text-xs text-slate-600 font-medium">Patient Info: {currentItem.patientInfo}</p>
                       )}
-                      {currentItem.patientUhid && (
+                      {!hideUhid && currentItem.patientUhid && (
                         <p className="text-xs font-semibold text-teal-800">Patient UHID: {currentItem.patientUhid}</p>
                       )}
                       {currentItem.declaredCompetency && (
@@ -631,7 +632,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                         <TableRow>
                           <TableHead className="text-xs font-semibold">Date</TableHead>
                           <TableHead className="text-xs font-semibold">Diagnosis</TableHead>
-                          <TableHead className="text-xs font-semibold">Patient UHID &amp; Info</TableHead>
+                          <TableHead className="text-xs font-semibold">{hideUhid ? "Patient Info" : "Patient UHID & Info"}</TableHead>
                           <TableHead className="text-xs font-semibold text-right">Status</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -642,7 +643,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                               <TableCell className="text-xs font-medium">{formatLogbookDate(log.date)}</TableCell>
                               <TableCell className="text-xs font-bold text-slate-900">{log.diagnosisFinal}</TableCell>
                               <TableCell className="text-xs text-slate-600">
-                                <p className="font-semibold text-teal-800">{log.patientUhid || "—"}</p>
+                                {!hideUhid && <p className="font-semibold text-teal-800">{log.patientUhid || "—"}</p>}
                                 <p>{log.patientAge} / {log.patientGender}</p>
                               </TableCell>
                               <TableCell className="text-right">
@@ -666,7 +667,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                       <TableHeader className="bg-slate-50">
                         <TableRow>
                           <TableHead className="text-xs font-semibold">Procedure Name</TableHead>
-                          <TableHead className="text-xs font-semibold">Patient UHID &amp; Age</TableHead>
+                          <TableHead className="text-xs font-semibold">{hideUhid ? "Age" : "Patient UHID & Age"}</TableHead>
                           <TableHead className="text-xs font-semibold">Competency</TableHead>
                           <TableHead className="text-xs font-semibold text-right">Status</TableHead>
                         </TableRow>
@@ -677,7 +678,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                             <TableRow key={log.id}>
                               <TableCell className="text-xs font-bold text-slate-900">{log.procedureName}</TableCell>
                               <TableCell className="text-xs text-slate-600">
-                                <p className="font-semibold text-teal-800">{log.patientUhid || "—"}</p>
+                                {!hideUhid && <p className="font-semibold text-teal-800">{log.patientUhid || "—"}</p>}
                                 <p>{log.patientAge}</p>
                               </TableCell>
                               <TableCell className="text-xs text-teal-800 font-semibold">{log.competencyDeclared}</TableCell>

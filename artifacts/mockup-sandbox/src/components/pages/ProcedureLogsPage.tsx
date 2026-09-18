@@ -2,7 +2,7 @@ import * as React from "react";
 import { AlertCircle, CheckCircle2, Clock, PlusCircle, Stethoscope, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { apiGet, apiPost, apiDelete } from "@/lib/apiClient";
-import { getCurrentUser } from "@/lib/session";
+import { getCurrentUser, isDemoMode } from "@/lib/session";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -41,8 +41,8 @@ export function ProcedureLogsPage() {
   const REQUIRED_PROCEDURE_COUNT = PROCEDURE_REQUIREMENTS.reduce((sum, p) => sum + p.required, 0);
   const groupNames: Record<string, string> = Object.fromEntries(Object.keys(PROCEDURE_GROUPS).map((group) => [group, group]));
   const user = React.useMemo(() => getCurrentUser(), []);
-  const isDemoMode = window.sessionStorage.getItem("elogbook-user")?.includes('"isDemoMode":true') ?? false;
-  const initialGroup = isDemoMode ? PROCEDURE_REQUIREMENTS[0]?.group ?? "" : "";
+  const hideUhid = isDemoMode();
+  const initialGroup = hideUhid ? PROCEDURE_REQUIREMENTS[0]?.group ?? "" : "";
   const [open, setOpen] = React.useState(false);
   const [logs, setLogs] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -123,7 +123,7 @@ export function ProcedureLogsPage() {
         procedureGroup: form.group,
         procedureName: form.procedureName,
         date: form.date,
-        patientUhid: form.patientUhid,
+        patientUhid: hideUhid ? "N/A" : form.patientUhid,
         patientAge: form.age,
         competencyLevel: form.experience === "Observed / procedure seen" ? "observed" :
           form.experience === "Assisted" ? "assisted" :
@@ -189,8 +189,8 @@ export function ProcedureLogsPage() {
                   <SelectContent>{(PROCEDURE_GROUPS[form.group] || []).map((procedure) => <SelectItem key={procedure} value={procedure}>{procedure}</SelectItem>)}</SelectContent>
                 </Select>
               </Field>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Patient UHID"><Input value={form.patientUhid} onChange={(e) => setForm({ ...form, patientUhid: e.target.value })} required /></Field>
+              <div className={`grid gap-4 ${hideUhid ? "sm:grid-cols-1" : "sm:grid-cols-2"}`}>
+                {!hideUhid && <Field label="Patient UHID"><Input value={form.patientUhid} onChange={(e) => setForm({ ...form, patientUhid: e.target.value })} required /></Field>}
                 <Field label="Age"><Input value={form.age} onChange={(e) => setForm({ ...form, age: e.target.value })} placeholder="e.g. 4 months" required /></Field>
               </div>
               <Field label="Procedure experience">
@@ -304,7 +304,7 @@ export function ProcedureLogsPage() {
             </Empty>
           ) : (
             <Table>
-              <TableHeader><TableRow><TableHead>Number</TableHead><TableHead>Date</TableHead><TableHead>Group</TableHead><TableHead>Procedure</TableHead><TableHead>Patient UHID</TableHead><TableHead>Age</TableHead><TableHead>Experience</TableHead><TableHead>Verified competency</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Number</TableHead><TableHead>Date</TableHead><TableHead>Group</TableHead><TableHead>Procedure</TableHead>{!hideUhid && <TableHead>Patient UHID</TableHead>}<TableHead>Age</TableHead><TableHead>Experience</TableHead><TableHead>Verified competency</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
               <TableBody>
                 {logs.map((log) => (
                   <TableRow key={log.id}>
@@ -312,7 +312,7 @@ export function ProcedureLogsPage() {
                     <TableCell>{formatLogbookDate(log.date)}</TableCell>
                     <TableCell><Badge variant="outline" className="border-teal-100 bg-teal-50 text-teal-800">{groupNames[log.procedureGroup as ProcedureGroup]}</Badge></TableCell>
                     <TableCell className="font-semibold">{log.procedureName}</TableCell>
-                    <TableCell className="font-semibold text-teal-800">{log.patientUhid}</TableCell>
+                    {!hideUhid && <TableCell className="font-semibold text-teal-800">{log.patientUhid}</TableCell>}
                     <TableCell>{log.patientAge || log.age}</TableCell>
                     <TableCell className="text-xs">{log.competencyLevel}</TableCell>
                     <TableCell className="text-xs">{log.verifiedCompetency || (log.status === 'verified' ? log.competencyLevel : 'Pending verification')}</TableCell>

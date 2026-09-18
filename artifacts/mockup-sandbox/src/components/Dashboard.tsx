@@ -21,7 +21,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { formatLogbookDate, expectedCompletionDate } from "@/lib/logbook-config";
 import { apiGet } from "@/lib/apiClient";
-import { getCurrentUser } from "@/lib/session";
+import { getCurrentUser, isDemoMode } from "@/lib/session";
 import { useDepartment } from "@/lib/department-context";
 
 export function Dashboard() {
@@ -85,6 +85,7 @@ export function Dashboard() {
   const configured = categories.filter((item) => item.required > 0);
   const completion = configured.length ? Math.round(configured.reduce((sum, item) => sum + Math.min(item.verified / item.required, 1), 0) / configured.length * 100) : 0;
 
+  const hideUhid = isDemoMode();
   const mappedCaseLogs = (logs.caseLogs || []).map((l: any) => ({
     number: l.id, date: l.date, type: "Case", title: l.diagnosisProvisional || "Case Log", patientUhid: l.patientUhid, status: l.status, timestamp: new Date(l.createdAt).getTime()
   }));
@@ -227,7 +228,7 @@ export function Dashboard() {
               </div>
             ) : (
               <Table>
-                <TableHeader><TableRow><TableHead>#</TableHead><TableHead>Date</TableHead><TableHead>Type</TableHead><TableHead>Entry</TableHead><TableHead>Patient UHID</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+                <TableHeader><TableRow><TableHead>#</TableHead><TableHead>Date</TableHead><TableHead>Type</TableHead><TableHead>Entry</TableHead>{!hideUhid && <TableHead>Patient UHID</TableHead>}<TableHead>Status</TableHead></TableRow></TableHeader>
                 <TableBody>
                   {recent.map((item, index) => (
                     <TableRow key={`${item.type}-${item.number}`}>
@@ -235,7 +236,7 @@ export function Dashboard() {
                       <TableCell>{formatLogbookDate(item.date)}</TableCell>
                       <TableCell><Badge variant="outline" className="border-teal-100 bg-teal-50 text-teal-800">{item.type}</Badge></TableCell>
                       <TableCell className="max-w-xs font-semibold">{item.title}</TableCell>
-                      <TableCell className="text-xs font-semibold text-teal-800">{item.patientUhid}</TableCell>
+                      {!hideUhid && <TableCell className="text-xs font-semibold text-teal-800">{item.patientUhid}</TableCell>}
                       <TableCell><Status value={item.status} /></TableCell>
                     </TableRow>
                   ))}

@@ -77,9 +77,9 @@ export const demoData = {
   ],
   logs: {
     cases: [
-      { id: 101, date: "2024-10-15", patientUhid: "UHID-PED-102", diagnosisProvisional: "Acute Bronchiolitis (14-month-old)", status: "verified" },
-      { id: 102, date: "2024-10-18", patientUhid: "UHID-PED-144", diagnosisProvisional: "Febrile Seizure Workup (2-year-old)", status: "pending" },
-      { id: 103, date: "2024-10-22", patientUhid: "UHID-PED-189", diagnosisProvisional: "Neonatal Jaundice Follow-up", status: "verified" }
+      { id: 101, date: "2024-10-15", diagnosisProvisional: "Acute Bronchiolitis (14-month-old)", status: "verified" },
+      { id: 102, date: "2024-10-18", diagnosisProvisional: "Febrile Seizure Workup (2-year-old)", status: "pending" },
+      { id: 103, date: "2024-10-22", diagnosisProvisional: "Neonatal Jaundice Follow-up", status: "verified" }
     ],
     procedures: [
       { id: 201, date: "2024-10-12", procedureName: "Lumbar Puncture", group: "Emergency / Diagnostics", status: "verified", remarks: "Good aseptic technique." },
