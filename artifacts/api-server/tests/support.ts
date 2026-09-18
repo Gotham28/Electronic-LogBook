@@ -37,6 +37,10 @@ export async function setup() {
     await db.insert(departmentCatalogTable).values([
       { departmentId: department.id, kind: "posting", name: "Test unit " + index, value: "unit-" + index },
       { departmentId: department.id, kind: "academic", name: "Test discussion " + index, value: "discussion-" + index, required: 3 + index },
+      { departmentId: department.id, kind: "competency_level", name: "Observed", value: "observed" },
+      { departmentId: department.id, kind: "competency_level", name: "Assisted", value: "assisted" },
+      { departmentId: department.id, kind: "competency_level", name: "Performed under supervision", value: "performed_under_supervision" },
+      { departmentId: department.id, kind: "competency_level", name: "Performed independently", value: "performed_independently" }
     ]);
     for (const kind of ["hod", "faculty", "faculty2", "student", "student2", "pending"] as const) {
       const role = kind.startsWith("faculty") ? "professor" : kind === "hod" ? "hod" : "student";

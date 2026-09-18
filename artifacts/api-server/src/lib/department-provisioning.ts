@@ -11,7 +11,7 @@ export const setupSchema = z.object({
   hod: z.object({ fullName: nameSchema, email: emailSchema }).strict(),
   config: configSchema.optional(),
   procedures: z.array(z.object({ name: nameSchema, group: nameSchema, required: targetSchema }).strict()).max(1000).optional(),
-  catalog: z.array(z.object({ kind: z.enum(["posting", "academic"]), name: nameSchema, value: nameSchema,
+  catalog: z.array(z.object({ kind: z.enum(["posting", "academic", "case_category", "competency_level"]), name: nameSchema, value: nameSchema,
     required: targetSchema, period: z.enum(["total", "month"]) }).strict()).max(1000).optional(),
 }).strict();
 
@@ -30,7 +30,18 @@ export async function provisionDepartment(input: unknown, initialPassword: unkno
     if (setup.config) await tx.insert(departmentConfigsTable).values({ ...setup.config, departmentId: department.id })
       .onConflictDoUpdate({ target: departmentConfigsTable.departmentId, set: setup.config });
     if (setup.procedures?.length) await tx.insert(procedureTypesTable).values(setup.procedures.map((p) => ({ ...p, departmentId: department.id })));
-    if (setup.catalog?.length) await tx.insert(departmentCatalogTable).values(setup.catalog.map((p) => ({ ...p, departmentId: department.id })));
+    
+    const catalog = setup.catalog?.map((p) => ({ ...p, departmentId: department.id })) || [];
+    if (!catalog.some((c) => c.kind === "competency_level")) {
+      catalog.push(
+        { departmentId: department.id, kind: "competency_level", name: "Observed / procedure seen", value: "observed", required: 0, period: "total" },
+        { departmentId: department.id, kind: "competency_level", name: "Assisted", value: "assisted", required: 0, period: "total" },
+        { departmentId: department.id, kind: "competency_level", name: "Performed under supervision", value: "performed_under_supervision", required: 0, period: "total" },
+        { departmentId: department.id, kind: "competency_level", name: "Performed independently", value: "performed_independently", required: 0, period: "total" }
+      );
+    }
+    if (catalog.length) await tx.insert(departmentCatalogTable).values(catalog).onConflictDoNothing();
+
     return { departmentId: department.id, hodId: created.id };
   });
 

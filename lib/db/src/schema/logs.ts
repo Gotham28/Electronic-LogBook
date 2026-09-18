@@ -45,9 +45,7 @@ export const procedureLogsTable = pgTable("procedure_logs", {
   date: text("date").notNull(),
   patientUhid: text("patient_uhid").notNull(),
   patientAge: text("patient_age").notNull(),
-  competencyLevel: text("competency_level", {
-    enum: ["observed", "assisted", "performed_under_supervision", "performed_independently"]
-  }).notNull(),
+  competencyLevel: text("competency_level").notNull(),
   facultyVerifiedLevel: text("faculty_verified_level"),
   status: text("status", { enum: ["pending", "verified", "rejected"] }).notNull().default("pending"),
   facultyRemarks: text("faculty_remarks"),

@@ -38,7 +38,8 @@ router.get("/:departmentId/catalog", async (req, res) => {
       db.select().from(departmentCatalogTable).where(eq(departmentCatalogTable.departmentId, configSourceId)).orderBy(departmentCatalogTable.name),
     ]);
     res.json({ department: department[0], hod: hod[0] || null, config: config[0] || null, procedures,
-      postings: catalog.filter((item) => item.kind === "posting"), academics: catalog.filter((item) => item.kind === "academic"), caseCategories: catalog.filter((item) => item.kind === "case_category") });
+      postings: catalog.filter((item) => item.kind === "posting"), academics: catalog.filter((item) => item.kind === "academic"), caseCategories: catalog.filter((item) => item.kind === "case_category"),
+      competencyLevels: catalog.filter((item) => item.kind === "competency_level") });
   } catch (error) {
     req.log.error({ departmentId: req.params.departmentId, status: 500 }, "Error resolving config department");
     res.status(500).json({ message: "Internal server error" });

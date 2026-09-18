@@ -56,9 +56,11 @@ import {
 import { formatLogbookDate } from "@/lib/logbook-config";
 import { apiGet, apiPatch, apiPost } from "@/lib/apiClient";
 import { getCurrentUser, isDemoMode } from "@/lib/session";
+import { useDepartment } from "@/lib/department-context";
 
 export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; embedded?: boolean }) {
   const hideUhid = isDemoMode();
+  const { competencyLevels } = useDepartment();
   const [location, setLocation] = useLocation();
   const [data, setData] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
@@ -354,10 +356,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="performed_independently">Performed Independently</SelectItem>
-                            <SelectItem value="performed_under_supervision">Performed Under Supervision</SelectItem>
-                            <SelectItem value="assisted">Assisted</SelectItem>
-                            <SelectItem value="observed">Observed</SelectItem>
+                            {competencyLevels.map((c) => <SelectItem key={c.id} value={c.value}>{c.name}</SelectItem>)}
                           </SelectContent>
                         </Select>
                         <p className="text-[10px] text-slate-500">Available only while reviewing procedure logs.</p>

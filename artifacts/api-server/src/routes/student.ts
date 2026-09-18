@@ -617,7 +617,7 @@ router.post("/:studentId/case-logs", validate(z.object({ supervisorId: idSchema,
 
 router.post("/:studentId/procedure-logs", validate(z.object({ supervisorId: idSchema, procedureGroup: nameSchema,
   procedureName: nameSchema, date: dateSchema, patientUhid: nameSchema, patientAge: nameSchema,
-  competencyLevel: z.enum(["observed", "assisted", "performed_under_supervision", "performed_independently"]) }).strict()), async (req, res) => {
+  competencyLevel: nameSchema }).strict()), async (req, res) => {
   try {
     const studentId = parseInt(String(req.params.studentId), 10);
     const { supervisorId, procedureGroup, procedureName, date, patientUhid, patientAge, competencyLevel } = req.body;
@@ -631,6 +631,10 @@ router.post("/:studentId/procedure-logs", validate(z.object({ supervisorId: idSc
     const [option] = await db.select({ id: procedureTypesTable.id }).from(procedureTypesTable).where(and(
       eq(procedureTypesTable.departmentId, configSourceId), eq(procedureTypesTable.name, procedureName), eq(procedureTypesTable.group, procedureGroup))).limit(1);
     if (!option) { res.status(400).json({ message: "Select a procedure from your department" }); return; }
+
+    const [compLevel] = await db.select({ id: departmentCatalogTable.id }).from(departmentCatalogTable).where(and(
+      eq(departmentCatalogTable.departmentId, req.user!.departmentId!), eq(departmentCatalogTable.kind, "competency_level"), eq(departmentCatalogTable.value, competencyLevel))).limit(1);
+    if (!compLevel) { res.status(400).json({ message: "Invalid competency level for your department" }); return; }
     const [inserted] = await db.insert(procedureLogsTable).values({
       studentId, supervisorId: supervisorIdNum, procedureGroup, procedureName, date, 
       patientUhid, patientAge, competencyLevel, status: "pending"
