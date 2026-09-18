@@ -185,8 +185,8 @@ export function DepartmentSettings() {
             <Button variant="outline" size="sm" type="button" disabled={busy || deleting} onClick={() => confirmDelete(item.id, "case_category", item.name)} className="text-rose-700 border-rose-200 hover:bg-rose-50 px-2"><Trash2 className="h-4 w-4" /></Button>
           </form>)}
         </section>
-        <section><h3 className="font-semibold">Experience levels</h3>{!data.competencyLevels.length && <p className="mt-2 text-sm text-slate-500">No experience levels configured.</p>}
-          <ul className="mt-2 space-y-2 text-sm">{data.competencyLevels.map((item) => <li key={item.id} className="flex items-center gap-2 rounded-xl bg-slate-50 p-3"><span className="flex-1">{item.name}</span><Button variant="ghost" size="sm" type="button" disabled={busy || deleting} onClick={() => confirmDelete(item.id, "competency_level", item.name)} className="text-rose-700 hover:bg-rose-100 h-8 w-8 p-0"><Trash2 className="h-4 w-4" /></Button></li>)}</ul></section>
+        <section><h3 className="font-semibold">Experience levels</h3>{!data.competencyLevels?.length && <p className="mt-2 text-sm text-slate-500">No experience levels configured.</p>}
+          <ul className="mt-2 space-y-2 text-sm">{data.competencyLevels?.map((item) => <li key={item.id} className="flex items-center gap-2 rounded-xl bg-slate-50 p-3"><span className="flex-1">{item.name}</span><Button variant="ghost" size="sm" type="button" disabled={busy || deleting} onClick={() => confirmDelete(item.id, "competency_level", item.name)} className="text-rose-700 hover:bg-rose-100 h-8 w-8 p-0"><Trash2 className="h-4 w-4" /></Button></li>)}</ul></section>
       </div>
       <div className="grid gap-6 md:grid-cols-2 mt-8 pt-8 border-t">
         <section><h3 className="font-semibold">Leave types</h3>{!data.leaveTypes?.length && <p className="mt-2 text-sm text-slate-500">No leave types configured.</p>}

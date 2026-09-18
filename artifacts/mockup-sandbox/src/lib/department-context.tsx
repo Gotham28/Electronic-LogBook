@@ -24,7 +24,16 @@ export function DepartmentProvider({ departmentId, children }: { departmentId: n
     if (!departmentId) { setError("Your account has no department. Contact the database administrator."); return; }
     try {
       const result = await apiGet<DepartmentData>(`/api/departments/${departmentId}/catalog`);
-      setData(result); setError("");
+      setData({
+        ...result,
+        postings: result.postings || [],
+        academics: result.academics || [],
+        caseCategories: result.caseCategories || [],
+        competencyLevels: result.competencyLevels || [],
+        leaveTypes: result.leaveTypes || [],
+        procedures: result.procedures || []
+      });
+      setError("");
     } catch (err) { setError(err instanceof Error ? err.message : "Unable to load your department"); }
   }, [departmentId]);
   React.useEffect(() => { setData(null); void refresh(); }, [refresh]);
