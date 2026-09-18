@@ -6,7 +6,7 @@ import { usersTable } from "./users.js";
 export const leaveRecordsTable = pgTable("leave_records", {
   id: serial("id").primaryKey(),
   studentId: integer("student_id").notNull().references(() => studentsTable.id),
-  leaveType: text("leave_type", { enum: ["casual", "academic", "medical", "maternity_paternity"] }).notNull(),
+  leaveType: text("leave_type").notNull(),
   startDate: text("start_date").notNull(),
   endDate: text("end_date").notNull(),
   reason: text("reason"),

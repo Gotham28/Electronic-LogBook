@@ -11,7 +11,7 @@ export const setupSchema = z.object({
   hod: z.object({ fullName: nameSchema, email: emailSchema }).strict(),
   config: configSchema.optional(),
   procedures: z.array(z.object({ name: nameSchema, group: nameSchema, required: targetSchema }).strict()).max(1000).optional(),
-  catalog: z.array(z.object({ kind: z.enum(["posting", "academic", "case_category", "competency_level"]), name: nameSchema, value: nameSchema,
+  catalog: z.array(z.object({ kind: z.enum(["posting", "academic", "case_category", "competency_level", "leave_type"]), name: nameSchema, value: nameSchema,
     required: targetSchema, period: z.enum(["total", "month"]) }).strict()).max(1000).optional(),
 }).strict();
 
@@ -38,6 +38,14 @@ export async function provisionDepartment(input: unknown, initialPassword: unkno
         { departmentId: department.id, kind: "competency_level", name: "Assisted", value: "assisted", required: 0, period: "total" },
         { departmentId: department.id, kind: "competency_level", name: "Performed under supervision", value: "performed_under_supervision", required: 0, period: "total" },
         { departmentId: department.id, kind: "competency_level", name: "Performed independently", value: "performed_independently", required: 0, period: "total" }
+      );
+    }
+    if (!catalog.some((c) => c.kind === "leave_type")) {
+      catalog.push(
+        { departmentId: department.id, kind: "leave_type", name: "Casual Leave", value: "casual", required: 0, period: "total" },
+        { departmentId: department.id, kind: "leave_type", name: "Academic Leave", value: "academic", required: 0, period: "total" },
+        { departmentId: department.id, kind: "leave_type", name: "Medical Leave", value: "medical", required: 0, period: "total" },
+        { departmentId: department.id, kind: "leave_type", name: "Maternity / Paternity Leave", value: "maternity_paternity", required: 0, period: "total" }
       );
     }
     if (catalog.length) await tx.insert(departmentCatalogTable).values(catalog).onConflictDoNothing();

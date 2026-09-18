@@ -18,6 +18,7 @@ import { formatLogbookDate, todayForInput } from "@/lib/logbook-config";
 import { apiGet, apiPost } from "@/lib/apiClient";
 import { getCurrentUser } from "@/lib/session";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { useDepartment } from "@/lib/department-context";
 
 type LeaveStatus = "pending" | "approved" | "rejected";
 
@@ -34,7 +35,8 @@ type LeaveRecord = {
 };
 
 export function AttendancePage() {
-  const [leaveType, setLeaveType] = React.useState("Casual Leave");
+  const dept = useDepartment();
+  const [leaveType, setLeaveType] = React.useState(dept.leaveTypes[0]?.value || "");
   const [fromDate, setFromDate] = React.useState(todayForInput());
   const [toDate, setToDate] = React.useState(todayForInput());
   const [reason, setReason] = React.useState("");
@@ -62,7 +64,7 @@ export function AttendancePage() {
       setLeaves(leavesData.map((l: any) => ({
         number: l.id.toString(),
         appliedOn: new Date(l.createdAt).toISOString(),
-        leaveType: l.leaveType === "casual" ? "Casual Leave" : l.leaveType === "academic" ? "Academic Leave" : l.leaveType,
+        leaveType: dept.leaveTypes.find(t => t.value === l.leaveType)?.name || l.leaveType,
         fromDate: l.startDate,
         toDate: l.endDate,
         reason: l.reason,
@@ -81,7 +83,7 @@ export function AttendancePage() {
       // "0 used" and believe their full allowance is untouched.
       setBalanceError(error?.message || "Could not load your leave balance");
     }
-  }, [user?.studentProfileId]);
+  }, [user?.studentProfileId, dept.leaveTypes]);
 
   React.useEffect(() => {
     fetchLeaves();
@@ -104,7 +106,7 @@ export function AttendancePage() {
       const payload = {
         startDate: fromDate,
         endDate: toDate,
-        leaveType: leaveType.split(" ")[0].toLowerCase(),
+        leaveType,
         reason
       };
       await apiPost(`/api/students/${user.studentProfileId}/leave-records`, payload);
@@ -155,10 +157,9 @@ export function AttendancePage() {
                 <Select value={leaveType} onValueChange={setLeaveType}>
                   <SelectTrigger className="text-xs"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Casual Leave">Casual Leave</SelectItem>
-                    <SelectItem value="Medical Leave">Medical Leave</SelectItem>
-                    <SelectItem value="Academic Leave">Academic Leave</SelectItem>
-                    <SelectItem value="Maternity / Paternity Leave">Maternity / Paternity Leave</SelectItem>
+                    {dept.leaveTypes.map((t) => (
+                      <SelectItem key={t.id} value={t.value}>{t.name}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

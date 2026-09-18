@@ -23,11 +23,11 @@ export function DepartmentSettings() {
   const [targets, setTargets] = React.useState<Record<number, string>>({});
   const [academicTargets, setAcademicTargets] = React.useState<Record<number, string>>({});
 
-  const [deleteTarget, setDeleteTarget] = React.useState<{id: number, type: "procedure" | "posting" | "academic" | "case_category" | "competency_level", name: string, count: number | null} | null>(null);
+  const [deleteTarget, setDeleteTarget] = React.useState<{id: number, type: "procedure" | "posting" | "academic" | "case_category" | "competency_level" | "leave_type", name: string, count: number | null} | null>(null);
   const [deleting, setDeleting] = React.useState(false);
   const [deleteError, setDeleteError] = React.useState<string | null>(null);
 
-  const confirmDelete = async (id: number, type: "procedure" | "posting" | "academic" | "case_category" | "competency_level", name: string) => {
+  const confirmDelete = async (id: number, type: "procedure" | "posting" | "academic" | "case_category" | "competency_level" | "leave_type", name: string) => {
     setDeleteTarget({ id, type, name, count: null });
     setDeleteError(null);
     try {
@@ -54,7 +54,11 @@ export function DepartmentSettings() {
       }
       setDeleteTarget(null);
     } catch (err: any) {
-      setDeleteError(err.message || "Failed to delete");
+      if (err?.message?.includes("cannot be removed")) {
+        setDeleteError(err.message);
+      } else {
+        setDeleteError(err.message || "Failed to delete");
+      }
     } finally {
       setDeleting(false);
     }
@@ -160,7 +164,7 @@ export function DepartmentSettings() {
         await apiPost("/api/admin/department/catalog", { ...entry, value: entry.name.trim(), required: entry.kind === "posting" ? 0 : Number(entry.required) });
         setEntry({ ...entry, name: "", required: "" });
       }, "Training option added"); }}>
-        <div className="space-y-2"><Label htmlFor="catalog-kind">Category</Label><select id="catalog-kind" className="h-11 w-full rounded-xl border bg-white px-3 text-sm" value={entry.kind} onChange={(e) => setEntry({ ...entry, kind: e.target.value })}><option value="posting">Posting / rotation</option><option value="academic">Academic activity</option><option value="case_category">Case Category</option><option value="competency_level">Experience level</option></select></div>
+        <div className="space-y-2"><Label htmlFor="catalog-kind">Category</Label><select id="catalog-kind" className="h-11 w-full rounded-xl border bg-white px-3 text-sm" value={entry.kind} onChange={(e) => setEntry({ ...entry, kind: e.target.value })}><option value="posting">Posting / rotation</option><option value="academic">Academic activity</option><option value="case_category">Case Category</option><option value="competency_level">Experience level</option><option value="leave_type">Leave type</option></select></div>
         <div className="space-y-2"><Label htmlFor="catalog-name">Name</Label><Input id="catalog-name" required maxLength={160} value={entry.name} onChange={(e) => setEntry({ ...entry, name: e.target.value })} /></div>
         {(entry.kind === "academic" || entry.kind === "case_category") && <><div className="space-y-2"><Label htmlFor="catalog-required">Required count</Label><Input id="catalog-required" type="number" min={0} max={100000} required value={entry.required} onChange={(e) => setEntry({ ...entry, required: e.target.value })} /></div>
           <div className="space-y-2"><Label htmlFor="catalog-period">Period</Label><select id="catalog-period" className="h-11 w-full rounded-xl border bg-white px-3 text-sm" value={entry.period} onChange={(e) => setEntry({ ...entry, period: e.target.value })}><option value="total">Overall</option><option value="month">Per month</option></select></div></>}
@@ -183,6 +187,10 @@ export function DepartmentSettings() {
         </section>
         <section><h3 className="font-semibold">Experience levels</h3>{!data.competencyLevels.length && <p className="mt-2 text-sm text-slate-500">No experience levels configured.</p>}
           <ul className="mt-2 space-y-2 text-sm">{data.competencyLevels.map((item) => <li key={item.id} className="flex items-center gap-2 rounded-xl bg-slate-50 p-3"><span className="flex-1">{item.name}</span><Button variant="ghost" size="sm" type="button" disabled={busy || deleting} onClick={() => confirmDelete(item.id, "competency_level", item.name)} className="text-rose-700 hover:bg-rose-100 h-8 w-8 p-0"><Trash2 className="h-4 w-4" /></Button></li>)}</ul></section>
+      </div>
+      <div className="grid gap-6 md:grid-cols-2 mt-8 pt-8 border-t">
+        <section><h3 className="font-semibold">Leave types</h3>{!data.leaveTypes?.length && <p className="mt-2 text-sm text-slate-500">No leave types configured.</p>}
+          <ul className="mt-2 space-y-2 text-sm">{data.leaveTypes?.map((item) => <li key={item.id} className="flex items-center gap-2 rounded-xl bg-slate-50 p-3"><span className="flex-1">{item.name}</span><Button variant="ghost" size="sm" type="button" disabled={busy || deleting} onClick={() => confirmDelete(item.id, "leave_type", item.name)} className="text-rose-700 hover:bg-rose-100 h-8 w-8 p-0"><Trash2 className="h-4 w-4" /></Button></li>)}</ul></section>
       </div>
     </CardContent></Card>
   </div>;

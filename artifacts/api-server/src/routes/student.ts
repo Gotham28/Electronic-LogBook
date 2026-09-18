@@ -373,23 +373,33 @@ router.get("/:studentId/leave-records", requireAuth, async (req, res) => {
 });
 
 router.post("/:studentId/leave-records", validate(z.object({ startDate: dateSchema, endDate: dateSchema,
-  leaveType: z.enum(["Casual", "Academic", "Medical", "Maternity / Paternity", "casual", "academic", "medical", "maternity_paternity"]),
+  leaveType: z.string().trim().min(1),
   reason: z.string().trim().min(1).max(4000) }).strict().refine((v) => v.endDate >= v.startDate, "End date must be on or after start date")), async (req, res) => {
   try {
     const studentId = parseInt(String(req.params.studentId), 10);
     const { fromDate, toDate, leaveType, reason, startDate, endDate } = req.body;
     
-    let type: "casual" | "academic" | "medical" | "maternity_paternity" = "casual";
-    const rawType = leaveType?.toLowerCase();
-    if (rawType === "academic") type = "academic";
-    else if (rawType === "medical") type = "medical";
-    else if (rawType === "maternity / paternity" || rawType === "maternity_paternity") type = "maternity_paternity";
+    const [studentUser] = await db.select({ departmentId: usersTable.departmentId }).from(studentsTable)
+      .innerJoin(usersTable, eq(studentsTable.userId, usersTable.id)).where(eq(studentsTable.id, studentId)).limit(1);
+    
+    if (!studentUser) {
+      res.status(404).json({ message: "Student not found" });
+      return;
+    }
+
+    const [catalogEntry] = await db.select().from(departmentCatalogTable)
+      .where(and(eq(departmentCatalogTable.departmentId, studentUser.departmentId!), eq(departmentCatalogTable.kind, "leave_type"), eq(departmentCatalogTable.value, leaveType))).limit(1);
+
+    if (!catalogEntry) {
+      res.status(400).json({ message: "Invalid leave type for this department" });
+      return;
+    }
 
     const [inserted] = await db.insert(leaveRecordsTable).values({
       studentId,
       startDate: startDate || fromDate,
       endDate: endDate || toDate,
-      leaveType: type,
+      leaveType,
       reason,
       status: "pending"
     }).returning();
