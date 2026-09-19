@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, caseLogsTable, procedureLogsTable, academicLogsTable, studentsTable, usersTable } from "@workspace/db";
+import { db, caseLogsTable, procedureLogsTable, academicLogsTable, studentsTable, usersTable, conferencesTable } from "@workspace/db";
 import { eq, and, inArray, isNull } from "drizzle-orm";
 import { requireAuth, requireRole, requireDepartment } from "../middlewares/auth.js";
 import { z } from "zod";
@@ -37,6 +37,9 @@ router.patch("/:logType/:logId/review", requireAuth, requireRole(["professor", "
     } else if (logType === "academic") {
       [target] = await db.select({ supervisorId: academicLogsTable.supervisorId, studentId: academicLogsTable.studentId })
         .from(academicLogsTable).where(eq(academicLogsTable.id, id)).limit(1);
+    } else if (logType === "conference") {
+      [target] = await db.select({ supervisorId: conferencesTable.supervisorId, studentId: conferencesTable.studentId })
+        .from(conferencesTable).where(eq(conferencesTable.id, id)).limit(1);
     } else {
       res.status(400).json({ message: "Invalid logType" });
       return;
@@ -89,6 +92,9 @@ router.patch("/:logType/:logId/review", requireAuth, requireRole(["professor", "
     } else if (logType === "academic") {
       updatedRows = await db.update(academicLogsTable).set(updateData).where(and(eq(academicLogsTable.id, id), eq(academicLogsTable.status, "pending"),
         inArray(academicLogsTable.studentId, departmentStudents), reviewer.role === "professor" ? eq(academicLogsTable.supervisorId, reviewer.id) : undefined)).returning();
+    } else if (logType === "conference") {
+      updatedRows = await db.update(conferencesTable).set(updateData).where(and(eq(conferencesTable.id, id), eq(conferencesTable.status, "pending"),
+        inArray(conferencesTable.studentId, departmentStudents), reviewer.role === "professor" ? eq(conferencesTable.supervisorId, reviewer.id) : undefined)).returning();
     }
 
     if (updatedRows.length === 0) {

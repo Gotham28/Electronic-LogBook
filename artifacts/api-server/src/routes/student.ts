@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import { 
   db, studentsTable, caseLogsTable, procedureLogsTable, 
   academicLogsTable, usersTable, departmentsTable, departmentConfigsTable,
-  postingsTable, leaveRecordsTable, appraisalsTable, researchTable, assessmentsTable, procedureTypesTable, departmentCatalogTable, certificationsTable
+  postingsTable, leaveRecordsTable, appraisalsTable, researchTable, assessmentsTable, procedureTypesTable, departmentCatalogTable, certificationsTable, conferencesTable
 } from "@workspace/db";
 import { eq, and, or, desc, count, sql, isNull } from "drizzle-orm";
 import { requireAuth, requireRole, requireDepartment } from "../middlewares/auth.js";
@@ -185,8 +185,11 @@ router.get("/:studentId/logs", requireAuth, async (req, res) => {
     const academicFilter = caller.role === "professor"
       ? and(eq(academicLogsTable.studentId, studentId), eq(academicLogsTable.supervisorId, caller.id))
       : eq(academicLogsTable.studentId, studentId);
+    const conferenceFilter = caller.role === "professor"
+      ? and(eq(conferencesTable.studentId, studentId), eq(conferencesTable.supervisorId, caller.id))
+      : eq(conferencesTable.studentId, studentId);
 
-    const [caseLogsRaw, procedureLogsRaw, academicLogsRaw] = await Promise.all([
+    const [caseLogsRaw, procedureLogsRaw, academicLogsRaw, conferenceLogsRaw] = await Promise.all([
       db.select({ log: caseLogsTable, supervisorName: usersTable.fullName })
         .from(caseLogsTable).leftJoin(usersTable, eq(caseLogsTable.supervisorId, usersTable.id))
         .where(caseFilter).orderBy(desc(caseLogsTable.createdAt)),
@@ -196,6 +199,9 @@ router.get("/:studentId/logs", requireAuth, async (req, res) => {
       db.select({ log: academicLogsTable, supervisorName: usersTable.fullName })
         .from(academicLogsTable).leftJoin(usersTable, eq(academicLogsTable.supervisorId, usersTable.id))
         .where(academicFilter).orderBy(desc(academicLogsTable.createdAt)),
+      db.select({ log: conferencesTable, supervisorName: usersTable.fullName })
+        .from(conferencesTable).leftJoin(usersTable, eq(conferencesTable.supervisorId, usersTable.id))
+        .where(conferenceFilter).orderBy(desc(conferencesTable.createdAt)),
     ]);
 
     res.json({
@@ -208,6 +214,7 @@ router.get("/:studentId/logs", requireAuth, async (req, res) => {
       caseLogs: caseLogsRaw.map(r => ({ ...r.log, supervisorName: r.supervisorName })),
       procedureLogs: procedureLogsRaw.map(r => ({ ...r.log, supervisorName: r.supervisorName })),
       academicLogs: academicLogsRaw.map(r => ({ ...r.log, supervisorName: r.supervisorName })),
+      conferenceLogs: conferenceLogsRaw.map(r => ({ ...r.log, supervisorName: r.supervisorName })),
     });
   } catch (error) {
     req.log.error({ studentId: req.params.studentId, status: 500 }, "Error fetching student logs");
@@ -674,6 +681,31 @@ router.post("/:studentId/academic-logs", validate(z.object({ supervisorId: idSch
     const [inserted] = await db.insert(academicLogsTable).values({
       studentId, supervisorId: supervisorIdNum, activityType, presentationType: req.body.presentationType, 
       topic, date, presenter: req.body.presenter, status: "pending"
+    }).returning();
+    res.status(201).json(inserted);
+  } catch (error) {
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+router.post("/:studentId/conference-logs", validate(z.object({ supervisorId: idSchema.optional().nullable(), conferenceName: nameSchema,
+  role: z.enum(["attended", "presented"]), date: dateSchema, location: optionalText.nullable(),
+  certificateUrl: optionalText.nullable() }).strict()), async (req, res) => {
+  try {
+    const studentId = parseInt(String(req.params.studentId), 10);
+    const { supervisorId, conferenceName, role, date, location, certificateUrl } = req.body;
+    
+    let supervisorIdNum = null;
+    if (supervisorId) {
+      supervisorIdNum = parseInt(supervisorId, 10);
+      if (!(await validateSupervisor(supervisorIdNum, req.user!.departmentId!))) {
+        res.status(400).json({ message: "Invalid supervisorId" });
+        return;
+      }
+    }
+
+    const [inserted] = await db.insert(conferencesTable).values({
+      studentId, supervisorId: supervisorIdNum, conferenceName, role, date, location, certificateUrl, status: "pending"
     }).returning();
     res.status(201).json(inserted);
   } catch (error) {

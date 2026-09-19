@@ -91,7 +91,7 @@ function generateDefaultStudentForm() {
 
 export function HODPortal({ activeTab }: { activeTab?: string }) {
   const [location, setLocation] = useLocation();
-  const { department, hod } = useDepartment();
+  const { department, hod, config } = useDepartment();
   const currentTab = React.useMemo(() => {
     if (activeTab) return activeTab;
     if (location === "/" || location === "/mentees") return "mentees";
@@ -451,7 +451,12 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
               )}
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <SummaryCard label="Approved students" value={roster?.students.filter((student) => student.status === "approved").length ?? 0} />
-                <SummaryCard label="Average progress" value={`${Math.round((roster?.students.reduce((sum, student) => sum + (student.completion || 0), 0) ?? 0) / Math.max(roster?.students.length ?? 0, 1))}%`} />
+                {(() => {
+                  const withProgress = roster?.students.filter((s) => s.completion !== null && s.completion !== undefined) || [];
+                  return withProgress.length > 0 ? (
+                    <SummaryCard label="Average progress" value={`${Math.round(withProgress.reduce((sum, s) => sum + (s.completion || 0), 0) / withProgress.length)}%`} />
+                  ) : null;
+                })()}
                 <SummaryCard label="Faculty" value={roster?.professors.length ?? 0} />
                 <SummaryCard label="Awaiting approval" value={pendingStudents.length} error={studentsError} />
               </div>
@@ -515,11 +520,13 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
                             <TableCell>{s.batch ?? "—"}</TableCell>
                             <TableCell>
                               <div className="flex items-center gap-3">
-                                <CompletionRing value={s.completion ?? 0} />
+                                {s.completion !== null && s.completion !== undefined && (
+                                  <CompletionRing value={s.completion} />
+                                )}
                                 <div className="text-[11px] leading-5 text-slate-500">
-                                  <p>{s.verified?.cases ?? 0}/{s.targets?.cases ?? 0} cases</p>
-                                  <p>{s.verified?.procedures ?? 0}/{s.targets?.procedures ?? 0} procedures</p>
-                                  <p>{s.verified?.academics ?? 0}/{s.targets?.academics ?? 0} academics</p>
+                                  <p>{config?.requiredCases !== null && config?.requiredCases !== undefined ? `${s.verified?.cases ?? 0}/${s.targets?.cases ?? 0} cases` : `${s.verified?.cases ?? 0} cases verified`}</p>
+                                  <p>{config?.requiredProcedures !== null && config?.requiredProcedures !== undefined ? `${s.verified?.procedures ?? 0}/${s.targets?.procedures ?? 0} procedures` : `${s.verified?.procedures ?? 0} procedures verified`}</p>
+                                  <p>{config?.requiredAcademic !== null && config?.requiredAcademic !== undefined ? `${s.verified?.academics ?? 0}/${s.targets?.academics ?? 0} academics` : `${s.verified?.academics ?? 0} academics verified`}</p>
                                 </div>
                               </div>
                             </TableCell>

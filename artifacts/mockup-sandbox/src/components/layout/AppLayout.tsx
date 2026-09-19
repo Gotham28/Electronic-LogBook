@@ -49,6 +49,7 @@ import {
   KeyRound,
   LayoutDashboard,
   LogOut,
+  Presentation,
   Printer,
   Stethoscope,
   UserCheck,
@@ -83,6 +84,8 @@ const navigationDescriptions: Record<string, string> = {
   "Academic Activities": "Document seminars, journal clubs, presentations, teaching sessions, and other academic work.",
   Assessments: "View assessment records and feedback entered during your training.",
   "Thesis & Certifications": "Keep thesis milestones, certifications, and supporting academic requirements together.",
+  Thesis: "Keep thesis milestones and related records together.",
+  Certifications: "Track certifications and supporting academic requirements.",
   "Leave Records": "Check your leave balance, previous requests, and approval status.",
   "Evaluation Queue": "Open student log entries that are waiting for your review and verification.",
   "Student Progress": "Follow the training progress and completion status of the students assigned to you.",
@@ -94,7 +97,7 @@ const navigationDescriptions: Record<string, string> = {
   Requirements: "Configure the case, procedure, and academic requirements used to measure progress.",
 };
 
-function navigationForRole(role: RoleType, dashboardData?: any, loadingBadges?: boolean): NavigationItem[] {
+function navigationForRole(role: RoleType, dashboardData?: any, loadingBadges?: boolean, config?: any): NavigationItem[] {
   if (role === "Faculty") {
     return [
       { title: "Evaluation Queue", icon: FileText, href: "/" },
@@ -119,19 +122,39 @@ function navigationForRole(role: RoleType, dashboardData?: any, loadingBadges?: 
     if (!dashboardData) return undefined;
     const cat = dashboardData.categories?.find((c: any) => c.id === id);
     if (!cat) return undefined;
-    return `${cat.logged}/${cat.required}`;
+
+    const required = id === "cases" ? config?.requiredCases : id === "procedures" ? config?.requiredProcedures : id === "academics" ? config?.requiredAcademic : 0;
+    
+    if (required === null || required === undefined) {
+      return `${cat.logged}`;
+    }
+    return `${cat.logged}/${required}`;
   };
 
-  return [
+  const items: NavigationItem[] = [
     { title: "Dashboard", icon: LayoutDashboard, href: "/" },
     { title: "Postings & Rotations", icon: CalendarDays, href: "/postings" },
     { title: "Case Logs", icon: FileText, href: "/cases", badge: getCount("cases"), badgeLoading: loadingBadges },
     { title: "Procedure Logs", icon: Stethoscope, href: "/procedures", badge: getCount("procedures"), badgeLoading: loadingBadges },
     { title: "Academic Activities", icon: GraduationCap, href: "/academics" },
-    { title: "Assessments", icon: ClipboardCheck, href: "/assessments" },
-    { title: "Thesis & Certifications", icon: Award, href: "/milestones" },
-    { title: "Leave Records", icon: CalendarDays, href: "/attendance" },
   ];
+
+  if (config?.enabledFeatures?.attendedConferences) {
+    items.push({ title: "Conferences", icon: Presentation, href: "/conferences" });
+  }
+
+  items.push({ title: "Assessments", icon: ClipboardCheck, href: "/assessments" });
+
+  if (config?.enabledFeatures?.splitThesisAndCertifications) {
+    items.push({ title: "Thesis", icon: FileText, href: "/thesis" });
+    items.push({ title: "Certifications", icon: Award, href: "/certifications" });
+  } else {
+    items.push({ title: "Thesis & Certifications", icon: Award, href: "/milestones" });
+  }
+
+  items.push({ title: "Leave Records", icon: CalendarDays, href: "/attendance" });
+
+  return items;
 }
 
 export function AppLayout({
@@ -140,7 +163,7 @@ export function AppLayout({
   onSignOut,
 }: AppLayoutProps) {
   const [location, setLocation] = useLocation();
-  const { department } = useDepartment();
+  const { department, config } = useDepartment();
   const [dashboardData, setDashboardData] = React.useState<any>(null);
   const [loadingBadges, setLoadingBadges] = React.useState(activeRole === "Student");
 
@@ -287,8 +310,8 @@ export function AppLayout({
 
 
   const navigationItems = React.useMemo(
-    () => navigationForRole(activeRole, dashboardData, loadingBadges),
-    [activeRole, dashboardData, loadingBadges],
+    () => navigationForRole(activeRole, dashboardData, loadingBadges, config),
+    [activeRole, dashboardData, loadingBadges, config],
   );
   const closeTour = React.useCallback(() => {
     setIsTourOpen(false);

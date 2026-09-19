@@ -418,7 +418,10 @@ router.post("/department/config", validate(configSchema), async (req, res) => {
       return;
     }
 
-    const { requiredCases, requiredProcedures, requiredAcademic } = req.body;
+    const { requiredCases, requiredProcedures, requiredAcademic, enabledFeatures } = req.body;
+
+    const toNullableInt = (v: unknown) =>
+      v === null || v === undefined || v === "" ? null : parseInt(String(v), 10);
 
     const existing = await db.select().from(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, departmentId));
     
@@ -427,9 +430,10 @@ router.post("/department/config", validate(configSchema), async (req, res) => {
         programDurationMonths: req.body.programDurationMonths,
         casualLeaveAllowance: req.body.casualLeaveAllowance,
         academicLeaveAllowance: req.body.academicLeaveAllowance,
-        requiredCases: parseInt(requiredCases, 10),
-        requiredProcedures: parseInt(requiredProcedures, 10),
-        requiredAcademic: parseInt(requiredAcademic, 10)
+        requiredCases: toNullableInt(requiredCases),
+        requiredProcedures: toNullableInt(requiredProcedures),
+        requiredAcademic: toNullableInt(requiredAcademic),
+        enabledFeatures: enabledFeatures ?? existing[0].enabledFeatures
       }).where(eq(departmentConfigsTable.departmentId, departmentId)).returning();
       res.json(updated);
       return;
@@ -439,9 +443,10 @@ router.post("/department/config", validate(configSchema), async (req, res) => {
         programDurationMonths: req.body.programDurationMonths,
         casualLeaveAllowance: req.body.casualLeaveAllowance,
         academicLeaveAllowance: req.body.academicLeaveAllowance,
-        requiredCases: parseInt(requiredCases, 10),
-        requiredProcedures: parseInt(requiredProcedures, 10),
-        requiredAcademic: parseInt(requiredAcademic, 10)
+        requiredCases: toNullableInt(requiredCases),
+        requiredProcedures: toNullableInt(requiredProcedures),
+        requiredAcademic: toNullableInt(requiredAcademic),
+        enabledFeatures: enabledFeatures ?? {}
       }).returning();
       res.json(inserted);
       return;

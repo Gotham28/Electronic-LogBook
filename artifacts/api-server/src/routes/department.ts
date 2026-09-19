@@ -46,7 +46,7 @@ router.get("/:departmentId/catalog", async (req, res) => {
   }
 });
 
-function computeCompletion(cases: number, procs: number, acad: number, reqCases: number, reqProcs: number, reqAcad: number) {
+function computeCompletion(cases: number, procs: number, acad: number, reqCases: number | null, reqProcs: number | null, reqAcad: number | null) {
   return completionPercent([[cases, reqCases], [procs, reqProcs], [acad, reqAcad]]);
 }
 
@@ -202,7 +202,7 @@ router.get("/:departmentId/analytics", requireRole(["hod"]), async (req, res) =>
 
       const completions = studentsInDept.map(s =>
         computeCompletion(caseMap[s.studentId] ?? 0, procMap[s.studentId] ?? 0, acadMap[s.studentId] ?? 0, reqCases, reqProcs, reqAcad)
-      );
+      ).filter((c): c is number => c !== null);
       avgCompletion = completions.length > 0
         ? Math.round(completions.reduce((a, b) => a + b, 0) / completions.length)
         : 0;
