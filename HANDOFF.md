@@ -1,94 +1,85 @@
-# HANDOFF — Dispatch 43
-**Task:** Fix HODPortal.tsx "Awaiting approval" summary card fallback-to-zero bug  
-**Date:** 2026-09-18  
-**Commit worked from:** _not run — sandbox constraint; no shell commands executed_
+# HANDOFF — Dispatch 44
+# Fix HODPortal.tsx transient studentsError reset on unrelated retry
 
----
+## Commit hash worked from
+Not available in this sandbox dispatch. Developer confirmed repo was up to date before dispatch.
 
-## What changed
+## Files changed
 
 ### `artifacts/mockup-sandbox/src/components/HODPortal.tsx`
 
-Two contiguous edits, both in the same file:
+**What changed and why:**
 
-**1. Call site — line 456**
+The `studentsError` state was previously reset to `null` at the very top of `fetchData`
+(line 142, alongside `setError(null)`, `setAnalyticsError(null)`, `setLeavesError(null)`).
+Because `fetchData` is the callback wired to every "Try again" button in the file — including
+the analytics-error banner's "Try again" (line 368) and the outer full-page error (line 346) —
+any click of any retry button transiently wiped `studentsError` before the
+`/api/admin/students/pending` fetch had a chance to fail again. If that fetch subsequently
+failed, the error re-appeared; but if it was the analytics fetch that was retried, the
+students error disappeared and did not come back. This violated AGENTS.md §7: a failed load
+must show a visible error state, not silently disappear.
 
-```diff
-- <SummaryCard label="Awaiting approval" value={pendingStudents.length} />
-+ <SummaryCard label="Awaiting approval" value={pendingStudents.length} error={studentsError} />
-```
-
-Why: `pendingStudents` stays `[]` when the fetch throws, so `pendingStudents.length` silently
-rendered `0` — indistinguishable from a real empty queue. Passing `studentsError` (already set
-to `"Could not load pending students"` at line 156 when the fetch fails) lets the component
-surface the error instead.
-
-**2. `SummaryCard` component — lines 762–764**
+**Exact diff:**
 
 ```diff
-- function SummaryCard({ label, value }: { label: string; value: string | number }) {
--   return <Card ...><CardContent ...><p ...>{label}</p><p ...>{value}</p></CardContent></Card>;
-- }
-+ function SummaryCard({ label, value, error }: { label: string; value: string | number; error?: string | null }) {
-+   return <Card ...><CardContent ...><p ...>{label}</p>{error ? <p className="mt-2 text-sm font-medium text-red-500">{error}</p> : <p ...>{value}</p>}</CardContent></Card>;
-+ }
+--- a/artifacts/mockup-sandbox/src/components/HODPortal.tsx
++++ b/artifacts/mockup-sandbox/src/components/HODPortal.tsx
+@@ -139,7 +139,6 @@
+     setLoading(true);
+     setError(null);
+     setAnalyticsError(null);
+-    setStudentsError(null);
+     setLeavesError(null);
+     try {
+       const user = getCurrentUser();
+@@ -150,6 +149,7 @@
+       try {
+         const students = await apiGet<Registration[]>("/api/admin/students/pending");
+         setPendingStudents(students);
++        setStudentsError(null);
+       } catch (err) {
+         console.warn("Could not fetch pending students", err);
+         setStudentsError("Could not load pending students");
 ```
 
-Why: The `error` prop is optional (`string | null | undefined`), so all other `SummaryCard`
-call sites (`label="Approved students"`, `label="Average progress"`, `label="Faculty"`) are
-unaffected — they do not pass `error`, so the prop resolves to `undefined` / falsy and the
-normal `{value}` branch renders unchanged.
+**File:line evidence:**
+- Removal: [`HODPortal.tsx` (was line 142)](file:///D:/Electronic-LogBook-main/artifacts/mockup-sandbox/src/components/HODPortal.tsx#L138-L142) — `setStudentsError(null)` removed from eager reset block.
+- Addition: [`HODPortal.tsx` line 153](file:///D:/Electronic-LogBook-main/artifacts/mockup-sandbox/src/components/HODPortal.tsx#L150-L157) — `setStudentsError(null)` added immediately after `setPendingStudents(students)`.
 
-**Visual treatment:** When `studentsError` is set, the card shows the error message in
-`text-sm font-medium text-red-500`, matching exactly the className used for `studentsError`
-at lines 649–651 and for `leavesError` at lines 727–728.  No new visual language was
-invented.
+## Files skipped / not touched
 
-**Error copy reused:** `"Could not load pending students"` — taken from `setStudentsError`
-at line 156, already present in the file. No new wording invented.
+- `setAnalyticsError(null)` (line 141) — explicitly out of scope per CURRENT_TASK.md.
+- `setLeavesError(null)` (line 142) — explicitly out of scope per CURRENT_TASK.md.
+- The three "Try again" buttons (lines 346, 368, 394) — explicitly out of scope.
+- `fetchRoster`, `rosterError`, and the roster tab — explicitly out of scope.
+- `SummaryCard` and its `error` prop — no change needed; already correct from prior merge.
+- Everything in `artifacts/api-server` — not in scope.
 
----
+## Expanded beyond Build list
 
-## Nothing skipped
+Nothing. The change is exactly the two lines specified: one removal from the eager reset
+block, one addition in the success path of the pending-students fetch.
 
-The full Build list was completed. No items were deferred.
+## Anything noticed but not acted on
 
----
+`setAnalyticsError(null)` and `setLeavesError(null)` remain in the eager reset block. Both
+are vulnerable to the same class of bug (a retry of an unrelated section transiently clears
+them). CURRENT_TASK.md §16 explicitly excludes them as a separate follow-up. They have not
+been touched and are recorded here only so the reviewer is aware.
 
-## Nothing expanded beyond scope
+## Rule triggers checked
 
-- The `SummaryCard` signature change is load-bearing for the fix and is the minimum required
-  change to the component. No refactor of the other three `SummaryCard` usages was done.
-- No changes to `artifacts/api-server`, no authorization logic, no schema, no other
-  fetch/card, no shell commands.
+- §3/§4 Ownership/ID systems — not applicable; no routes or queries touched.
+- §5 Hardcoded department behaviour — not applicable.
+- §6 Schema/migration — not applicable.
+- §7 No fabricated content — error message text "Could not load pending students" preserved
+  verbatim from the existing catch block; no new text invented.
+- §8 Patient data near logs — not applicable; no log statements touched.
+- §9 One feature per task — confirmed; exactly one behaviour changed.
+- §10/§13 Secrets — not applicable.
 
----
+## Verification pending (Claude Code, outside this dispatch)
 
-## Other observations (not acted on — §9)
-
-- The three other `SummaryCard` calls in the roster grid (`Approved students`, `Average
-  progress`, `Faculty`) also derive from `roster`, which has its own `rosterError` guard at
-  the tab level. Those cards are not reachable when `rosterError` is set (the tab renders the
-  error + retry button instead), so they do not carry the same silent-zero risk. No change
-  made; noted for completeness.
-
----
-
-## Commands run
-
-None. The sandbox constraint required all work to be done with file-reading and file-editing
-tools only. No `git status`, typecheck, lint, or any other shell command was executed.
-
----
-
-## Files modified
-
-| File | Change |
-|---|---|
-| `artifacts/mockup-sandbox/src/components/HODPortal.tsx` | Line 456: added `error={studentsError}` prop. Lines 762–764: added `error?: string \| null` prop to `SummaryCard`; renders error text instead of value when set. |
-
-## Files created
-
-| File | Change |
-|---|---|
-| `HANDOFF.md` | This file. |
+- [ ] Frontend typecheck: `tsc -p tsconfig.json --noEmit` in `artifacts/mockup-sandbox` — no new errors.
+- [ ] Diff confirms `studentsError` is written in exactly two places in `fetchData`: the new success-path clear (line 153) and the existing failure-path message (line 156). Nowhere else.
