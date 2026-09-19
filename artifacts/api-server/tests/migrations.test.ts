@@ -1,3 +1,4 @@
+
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
@@ -12,7 +13,7 @@ test("fresh installation and rerunning migrations are safe and checksum-tracked"
   try {
     await applyMigrations(migrationConnection(database));
     await applyMigrations(migrationConnection(database));
-    assert.equal((await database.query("SELECT * FROM elogbook_migrations")).rows.length, 5);
+    assert.equal((await database.query("SELECT * FROM elogbook_migrations")).rows.length, 7);
     assert.equal((await database.query("SELECT * FROM departments")).rows.length, 0);
     assert.equal((await database.query("SELECT * FROM assignment_recipients")).rows.length, 0);
     await database.query("UPDATE elogbook_migrations SET checksum = 'tampered' WHERE name = '0002_departments_assignments.sql'");

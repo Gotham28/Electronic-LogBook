@@ -77,7 +77,7 @@ export function CaseLogsPage() {
   const [professors, setProfessors] = React.useState<any[]>([]);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
-  const { caseCategories } = useDepartment();
+  const { caseCategories, config: deptConfig } = useDepartment();
 
   const totalRequired = React.useMemo(() => 
     caseCategories?.reduce((acc: number, c: any) => acc + c.required, 0) || 50,
@@ -184,6 +184,8 @@ export function CaseLogsPage() {
   });
 
   const setField = (field: keyof typeof form, value: string) => setForm({ ...form, [field]: value });
+  
+  const hasTarget = deptConfig?.requiredCases !== null && deptConfig?.requiredCases !== undefined;
 
   return (
     <div className="space-y-6 pb-12">
@@ -269,7 +271,9 @@ export function CaseLogsPage() {
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-slate-700">Progress by category</h3>
-            <span className="text-xs text-slate-500">{caseLogs.length} of {totalRequired} total cases logged</span>
+            <span className="text-xs text-slate-500">
+              {hasTarget ? `${caseLogs.length} of ${totalRequired} total cases logged` : `${caseLogs.length} cases logged`}
+            </span>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {caseCategories.slice(0, showAllCategories ? undefined : 8).map((cat: any) => {
@@ -277,18 +281,20 @@ export function CaseLogsPage() {
               const pct = cat.required > 0 ? Math.min(Math.round((logged / cat.required) * 100), 100) : 0;
               const done = logged >= cat.required;
               return (
-                <div key={cat.value} className={`rounded-xl border p-4 ${done ? "border-emerald-200 bg-emerald-50/60" : "border-teal-100 bg-white"}`}>
+                <div key={cat.value} className={`rounded-xl border p-4 ${done && hasTarget ? "border-emerald-200 bg-emerald-50/60" : "border-teal-100 bg-white"}`}>
                   <div className="flex items-start justify-between gap-2">
                     <p className="text-xs font-semibold leading-snug text-slate-700">{cat.name}</p>
-                    {done && <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />}
+                    {done && hasTarget && <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />}
                   </div>
-                  <p className="mt-2 text-xl font-bold text-slate-900">{logged}<span className="text-sm font-normal text-slate-400">/{cat.required}</span></p>
-                  <div className="mt-2 h-1.5 w-full rounded-full bg-slate-100">
-                    <div
-                      className={`h-1.5 rounded-full transition-all ${done ? "bg-emerald-500" : "bg-teal-500"}`}
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
+                  <p className="mt-2 text-xl font-bold text-slate-900">{logged}{hasTarget && <span className="text-sm font-normal text-slate-400">/{cat.required}</span>}</p>
+                  {hasTarget && (
+                    <div className="mt-2 h-1.5 w-full rounded-full bg-slate-100">
+                      <div
+                        className={`h-1.5 rounded-full transition-all ${done ? "bg-emerald-500" : "bg-teal-500"}`}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -315,7 +321,7 @@ export function CaseLogsPage() {
             </div>
           </div>
           <Badge variant="outline" className="w-fit border-teal-100 bg-teal-50 px-3 py-1 text-teal-800">
-            {caseLogs.length} of {totalRequired} cases logged
+            {hasTarget ? `${caseLogs.length} of ${totalRequired} cases logged` : `${caseLogs.length} cases logged`}
           </Badge>
         </CardHeader>
         <CardContent className="p-0">

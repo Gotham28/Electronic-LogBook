@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, caseLogsTable, procedureLogsTable, academicLogsTable, studentsTable, usersTable, departmentsTable, departmentConfigsTable } from "@workspace/db";
+import { db, caseLogsTable, procedureLogsTable, academicLogsTable, studentsTable, usersTable, departmentsTable, departmentConfigsTable, conferencesTable } from "@workspace/db";
 import { eq, and, inArray, count, or, isNull } from "drizzle-orm";
 import { requireAuth, requireRole, requireDepartment } from "../middlewares/auth.js";
 import { completionPercent } from "../lib/validation.js";
@@ -10,11 +10,12 @@ const router: IRouter = Router();
 // Both professors and HODs can access all routes in this router
 router.use(requireAuth, requireRole(["professor", "hod"]), requireDepartment);
 
-function computeCompletion(cases: number, procs: number, acad: number, reqCases: number, reqProcs: number, reqAcad: number) {
+function computeCompletion(cases: number, procs: number, acad: number, reqCases: number | null, reqProcs: number | null, reqAcad: number | null) {
   return completionPercent([[cases, reqCases], [procs, reqProcs], [acad, reqAcad]]);
 }
 
-function shortfallStatus(pct: number): "on_track" | "at_risk" | "behind" {
+function shortfallStatus(pct: number | null): "on_track" | "at_risk" | "behind" | "not_tracked" {
+  if (pct === null) return "not_tracked";
   if (pct >= 75) return "on_track";
   if (pct >= 40) return "at_risk";
   return "behind";
@@ -107,6 +108,23 @@ router.get("/:professorId/review-queue", async (req, res) => {
 
     const academics = await acadQuery.where(and(acadWhere, eq(usersTable.departmentId, deptId), eq(usersTable.status, "approved")));
 
+    const confWhere = isHod && deptId != null
+      ? eq(conferencesTable.status, "pending")
+      : and(eq(conferencesTable.supervisorId, professorId), eq(conferencesTable.status, "pending"));
+
+    const confQuery = db.select({
+      log: conferencesTable,
+      student: studentsTable,
+      user: usersTable,
+      department: departmentsTable,
+    })
+    .from(conferencesTable)
+    .innerJoin(studentsTable, eq(conferencesTable.studentId, studentsTable.id))
+    .innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
+    .leftJoin(departmentsTable, eq(usersTable.departmentId, departmentsTable.id));
+
+    const conferences = await confQuery.where(and(confWhere, eq(usersTable.departmentId, deptId), eq(usersTable.status, "approved")));
+
     const pendingReviews = [
       ...cases.map(c => ({
         id: `case-${c.log.id}`,
@@ -155,6 +173,22 @@ router.get("/:professorId/review-queue", async (req, res) => {
         date: a.log.date,
         detail: a.log.presentationType || a.log.activityType,
         status: a.log.status
+      })),
+      ...conferences.map(c => ({
+        id: `conference-${c.log.id}`,
+        dbId: c.log.id,
+        logType: "conference",
+        studentId: c.student.id,
+        studentName: c.user.fullName,
+        registrationNumber: c.student.registrationNumber,
+        department: c.department?.name || "Unknown",
+        type: "Conference",
+        title: c.log.conferenceName,
+        date: c.log.date,
+        location: c.log.location,
+        certificateUrl: c.log.certificateUrl,
+        detail: c.log.role === "presented" ? "Presented" : "Attended",
+        status: c.log.status
       }))
     ];
 

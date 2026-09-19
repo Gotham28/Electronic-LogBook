@@ -327,6 +327,14 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                           Self-Declared Level: {currentItem.declaredCompetency}
                         </p>
                       )}
+                      {currentItem.type === "Conference" && currentItem.location && (
+                        <p className="text-xs text-slate-600 font-medium">Location: {currentItem.location}</p>
+                      )}
+                      {currentItem.type === "Conference" && currentItem.certificateUrl && (
+                        <p className="text-xs text-slate-600 font-medium overflow-hidden text-ellipsis whitespace-nowrap">
+                          Certificate: <a href={currentItem.certificateUrl} target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline">{currentItem.certificateUrl}</a>
+                        </p>
+                      )}
                     </div>
 
                     {evaluatedLogs[currentItem.id] && (
@@ -363,22 +371,24 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                       </div>
                     )}
 
-                    <div className="space-y-2">
-                      <label className="text-xs font-semibold text-slate-700">Scholastic Grade</label>
-                      <div className="flex gap-2">
-                        {["A+", "A", "B+", "B", "C"].map((g) => (
-                          <button
-                            key={g}
-                            type="button"
-                            onClick={() => setGrade(g)}
-                            className={`flex-1 py-1.5 rounded text-xs font-bold transition-all border ${grade === g ? "bg-teal-600 text-white border-teal-600" : "bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200"
-                              }`}
-                          >
-                            {g}
-                          </button>
-                        ))}
+                    {currentItem.type === "Academic" && (
+                      <div className="space-y-2">
+                        <label className="text-xs font-semibold text-slate-700">Scholastic Grade</label>
+                        <div className="flex gap-2">
+                          {["A+", "A", "B+", "B", "C"].map((g) => (
+                            <button
+                              key={g}
+                              type="button"
+                              onClick={() => setGrade(g)}
+                              className={`flex-1 py-1.5 rounded text-xs font-bold transition-all border ${grade === g ? "bg-teal-600 text-white border-teal-600" : "bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200"
+                                }`}
+                            >
+                              {g}
+                            </button>
+                          ))}
+                        </div>
                       </div>
-                    </div>
+                    )}
 
                     <div className="space-y-2">
                       <label className="text-xs font-semibold text-slate-700">Faculty Remarks</label>
@@ -451,10 +461,16 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                         <p className="text-[11px] text-slate-500 font-normal">{m.registrationNumber}</p>
                       </TableCell>
                       <TableCell className="text-xs w-48">
-                        <div className="flex items-center justify-between text-[11px] mb-1">
-                          <span className="font-semibold text-slate-700">{m.overallCompletion}%</span>
-                        </div>
-                        <Progress value={m.overallCompletion} className="h-2" />
+                        {m.overallCompletion !== null && m.overallCompletion !== undefined ? (
+                          <>
+                            <div className="flex items-center justify-between text-[11px] mb-1">
+                              <span className="font-semibold text-slate-700">{m.overallCompletion}%</span>
+                            </div>
+                            <Progress value={m.overallCompletion} className="h-2" />
+                          </>
+                        ) : (
+                          <span className="text-slate-400">Not configured</span>
+                        )}
                       </TableCell>
                       <TableCell>{renderShortfallBadge(m.shortfallStatus)}</TableCell>
                       <TableCell className="text-right">
@@ -607,13 +623,15 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                 </DialogDescription>
               </DialogHeader>
 
-              <div className="bg-slate-50 p-4 rounded-xl space-y-2 border border-slate-200">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-semibold text-slate-700">Overall MCI Requirement Completion</span>
-                  <span className="font-bold text-teal-800">{selectedMentee.overallCompletion}%</span>
+              {selectedMentee.overallCompletion !== null && selectedMentee.overallCompletion !== undefined && (
+                <div className="bg-slate-50 p-4 rounded-xl space-y-2 border border-slate-200">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-slate-700">Overall MCI Requirement Completion</span>
+                    <span className="font-bold text-teal-800">{selectedMentee.overallCompletion}%</span>
+                  </div>
+                  <Progress value={selectedMentee.overallCompletion} className="h-2" />
                 </div>
-                <Progress value={selectedMentee.overallCompletion} className="h-2" />
-              </div>
+              )}
 
               <Tabs defaultValue="case-logs" className="w-full">
                 <TabsList className="bg-slate-100 p-1 rounded-lg">
@@ -739,6 +757,8 @@ function renderShortfallBadge(status: string) {
       return <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px]">On Track</Badge>;
     case "behind":
       return <Badge className="bg-rose-50 text-rose-700 border-rose-200 text-[10px]">Behind</Badge>;
+    case "not_tracked":
+      return <Badge variant="outline" className="text-slate-500 text-[10px]">Not tracked</Badge>;
     default:
       return <Badge className="bg-amber-50 text-amber-700 border-amber-200 text-[10px]">At Risk</Badge>;
   }

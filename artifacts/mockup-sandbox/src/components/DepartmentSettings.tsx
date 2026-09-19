@@ -4,13 +4,14 @@ import { apiPost, apiPatch, apiGet, apiDelete } from "@/lib/apiClient";
 import { Trash2, AlertTriangle, ChevronDown, Search } from "lucide-react";
 import { useDepartment } from "@/lib/department-context";
 import { Button } from "@/components/ui/button";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 const configFields = [
-  ["requiredCases", "Required clinical cases", false], ["requiredProcedures", "Required procedures", false],
-  ["requiredAcademic", "Required academic activities", false], ["programDurationMonths", "Program duration (months)", true],
+  ["requiredCases", "Required clinical cases", true], ["requiredProcedures", "Required procedures", true],
+  ["requiredAcademic", "Required academic activities", true], ["programDurationMonths", "Program duration (months)", true],
   ["casualLeaveAllowance", "Casual leave allowance (days)", true], ["academicLeaveAllowance", "Academic leave allowance (days)", true],
 ] as const;
 
@@ -200,13 +201,14 @@ export function DepartmentSettings() {
     <div className="grid gap-6 lg:grid-cols-2">
       <Card><CardHeader><CardTitle>Department requirements</CardTitle></CardHeader><CardContent>
         <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); void save(() => apiPost("/api/admin/department/config",
-          Object.fromEntries(configFields.map(([key, _label, optional]) => [key, optional && config[key] === "" ? null : Number(config[key])]))), "Department requirements saved"); }}>
+          { ...Object.fromEntries(configFields.map(([key, _label, optional]) => [key, optional && config[key] === "" ? null : Number(config[key])])) }), "Department requirements saved"); }}>
           {configFields.map(([key, label, optional]) => <div className="space-y-2" key={key}><Label htmlFor={`config-${key}`}>{label}</Label>
             <Input id={`config-${key}`} type="number" step="1" min={key === "programDurationMonths" ? 1 : 0} max={key === "programDurationMonths" ? 240 : 100000}
               required={!optional} value={config[key]} onChange={(e) => setConfig({ ...config, [key]: e.target.value })} /></div>)}
           <Button disabled={busy} type="submit">Save requirements</Button>
         </form>
       </CardContent></Card>
+
       <Card><CardHeader><CardTitle>Add procedure type</CardTitle></CardHeader><CardContent>
         <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); void save(async () => {
           await apiPost("/api/admin/department/procedures", { ...procedure, required: Number(procedure.required) });

@@ -77,23 +77,23 @@ export function Dashboard() {
   if (!logs) return null;
 
   const categories = [
-    { label: "Clinical cases", logged: logs.caseLogs?.length || 0, required: deptConfig?.requiredCases ?? 0, verified: logs.caseLogs?.filter((l: any) => l.status === "verified").length || 0, icon: FileText, href: "/cases", tone: "from-teal-500 to-cyan-500" },
-    { label: "Procedures", logged: logs.procedureLogs?.length || 0, required: deptConfig?.requiredProcedures ?? 0, verified: logs.procedureLogs?.filter((l: any) => l.status === "verified").length || 0, icon: Stethoscope, href: "/procedures", tone: "from-cyan-500 to-sky-500" },
-    { label: "Case discussions", logged: logs.academicLogs?.length || 0, required: deptConfig?.requiredAcademic ?? 0, verified: logs.academicLogs?.filter((l: any) => l.status === "verified").length || 0, icon: GraduationCap, href: "/academics", tone: "from-emerald-500 to-teal-500" },
+    { label: "Clinical cases", logged: logs.caseLogs?.length || 0, required: deptConfig?.requiredCases ?? 0, verified: logs.caseLogs?.filter((l: any) => l.status === "verified").length || 0, icon: FileText, href: "/cases", tone: "from-teal-500 to-cyan-500", hasTarget: deptConfig?.requiredCases !== null && deptConfig?.requiredCases !== undefined },
+    { label: "Procedures", logged: logs.procedureLogs?.length || 0, required: deptConfig?.requiredProcedures ?? 0, verified: logs.procedureLogs?.filter((l: any) => l.status === "verified").length || 0, icon: Stethoscope, href: "/procedures", tone: "from-cyan-500 to-sky-500", hasTarget: deptConfig?.requiredProcedures !== null && deptConfig?.requiredProcedures !== undefined },
+    { label: "Case discussions", logged: logs.academicLogs?.length || 0, required: deptConfig?.requiredAcademic ?? 0, verified: logs.academicLogs?.filter((l: any) => l.status === "verified").length || 0, icon: GraduationCap, href: "/academics", tone: "from-emerald-500 to-teal-500", hasTarget: deptConfig?.requiredAcademic !== null && deptConfig?.requiredAcademic !== undefined },
   ];
 
-  const configured = categories.filter((item) => item.required > 0);
-  const completion = configured.length ? Math.round(configured.reduce((sum, item) => sum + Math.min(item.verified / item.required, 1), 0) / configured.length * 100) : 0;
+  const configured = categories.filter((item) => item.hasTarget && item.required > 0);
+  const completion = configured.length ? Math.round(configured.reduce((sum, item) => sum + Math.min(item.verified / item.required, 1), 0) / configured.length * 100) : null;
 
   const hideUhid = isDemoMode();
   const mappedCaseLogs = (logs.caseLogs || []).map((l: any) => ({
     number: l.id, date: l.date, type: "Case", title: l.diagnosisProvisional || "Case Log", patientUhid: l.patientUhid, status: l.status, timestamp: new Date(l.createdAt).getTime()
   }));
   const mappedProcLogs = (logs.procedureLogs || []).map((l: any) => ({
-    number: l.id, date: l.date, type: "Procedure", title: l.procedureName, patientUhid: l.patientUhid, status: l.status, timestamp: new Date(l.createdAt).getTime()
+    number: l.id, date: l.date, type: "Procedure", title: l.procedureName || "Procedure Log", patientUhid: l.patientUhid, status: l.status, timestamp: new Date(l.createdAt).getTime()
   }));
   const mappedAcadLogs = (logs.academicLogs || []).map((l: any) => ({
-    number: l.id, date: l.date, type: "Academic", title: l.topic, patientUhid: "—", status: l.status, timestamp: new Date(l.createdAt).getTime()
+    number: l.id, date: l.date, type: "Academic", title: l.topic || "Academic Log", patientUhid: undefined, status: l.status, timestamp: new Date(l.createdAt).getTime()
   }));
 
   const recent = [...mappedCaseLogs, ...mappedProcLogs, ...mappedAcadLogs]
@@ -103,7 +103,9 @@ export function Dashboard() {
   const overallRemaining = categories.reduce((sum, item) => sum + Math.max(item.required - item.verified, 0), 0);
   const pendingCount = [...(logs.caseLogs || []), ...(logs.procedureLogs || []), ...(logs.academicLogs || [])]
     .filter((entry: any) => entry.status === "pending").length;
-  const progressLabel = completion >= 75 ? "On track" : completion >= 40 ? "Needs attention" : "Getting started";
+  const progressLabel = completion !== null ? (completion >= 75 ? "On track" : completion >= 40 ? "Needs attention" : "Getting started") : "Getting started";
+
+  const hasAnyNumericTargets = configured.length > 0;
 
   return (
     <div className="section-spacing pb-12">
@@ -148,28 +150,34 @@ export function Dashboard() {
         <CardContent className="p-6 md:p-8">
           <div className="grid gap-8 lg:grid-cols-[1fr_.9fr] lg:items-center">
             <div className="flex items-center gap-6">
-              <ProgressDonut value={completion} />
+              {hasAnyNumericTargets && completion !== null && <ProgressDonut value={completion} />}
               <div>
                 <p className="page-eyebrow">Dashboard insights</p>
-                <h2 className="mt-1 text-2xl font-semibold text-slate-950">You need {overallRemaining} more entries to complete the core targets.</h2>
+                {hasAnyNumericTargets ? (
+                  <h2 className="mt-1 text-2xl font-semibold text-slate-950">You need {overallRemaining} more entries to complete the core targets.</h2>
+                ) : (
+                  <h2 className="mt-1 text-2xl font-semibold text-slate-950">Keep logging your cases and procedures.</h2>
+                )}
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">{pendingCount > 0 ? `${pendingCount} ${pendingCount === 1 ? "entry is" : "entries are"} waiting for faculty verification.` : "All submitted entries have been reviewed."}</p>
-                <Badge variant="secondary" className="mt-4 rounded-full border-white/70 bg-teal-50 px-3 py-1 text-teal-800">{progressLabel}</Badge>
+                {hasAnyNumericTargets && <Badge variant="secondary" className="mt-4 rounded-full border-white/70 bg-teal-50 px-3 py-1 text-teal-800">{progressLabel}</Badge>}
               </div>
             </div>
-            <div className="space-y-4 rounded-[22px] border border-slate-100 bg-slate-50/75 p-5">
-              {categories.map((item) => {
-                const percent = item.required > 0 ? Math.min(Math.round(item.verified / item.required * 100), 100) : 0;
-                return (
-                  <div key={item.label}>
-                    <div className="mb-2 flex items-center justify-between text-xs">
-                      <span className="font-semibold text-slate-700">{item.label}</span>
-                      <span className="font-bold text-teal-700">{percent}%</span>
+            {hasAnyNumericTargets && (
+              <div className="space-y-4 rounded-[22px] border border-slate-100 bg-slate-50/75 p-5">
+                {configured.map((item) => {
+                  const percent = item.required > 0 ? Math.min(Math.round(item.verified / item.required * 100), 100) : 0;
+                  return (
+                    <div key={item.label}>
+                      <div className="mb-2 flex items-center justify-between text-xs">
+                        <span className="font-semibold text-slate-700">{item.label}</span>
+                        <span className="font-bold text-teal-700">{percent}%</span>
+                      </div>
+                      <Progress value={percent} className="h-2 bg-slate-200" />
                     </div>
-                    <Progress value={percent} className="h-2 bg-slate-200" />
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -185,18 +193,30 @@ export function Dashboard() {
                 <CardContent className="p-5">
                   <div className="flex items-start justify-between gap-4">
                     <div className={`flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br ${item.tone} text-white shadow-[0_12px_28px_rgba(13,148,136,0.18)]`}><Icon className="h-5 w-5" /></div>
-                    <CircularProgress value={percent} />
+                    {item.hasTarget ? (
+                      <CircularProgress value={percent} />
+                    ) : (
+                      <div className="grid h-14 w-14 place-items-center rounded-full bg-slate-100 shadow-inner">
+                        <div className="grid h-10 w-10 place-items-center rounded-full bg-white text-xs font-bold text-slate-900">{item.logged}</div>
+                      </div>
+                    )}
                     <div className="sr-only">
                       <div className="text-4xl font-semibold leading-none text-slate-950">{item.logged}</div>
                     </div>
                   </div>
                   <p className="mt-4 text-sm font-semibold text-slate-900">{item.label}</p>
-                  <p className="mt-1 text-[11px] text-slate-500">{item.logged} of {item.required} required</p>
-                  <Progress value={percent} className="mt-4 h-2" />
-                  <div className="mt-3 flex items-center justify-between text-[11px] text-slate-500">
-                    <span>{remaining} remaining</span>
-                    <span>{percent}%</span>
-                  </div>
+                  {item.hasTarget ? (
+                    <>
+                      <p className="mt-1 text-[11px] text-slate-500">{item.logged} of {item.required} required</p>
+                      <Progress value={percent} className="mt-4 h-2" />
+                      <div className="mt-3 flex items-center justify-between text-[11px] text-slate-500">
+                        <span>{remaining} remaining</span>
+                        <span>{percent}%</span>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="mt-1 text-[11px] text-slate-500">{item.logged} logged</p>
+                  )}
                 </CardContent>
               </Card>
             </Link>

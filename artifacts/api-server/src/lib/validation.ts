@@ -11,9 +11,10 @@ export const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((s) => 
 }, "Invalid date");
 export const targetSchema = z.coerce.number().int().min(0).max(100000);
 export const configSchema = z.object({
-  requiredCases: targetSchema, requiredProcedures: targetSchema, requiredAcademic: targetSchema,
+  requiredCases: targetSchema.nullable(), requiredProcedures: targetSchema.nullable(), requiredAcademic: targetSchema.nullable(),
   programDurationMonths: z.coerce.number().int().min(1).max(240).nullable(),
   casualLeaveAllowance: targetSchema.nullable(), academicLeaveAllowance: targetSchema.nullable(),
+  enabledFeatures: z.record(z.string(), z.boolean()).optional(),
 }).strict();
 
 export function validate(schema: z.ZodTypeAny): RequestHandler {
@@ -28,8 +29,8 @@ export function validate(schema: z.ZodTypeAny): RequestHandler {
   };
 }
 
-export function completionPercent(values: Array<[number, number | null | undefined]>): number {
+export function completionPercent(values: Array<[number, number | null | undefined]>): number | null {
   const configured = values.filter((v): v is [number, number] => typeof v[1] === "number" && v[1] > 0);
-  if (!configured.length) return 0;
+  if (!configured.length) return null;
   return Math.round(configured.reduce((sum, [done, target]) => sum + Math.min(done / target, 1), 0) / configured.length * 100);
 }

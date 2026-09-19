@@ -10,9 +10,12 @@ import { RegistrationPage } from "@/components/RegistrationPage";
 import { CaseLogsPage } from "@/components/pages/CaseLogsPage";
 import { ProcedureLogsPage } from "@/components/pages/ProcedureLogsPage";
 import { AcademicLogsPage } from "@/components/pages/AcademicLogsPage";
+import { ConferencesPage } from "@/components/pages/ConferencesPage";
 import { PostingsPage } from "@/components/pages/PostingsPage";
 import { AttendancePage } from "@/components/pages/AttendancePage";
 import { MilestonesPage } from "@/components/pages/MilestonesPage";
+import { ThesisPage } from "@/components/pages/ThesisPage";
+import { CertificationsPage } from "@/components/pages/CertificationsPage";
 import { AssessmentsPage } from "@/components/pages/AssessmentsPage";
 import { PrintableLogbook } from "@/components/pages/PrintableLogbook";
 import { PrivacyPolicyPage } from "@/components/pages/PrivacyPolicyPage";
@@ -249,10 +252,13 @@ function App() {
           <Route path="/cases" component={CaseLogsPage} />
           <Route path="/procedures" component={ProcedureLogsPage} />
           <Route path="/academics" component={AcademicLogsPage} />
+          <Route path="/conferences" component={ConferencesPage} />
           <Route path="/postings" component={PostingsPage} />
           <Route path="/attendance" component={AttendancePage} />
           <Route path="/assessments" component={AssessmentsPage} />
           <Route path="/milestones" component={MilestonesPage} />
+          <Route path="/thesis" component={ThesisPage} />
+          <Route path="/certifications" component={CertificationsPage} />
           <Route component={Dashboard} />
         </Switch>
       )}
