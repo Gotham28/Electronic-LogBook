@@ -205,14 +205,19 @@ test("thesis and certificates persist without fabricated defaults and enforce de
 });
 
 test("HOD requirements and training catalog are database-backed and reject cross-department updates", async () => {
-  const configuration = { requiredCases: 17, requiredProcedures: 21, requiredAcademic: 5,
-    programDurationMonths: 31, casualLeaveAllowance: 12, academicLeaveAllowance: null };
+  const configuration = { programDurationMonths: 31, casualLeaveAllowance: 12, academicLeaveAllowance: null };
   assert.equal((await call("/admin/department/config", "hod2", "POST", configuration)).status, 200);
   assert.equal((await call("/admin/department/config", "hod2", "POST", { ...configuration, departmentId: departmentIds[0] })).status, 400);
   assert.equal((await call("/admin/department/config", "faculty2", "POST", configuration)).status, 403);
-  assert.equal((await call("/departments/" + departmentIds[2] + "/catalog", "student2")).body.config.requiredCases, 17);
+  assert.equal((await call("/departments/" + departmentIds[2] + "/catalog", "student2")).body.config.requiredCases, 9);
   const option = await call("/admin/department/catalog", "hod2", "POST", { kind: "academic", name: "Custom seminar", value: "custom-seminar", required: 2, period: "month" });
   assert.equal(option.status, 201);
+  const caseCategory = await call("/admin/department/catalog", "hod2", "POST", { kind: "case_category", name: "Custom case type", value: "custom-case-type", required: 5, period: "total" });
+  assert.equal(caseCategory.status, 201);
+  assert.equal((await call("/departments/" + departmentIds[2] + "/catalog", "student2")).body.config.requiredCases, 5);
+  const academicTotal = await call("/admin/department/catalog", "hod2", "POST", { kind: "academic", name: "Custom total seminar", value: "custom-total-seminar", required: 7, period: "total" });
+  assert.equal(academicTotal.status, 201);
+  assert.equal((await call("/departments/" + departmentIds[2] + "/catalog", "student2")).body.config.requiredAcademic, 12);
   assert.equal((await call("/admin/department/catalog/" + option.body.id, "hod0", "PATCH", { required: 200, period: "total" })).status, 404);
 });
 
