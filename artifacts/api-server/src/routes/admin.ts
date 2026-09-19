@@ -6,6 +6,7 @@ import bcrypt from "bcryptjs";
 import { requireAuth, requireRole, requireDepartment } from "../middlewares/auth.js";
 import { completionPercent, configSchema, dateSchema, emailSchema, nameSchema, passwordSchema, targetSchema, validate } from "../lib/validation.js";
 import { resolveConfigDepartmentId } from "../lib/department-config-source.js";
+import { recomputeProcedureRequirement, recomputeCatalogRequirements } from "../lib/department-requirements.js";
 import { sendAccountCreatedEmail } from "../lib/mailer.js";
 
 const router = Router();
@@ -418,8 +419,6 @@ router.post("/department/config", validate(configSchema), async (req, res) => {
       return;
     }
 
-    const { requiredCases, requiredProcedures, requiredAcademic } = req.body;
-
     const existing = await db.select().from(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, departmentId));
     
     if (existing.length > 0) {
@@ -427,9 +426,6 @@ router.post("/department/config", validate(configSchema), async (req, res) => {
         programDurationMonths: req.body.programDurationMonths,
         casualLeaveAllowance: req.body.casualLeaveAllowance,
         academicLeaveAllowance: req.body.academicLeaveAllowance,
-        requiredCases: parseInt(requiredCases, 10),
-        requiredProcedures: parseInt(requiredProcedures, 10),
-        requiredAcademic: parseInt(requiredAcademic, 10)
       }).where(eq(departmentConfigsTable.departmentId, departmentId)).returning();
       res.json(updated);
       return;
@@ -439,9 +435,6 @@ router.post("/department/config", validate(configSchema), async (req, res) => {
         programDurationMonths: req.body.programDurationMonths,
         casualLeaveAllowance: req.body.casualLeaveAllowance,
         academicLeaveAllowance: req.body.academicLeaveAllowance,
-        requiredCases: parseInt(requiredCases, 10),
-        requiredProcedures: parseInt(requiredProcedures, 10),
-        requiredAcademic: parseInt(requiredAcademic, 10)
       }).returning();
       res.json(inserted);
       return;
@@ -497,6 +490,7 @@ router.post("/department/procedures", validate(z.object({ name: nameSchema, grou
       group,
       required: req.body.required,
     }).returning();
+    await recomputeProcedureRequirement(departmentId);
     res.json(inserted);
   } catch (error) {
     req.log.error({ departmentId: req.user!.departmentId, status: 500 }, "Error adding procedure");
@@ -584,6 +578,9 @@ router.post("/department/catalog", validate(z.object({ kind: z.enum(["posting", 
   const [dept] = await db.select({ configSourceDepartmentId: departmentsTable.configSourceDepartmentId }).from(departmentsTable).where(eq(departmentsTable.id, req.user!.departmentId!));
   if (dept?.configSourceDepartmentId !== null) { res.status(403).json({ message: "Test departments cannot modify mirrored settings" }); return; }
   const [row] = await db.insert(departmentCatalogTable).values({ ...req.body, departmentId: req.user!.departmentId! }).returning();
+  if (req.body.kind === "case_category" || req.body.kind === "academic") {
+    await recomputeCatalogRequirements(req.user!.departmentId!);
+  }
   res.status(201).json(row);
 });
 
@@ -593,6 +590,7 @@ router.patch("/department/procedures/:id", validate(z.object({ required: targetS
   const [row] = await db.update(procedureTypesTable).set({ required: req.body.required })
     .where(and(eq(procedureTypesTable.id, Number(req.params.id)), eq(procedureTypesTable.departmentId, req.user!.departmentId!))).returning();
   if (!row) { res.status(404).json({ message: "Procedure not found" }); return; }
+  await recomputeProcedureRequirement(req.user!.departmentId!);
   res.json(row);
 });
 
@@ -602,6 +600,9 @@ router.patch("/department/catalog/:id", validate(z.object({ required: targetSche
   const [row] = await db.update(departmentCatalogTable).set(req.body)
     .where(and(eq(departmentCatalogTable.id, Number(req.params.id)), eq(departmentCatalogTable.departmentId, req.user!.departmentId!))).returning();
   if (!row) { res.status(404).json({ message: "Training option not found" }); return; }
+  if (row.kind === "case_category" || row.kind === "academic") {
+    await recomputeCatalogRequirements(req.user!.departmentId!);
+  }
   res.json(row);
 });
 
@@ -836,6 +837,10 @@ router.delete("/department/catalog/:id", async (req, res) => {
       res.status(403).json({ message: "Catalog entry not found in your department" });
       return;
     }
+
+    if (deleted.kind === "case_category" || deleted.kind === "academic") {
+      await recomputeCatalogRequirements(departmentId!);
+    }
     
     res.json({ message: "Catalog entry deleted successfully" });
   } catch (error) {
@@ -889,6 +894,8 @@ router.delete("/department/procedures/:id", async (req, res) => {
       res.status(403).json({ message: "Procedure type not found in your department" });
       return;
     }
+
+    await recomputeProcedureRequirement(departmentId!);
     
     res.json({ message: "Procedure type deleted successfully" });
   } catch (error) {

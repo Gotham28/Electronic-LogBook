@@ -11,7 +11,6 @@ export const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((s) => 
 }, "Invalid date");
 export const targetSchema = z.coerce.number().int().min(0).max(100000);
 export const configSchema = z.object({
-  requiredCases: targetSchema, requiredProcedures: targetSchema, requiredAcademic: targetSchema,
   programDurationMonths: z.coerce.number().int().min(1).max(240).nullable(),
   casualLeaveAllowance: targetSchema.nullable(), academicLeaveAllowance: targetSchema.nullable(),
 }).strict();

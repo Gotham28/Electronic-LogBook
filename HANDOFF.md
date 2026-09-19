@@ -1,94 +1,134 @@
-# HANDOFF — Dispatch 43
-**Task:** Fix HODPortal.tsx "Awaiting approval" summary card fallback-to-zero bug  
-**Date:** 2026-09-18  
-**Commit worked from:** _not run — sandbox constraint; no shell commands executed_
+# HANDOFF.md — Dispatch 48
+
+Supersedes dispatch 47's HANDOFF.md.
+
+## Files modified
+
+- `artifacts/api-server/src/lib/department-requirements.ts`
+- `artifacts/api-server/tests/access.test.ts`
 
 ---
 
-## What changed
+## Build item 1 — atomic upsert in `department-requirements.ts`
 
-### `artifacts/mockup-sandbox/src/components/HODPortal.tsx`
+Both `recomputeProcedureRequirement` and `recomputeCatalogRequirements` previously
+performed a SELECT to check for an existing `department_configs` row, then branched to
+a separate INSERT or UPDATE. Two near-simultaneous calls for a new department could both
+see "no row" and both attempt INSERT, causing an unhandled unique-constraint violation on
+`department_configs.departmentId`.
 
-Two contiguous edits, both in the same file:
+Both functions now use a single atomic Drizzle upsert (`.onConflictDoUpdate`), matching
+the convention established in `department-provisioning.ts:30-31`. The two SUM queries are
+unchanged. Only the write mechanism changed.
 
-**1. Call site — line 456**
+### Diff — `artifacts/api-server/src/lib/department-requirements.ts`
 
 ```diff
-- <SummaryCard label="Awaiting approval" value={pendingStudents.length} />
-+ <SummaryCard label="Awaiting approval" value={pendingStudents.length} error={studentsError} />
+@@ -17,25 +17,8 @@
+ 
+   const requiredProcedures = Number(row?.total ?? 0);
+ 
+-  const existing = await db
+-    .select({ id: departmentConfigsTable.id })
+-    .from(departmentConfigsTable)
+-    .where(eq(departmentConfigsTable.departmentId, departmentId))
+-    .limit(1);
+-
+-  if (existing.length > 0) {
+-    await db
+-      .update(departmentConfigsTable)
+-      .set({ requiredProcedures })
+-      .where(eq(departmentConfigsTable.departmentId, departmentId));
+-  } else {
+-    await db.insert(departmentConfigsTable).values({
+-      departmentId,
+-      requiredProcedures,
+-      // requiredCases / requiredAcademic left at schema default (0)
+-      // programDurationMonths / casualLeaveAllowance / academicLeaveAllowance left null
+-    });
+-  }
++  await db.insert(departmentConfigsTable).values({ departmentId, requiredProcedures })
++    .onConflictDoUpdate({ target: departmentConfigsTable.departmentId, set: { requiredProcedures } });
+ }
+ 
+ /**
+@@ -58,25 +41,7 @@
+   const requiredCases = Number(casesRow?.total ?? 0);
+   const requiredAcademic = Number(academicRow?.total ?? 0);
+ 
+-  const existing = await db
+-    .select({ id: departmentConfigsTable.id })
+-    .from(departmentConfigsTable)
+-    .where(eq(departmentConfigsTable.departmentId, departmentId))
+-    .limit(1);
+-
+-  if (existing.length > 0) {
+-    await db
+-      .update(departmentConfigsTable)
+-      .set({ requiredCases, requiredAcademic })
+-      .where(eq(departmentConfigsTable.departmentId, departmentId));
+-  } else {
+-    await db.insert(departmentConfigsTable).values({
+-      departmentId,
+-      requiredCases,
+-      requiredAcademic,
+-      // requiredProcedures left at schema default (0)
+-      // programDurationMonths / casualLeaveAllowance / academicLeaveAllowance left null
+-    });
+-  }
++  await db.insert(departmentConfigsTable).values({ departmentId, requiredCases, requiredAcademic })
++    .onConflictDoUpdate({ target: departmentConfigsTable.departmentId, set: { requiredCases, requiredAcademic } });
+ }
 ```
 
-Why: `pendingStudents` stays `[]` when the fetch throws, so `pendingStudents.length` silently
-rendered `0` — indistinguishable from a real empty queue. Passing `studentsError` (already set
-to `"Could not load pending students"` at line 156 when the fetch fails) lets the component
-surface the error instead.
+---
 
-**2. `SummaryCard` component — lines 762–764**
+## Build item 2 — real test coverage in `access.test.ts`
+
+Inserted a block of 6 lines into the test
+`"HOD requirements and training catalog are database-backed and reject cross-department updates"`,
+immediately after the existing `assert.equal(option.status, 201)` line (the `academic`/`period: "month"` entry)
+and before the cross-department PATCH assertion.
+
+### Value derivation
+
+| Assertion | Value | Derivation |
+|---|---|---|
+| `requiredCases` after one `case_category`/`total` row at `required: 5` | **5** | `departmentIds[2]` starts with zero `case_category` catalog rows → SUM = 5 |
+| `requiredAcademic` after one more `academic`/`total` row at `required: 7` | **12** | Existing seed row "Test discussion 2" at `required: 5` + new row at `required: 7` = 12. The `period: "month"` "Custom seminar" added earlier in this test is excluded from the sum. |
+
+### Diff — `artifacts/api-server/tests/access.test.ts`
 
 ```diff
-- function SummaryCard({ label, value }: { label: string; value: string | number }) {
--   return <Card ...><CardContent ...><p ...>{label}</p><p ...>{value}</p></CardContent></Card>;
-- }
-+ function SummaryCard({ label, value, error }: { label: string; value: string | number; error?: string | null }) {
-+   return <Card ...><CardContent ...><p ...>{label}</p>{error ? <p className="mt-2 text-sm font-medium text-red-500">{error}</p> : <p ...>{value}</p>}</CardContent></Card>;
-+ }
+@@ -212,6 +212,12 @@
+   assert.equal((await call("/departments/" + departmentIds[2] + "/catalog", "student2")).body.config.requiredCases, 9);
+   const option = await call("/admin/department/catalog", "hod2", "POST", { kind: "academic", name: "Custom seminar", value: "custom-seminar", required: 2, period: "month" });
+   assert.equal(option.status, 201);
++  const caseCategory = await call("/admin/department/catalog", "hod2", "POST", { kind: "case_category", name: "Custom case type", value: "custom-case-type", required: 5, period: "total" });
++  assert.equal(caseCategory.status, 201);
++  assert.equal((await call("/departments/" + departmentIds[2] + "/catalog", "student2")).body.config.requiredCases, 5);
++  const academicTotal = await call("/admin/department/catalog", "hod2", "POST", { kind: "academic", name: "Custom total seminar", value: "custom-total-seminar", required: 7, period: "total" });
++  assert.equal(academicTotal.status, 201);
++  assert.equal((await call("/departments/" + departmentIds[2] + "/catalog", "student2")).body.config.requiredAcademic, 12);
+   assert.equal((await call("/admin/department/catalog/" + option.body.id, "hod0", "PATCH", { required: 200, period: "total" })).status, 404);
+ });
 ```
-
-Why: The `error` prop is optional (`string | null | undefined`), so all other `SummaryCard`
-call sites (`label="Approved students"`, `label="Average progress"`, `label="Faculty"`) are
-unaffected — they do not pass `error`, so the prop resolves to `undefined` / falsy and the
-normal `{value}` branch renders unchanged.
-
-**Visual treatment:** When `studentsError` is set, the card shows the error message in
-`text-sm font-medium text-red-500`, matching exactly the className used for `studentsError`
-at lines 649–651 and for `leavesError` at lines 727–728.  No new visual language was
-invented.
-
-**Error copy reused:** `"Could not load pending students"` — taken from `setStudentsError`
-at line 156, already present in the file. No new wording invented.
-
----
-
-## Nothing skipped
-
-The full Build list was completed. No items were deferred.
-
----
-
-## Nothing expanded beyond scope
-
-- The `SummaryCard` signature change is load-bearing for the fix and is the minimum required
-  change to the component. No refactor of the other three `SummaryCard` usages was done.
-- No changes to `artifacts/api-server`, no authorization logic, no schema, no other
-  fetch/card, no shell commands.
-
----
-
-## Other observations (not acted on — §9)
-
-- The three other `SummaryCard` calls in the roster grid (`Approved students`, `Average
-  progress`, `Faculty`) also derive from `roster`, which has its own `rosterError` guard at
-  the tab level. Those cards are not reachable when `rosterError` is set (the tab renders the
-  error + retry button instead), so they do not carry the same silent-zero risk. No change
-  made; noted for completeness.
 
 ---
 
 ## Commands run
 
-None. The sandbox constraint required all work to be done with file-reading and file-editing
-tools only. No `git status`, typecheck, lint, or any other shell command was executed.
+None. No shell commands, no typecheck, no test run, no git commands.
 
----
+## Not touched
 
-## Files modified
+- `admin.ts` call sites — untouched, already correct.
+- `validation.ts` — untouched.
+- `DepartmentSettings.tsx` — untouched.
+- `tests/support.ts` — untouched.
+- No schema changes, migrations, or backfills.
+- No secrets or credentials.
 
-| File | Change |
-|---|---|
-| `artifacts/mockup-sandbox/src/components/HODPortal.tsx` | Line 456: added `error={studentsError}` prop. Lines 762–764: added `error?: string \| null` prop to `SummaryCard`; renders error text instead of value when set. |
+## Noticed but not changed
 
-## Files created
-
-| File | Change |
-|---|---|
-| `HANDOFF.md` | This file. |
+Nothing outside scope was observed that requires flagging.
