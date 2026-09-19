@@ -139,7 +139,6 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
     setLoading(true);
     setError(null);
     setAnalyticsError(null);
-    setStudentsError(null);
     setLeavesError(null);
     try {
       const user = getCurrentUser();
@@ -151,6 +150,7 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
       try {
         const students = await apiGet<Registration[]>("/api/admin/students/pending");
         setPendingStudents(students);
+        setStudentsError(null);
       } catch (err) {
         console.warn("Could not fetch pending students", err);
         setStudentsError("Could not load pending students");
