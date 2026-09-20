@@ -206,7 +206,7 @@ test("thesis and certificates persist without fabricated defaults and enforce de
 });
 
 test("HOD requirements and training catalog are database-backed and reject cross-department updates", async () => {
-  const configuration = { programDurationMonths: 31, casualLeaveAllowance: 12, academicLeaveAllowance: null };
+  const configuration = { enabledFeatures: { customToggle: true } };
   assert.equal((await call("/admin/department/config", "hod2", "POST", configuration)).status, 200);
   assert.equal((await call("/admin/department/config", "hod2", "POST", { ...configuration, departmentId: departmentIds[0] })).status, 400);
   assert.equal((await call("/admin/department/config", "faculty2", "POST", configuration)).status, 403);
