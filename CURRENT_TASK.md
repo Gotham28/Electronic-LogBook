@@ -1,313 +1,390 @@
 # Current Task
 
 ## Feature
-Add `GET /api/students/:studentId/progress`, an endpoint returning per-item log
-counts (case category, procedure, academic activity type) split by
-verified/pending status, for the faculty progress-breakdown feature. This is
-Task 1 of 2 (backend); Task 2 (the frontend Progress tab) is scoped and
-dispatched separately once this is reviewed and accepted.
+Add a "Progress" tab to the faculty Logbook Inspector dialog, showing
+interactive per-item bar charts (verified vs. pending vs. remaining, against
+the department's own Training Catalog targets) for a student's case
+categories, procedures, and academic activities, with click-through to the
+existing entry tables. This is Task 2 of 2 (frontend); Task 1 (the backend
+endpoint) is merged/on `main` as of this task — see
+[PR #51](https://github.com/Gotham28/Electronic-LogBook/pull/51).
 
 ## Plan reference
 No MASTER_PLAN.md exists for this project (AGENTS.md §14.7). Unplanned: direct
-developer request to give faculty an interactive, per-type progress view of
-student logs (currently they see one flat overall-completion percentage and
-undifferentiated log tables). Full design plan on file at
+developer request (same request as Task 1). Full design plan on file at
 `C:\Users\aravi\.claude\plans\right-now-the-facult-staged-papert.md`, approved
 by the developer. STATUS.md does not exist in this repo.
 
 ## MASTER_PLAN.md update
 - [ ] None — this project has no MASTER_PLAN.md; nothing to append.
 
-## Context for the agent
-`main` moved since this plan was drafted (dermatology feature, commit
-`a452bed`, already merged). Two things from that merge are relevant here and
-must NOT be treated as things to fix or touch:
-- A new `conferences` log family now exists (`conferencesTable`). It carries
-  no `required`/target field anywhere, so it does not fit a progress-bar
-  model. **Do not add a conferences section to this endpoint.** It is
-  explicitly out of scope.
-- `department_configs.requiredCases/requiredProcedures/requiredAcademic` are
-  now nullable, and `completionPercent()` in `validation.ts` now returns
-  `null` (not `0`) when no target is configured — "not tracked" is a real,
-  already-established state elsewhere in this app. This endpoint does not
-  return targets or percentages at all (see Response shape below), so it is
-  not directly affected, but do not introduce a different zero-vs-null
-  convention than the one already established.
-
-## Files/areas in scope
-- `artifacts/api-server/src/routes/student.ts` — add one new route,
-  `router.get("/:studentId/progress", requireAuth, async (req, res) => {...})`,
-  inserted immediately after the closing `});` of the existing
-  `router.get("/:studentId/logs", ...)` handler (currently ends around line
-  225, directly before the `// Postings` comment and
-  `router.get("/:studentId/postings", ...)`). Do not reorder any other route.
-
-## What to build
-
-The route sits below `router.use("/:studentId", studentAccess)` (already
-mounted earlier in this file), so `studentAccess` has already run and
-guarantees: the caller is authenticated, the target student exists, is
-`approved`, and is in the caller's own department (a professor or HOD caller),
-or is the student themselves. A nonexistent student ID and a student in a
-different department both already produce an identical
-`403 {"message":"Student is outside your access scope"}` from `studentAccess`
-before this handler ever runs — this is deliberate enumeration-collapse,
-matching `tests/enumeration-collapse.test.ts`. Do not weaken or duplicate that
-check in a way that could produce a different status code or a different
-message for those two cases.
-
-Despite that, mirror the existing `/:studentId/logs` handler immediately above
-(read it in full before writing anything) for its defense-in-depth style: it
-independently re-resolves the student row and re-checks
-`caller.departmentId !== student.departmentId` even though `studentAccess`
-already covers it. Do the same in this new route — parse `studentId`, look up
-the student and its `departmentId` the same way `/:studentId/logs` does, and
-re-check before running the three queries below. This project's ownership
-rule (`AGENTS.md` §3) treats a missing re-check as a defect, not redundant
-code.
-
-Then run three separate `GROUP BY` queries against `case_logs`,
-`procedure_logs`, and `academic_logs` — **all three filtered only by
-`studentId`, with no `supervisorId` filter**. This is a deliberate departure
-from `/:studentId/logs`'s filtering (which restricts a professor caller to
-`supervisorId = caller.id`); add a comment next to this new route explaining
-why, referencing the existing comment at `/:studentId/logs` ("Faculty
-inspection is assignment-scoped. HODs retain department-wide oversight.") —
-this new route's counts are deliberately NOT assignment-scoped, because they
-represent the student's total training progress, not what one supervisor
-personally reviewed.
-
-Query 1 — case logs, grouped by `category` and `status`:
-```
-WHERE studentId = ? AND deletedAt IS NULL
-GROUP BY category, status
-```
-A `NULL` `category` (rows predating migration 0005) is a real, valid group —
-do not filter it out and do not coerce it to a string. Return it as `null`.
-
-Query 2 — procedure logs, grouped by `procedureGroup`, `procedureName`,
-`competencyLevel`, and `status`:
-```
-WHERE studentId = ? AND deletedAt IS NULL
-GROUP BY procedureGroup, procedureName, competencyLevel, status
-```
-
-Query 3 — academic logs, grouped by `activityType` and `status`:
-```
-WHERE studentId = ?
-GROUP BY activityType, status
-```
-`academic_logs` has no `deletedAt` column — do not add a `deletedAt` filter to
-this query, and do not add a `deletedAt` column to the schema.
-
-Shape the three query results into this exact response JSON (reshape
-verified/pending into fields in code — the raw per-status rows are not the
-response shape):
+## What Task 1 actually shipped (read this before anything else)
+`GET /api/students/:studentId/progress` (added in
+`artifacts/api-server/src/routes/student.ts`, PR #51) returns exactly:
 
 ```json
 {
-  "caseCategories": [
-    { "value": "string or null", "verified": 0, "pending": 0 }
-  ],
+  "caseCategories": [{ "value": "string or null", "verified": 0, "pending": 0 }],
   "procedures": [
     {
-      "group": "string",
-      "name": "string",
-      "verified": 0,
-      "pending": 0,
-      "byCompetency": [
-        { "level": "string", "verified": 0, "pending": 0 }
-      ]
+      "group": "string", "name": "string", "verified": 0, "pending": 0,
+      "byCompetency": [{ "level": "string", "verified": 0, "pending": 0 }]
     }
   ],
-  "academics": [
-    { "value": "string", "verified": 0, "pending": 0 }
-  ]
+  "academics": [{ "value": "string", "verified": 0, "pending": 0 }]
 }
 ```
 
-`verified` counts rows with `status = "verified"`. `pending` counts rows with
-`status = "pending"`. Rows with `status = "rejected"` are counted in neither
-and do not appear anywhere in the response — they are not verified, not
-pending, and not part of "remaining" either. For `procedures`, `verified` and
-`pending` are the totals across all competency levels for that
-group+name; `byCompetency` is the same counts broken down by
-`competencyLevel` for that same group+name.
+No targets, no percentages — counts only. `value: null` in `caseCategories`
+means logs predating a migration that added the category column; render it as
+"Uncategorised". This is the exact, final response shape — do not assume a
+different one.
 
-Return **counts only**. No diagnosis, no patient identifier, no free-text
-field of any kind, from any of the three tables (`AGENTS.md` §8).
+## Files/areas in scope
+- `artifacts/mockup-sandbox/src/components/ProfessorPortal.tsx` — the Logbook
+  Inspector `<Dialog>` (currently lines 611-748: `<Dialog
+  open={!!selectedMentee}...>` through its closing `</DialogContent>`).
 
-Do not add `required`/target numbers to this response. The frontend already
-holds per-item targets via a separate endpoint
-(`GET /api/departments/:departmentId/catalog`) and joins them client-side;
-that join is Task 2's job, not this one.
+## What to build
+
+### 1. Fetch the new endpoint
+The existing effect that loads `menteeLogs` (around lines 142-160,
+`fetchLogs` calling `apiGet(/api/students/${selectedMentee.id}/logs)`) already
+runs whenever `selectedMentee` changes and sets `menteeLogsLoading`. Extend
+this same effect (do not add a second effect or a second loading flag) to also
+`apiGet(/api/students/${selectedMentee.id}/progress)` in parallel
+(`Promise.all`), storing the result in a new `menteeProgress` state variable
+declared next to `menteeLogs` (line 78). On fetch failure, the existing
+`catch` already shows `toast.error("Failed to load student logs")` — extend
+that message or add a second toast so a progress-fetch failure is not silent,
+and make sure the Progress tab shows a visible error state (see Error and
+empty states below), never a chart of zeros.
+
+### 2. Join counts to targets client-side
+`useDepartment()` (already imported, line 59) exposes `caseCategories[]`,
+`procedures[]`, `academics[]`, each `{ id, name, value, required, period }`
+(see `artifacts/mockup-sandbox/src/lib/department-context.tsx`). Join by
+`value` for case categories and academics, and by `group`+`name` for
+procedures. This is the same join
+`artifacts/mockup-sandbox/src/components/pages/CaseLogsPage.tsx` already does
+for the student-facing "Progress by category" section (around lines 270-305)
+— read that block as the reference pattern for the join and the
+already-established zero-target handling, colors, and "Show all N" toggle,
+including its exact classes (`rounded-xl border`, `bg-emerald-50/60` when
+done, `bg-teal-500`/`bg-emerald-500` bar fill, `text-slate-500` "Show all"
+button).
+
+A catalog item with `required === 0` is the codebase's existing convention
+for "not tracked" — do not render a bar for it, matching
+`completionPercent()` in `artifacts/api-server/src/lib/validation.ts`
+(`values.filter(v => v[1] > 0)`) and the "Not configured"/"Not tracked" text
+already used elsewhere in this same file (lines 464-471, 626-634) for the
+overall-completion block. Do not invent a different zero-vs-not-tracked
+convention.
+
+`period: "month"` catalog rows are excluded from the department's rolled-up
+totals server-side and no month-based logic exists anywhere in this app.
+Render those rows' `required` targets as-is (a flat total, same as every
+other item) — do not add pro-rating.
+
+An item present in the progress response's `caseCategories`/`academics` but
+absent from `useDepartment()`'s catalog (a logged category that was later
+deleted from the Training Catalog) still has real verified/pending counts
+that must not be dropped — render it as its own bar with no target line and a
+"Not in current catalog" label, rather than hiding it. This is the same
+principle as the endpoint's own `null`-category handling: real counts are
+never discarded.
+
+### 3. The charts
+`recharts@^2.15.4` is installed. The shadcn wrapper
+`artifacts/mockup-sandbox/src/components/ui/chart.tsx` exports exactly
+`ChartContainer`, `ChartTooltip`, `ChartTooltipContent`, `ChartLegend`,
+`ChartLegendContent`, `ChartStyle`, and the `ChartConfig` type — use these,
+do not add a new charting dependency and do not hand-roll SVG bars.
+
+Add "Progress" as the first `<TabsTrigger>` in the existing `<Tabs
+defaultValue="case-logs">` (line 636), before "Clinical Case Logs", and change
+`defaultValue` to `"progress"`. Widen `<DialogContent>` from
+`sm:max-w-[700px]` (line 612) to roughly `sm:max-w-[900px]`; keep `max-h-[85vh]
+overflow-y-auto`.
+
+Three sections inside the new tab, one per log family (case categories,
+procedures, academics):
+- A horizontal bar chart (`<BarChart layout="vertical">`) — category and
+  procedure names are long; horizontal bars stay readable and scale to many
+  rows.
+- Each bar is stacked: verified (solid) + pending (a lighter segment of the
+  same hue) on a neutral track running to the target. The gap is remaining.
+- A fully verified item (verified ≥ required) flips to emerald, matching
+  `CaseLogsPage.tsx`'s existing convention.
+- `ChartTooltipContent` shows verified / pending / remaining / target. For a
+  procedure bar, also list the `byCompetency` split from the response.
+- Procedures are grouped under their `group` heading.
+- Lists longer than 8 collapse behind a "Show all N" toggle, matching
+  `CaseLogsPage.tsx`'s exact pattern (lines 302-309).
+- Above the three sections, three summary tiles (cases / procedures /
+  academic), using the existing `.metric-value` / `.metric-label` utility
+  classes from `artifacts/mockup-sandbox/src/index.css` (around lines
+  241-248) — do not invent new utility classes.
+
+Use the existing teal/emerald palette and `.layer-1`/`.layer-2`/`.layer-3`
+elevation utilities already in `index.css`. No new colors. Confirm the chart
+renders correctly in both light and dark — `ChartStyle` themes through CSS
+variables already.
+
+### 4. Click-through
+Clicking a bar switches the dialog's active tab to the matching log tab
+("Clinical Case Logs" / "Procedure Logs" / "Academic Activity") and filters
+that tab's existing table to the clicked category/procedure/activity. Add a
+visible "Filtered by X — clear" control above the filtered table.
+
+**State the count mismatch, do not hide it.** For a `professor` caller, the
+new `/progress` endpoint's counts are department-wide (see the comment in
+`student.ts` above the route), but `menteeLogs` (from the existing `/logs`
+endpoint) is still supervisor-scoped for a professor caller — a real,
+intentional difference between the two endpoints. When the filtered table
+shows fewer rows than the bar's count, render a line such as "Showing 3
+entries you supervised, of 12 logged." For an `hod` caller the two always
+match (neither endpoint scopes by supervisor for an HOD), so this line must
+not appear for an HOD.
+
+### 5. Error and empty states
+- `/progress` fetch failure → a visible error state with a retry action,
+  never a chart of zeros or an empty-looking chart with no explanation. This
+  is the specific regression `AGENTS.md` §7 calls out by name for
+  `HODPortal.tsx` — do not repeat it here.
+- Student with no logs at all → use the `Empty` component
+  (`@/components/ui/empty`, already used in
+  `artifacts/mockup-sandbox/src/components/pages/AssessmentsPage.tsx`), not
+  an empty chart frame.
+- Department with no Training Catalog items configured for a family (e.g. no
+  case categories at all) → say so in that section, do not render zero-target
+  bars.
 
 ## Explicitly out of scope
-- Any conferences data (see Context above).
-- Any target/requirement number in the response.
-- Any change to `/:studentId/logs`, `/:studentId/dashboard`, or any other
-  existing route — read them for pattern only, do not modify them.
-- Any change to `professor.ts`, `admin.ts`, `department.ts`, or any file
-  outside `student.ts`.
-- Any schema or migration change. The three log tables' columns already
-  support this query as they exist today.
+- Any conferences data. `conferenceLogs` exists on the `/logs` response and
+  `conferencesTable` exists in the schema, but it carries no `required`
+  target anywhere and does not belong in a progress-bar view. Do not add a
+  conferences section or tab.
+- Any change to the "Evaluation Queue" or "Assessments" tabs, or to the
+  mentee roster table (lines ~419-479) outside the dialog.
+- Any backend change. `/:studentId/progress` and `/:studentId/logs` are
+  final as shipped; read-only reference.
+- Any change to `HODPortal.tsx`'s own summary cards or roster ring — this
+  task only touches the shared `ProfessorPortal.tsx` component, which
+  `HODPortal.tsx` already embeds three times via the existing `embedded`
+  prop. The Progress tab will appear in the HOD view automatically through
+  that embedding; no separate HOD-specific work is in scope.
 
 ## Do NOT touch
-- Any file other than `artifacts/api-server/src/routes/student.ts`.
-- `studentAccess` (`artifacts/api-server/src/middlewares/student-access.ts`)
-  and `requireAuth`/`requireRole`/`requireDepartment`
-  (`artifacts/api-server/src/middlewares/auth.ts`) — do not modify, only rely
-  on what is already mounted.
-- The existing `/:studentId/logs`, `/:studentId/dashboard`, and every other
-  route in this file — read-only reference, no edits.
-- Any test file. No test file is in scope for this dispatch.
+- `artifacts/api-server/**` — no backend changes at all in this task.
+- `HODPortal.tsx`, `Dashboard.tsx`, `CaseLogsPage.tsx`,
+  `ProcedureLogsPage.tsx`, `AcademicLogsPage.tsx` — read-only reference for
+  patterns, no edits. (`CaseLogsPage.tsx`'s "Progress by category" block is
+  the pattern to follow, not a file to modify.)
+- Any file under `artifacts/mockup-sandbox/src/components/ui/` — use the
+  existing primitives, do not modify them.
+- Any dependency in `package.json` — `recharts` is already installed; add no
+  new package.
 
 ## Execution route
 - B — Claude Code loop
-- Why: this route touches the clinical log tables and the ownership boundary
-  (`AGENTS.md` §3, §4) even though it deliberately departs from the
-  assignment-scoping precedent right above it — that departure needs a
-  reviewed diff, not just a diff + exit code.
+- Why: this is a significant UI addition (new tab, charts, click-through
+  filtering, a cross-endpoint count-mismatch disclosure) with real judgment
+  calls (zero-target handling, error/empty states, HOD-vs-professor
+  behavior) — not mechanical enough for route C.
 
 ## Manual (developer does)
 - [ ] Approve this CURRENT_TASK.md before dispatch.
 - [ ] Review the diff.
-- [ ] Run `pnpm test` in `artifacts/api-server` after the diff is accepted,
-      and separately exercise the four cases below by hand (curl or
-      equivalent), pasting the request and full response for each. Claude
-      Code does not run these — `AGENTS.md` §6 forbids any command that
-      connects to a database, with no exception for read-only test runs, and
-      `.env`'s `DATABASE_URL` could not be confirmed as a non-production host
-      from this session.
-- [ ] Merge into PR, when a new PR is opened for this branch, when ready —
-      never automated.
+- [ ] Visually verify the Progress tab (screenshots requested below) before
+      merge — this task's own frontend typecheck cannot confirm the charts
+      render correctly or that the color/spacing conventions were followed.
+- [ ] Merge PR #51 (this lands as a second commit on it) when ready — never
+      automated.
 
 ## Agent (does on its own, once scope is confirmed)
-- [ ] Add the one new route exactly as specified above.
-- [ ] Report the exact diff, and confirm no other route or file was touched.
+- [ ] Build the Progress tab exactly as specified above.
+- [ ] Report the exact diff, and confirm no file outside
+      `ProfessorPortal.tsx` was touched.
 
 ## Blocked on developer input
-- None. The test-verification handoff above is resolved (developer runs it,
-  per this session's decision) — not an open question.
+- None.
 
 ## Order
 ### Steps inside this task
-1. Add the new route to `student.ts`.
+1. Add the Progress tab, charts, join logic, click-through, and error/empty
+   states to `ProfessorPortal.tsx`.
 2. Report diff; hand off for review.
 
 ### Where this task sits
-- Before this: PR #49 (Department requirements card), merged into this
-  session's other work; unrelated to this feature.
-- After this: Task 2 — the frontend Progress tab in `ProfessorPortal.tsx` —
-  scoped and dispatched separately once this is reviewed and accepted, per
-  `AGENTS.md` §9 (one feature per task).
-- This is new work, on a **new branch cut from an updated `main`** (not
-  continuing on `feature/computed-department-requirements`).
+- Before this: Task 1 (backend endpoint), PR #51, reviewed and pushed to
+  `feature/faculty-progress-breakdown`.
+- This task's commit lands on the same branch/PR, as a second commit —
+  matching how PR #49 was built (an earlier commit, then a reviewed follow-up
+  commit on the same open PR).
+- After this: nothing queued.
 
 ## Verification required before this is considered done
-- [ ] Backend typecheck / build — no new errors.
-- [ ] The four §11 cases below, run by the developer (see Manual), pasted with
-      request and full response for each:
-
-| Case | Expected |
-|---|---|
-| Unauthenticated request | `401` |
-| Professor, student in another department | `403` — same message `studentAccess` already returns for this case |
-| Professor, student in own department | `200` + the JSON shape above |
-| Authenticated, nonexistent `studentId` | `403` — same collapsed message as "wrong department", per `studentAccess`; matches `tests/enumeration-collapse.test.ts` |
-
-- [ ] Diff read and confirmed: exactly one route added, in
-      `artifacts/api-server/src/routes/student.ts`, no other file touched, no
-      `supervisorId` filter present in any of the three queries, no
-      `conferences` reference, no target/`required` field in the response.
+- [ ] Frontend typecheck (`pnpm --filter @workspace/mockup-sandbox run
+      typecheck` — i.e. `tsc -p tsconfig.json --noEmit` in
+      `artifacts/mockup-sandbox`) — no new errors.
+- [ ] Diff read and confirmed: only `ProfessorPortal.tsx` touched; the
+      Progress tab, join logic, click-through, and error/empty states all
+      present as specified; no conferences reference added; no new
+      dependency added.
+- [ ] Screenshots captured (via the preview browser, once this session
+      resumes after dispatch) of: the Progress tab as a professor, as an
+      HOD (through `HODPortal.tsx`'s embedding), a click-through filtered
+      list showing the count-mismatch line, the error state, and the empty
+      state.
 
 ## Flags (AGENTS.md rule triggers)
-- §3 Ownership before data — this route deliberately returns counts spanning
-  all of a student's logs to a professor caller, not just their own
-  supervised logs (a documented, reviewed departure from `/:studentId/logs`'s
-  precedent, not an accidental widening). No patient text or identifiers are
-  returned, so the exposure is bounded to counts.
-- §4 The two ID systems — `:studentId` is `studentsTable.id`; `req.user.id` is
-  `usersTable.id`. The route does not compare them; ownership is resolved
-  through `studentAccess` and the student row lookup, matching
-  `/:studentId/logs`'s own pattern.
-- §9 One feature per task — confirmed; the frontend Progress tab is Task 2,
-  dispatched separately after this is accepted.
-- No §6/§7/§8/§10/§13 trigger — no schema change, no fabricated data (a `NULL`
-  category is passed through as `null`, never invented or dropped), no
-  patient text near a log, no secrets.
+- §9 One feature per task — confirmed; this is purely the frontend half of
+  the feature Task 1 already scoped separately.
+- §7 No fabricated data — explicitly instructed: no invented zero-target
+  bars, no silently dropped uncatalogued items, no pro-rated month targets,
+  visible error states only.
+- No §3/§4/§6/§8/§10/§13 trigger — this task reads two existing endpoints and
+  renders their data; it does not add or change any backend route, query, or
+  ownership check. The count-mismatch disclosure (§4) is a UI honesty
+  requirement, not a new authorization decision.
 
 ## Suggested review tier (set at scoping time)
-- **Opus, high effort.** §15.2 fires: ownership resolution on the clinical
-  tables (§3) and a route taking `:studentId` alongside `req.user.id` (§4).
-  This tier is set now and cannot be lowered (§15.4), even if the returned
-  diff turns out small.
+- **Sonnet, medium effort.** UI-only, no route or query change, no §15.2
+  Opus trigger. Ordinary feature work at Sonnet tier per §15.3.
 
 ## Suggested Antigravity model
-- Claude Opus 4.6 (Thinking).
+- Claude Sonnet 4.6 (Thinking).
 
 ---
 
-## Review findings to fix (dispatch 52)
+## Review findings to fix (dispatch 54)
 
-The first dispatch (51) returned a correct, well-scoped diff — additive only,
-no supervisorId filter, no conferences reference, no target field, matches the
-spec above. `code-review` (Opus, 8 finder angles, verified) found one real bug
-that must be fixed before this is accepted. Two other findings were reviewed
-and are **not** being fixed — see below.
+`code-review` (Sonnet, medium effort, 8 finder angles, verified) found four
+correctness bugs and one confirmed spec deviation. All five must be fixed
+before this is accepted. Two lower-severity cleanup findings (duplicated
+join logic, unmemoized O(n×m) joins) are **not** being fixed in this
+dispatch — see "Reviewed, not being fixed" below.
 
-### Must fix
+### Must fix — correctness bugs
 
-**`case_logs.status` has no `NOT NULL` constraint at the DB level** (unlike
-`procedure_logs.status` and `academic_logs.status`, which both do —
-`lib/db/migrations/0001_baseline.sql:85` vs. lines 13 and 129;
-`lib/db/src/schema/logs.ts:26` lacks `.notNull()` unlike lines 50 and 71). The
-new route's reshape loop for case categories
-(`artifacts/api-server/src/routes/student.ts`, around line 313-322) only
-increments `verified` on `row.status === "verified"` and `pending` on
-`row.status === "pending"`. A row with `status = NULL` still creates a
-category entry (via the `Map.set` that runs regardless of status) but
-contributes to neither count — it is silently dropped, understating that
-category's real progress with no visible signal.
+**1. `required === 0` catalog items silently drop a student's real logged
+progress.** In all three join blocks (`caseBarItems` ~line 1077,
+`procBarItems` ~line 1125, `acadBarItems` ~line 1178), an item with
+`required === 0` is skipped by the catalog-ordered loop (correct — it's
+"not tracked"), but the "uncatalogued items" fallback loop right after it
+checks `alreadyIncluded`/`deptProcMap.has(...)` against the **full** catalog
+array, not the `required > 0` subset. A progress item whose catalog entry
+has `required === 0` therefore registers as "already included" and is
+**never added by either loop** — its real verified/pending counts vanish
+from the bars entirely, even though the three summary tiles above (built
+straight from the raw `/progress` response) still count them, so the tiles
+and the bar list visibly disagree.
 
-**Fix:** treat a `NULL` `status` the same as `"pending"` for counting
-purposes — `NULL` sits at the same semantic position as the column's own
-`DEFAULT 'pending'` (a row that has not been given a definitive status), and
-"pending" is already a bucket in the response shape, so this requires no new
-field and no schema change. Change the case-category reshape loop's condition
-from `row.status === "pending"` to `row.status === "pending" || row.status ===
-null`, and add a one-line comment explaining why (mirroring how the same block
-already explicitly comments its `NULL` `category` handling). Do **not** apply
-this same change to the procedure or academic reshape loops —
-`procedure_logs.status` and `academic_logs.status` are both `NOT NULL` at the
-DB level, so a `NULL` status is not a real possibility there and adding
-dead-code handling for it would be unmotivated.
+**Fix:** in each of the three "uncatalogued items" fallback loops, check
+`alreadyIncluded`/`has(...)` against a catalog list **filtered to
+`required > 0`** (or equivalently, only compare against catalog entries
+that were actually pushed as bars), not the unfiltered full catalog array.
+An item with `required === 0` that has real logged progress must still
+appear as an "uncatalogued" bar (no target line), exactly like an item
+whose catalog entry was deleted entirely.
+
+**2. Procedure click-through filter ignores `procedureGroup`.** The row
+filter at (currently) lines 855 and 876 matches only
+`log.procedureName === (logFilter as any).name`, dropping the `group`
+check even though `LogFilter` already carries `group` and the
+count-mismatch banner's `progressCount` correctly matches on both
+`group` and `name`. The same procedure name can exist under two different
+groups (confirmed: `admin.ts` filters by both `procedureName` AND
+`procedureGroup` together elsewhere in this codebase).
+
+**Fix:** add the `procedureGroup` check to both places the row filter is
+applied (the `filteredCount` calculation and the actual table row filter),
+matching the same two-field match the banner's `progressCount` already
+uses.
+
+**3. `Promise.all([/logs, /progress])` couples an unrelated failure.** If
+`/progress` rejects while `/logs` succeeds (or vice versa), the shared
+`catch` means **neither** `setMenteeLogs` nor `setMenteeProgress` runs —
+the three previously-independent log tables (Clinical Case Logs, Procedure
+Logs, Academic Activity) now go stale or blank on a `/progress`-only
+failure, which they never depended on before this diff. The toast text
+also misleadingly implies the logs themselves failed.
+
+**Fix:** fetch `/logs` and `/progress` as two independent operations (e.g.
+`Promise.allSettled`, or two separate `try`/`catch` blocks) so a failure in
+one does not clear or block state that the other successfully loaded. Each
+surface (`menteeLogs` vs. `menteeProgress`/`menteeProgressError`) should
+reflect only its own fetch's outcome.
+
+**4. Retry button has no staleness guard.** The original effect (~lines
+112-151) uses a `mounted` flag, set false on cleanup, specifically so a
+slow fetch can't write stale data after `selectedMentee` changes. The
+Retry button's inline `onClick` (~lines 210-225) duplicates the same
+`Promise.all` fetch but omits this guard entirely.
+
+**Fix:** either have the Retry button call the same fetch function the
+effect uses (so it inherits the same closure-scoped guard), or give the
+Retry handler its own equivalent staleness check tied to the mentee whose
+dialog was open when Retry was clicked.
+
+### Must fix — spec deviation
+
+**5. Replace the hand-rolled CSS `ProgressBar` with `recharts` via the
+existing `chart.tsx` wrapper, as originally specified.** The delivered
+code uses CSS `<div>` bars with a native `title`-attribute tooltip instead
+of `ChartContainer`/`ChartTooltip`/`ChartTooltipContent` and
+`<BarChart layout="vertical">`. This was self-flagged in `HANDOFF.md` as a
+deviation, and confirmed by review as a genuine spec violation with a real
+functional gap, not just a style shortcut: case-category and academic bars
+currently have **no tooltip at all**, and the spec-required
+verified/pending/remaining/target figures are not shown anywhere for any
+bar type except partially inline in the row label. The developer's
+original request specifically asked for "a very interactive bar graph kind
+of way" that should "look and feel real nice" — this is a product
+requirement, not a nice-to-have.
+
+**Fix:** rebuild `ProgressBar` (and its three call sites) using
+`ChartContainer` + `<BarChart layout="vertical">` (one bar chart per
+section, each row = one catalog item, a stacked series for
+verified/pending against the `required` domain) and `ChartTooltipContent`
+showing verified / pending / remaining / target — plus the `byCompetency`
+breakdown for procedure bars. Keep the existing "fully verified → emerald"
+color convention and the "Show all N" collapse behavior exactly as they
+are; only the bar-rendering mechanism changes. If a variable-row-count
+`BarChart` genuinely cannot be made to work cleanly within the dialog's
+layout, stop and report the specific rendering obstacle rather than
+reverting to CSS divs again.
 
 ### Reviewed, not being fixed
 
-- **Redundant department re-check** (`student.ts` around lines 240-268)
-  duplicates `studentAccess`, unlike `/:studentId/postings`,
-  `/:studentId/thesis`, `/:studentId/certifications`, which trust the
-  middleware alone. This was an explicit instruction in this task file's
-  original `## What to build` section (mirror `/:studentId/logs`'s
-  defense-in-depth style, given §3's stakes on the highest-severity rule in
-  this repo). Deliberate, not a defect — leave as-is.
-- **`Number(row.count)` on Postgres `bigint`** — theoretically lossy past
-  `Number.MAX_SAFE_INTEGER`, but not reachable at single-student log-count
-  scale. Not worth a dispatch by itself.
+- **Three near-identical ~130-line catalog-join blocks** (case/procedure/
+  academic) with no shared helper — real duplication, already drifting
+  slightly, but a refactor risks touching the same logic the four bug
+  fixes above are landing in. Leave as three separate blocks for this
+  dispatch; a future cleanup task can extract a shared
+  `joinCatalogWithProgress()` helper.
+- **O(n×m) nested-loop joins with no `useMemo`** — real inefficiency, not
+  urgent at realistic catalog sizes (dozens of items, not thousands). Not
+  worth the added risk of touching the same code twice in one dispatch.
 
-## Files/areas in scope for dispatch 52
-- `artifacts/api-server/src/routes/student.ts` — only the case-category
-  reshape loop's condition, as described above. Nothing else in this file.
+## Files/areas in scope for dispatch 54
+- `artifacts/mockup-sandbox/src/components/ProfessorPortal.tsx` only — the
+  five items above. Nothing else in this file beyond what each fix
+  requires.
 
-## Do NOT touch (dispatch 52)
+## Do NOT touch (dispatch 54)
 - Everything already listed under `## Do NOT touch` above, unchanged.
-- The procedure and academic reshape loops — do not add `NULL`-status
-  handling there; their columns are `NOT NULL`.
-- The redundant department re-check block — reviewed and kept, not to be
-  simplified in this dispatch.
+- The two "Reviewed, not being fixed" items — do not refactor the join
+  blocks into a shared helper, and do not add `useMemo` as a drive-by
+  change in this dispatch.
+- Any file outside `ProfessorPortal.tsx`.
 
-## Verification required (dispatch 52)
-- [ ] Diff read and confirmed: exactly one condition changed (the case-status
-      check), no other line touched.
-- [ ] Backend typecheck / build — no new errors.
+## Verification required (dispatch 54)
+- [ ] Diff read and confirmed: all five items fixed as specified, nothing
+      else changed.
+- [ ] Frontend typecheck — no new errors.
+- [ ] Re-verify finding 1 by reading the fixed fallback-loop condition
+      directly; re-verify finding 2 by reading the fixed filter predicate
+      directly.

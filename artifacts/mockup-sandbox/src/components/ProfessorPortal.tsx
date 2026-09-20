@@ -34,14 +34,18 @@ import {
 } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import {
   CheckCircle2,
   XCircle,
-  Stethoscope,
-  GraduationCap,
-  Clock,
   UserCheck,
   ChevronLeft,
   ChevronRight,
@@ -50,17 +54,70 @@ import {
   AlertTriangle,
   PlusCircle,
   BookOpen,
-  User,
   FileText,
+  X,
+  RefreshCw,
 } from "lucide-react";
 import { formatLogbookDate } from "@/lib/logbook-config";
 import { apiGet, apiPatch, apiPost } from "@/lib/apiClient";
 import { getCurrentUser, isDemoMode } from "@/lib/session";
 import { useDepartment } from "@/lib/department-context";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from "@/components/ui/chart";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Cell,
+  Tooltip,
+} from "recharts";
+
+// ── Types for the /progress response ──────────────────────────────────────────
+
+type ProgressCaseCategory = {
+  value: string | null;
+  verified: number;
+  pending: number;
+};
+
+type ProgressProcedure = {
+  group: string;
+  name: string;
+  verified: number;
+  pending: number;
+  byCompetency: { level: string; verified: number; pending: number }[];
+};
+
+type ProgressAcademic = {
+  value: string;
+  verified: number;
+  pending: number;
+};
+
+type MenteeProgress = {
+  caseCategories: ProgressCaseCategory[];
+  procedures: ProgressProcedure[];
+  academics: ProgressAcademic[];
+};
+
+// ── Click-through filter state ─────────────────────────────────────────────────
+
+type LogFilter =
+  | { tab: "case-logs"; category: string | null; label: string }
+  | { tab: "proc-logs"; group: string; name: string; label: string }
+  | { tab: "acad-logs"; activityType: string; label: string }
+  | null;
+
+// ── Main component ─────────────────────────────────────────────────────────────
 
 export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; embedded?: boolean }) {
   const hideUhid = isDemoMode();
-  const { competencyLevels } = useDepartment();
+  const { competencyLevels, caseCategories: deptCaseCategories, procedures: deptProcedures, academics: deptAcademics } = useDepartment();
   const [location, setLocation] = useLocation();
   const [data, setData] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
@@ -76,7 +133,18 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
   // Selected mentee for Logbook Inspector Modal
   const [selectedMentee, setSelectedMentee] = React.useState<any | null>(null);
   const [menteeLogs, setMenteeLogs] = React.useState<any>(null);
+  const [menteeProgress, setMenteeProgress] = React.useState<MenteeProgress | null>(null);
+  const [menteeProgressError, setMenteeProgressError] = React.useState<string | null>(null);
   const [menteeLogsLoading, setMenteeLogsLoading] = React.useState(false);
+
+  // Dialog inner tab & click-through filter
+  const [dialogTab, setDialogTab] = React.useState("progress");
+  const [logFilter, setLogFilter] = React.useState<LogFilter>(null);
+
+  // "Show all" toggles for bar charts
+  const [showAllCaseBars, setShowAllCaseBars] = React.useState(false);
+  const [showAllProcBars, setShowAllProcBars] = React.useState(false);
+  const [showAllAcadBars, setShowAllAcadBars] = React.useState(false);
 
   // Assessment form state
   const [assessExamName, setAssessExamName] = React.useState("");
@@ -139,24 +207,43 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
     }
   }, [reviews.length, currentIndex]);
 
+  // ── Fetch /logs and /progress in parallel when selectedMentee changes ────────
   React.useEffect(() => {
     if (!selectedMentee) {
       setMenteeLogs(null);
+      setMenteeProgress(null);
+      setMenteeProgressError(null);
+      setLogFilter(null);
+      setDialogTab("progress");
       return;
     }
     let mounted = true;
-    const fetchLogs = async () => {
+    const fetchBoth = async () => {
       setMenteeLogsLoading(true);
+      setMenteeProgressError(null);
+
+      // Fetch /logs independently so a /progress failure doesn't blank the log tables.
       try {
         const logs = await apiGet(`/api/students/${selectedMentee.id}/logs`);
         if (mounted) setMenteeLogs(logs);
-      } catch (err) {
+      } catch (err: any) {
         if (mounted) toast.error("Failed to load student logs");
-      } finally {
-        if (mounted) setMenteeLogsLoading(false);
       }
+
+      // Fetch /progress independently so a /logs failure doesn't block the progress tab.
+      try {
+        const progress = await apiGet(`/api/students/${selectedMentee.id}/progress`);
+        if (mounted) setMenteeProgress(progress as MenteeProgress);
+      } catch (err: any) {
+        if (mounted) {
+          toast.error("Failed to load progress data");
+          setMenteeProgressError(err?.message || "Failed to load progress data");
+        }
+      }
+
+      if (mounted) setMenteeLogsLoading(false);
     };
-    fetchLogs();
+    fetchBoth();
     return () => { mounted = false; };
   }, [selectedMentee]);
 
@@ -212,6 +299,10 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
 
   const handleApprove = () => handleReviewAction("verified", "Approved without conditions.");
   const handleReject = () => handleReviewAction("rejected", "Please expand on case findings.");
+
+  // ── Helper: derive faculty role from review-queue response ────────────────────
+  // data?.faculty?.role === "hod" means this portal is rendering in HOD context.
+  const callerIsHod = data?.faculty?.role === "hod";
 
   return (
     <div className="space-y-6 pb-12">
@@ -608,8 +699,12 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
       </Tabs>
 
       {/* Mentee Detailed Logbook Inspector Dialog Modal */}
-      <Dialog open={!!selectedMentee} onOpenChange={() => setSelectedMentee(null)}>
-        <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-y-auto bg-white">
+      <Dialog open={!!selectedMentee} onOpenChange={() => {
+        setSelectedMentee(null);
+        setLogFilter(null);
+        setDialogTab("progress");
+      }}>
+        <DialogContent className="sm:max-w-[900px] max-h-[85vh] overflow-y-auto bg-white">
           {selectedMentee && (
             <div className="space-y-4">
               <DialogHeader className="border-b border-slate-100 pb-3">
@@ -633,14 +728,105 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                 </div>
               )}
 
-              <Tabs defaultValue="case-logs" className="w-full">
+              <Tabs value={dialogTab} onValueChange={(v) => { setDialogTab(v); setLogFilter(null); }} className="w-full">
                 <TabsList className="bg-slate-100 p-1 rounded-lg">
+                  <TabsTrigger value="progress" className="text-xs">Training Progress</TabsTrigger>
                   <TabsTrigger value="case-logs" className="text-xs">Clinical Case Logs</TabsTrigger>
                   <TabsTrigger value="proc-logs" className="text-xs">Procedure Logs</TabsTrigger>
                   <TabsTrigger value="acad-logs" className="text-xs">Academic Activity</TabsTrigger>
                 </TabsList>
 
+                {/* ── Progress Tab ─────────────────────────────────────────── */}
+                <TabsContent value="progress" className="pt-3">
+                  {menteeLogsLoading ? (
+                    <div className="flex h-32 items-center justify-center">
+                      <div className="animate-spin rounded-full border-4 border-slate-300 border-t-teal-600 h-8 w-8" />
+                    </div>
+                  ) : menteeProgressError ? (
+                    /* ── Error state — never show zeros on fetch failure ── */
+                    <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-rose-100 bg-rose-50/60 p-8 text-center">
+                      <AlertTriangle className="h-8 w-8 text-rose-500" />
+                      <div>
+                        <p className="font-semibold text-rose-800">Failed to load progress data</p>
+                        <p className="mt-1 text-xs text-rose-600">{menteeProgressError}</p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-rose-200 text-rose-700 gap-2"
+                        onClick={() => {
+                          if (!selectedMentee) return;
+                          // Capture the mentee at click time so a navigation
+                          // away during the async fetch cannot write stale state.
+                          const menteeIdAtClick = selectedMentee.id;
+                          setMenteeProgressError(null);
+                          setMenteeLogsLoading(true);
+                          (async () => {
+                            try {
+                              const logs = await apiGet(`/api/students/${menteeIdAtClick}/logs`);
+                              if (selectedMentee?.id === menteeIdAtClick) setMenteeLogs(logs);
+                            } catch {
+                              /* toast already shown by original effect; suppress here */
+                            }
+                            try {
+                              const progress = await apiGet(`/api/students/${menteeIdAtClick}/progress`);
+                              if (selectedMentee?.id === menteeIdAtClick) setMenteeProgress(progress as MenteeProgress);
+                            } catch (err: any) {
+                              if (selectedMentee?.id === menteeIdAtClick) {
+                                setMenteeProgressError(err?.message || "Failed to load progress data");
+                              }
+                            }
+                            if (selectedMentee?.id === menteeIdAtClick) setMenteeLogsLoading(false);
+                          })();
+                        }}
+                      >
+                        <RefreshCw className="h-4 w-4" /> Retry
+                      </Button>
+                    </div>
+                  ) : menteeProgress ? (
+                    <ProgressTabContent
+                      progress={menteeProgress}
+                      deptCaseCategories={deptCaseCategories}
+                      deptProcedures={deptProcedures}
+                      deptAcademics={deptAcademics}
+                      showAllCaseBars={showAllCaseBars}
+                      setShowAllCaseBars={setShowAllCaseBars}
+                      showAllProcBars={showAllProcBars}
+                      setShowAllProcBars={setShowAllProcBars}
+                      showAllAcadBars={showAllAcadBars}
+                      setShowAllAcadBars={setShowAllAcadBars}
+                      onBarClick={(filter) => {
+                        setLogFilter(filter);
+                        setDialogTab(filter?.tab ?? "case-logs");
+                      }}
+                    />
+                  ) : (
+                    /* ── Empty state before load completes ── */
+                    <div className="flex h-32 items-center justify-center">
+                      <div className="animate-spin rounded-full border-4 border-slate-300 border-t-teal-600 h-8 w-8" />
+                    </div>
+                  )}
+                </TabsContent>
+
+                {/* ── Clinical Case Logs Tab ───────────────────────────────── */}
                 <TabsContent value="case-logs" className="pt-3">
+                  {logFilter?.tab === "case-logs" && (
+                    <FilterBanner
+                      label={logFilter.label}
+                      onClear={() => setLogFilter(null)}
+                      progressCount={
+                        menteeProgress?.caseCategories.find(
+                          (c) => c.value === (logFilter as any).category
+                        )
+                      }
+                      filteredCount={
+                        (menteeLogs?.caseLogs ?? []).filter((log: any) =>
+                          log.category === (logFilter as any).category
+                        ).length
+                      }
+                      callerIsHod={callerIsHod}
+                    />
+                  )}
                   {menteeLogsLoading ? (
                     <div className="flex h-32 items-center justify-center"><div className="animate-spin rounded-full border-4 border-slate-300 border-t-teal-600 h-8 w-8" /></div>
                   ) : (
@@ -654,8 +840,14 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {menteeLogs?.caseLogs?.length ? (
-                          menteeLogs.caseLogs.map((log: any) => (
+                        {(() => {
+                          const rows = logFilter?.tab === "case-logs"
+                            ? (menteeLogs?.caseLogs ?? []).filter((log: any) => log.category === (logFilter as any).category)
+                            : (menteeLogs?.caseLogs ?? []);
+                          if (!rows.length) {
+                            return <TableRow><TableCell colSpan={4} className="text-center text-sm text-slate-500 py-6">No case logs found.</TableCell></TableRow>;
+                          }
+                          return rows.map((log: any) => (
                             <TableRow key={log.id}>
                               <TableCell className="text-xs font-medium">{formatLogbookDate(log.date)}</TableCell>
                               <TableCell className="text-xs font-bold text-slate-900">{log.diagnosisFinal}</TableCell>
@@ -667,16 +859,33 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                                 {renderLogStatusBadge(log.status)}
                               </TableCell>
                             </TableRow>
-                          ))
-                        ) : (
-                          <TableRow><TableCell colSpan={4} className="text-center text-sm text-slate-500 py-6">No case logs found.</TableCell></TableRow>
-                        )}
+                          ));
+                        })()}
                       </TableBody>
                     </Table>
                   )}
                 </TabsContent>
 
+                {/* ── Procedure Logs Tab ───────────────────────────────────── */}
                 <TabsContent value="proc-logs" className="pt-3">
+                  {logFilter?.tab === "proc-logs" && (
+                    <FilterBanner
+                      label={logFilter.label}
+                      onClear={() => setLogFilter(null)}
+                      progressCount={
+                        menteeProgress?.procedures.find(
+                          (p) => p.group === (logFilter as any).group && p.name === (logFilter as any).name
+                        )
+                      }
+                      filteredCount={
+                        (menteeLogs?.procedureLogs ?? []).filter((log: any) =>
+                          log.procedureName === (logFilter as any).name &&
+                          log.procedureGroup === (logFilter as any).group
+                        ).length
+                      }
+                      callerIsHod={callerIsHod}
+                    />
+                  )}
                   {menteeLogsLoading ? (
                     <div className="flex h-32 items-center justify-center"><div className="animate-spin rounded-full border-4 border-slate-300 border-t-teal-600 h-8 w-8" /></div>
                   ) : (
@@ -690,8 +899,17 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {menteeLogs?.procedureLogs?.length ? (
-                          menteeLogs.procedureLogs.map((log: any) => (
+                        {(() => {
+                          const rows = logFilter?.tab === "proc-logs"
+                            ? (menteeLogs?.procedureLogs ?? []).filter((log: any) =>
+                                log.procedureName === (logFilter as any).name &&
+                                log.procedureGroup === (logFilter as any).group
+                              )
+                            : (menteeLogs?.procedureLogs ?? []);
+                          if (!rows.length) {
+                            return <TableRow><TableCell colSpan={4} className="text-center text-sm text-slate-500 py-6">No procedure logs found.</TableCell></TableRow>;
+                          }
+                          return rows.map((log: any) => (
                             <TableRow key={log.id}>
                               <TableCell className="text-xs font-bold text-slate-900">{log.procedureName}</TableCell>
                               <TableCell className="text-xs text-slate-600">
@@ -703,16 +921,32 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                                 {renderLogStatusBadge(log.status)}
                               </TableCell>
                             </TableRow>
-                          ))
-                        ) : (
-                          <TableRow><TableCell colSpan={4} className="text-center text-sm text-slate-500 py-6">No procedure logs found.</TableCell></TableRow>
-                        )}
+                          ));
+                        })()}
                       </TableBody>
                     </Table>
                   )}
                 </TabsContent>
 
+                {/* ── Academic Activity Tab ────────────────────────────────── */}
                 <TabsContent value="acad-logs" className="pt-3">
+                  {logFilter?.tab === "acad-logs" && (
+                    <FilterBanner
+                      label={logFilter.label}
+                      onClear={() => setLogFilter(null)}
+                      progressCount={
+                        menteeProgress?.academics.find(
+                          (a) => a.value === (logFilter as any).activityType
+                        )
+                      }
+                      filteredCount={
+                        (menteeLogs?.academicLogs ?? []).filter((log: any) =>
+                          log.activityType === (logFilter as any).activityType
+                        ).length
+                      }
+                      callerIsHod={callerIsHod}
+                    />
+                  )}
                   {menteeLogsLoading ? (
                     <div className="flex h-32 items-center justify-center"><div className="animate-spin rounded-full border-4 border-slate-300 border-t-teal-600 h-8 w-8" /></div>
                   ) : (
@@ -725,8 +959,14 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {menteeLogs?.academicLogs?.length ? (
-                          menteeLogs.academicLogs.map((log: any) => (
+                        {(() => {
+                          const rows = logFilter?.tab === "acad-logs"
+                            ? (menteeLogs?.academicLogs ?? []).filter((log: any) => log.activityType === (logFilter as any).activityType)
+                            : (menteeLogs?.academicLogs ?? []);
+                          if (!rows.length) {
+                            return <TableRow><TableCell colSpan={3} className="text-center text-sm text-slate-500 py-6">No academic logs found.</TableCell></TableRow>;
+                          }
+                          return rows.map((log: any) => (
                             <TableRow key={log.id}>
                               <TableCell className="text-xs font-semibold">{log.activityType}</TableCell>
                               <TableCell className="text-xs text-slate-900">{log.topic}</TableCell>
@@ -734,10 +974,8 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                                 {renderLogStatusBadge(log.status)}
                               </TableCell>
                             </TableRow>
-                          ))
-                        ) : (
-                          <TableRow><TableCell colSpan={3} className="text-center text-sm text-slate-500 py-6">No academic logs found.</TableCell></TableRow>
-                        )}
+                          ));
+                        })()}
                       </TableBody>
                     </Table>
                   )}
@@ -750,6 +988,588 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
     </div>
   );
 }
+
+// ── FilterBanner ───────────────────────────────────────────────────────────────
+// Renders the "Filtered by X — clear" control and the count-mismatch line
+// for professor callers (never for HOD callers).
+
+function FilterBanner({
+  label,
+  onClear,
+  progressCount,
+  filteredCount,
+  callerIsHod,
+}: {
+  label: string;
+  onClear: () => void;
+  progressCount?: { verified: number; pending: number } | undefined;
+  filteredCount: number;
+  callerIsHod: boolean;
+}) {
+  const totalInProgress = progressCount
+    ? progressCount.verified + progressCount.pending
+    : null;
+
+  // Count-mismatch: only visible to professor callers, and only when the counts differ.
+  const showMismatch =
+    !callerIsHod &&
+    totalInProgress !== null &&
+    filteredCount < totalInProgress;
+
+  return (
+    <div className="mb-3 rounded-lg border border-teal-100 bg-teal-50/60 px-4 py-2.5 flex items-center justify-between gap-3">
+      <div>
+        <span className="text-xs font-semibold text-teal-800">Filtered by: {label}</span>
+        {showMismatch && (
+          <p className="mt-0.5 text-[11px] text-slate-500">
+            Showing {filteredCount} {filteredCount === 1 ? "entry" : "entries"} you supervised, of {totalInProgress} logged.
+          </p>
+        )}
+      </div>
+      <Button
+        size="sm"
+        variant="ghost"
+        onClick={onClear}
+        className="h-7 px-2 text-xs text-slate-500 hover:text-slate-700 gap-1 shrink-0"
+      >
+        <X className="h-3 w-3" /> Clear filter
+      </Button>
+    </div>
+  );
+}
+
+// ── ProgressTabContent ─────────────────────────────────────────────────────────
+// Renders the three chart sections plus summary tiles.
+// Extracted to keep the main component readable.
+
+type DeptProcedure = { id: number; name: string; group: string; required: number };
+type CatalogItem = { id: number; name: string; value: string; required: number; period: "total" | "month" };
+
+function ProgressTabContent({
+  progress,
+  deptCaseCategories,
+  deptProcedures,
+  deptAcademics,
+  showAllCaseBars,
+  setShowAllCaseBars,
+  showAllProcBars,
+  setShowAllProcBars,
+  showAllAcadBars,
+  setShowAllAcadBars,
+  onBarClick,
+}: {
+  progress: MenteeProgress;
+  deptCaseCategories: CatalogItem[];
+  deptProcedures: DeptProcedure[];
+  deptAcademics: CatalogItem[];
+  showAllCaseBars: boolean;
+  setShowAllCaseBars: (v: boolean) => void;
+  showAllProcBars: boolean;
+  setShowAllProcBars: (v: boolean) => void;
+  showAllAcadBars: boolean;
+  setShowAllAcadBars: (v: boolean) => void;
+  onBarClick: (filter: LogFilter) => void;
+}) {
+  // ── Check: student has no logs at all ────────────────────────────────────────
+  const totalLogs =
+    progress.caseCategories.reduce((s, c) => s + c.verified + c.pending, 0) +
+    progress.procedures.reduce((s, p) => s + p.verified + p.pending, 0) +
+    progress.academics.reduce((s, a) => s + a.verified + a.pending, 0);
+
+  if (totalLogs === 0) {
+    return (
+      <Empty>
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <FileText />
+          </EmptyMedia>
+          <EmptyTitle>No logs yet</EmptyTitle>
+          <EmptyDescription>
+            This student has not submitted any case, procedure, or academic logs.
+          </EmptyDescription>
+        </EmptyHeader>
+      </Empty>
+    );
+  }
+
+  // ── Join: case categories ─────────────────────────────────────────────────────
+  // Catalog items with required === 0 are "not tracked" — do not render a bar.
+  // Items from progress absent in catalog render with no target and label "Not in current catalog".
+  type CaseBarItem = {
+    key: string;
+    label: string;
+    verified: number;
+    pending: number;
+    required: number | null; // null = no catalog entry
+    inCatalog: boolean;
+    done: boolean;
+  };
+
+  const caseBarItems: CaseBarItem[] = [];
+  // Catalog-ordered items first
+  for (const cat of deptCaseCategories) {
+    if (cat.required === 0) continue; // not tracked
+    const match = progress.caseCategories.find((c) => c.value === cat.value);
+    const verified = match?.verified ?? 0;
+    const pending = match?.pending ?? 0;
+    caseBarItems.push({
+      key: cat.value,
+      label: cat.name,
+      verified,
+      pending,
+      required: cat.required,
+      inCatalog: true,
+      done: verified >= cat.required,
+    });
+  }
+  // Uncatalogued items (present in progress but absent from catalog, or value === null)
+  for (const item of progress.caseCategories) {
+    const key = item.value ?? "__null__";
+    const alreadyIncluded = deptCaseCategories.some((c) => c.value === item.value && c.required > 0);
+    if (!alreadyIncluded) {
+      caseBarItems.push({
+        key,
+        label: item.value === null ? "Uncategorised" : item.value,
+        verified: item.verified,
+        pending: item.pending,
+        required: null,
+        inCatalog: false,
+        done: false,
+      });
+    }
+  }
+
+  // ── Join: procedures ──────────────────────────────────────────────────────────
+  type ProcBarItem = {
+    key: string;
+    group: string;
+    label: string;
+    verified: number;
+    pending: number;
+    required: number | null;
+    inCatalog: boolean;
+    done: boolean;
+    byCompetency: { level: string; verified: number; pending: number }[];
+  };
+
+  // Build a lookup for catalog procedures keyed by group+name
+  const deptProcMap = new Map<string, DeptProcedure>();
+  for (const p of deptProcedures) {
+    deptProcMap.set(`${p.group}\0${p.name}`, p);
+  }
+  // Separate map restricted to required > 0 — used only by the uncatalogued fallback loop
+  // so that a procedure with required === 0 is NOT treated as "already included"
+  // when it has real logged counts (Fix 1b).
+  const deptProcTrackedMap = new Map<string, DeptProcedure>();
+  for (const p of deptProcedures) {
+    if (p.required > 0) deptProcTrackedMap.set(`${p.group}\0${p.name}`, p);
+  }
+
+  const procBarItems: ProcBarItem[] = [];
+  // Catalog-ordered items first (only those with required > 0)
+  for (const dp of deptProcedures) {
+    if (dp.required === 0) continue;
+    const match = progress.procedures.find((p) => p.group === dp.group && p.name === dp.name);
+    const verified = match?.verified ?? 0;
+    const pending = match?.pending ?? 0;
+    procBarItems.push({
+      key: `${dp.group}\0${dp.name}`,
+      group: dp.group,
+      label: dp.name,
+      verified,
+      pending,
+      required: dp.required,
+      inCatalog: true,
+      done: verified >= dp.required,
+      byCompetency: match?.byCompetency ?? [],
+    });
+  }
+  // Uncatalogued procedures — compare against deptProcTrackedMap (required > 0 only)
+  // so a procedure whose catalog entry has required === 0 still appears as a bar.
+  for (const item of progress.procedures) {
+    const key = `${item.group}\0${item.name}`;
+    if (!deptProcTrackedMap.has(key)) {
+      procBarItems.push({
+        key,
+        group: item.group,
+        label: item.name,
+        verified: item.verified,
+        pending: item.pending,
+        required: null,
+        inCatalog: false,
+        done: false,
+        byCompetency: item.byCompetency,
+      });
+    }
+  }
+
+  // ── Join: academics ───────────────────────────────────────────────────────────
+  type AcadBarItem = {
+    key: string;
+    label: string;
+    verified: number;
+    pending: number;
+    required: number | null;
+    inCatalog: boolean;
+    done: boolean;
+  };
+
+  const acadBarItems: AcadBarItem[] = [];
+  for (const cat of deptAcademics) {
+    if (cat.required === 0) continue;
+    const match = progress.academics.find((a) => a.value === cat.value);
+    const verified = match?.verified ?? 0;
+    const pending = match?.pending ?? 0;
+    acadBarItems.push({
+      key: cat.value,
+      label: cat.name,
+      verified,
+      pending,
+      required: cat.required,
+      inCatalog: true,
+      done: verified >= cat.required,
+    });
+  }
+  for (const item of progress.academics) {
+    const alreadyIncluded = deptAcademics.some((a) => a.value === item.value && a.required > 0);
+    if (!alreadyIncluded) {
+      acadBarItems.push({
+        key: item.value,
+        label: item.value,
+        verified: item.verified,
+        pending: item.pending,
+        required: null,
+        inCatalog: false,
+        done: false,
+      });
+    }
+  }
+
+  // ── Summary tile counts ───────────────────────────────────────────────────────
+  const totalCaseVerified = progress.caseCategories.reduce((s, c) => s + c.verified, 0);
+  const totalProcVerified = progress.procedures.reduce((s, p) => s + p.verified, 0);
+  const totalAcadVerified = progress.academics.reduce((s, a) => s + a.verified, 0);
+  const totalCasePending  = progress.caseCategories.reduce((s, c) => s + c.pending, 0);
+  const totalProcPending  = progress.procedures.reduce((s, p) => s + p.pending, 0);
+  const totalAcadPending  = progress.academics.reduce((s, a) => s + a.pending, 0);
+
+  // ── Group procedures by group name ────────────────────────────────────────────
+  const procGroups: Map<string, ProcBarItem[]> = new Map();
+  for (const item of procBarItems) {
+    if (!procGroups.has(item.group)) procGroups.set(item.group, []);
+    procGroups.get(item.group)!.push(item);
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Summary tiles */}
+      <div className="grid grid-cols-3 gap-4">
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-center">
+          <p className="metric-value">{totalCaseVerified + totalCasePending}</p>
+          <p className="metric-label mt-1">Cases Logged</p>
+          <p className="mt-1 text-[11px] text-slate-500">{totalCaseVerified} verified · {totalCasePending} pending</p>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-center">
+          <p className="metric-value">{totalProcVerified + totalProcPending}</p>
+          <p className="metric-label mt-1">Procedures Logged</p>
+          <p className="mt-1 text-[11px] text-slate-500">{totalProcVerified} verified · {totalProcPending} pending</p>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-center">
+          <p className="metric-value">{totalAcadVerified + totalAcadPending}</p>
+          <p className="metric-label mt-1">Academic Activities</p>
+          <p className="mt-1 text-[11px] text-slate-500">{totalAcadVerified} verified · {totalAcadPending} pending</p>
+        </div>
+      </div>
+
+      {/* ── Section 1: Case Categories ── */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold text-slate-700">Case Categories</h3>
+        {caseBarItems.length === 0 ? (
+          <p className="text-xs text-slate-500 rounded-xl border border-dashed border-slate-200 p-4 text-center">
+            No case categories configured for this department.
+          </p>
+        ) : (
+          <>
+            <ProgressSection
+              items={caseBarItems.slice(0, showAllCaseBars ? undefined : 8)}
+              onItemClick={(item) =>
+                onBarClick({
+                  tab: "case-logs",
+                  category: item.key === "__null__" ? null : item.key,
+                  label: item.label,
+                })
+              }
+            />
+            {caseBarItems.length > 8 && (
+              <div className="mt-1 flex justify-center">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowAllCaseBars(!showAllCaseBars)}
+                  className="text-slate-500 hover:text-slate-700"
+                >
+                  {showAllCaseBars ? "Show less" : `Show all ${caseBarItems.length} categories`}
+                </Button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* ── Section 2: Procedures (grouped) ── */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold text-slate-700">Procedures</h3>
+        {procBarItems.length === 0 ? (
+          <p className="text-xs text-slate-500 rounded-xl border border-dashed border-slate-200 p-4 text-center">
+            No procedures configured for this department.
+          </p>
+        ) : (
+          <>
+            {Array.from(procGroups.entries()).map(([group, items]) => (
+              <div key={group} className="space-y-1.5">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-teal-700">{group}</p>
+                <ProgressSection
+                  items={items.slice(0, showAllProcBars ? undefined : 8)}
+                  onItemClick={(item) =>
+                    onBarClick({
+                      tab: "proc-logs",
+                      group: item.group ?? group,
+                      name: item.label,
+                      label: item.label,
+                    })
+                  }
+                />
+              </div>
+            ))}
+            {procBarItems.length > 8 && (
+              <div className="mt-1 flex justify-center">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowAllProcBars(!showAllProcBars)}
+                  className="text-slate-500 hover:text-slate-700"
+                >
+                  {showAllProcBars ? "Show less" : `Show all ${procBarItems.length} procedures`}
+                </Button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* ── Section 3: Academic Activities ── */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold text-slate-700">Academic Activities</h3>
+        {acadBarItems.length === 0 ? (
+          <p className="text-xs text-slate-500 rounded-xl border border-dashed border-slate-200 p-4 text-center">
+            No academic activities configured for this department.
+          </p>
+        ) : (
+          <>
+            <ProgressSection
+              items={acadBarItems.slice(0, showAllAcadBars ? undefined : 8)}
+              onItemClick={(item) =>
+                onBarClick({
+                  tab: "acad-logs",
+                  activityType: item.key,
+                  label: item.label,
+                })
+              }
+            />
+            {acadBarItems.length > 8 && (
+              <div className="mt-1 flex justify-center">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowAllAcadBars(!showAllAcadBars)}
+                  className="text-slate-500 hover:text-slate-700"
+                >
+                  {showAllAcadBars ? "Show less" : `Show all ${acadBarItems.length} activities`}
+                </Button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── ProgressSection ────────────────────────────────────────────────────────────
+// Replaces the old ProgressBar with a Recharts vertical stacked BarChart.
+// Renders all items for a section sharing a single X-axis scale.
+
+type ProgressSectionItem = {
+  key: string;
+  label: string;
+  verified: number;
+  pending: number;
+  required: number | null;
+  inCatalog: boolean;
+  done: boolean;
+  group?: string;
+  byCompetency?: { level: string; verified: number; pending: number }[];
+};
+
+const progressChartConfig = {
+  verified: { label: "Verified", color: "#0d9488" },
+  pending: { label: "Pending", color: "#99f6e4" },
+  remaining: { label: "Remaining", color: "#f1f5f9" },
+} satisfies ChartConfig;
+
+function ProgressSection({
+  items,
+  onItemClick,
+}: {
+  items: ProgressSectionItem[];
+  onItemClick: (item: any) => void;
+}) {
+  const chartData = items.map((item) => {
+    const total = item.verified + item.pending;
+    const remaining = item.required !== null ? Math.max(item.required - total, 0) : 0;
+    return {
+      ...item,
+      name: item.label,
+      verifiedVal: item.verified,
+      pendingVal: item.pending,
+      remainingVal: remaining,
+    };
+  });
+
+  const chartHeight = Math.max(items.length * 45 + 30, 100);
+
+  return (
+    <div style={{ height: chartHeight, width: "100%" }}>
+      <ChartContainer config={progressChartConfig} className="h-full w-full">
+        <BarChart
+          data={chartData}
+          layout="vertical"
+          margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
+        >
+          <XAxis type="number" hide />
+          <YAxis
+            dataKey="name"
+            type="category"
+            axisLine={false}
+            tickLine={false}
+            tick={{ fontSize: 12, fill: "#334155" }}
+            width={160}
+          />
+          <ChartTooltip
+            cursor={{ fill: "rgba(241, 245, 249, 0.5)" }}
+            content={({ active, payload }) => {
+              if (!active || !payload || !payload.length) return null;
+              const data = payload[0].payload;
+              const isDone = data.done && data.required !== null;
+              const vColor = isDone ? "bg-emerald-500" : "bg-teal-600";
+              const pColor = isDone ? "bg-emerald-300" : "bg-teal-200";
+
+              return (
+                <div className="min-w-[200px] rounded-xl border border-slate-200 bg-white p-3 shadow-lg z-50">
+                  <p className="mb-2.5 text-sm font-bold text-slate-900">{data.name}</p>
+                  <div className="space-y-1.5 text-xs text-slate-600">
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="flex items-center gap-1.5">
+                        <span className={`h-2.5 w-2.5 rounded-sm ${vColor}`}></span>Verified:
+                      </span>
+                      <span className="font-semibold text-slate-900">{data.verifiedVal}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="flex items-center gap-1.5">
+                        <span className={`h-2.5 w-2.5 rounded-sm ${pColor}`}></span>Pending:
+                      </span>
+                      <span className="font-semibold text-slate-900">{data.pendingVal}</span>
+                    </div>
+                    {data.required !== null ? (
+                      <>
+                        <div className="flex items-center justify-between gap-4">
+                          <span className="flex items-center gap-1.5">
+                            <span className="h-2.5 w-2.5 rounded-sm bg-slate-200"></span>Remaining:
+                          </span>
+                          <span className="font-semibold text-slate-900">{data.remainingVal}</span>
+                        </div>
+                        <div className="mt-2.5 flex items-center justify-between gap-4 border-t border-slate-100 pt-2.5 text-sm font-bold text-slate-900">
+                          <span>Target:</span>
+                          <span>{data.required}</span>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="mt-2 border-t border-slate-100 pt-2 text-[10px] italic text-slate-500">
+                        Not in current catalog
+                      </div>
+                    )}
+                    {data.byCompetency && data.byCompetency.length > 0 && (
+                      <div className="mt-2.5 border-t border-slate-100 pt-2.5">
+                        <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                          By Competency
+                        </p>
+                        <div className="space-y-1.5">
+                          {data.byCompetency.map((comp: any) => (
+                            <div key={comp.level} className="flex items-center justify-between gap-4 text-[11px]">
+                              <span className="max-w-[140px] truncate text-slate-600">{comp.level}</span>
+                              <span className="whitespace-nowrap font-semibold text-slate-900">
+                                {comp.verified}V · {comp.pending}P
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            }}
+          />
+          <Bar
+            dataKey="verifiedVal"
+            stackId="a"
+            isAnimationActive={false}
+            onClick={(_, index) => onItemClick(items[index])}
+          >
+            {chartData.map((entry, index) => {
+              const isDone = entry.done && entry.required !== null;
+              return (
+                <Cell
+                  key={`cell-ver-${index}`}
+                  fill={isDone ? "#10b981" : "#0d9488"}
+                  className="cursor-pointer"
+                />
+              );
+            })}
+          </Bar>
+          <Bar
+            dataKey="pendingVal"
+            stackId="a"
+            isAnimationActive={false}
+            onClick={(_, index) => onItemClick(items[index])}
+          >
+            {chartData.map((entry, index) => {
+              const isDone = entry.done && entry.required !== null;
+              return (
+                <Cell
+                  key={`cell-pen-${index}`}
+                  fill={isDone ? "#6ee7b7" : "#99f6e4"}
+                  className="cursor-pointer"
+                />
+              );
+            })}
+          </Bar>
+          <Bar
+            dataKey="remainingVal"
+            stackId="a"
+            fill="#f1f5f9"
+            radius={[0, 4, 4, 0]}
+            isAnimationActive={false}
+            onClick={(_, index) => onItemClick(items[index])}
+            className="cursor-pointer"
+          />
+        </BarChart>
+      </ChartContainer>
+    </div>
+  );
+}
+
+// ── Shared badge helpers (unchanged from original) ────────────────────────────
 
 function renderShortfallBadge(status: string) {
   switch (status) {
@@ -774,5 +1594,3 @@ function renderLogStatusBadge(status: string) {
       return <Badge className="bg-amber-50 text-amber-700 border-amber-200 text-[10px]">Pending</Badge>;
   }
 }
-
-
