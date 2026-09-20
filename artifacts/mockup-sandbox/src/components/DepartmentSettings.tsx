@@ -9,10 +9,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-const configFields = [
-  ["requiredCases", "Required clinical cases", true], ["requiredProcedures", "Required procedures", true],
-  ["requiredAcademic", "Required academic activities", true], ["programDurationMonths", "Program duration (months)", true],
-  ["casualLeaveAllowance", "Casual leave allowance (days)", true], ["academicLeaveAllowance", "Academic leave allowance (days)", true],
+const computedRequirementsFields = [
+  ["requiredCases", "Required clinical cases (computed)"],
+  ["requiredProcedures", "Required procedures (computed)"],
+  ["requiredAcademic", "Required academic activities (computed)"],
 ] as const;
 
 // Lists longer than this start collapsed and get a search box when expanded.
@@ -85,7 +85,6 @@ function SearchableSection<T extends { id: number; name: string }>({
 
 export function DepartmentSettings() {
   const data = useDepartment();
-  const [config, setConfig] = React.useState<Record<string, string>>(() => Object.fromEntries(configFields.map(([key]) => [key, data.config?.[key]?.toString() ?? ""])));
   const [procedure, setProcedure] = React.useState({ name: "", group: "", required: "" });
   const [entry, setEntry] = React.useState({ kind: "posting", name: "", required: "", period: "total" });
   const [busy, setBusy] = React.useState(false);
@@ -200,13 +199,10 @@ export function DepartmentSettings() {
 
     <div className="grid gap-6 lg:grid-cols-2">
       <Card><CardHeader><CardTitle>Department requirements</CardTitle></CardHeader><CardContent>
-        <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); void save(() => apiPost("/api/admin/department/config",
-          { ...Object.fromEntries(configFields.map(([key, _label, optional]) => [key, optional && config[key] === "" ? null : Number(config[key])])) }), "Department requirements saved"); }}>
-          {configFields.map(([key, label, optional]) => <div className="space-y-2" key={key}><Label htmlFor={`config-${key}`}>{label}</Label>
-            <Input id={`config-${key}`} type="number" step="1" min={key === "programDurationMonths" ? 1 : 0} max={key === "programDurationMonths" ? 240 : 100000}
-              required={!optional} value={config[key]} onChange={(e) => setConfig({ ...config, [key]: e.target.value })} /></div>)}
-          <Button disabled={busy} type="submit">Save requirements</Button>
-        </form>
+        <div className="space-y-4">
+          {computedRequirementsFields.map(([key, label]) => <div className="space-y-2" key={key}><Label>{label}</Label>
+            <p className="flex h-10 items-center rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-700">{data.config?.[key] ?? 0}</p></div>)}
+        </div>
       </CardContent></Card>
 
       <Card><CardHeader><CardTitle>Add procedure type</CardTitle></CardHeader><CardContent>

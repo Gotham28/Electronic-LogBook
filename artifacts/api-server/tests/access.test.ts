@@ -2,9 +2,10 @@ import { before, after, test } from "node:test";
 import assert from "node:assert/strict";
 import { setup, request, accounts as a, departmentIds, mail, password } from "./support.js";
 import { engine, db, usersTable, studentsTable, assignmentsTable, assignmentRecipientsTable, auditTable, subscriptionPlansTable, paymentsTable } from "./database.js";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import jwt from "jsonwebtoken";
 import { provisionDepartment } from "../src/lib/department-provisioning.js";
+import { departmentCatalogTable } from "@workspace/db";
 
 let runtime: Awaited<ReturnType<typeof setup>>;
 before(async () => { runtime = await setup(); });
@@ -205,14 +206,19 @@ test("thesis and certificates persist without fabricated defaults and enforce de
 });
 
 test("HOD requirements and training catalog are database-backed and reject cross-department updates", async () => {
-  const configuration = { requiredCases: 17, requiredProcedures: 21, requiredAcademic: 5,
-    programDurationMonths: 31, casualLeaveAllowance: 12, academicLeaveAllowance: null };
+  const configuration = { programDurationMonths: 31, casualLeaveAllowance: 12, academicLeaveAllowance: null };
   assert.equal((await call("/admin/department/config", "hod2", "POST", configuration)).status, 200);
   assert.equal((await call("/admin/department/config", "hod2", "POST", { ...configuration, departmentId: departmentIds[0] })).status, 400);
   assert.equal((await call("/admin/department/config", "faculty2", "POST", configuration)).status, 403);
-  assert.equal((await call("/departments/" + departmentIds[2] + "/catalog", "student2")).body.config.requiredCases, 17);
+  assert.equal((await call("/departments/" + departmentIds[2] + "/catalog", "student2")).body.config.requiredCases, 9);
   const option = await call("/admin/department/catalog", "hod2", "POST", { kind: "academic", name: "Custom seminar", value: "custom-seminar", required: 2, period: "month" });
   assert.equal(option.status, 201);
+  const caseCategory = await call("/admin/department/catalog", "hod2", "POST", { kind: "case_category", name: "Custom case type", value: "custom-case-type", required: 5, period: "total" });
+  assert.equal(caseCategory.status, 201);
+  assert.equal((await call("/departments/" + departmentIds[2] + "/catalog", "student2")).body.config.requiredCases, 5);
+  const academicTotal = await call("/admin/department/catalog", "hod2", "POST", { kind: "academic", name: "Custom total seminar", value: "custom-total-seminar", required: 7, period: "total" });
+  assert.equal(academicTotal.status, 201);
+  assert.equal((await call("/departments/" + departmentIds[2] + "/catalog", "student2")).body.config.requiredAcademic, 12);
   assert.equal((await call("/admin/department/catalog/" + option.body.id, "hod0", "PATCH", { required: 200, period: "total" })).status, 404);
 });
 
@@ -299,4 +305,41 @@ test("backend provisioning creates generic department/HOD records and refuses du
   await assert.rejects(provisionDepartment(input, password), /active HOD already exists/);
   await assert.rejects(db.insert(usersTable).values({ fullName: "Duplicate HOD", email: "duplicate@example.test", role: "hod", status: "approved", departmentId: result.departmentId }));
   await assert.rejects(db.insert(usersTable).values({ fullName: "Unassigned student", email: "null@example.test", role: "student", departmentId: null }));
+});
+
+test("computed department requirements properly handle NULL opt-outs and zero sums", async () => {
+  const deptId = departmentIds[0];
+  
+  // Clear all existing case categories for this department to start fresh via direct DB call, 
+  // then we will trigger a recompute via the API.
+  const existingCats = await db.select().from(departmentCatalogTable).where(and(eq(departmentCatalogTable.departmentId, deptId), eq(departmentCatalogTable.kind, "case_category")));
+  for (const c of existingCats) {
+    await call("/admin/department/catalog/" + c.id, "hod0", "DELETE");
+  }
+  const tempCat = await call("/admin/department/catalog", "hod0", "POST", { kind: "case_category", name: "Temp", value: "temp", required: 0, period: "total" });
+  await call("/admin/department/catalog/" + tempCat.body.id, "hod0", "DELETE");
+  
+  let catalog = await call("/departments/" + deptId + "/catalog", "student0");
+  assert.equal(catalog.body.config.requiredCases, null, "Zero rows should result in NULL");
+
+  // Add subcategories summing normally
+  const cat1 = await call("/admin/department/catalog", "hod0", "POST", { kind: "case_category", name: "Cat 1", value: "cat-1", required: 3, period: "total" });
+  catalog = await call("/departments/" + deptId + "/catalog", "student0");
+  assert.equal(catalog.body.config.requiredCases, 3, "Should sum normally");
+
+  const cat2 = await call("/admin/department/catalog", "hod0", "POST", { kind: "case_category", name: "Cat 2", value: "cat-2", required: 2, period: "total" });
+  catalog = await call("/departments/" + deptId + "/catalog", "student0");
+  assert.equal(catalog.body.config.requiredCases, 5, "Should sum normally");
+
+  // Update to sum to real 0
+  await call("/admin/department/catalog/" + cat1.body.id, "hod0", "PATCH", { required: 0, period: "total" });
+  await call("/admin/department/catalog/" + cat2.body.id, "hod0", "PATCH", { required: 0, period: "total" });
+  catalog = await call("/departments/" + deptId + "/catalog", "student0");
+  assert.equal(catalog.body.config.requiredCases, 0, "Sum of 0s should be 0, not NULL");
+
+  // Delete the last subcategory rows
+  await call("/admin/department/catalog/" + cat1.body.id, "hod0", "DELETE");
+  await call("/admin/department/catalog/" + cat2.body.id, "hod0", "DELETE");
+  catalog = await call("/departments/" + deptId + "/catalog", "student0");
+  assert.equal(catalog.body.config.requiredCases, null, "Deleting last row should revert to NULL");
 });
