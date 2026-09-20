@@ -85,4 +85,25 @@ describe("Student leave records validation against dynamic leave types", () => {
     assert.equal(typeof res.body.casual.used, "number");
     assert.equal(typeof res.body.academic.used, "number");
   });
+
+  test("Concurrency: advisory lock serializes near-simultaneous leave submissions", async () => {
+    const [testLeave] = await db.insert(departmentCatalogTable).values({ departmentId: 1, kind: "leave_type", name: "Concurrency Test Leave", value: "concurrency_leave", required: 5 }).returning();
+    
+    const req1 = call(`/students/${a.student0.studentId}/leave-records`, "student0", "POST", {
+        startDate: "2024-03-01",
+        endDate: "2024-03-03",
+        leaveType: "concurrency_leave",
+        reason: "Test 1"
+    });
+    const req2 = call(`/students/${a.student0.studentId}/leave-records`, "student0", "POST", {
+        startDate: "2024-03-04",
+        endDate: "2024-03-06",
+        leaveType: "concurrency_leave",
+        reason: "Test 2"
+    });
+    
+    const [res1, res2] = await Promise.all([req1, req2]);
+    const statusCodes = [res1.status, res2.status].sort();
+    assert.deepEqual(statusCodes, [201, 400], "One request should succeed and one should fail due to lock");
+  });
 });

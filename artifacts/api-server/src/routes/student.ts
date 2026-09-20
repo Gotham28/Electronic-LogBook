@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import crypto from "crypto";
 import { 
   db, studentsTable, caseLogsTable, procedureLogsTable, 
   academicLogsTable, usersTable, departmentsTable, departmentConfigsTable,
@@ -521,7 +522,7 @@ router.get("/:studentId/leave-balance", requireAuth, async (req, res) => {
 
     const balances: Record<string, { used: number, total: number | null }> = {};
     for (const type of leaveTypes) {
-      if (caller.role === "student" && type.value.toLowerCase() === "maternity") continue;
+      if (caller.role === "student" && type.name.toLowerCase().includes("maternity")) continue;
       balances[type.value] = { used: usedMap[type.value] || 0, total: type.required || null };
     }
     res.json(balances);
@@ -569,10 +570,9 @@ router.post("/:studentId/leave-records", validate(z.object({ startDate: dateSche
 
     const currentYear = new Date().getFullYear().toString();
     const result = await db.transaction(async (tx) => {
-      // 1. Lock the student's leave records to prevent race conditions during submission
-      await tx.execute(sql`SELECT pg_advisory_xact_lock(
-        ('x' || substr(md5('leave_records' || ${studentId}::text), 1, 16))::bit(64)::bigint
-      )`);
+      const hashBuffer = crypto.createHash("md5").update(`leave_lock_${studentId}`).digest();
+      const hash = hashBuffer.readInt32BE(0);
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(${hash})`);
 
       const [catalogEntry] = await tx.select().from(departmentCatalogTable)
         .where(and(eq(departmentCatalogTable.departmentId, studentUser.departmentId!), eq(departmentCatalogTable.kind, "leave_type"), eq(departmentCatalogTable.value, leaveType))).limit(1);
