@@ -215,7 +215,7 @@ export function CaseLogsPage() {
             <form onSubmit={handleAddCase} className="space-y-5">
               <div className={`grid gap-4 ${hideUhid ? "sm:grid-cols-3" : "sm:grid-cols-4"}`}>
                 <Field label="Date"><Input type="date" value={form.date} onChange={(e) => setField("date", e.target.value)} required /></Field>
-                {!hideUhid && <Field label="Patient UHID"><Input value={form.patientUhid} onChange={(e) => setField("patientUhid", e.target.value)} placeholder="UHID-2026-…" /></Field>}
+                {!hideUhid && <Field label="Patient ID"><Input value={form.patientUhid} onChange={(e) => setField("patientUhid", e.target.value)} placeholder="ID-2026-…" /></Field>}
                 <Field label="Age"><Input value={form.age} onChange={(e) => setField("age", e.target.value)} placeholder="e.g. 7 years" required /></Field>
                 <Field label="Gender">
                   <Select value={form.gender} onValueChange={(value) => setField("gender", value)}>
@@ -313,7 +313,7 @@ export function CaseLogsPage() {
         <CardHeader className="flex flex-col justify-between gap-4 border-b border-teal-100 md:flex-row md:items-center">
           <div className="relative w-full max-w-md">
             <Search className="absolute left-3 top-3 h-4 w-4 text-teal-600" />
-            <Input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="h-11 pl-9 pr-24" placeholder={hideUhid ? "Search category or diagnosis..." : "Search patient, UHID, category or diagnosis..."} />
+            <Input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="h-11 pl-9 pr-24" placeholder={hideUhid ? "Search category or diagnosis..." : "Search patient, ID, category or diagnosis..."} />
             <div className="pointer-events-none absolute right-3 top-2.5 flex items-center gap-1">
               <Kbd>Ctrl</Kbd>
               <span className="text-[10px] text-slate-400">+</span>
@@ -337,7 +337,7 @@ export function CaseLogsPage() {
               </div>
               <div className="space-y-1 text-center">
                 <p className="text-base font-semibold text-slate-950">No cases found</p>
-                <p className="max-w-sm text-sm leading-6 text-slate-500">{hideUhid ? "Try a different diagnosis or case number, or clear the search to see all records." : "Try a different UHID, diagnosis, or case number, or clear the search to see all records."}</p>
+                <p className="max-w-sm text-sm leading-6 text-slate-500">{hideUhid ? "Try a different diagnosis or case number, or clear the search to see all records." : "Try a different ID, diagnosis, or case number, or clear the search to see all records."}</p>
               </div>
             </div>
           ) : (
@@ -346,7 +346,7 @@ export function CaseLogsPage() {
                 <TableRow>
                   <TableHead>Number</TableHead>
                   <TableHead>Date</TableHead>
-                  {!hideUhid && <TableHead>Patient UHID</TableHead>}
+                  {!hideUhid && <TableHead>Patient ID</TableHead>}
                   <TableHead>Age</TableHead>
                   <TableHead>Category</TableHead>
                   <TableHead>Diagnosis</TableHead>

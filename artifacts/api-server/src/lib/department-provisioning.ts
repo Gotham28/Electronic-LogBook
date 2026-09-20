@@ -2,7 +2,7 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import crypto from "node:crypto";
 import { eq, and } from "drizzle-orm";
-import { db, departmentsTable, usersTable, departmentConfigsTable, procedureTypesTable, departmentCatalogTable, studentsTable } from "@workspace/db";
+import { db, departmentsTable, usersTable, departmentConfigsTable, procedureTypesTable, departmentCatalogTable, studentsTable, caseLogsTable, procedureLogsTable } from "@workspace/db";
 import { configSchema, emailSchema, nameSchema, passwordSchema, targetSchema } from "./validation.js";
 import { sendAccountCreatedEmail } from "./mailer.js";
 
@@ -102,14 +102,14 @@ export async function provisionMirrorForRealDepartment(
       departmentId: mirrorDept.id
     });
 
-    await tx.insert(usersTable).values({
+    const [testProfUser] = await tx.insert(usersTable).values({
       fullName: "Test Professor",
       email: `test-prof.${safeCode}${emailDomain}`,
       passwordHash: await bcrypt.hash(crypto.randomBytes(16).toString("hex"), 12),
       role: "professor",
       status: "approved",
       departmentId: mirrorDept.id
-    });
+    }).returning({ id: usersTable.id });
 
     const [testStudentUser] = await tx.insert(usersTable).values({
       fullName: "Test Student",
@@ -120,14 +120,72 @@ export async function provisionMirrorForRealDepartment(
       departmentId: mirrorDept.id
     }).returning({ id: usersTable.id });
 
-    await tx.insert(studentsTable).values({
+    const [testStudent] = await tx.insert(studentsTable).values({
       userId: testStudentUser.id,
       registrationNumber: `TEST-${testStudentUser.id}`,
       batch: new Date().getFullYear().toString(),
       dateOfJoining: new Date().toISOString().slice(0, 10),
       kuhsId: `UNIV-${testStudentUser.id}`,
       specialty: mirrorDept.name
-    });
+    }).returning({ id: studentsTable.id });
+
+    // Insert dummy logs to populate the student progress bar for testing
+    const dummyDate = new Date().toISOString().slice(0, 10);
+    
+    await tx.insert(caseLogsTable).values([
+      {
+        studentId: testStudent.id,
+        supervisorId: testProfUser.id,
+        date: dummyDate,
+        patientUhid: "ID-001",
+        patientAge: "45",
+        patientGender: "male",
+        diagnosisFinal: "Essential Hypertension",
+        category: "General Medicine",
+        status: "verified",
+        reviewedBy: testProfUser.id,
+        reviewedAt: new Date()
+      },
+      {
+        studentId: testStudent.id,
+        supervisorId: testProfUser.id,
+        date: dummyDate,
+        patientUhid: "ID-002",
+        patientAge: "30",
+        patientGender: "female",
+        diagnosisFinal: "Type 2 Diabetes Mellitus",
+        category: "Endocrinology",
+        status: "pending"
+      }
+    ]);
+
+    await tx.insert(procedureLogsTable).values([
+      {
+        studentId: testStudent.id,
+        supervisorId: testProfUser.id,
+        procedureGroup: "Basic Procedures",
+        procedureName: "Venipuncture",
+        date: dummyDate,
+        patientUhid: "ID-003",
+        patientAge: "25",
+        competencyLevel: "performed_independently",
+        facultyVerifiedLevel: "performed_independently",
+        status: "verified",
+        reviewedBy: testProfUser.id,
+        reviewedAt: new Date()
+      },
+      {
+        studentId: testStudent.id,
+        supervisorId: testProfUser.id,
+        procedureGroup: "Basic Procedures",
+        procedureName: "ABG Sampling",
+        date: dummyDate,
+        patientUhid: "ID-004",
+        patientAge: "50",
+        competencyLevel: "performed_under_supervision",
+        status: "pending"
+      }
+    ]);
 
     return { created: true, mirrorDepartmentId: mirrorDept.id };
   });

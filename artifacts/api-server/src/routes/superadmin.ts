@@ -291,6 +291,11 @@ async function deleteDepartmentCascade(tx: any, targetDepartmentId: number, isMi
     throw err;
   }
 
+  if (isMirror && studentIds.length > 0) {
+    await tx.delete(caseLogsTable).where(inArray(caseLogsTable.studentId, studentIds));
+    await tx.delete(procedureLogsTable).where(inArray(procedureLogsTable.studentId, studentIds));
+  }
+
   if (assignmentIds.length > 0) {
     await tx.delete(assignmentRecipientsTable).where(inArray(assignmentRecipientsTable.assignmentId, assignmentIds));
   }

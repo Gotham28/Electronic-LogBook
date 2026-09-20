@@ -411,7 +411,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                         <p className="text-xs text-slate-600 font-medium">Patient Info: {currentItem.patientInfo}</p>
                       )}
                       {!hideUhid && currentItem.patientUhid && (
-                        <p className="text-xs font-semibold text-teal-800">Patient UHID: {currentItem.patientUhid}</p>
+                        <p className="text-xs font-semibold text-teal-800">Patient ID: {currentItem.patientUhid}</p>
                       )}
                       {currentItem.declaredCompetency && (
                         <p className="text-xs text-teal-800 font-semibold bg-teal-50 inline-block px-2.5 py-1 rounded border border-teal-200 mt-1">
@@ -835,7 +835,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                         <TableRow>
                           <TableHead className="text-xs font-semibold">Date</TableHead>
                           <TableHead className="text-xs font-semibold">Diagnosis</TableHead>
-                          <TableHead className="text-xs font-semibold">{hideUhid ? "Patient Info" : "Patient UHID & Info"}</TableHead>
+                          <TableHead className="text-xs font-semibold">{hideUhid ? "Patient Info" : "Patient ID & Info"}</TableHead>
                           <TableHead className="text-xs font-semibold text-right">Status</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -893,7 +893,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                       <TableHeader className="bg-slate-50">
                         <TableRow>
                           <TableHead className="text-xs font-semibold">Procedure Name</TableHead>
-                          <TableHead className="text-xs font-semibold">{hideUhid ? "Age" : "Patient UHID & Age"}</TableHead>
+                          <TableHead className="text-xs font-semibold">{hideUhid ? "Age" : "Patient ID & Age"}</TableHead>
                           <TableHead className="text-xs font-semibold">Competency</TableHead>
                           <TableHead className="text-xs font-semibold text-right">Status</TableHead>
                         </TableRow>

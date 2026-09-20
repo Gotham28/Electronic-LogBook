@@ -188,7 +188,7 @@ export function ProcedureLogsPage() {
                 </Select>
               </Field>
               <div className={`grid gap-4 ${hideUhid ? "sm:grid-cols-1" : "sm:grid-cols-2"}`}>
-                {!hideUhid && <Field label="Patient UHID"><Input value={form.patientUhid} onChange={(e) => setForm({ ...form, patientUhid: e.target.value })} required /></Field>}
+                {!hideUhid && <Field label="Patient ID"><Input value={form.patientUhid} onChange={(e) => setForm({ ...form, patientUhid: e.target.value })} required /></Field>}
                 <Field label="Age"><Input value={form.age} onChange={(e) => setForm({ ...form, age: e.target.value })} placeholder="e.g. 4 months" required /></Field>
               </div>
               <Field label="Procedure experience">
@@ -299,7 +299,7 @@ export function ProcedureLogsPage() {
             </Empty>
           ) : (
             <Table>
-              <TableHeader><TableRow><TableHead>Number</TableHead><TableHead>Date</TableHead><TableHead>Group</TableHead><TableHead>Procedure</TableHead>{!hideUhid && <TableHead>Patient UHID</TableHead>}<TableHead>Age</TableHead><TableHead>Experience</TableHead><TableHead>Verified competency</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Number</TableHead><TableHead>Date</TableHead><TableHead>Group</TableHead><TableHead>Procedure</TableHead>{!hideUhid && <TableHead>Patient ID</TableHead>}<TableHead>Age</TableHead><TableHead>Experience</TableHead><TableHead>Verified competency</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
               <TableBody>
                 {logs.map((log) => (
                   <TableRow key={log.id}>
