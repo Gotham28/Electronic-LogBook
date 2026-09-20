@@ -109,6 +109,7 @@ function navigationForRole(role: RoleType, dashboardData?: any, loadingBadges?: 
   if (role === "HOD") {
     return [
       { title: "Dashboard", icon: GraduationCap, href: "/roster" },
+      { title: "Student Progress", icon: UserCheck, href: "/mentees" },
       { title: "Review Queue", icon: FileText, href: "/review-queue" },
       { title: "Add Assessment", icon: ClipboardCheck, href: "/assessments" },
       { title: "Pending Students", icon: UserPlus, href: "/student-access" },

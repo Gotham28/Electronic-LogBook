@@ -739,3 +739,31 @@ The rest of the file (including the parallel `Promise.all` fetch effect, Retry h
 
 None. The sandbox constraint forbids all shell commands.
 
+---
+
+## Dispatch 56 — HOD Progress Visibility & Remove Manual Student Add
+
+Branch: `feature/faculty-progress-breakdown`
+
+### What changed
+
+**Files modified:**
+1. `artifacts/mockup-sandbox/src/components/layout/AppLayout.tsx`
+2. `artifacts/mockup-sandbox/src/components/HODPortal.tsx`
+
+#### `AppLayout.tsx`
+Added the "Student Progress" navigation item to the HOD role's sidebar array. This allows the HOD to navigate to the `/mentees` view, which hosts the Logbook Inspector where the interactive progress bar charts from PR 51 were added.
+
+#### `HODPortal.tsx`
+Removed the manual "Add Student" form, its associated state variables (`generateDefaultStudentForm`, `handleCreateStudent`), and the UI section completely. HODs can now only approve pending students, as requested.
+
+### Evidence — confirmations read directly from the file
+
+**1. HOD Navigation Tab Added:**
+In `AppLayout.tsx` lines 109-115, `{ title: "Student Progress", icon: UserCheck, href: "/mentees" }` was inserted.
+
+**2. Add Student Logic Removed:**
+In `HODPortal.tsx`, `handleCreateStudent` and the related "Add New Resident" form were entirely deleted, fulfilling the user request "Remove the option to manually add students by the hod, he should only be able to approve students".
+
+### Commands run
+- `git status` (to verify branch)
