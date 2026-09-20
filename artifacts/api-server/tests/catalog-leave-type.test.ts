@@ -102,6 +102,7 @@ describe("Student leave records validation against dynamic leave types", () => {
         reason: "Test 2"
     });
     
+    const currentYear = new Date().getFullYear();
     const [res1, res2] = await Promise.all([req1, req2]);
     const statusCodes = [res1.status, res2.status].sort();
     assert.deepEqual(statusCodes, [201, 400], "One request should succeed and one should fail due to lock");

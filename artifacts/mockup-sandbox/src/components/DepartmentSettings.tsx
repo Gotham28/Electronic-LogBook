@@ -90,6 +90,7 @@ export function DepartmentSettings() {
   const [busy, setBusy] = React.useState(false);
   const [targets, setTargets] = React.useState<Record<number, string>>({});
   const [academicTargets, setAcademicTargets] = React.useState<Record<number, string>>({});
+  const [leaveTargets, setLeaveTargets] = React.useState<Record<number, string>>({});
 
   const [deleteTarget, setDeleteTarget] = React.useState<{id: number, type: "procedure" | "posting" | "academic" | "case_category" | "competency_level" | "leave_type", name: string, count: number | null} | null>(null);
   const [deleting, setDeleting] = React.useState(false);
@@ -288,8 +289,8 @@ export function DepartmentSettings() {
           title="Leave types"
           items={data.leaveTypes ?? []}
           emptyText="No leave types configured."
-          renderItem={(item) => <form className="flex flex-wrap items-center gap-2 rounded-xl bg-slate-50 p-3" onSubmit={(e) => { e.preventDefault(); void save(() => apiPatch(`/api/admin/department/catalog/${item.id}`, { required: Number(academicTargets[item.id] ?? item.required), period: item.period }), "Leave allowance updated"); }}>
-            <span className="flex-1 text-sm">{item.name}</span><Input className="w-16" type="number" min={0} max={365} required aria-label={`Allowance for ${item.name}`} value={academicTargets[item.id] ?? item.required} onChange={(e) => setAcademicTargets({ ...academicTargets, [item.id]: e.target.value })} /><Button size="sm" variant="outline" disabled={busy} type="submit">Save</Button>
+          renderItem={(item) => <form className="flex flex-wrap items-center gap-2 rounded-xl bg-slate-50 p-3" onSubmit={(e) => { e.preventDefault(); void save(() => apiPatch(`/api/admin/department/catalog/${item.id}`, { required: Number(leaveTargets[item.id] ?? item.required), period: item.period }), "Leave allowance updated"); }}>
+            <span className="flex-1 text-sm">{item.name}</span><Input className="w-16" type="number" min={0} max={365} required aria-label={`Allowance for ${item.name}`} value={leaveTargets[item.id] ?? item.required} onChange={(e) => setLeaveTargets({ ...leaveTargets, [item.id]: e.target.value })} /><Button size="sm" variant="outline" disabled={busy} type="submit">Save</Button>
             <Button variant="outline" size="sm" type="button" disabled={busy || deleting} onClick={() => confirmDelete(item.id, "leave_type", item.name)} className="text-rose-700 border-rose-200 hover:bg-rose-50 px-2"><Trash2 className="h-4 w-4" /></Button>
           </form>}
         />

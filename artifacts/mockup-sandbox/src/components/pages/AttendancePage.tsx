@@ -135,9 +135,13 @@ export function AttendancePage() {
           </div>
         ) : (
           <>
-            {Object.entries(balance).map(([key, data]) => (
-              <SummaryCard key={key} label={`${key} Leave (${data.total ?? "not configured"})`} value={data.used} total={data.total} tone="teal" />
-            ))}
+            {Object.entries(balance).map(([key, data]) => {
+              const leaveType = dept.leaveTypes?.find(t => t.value === key);
+              const displayName = leaveType ? leaveType.name : `${key} Leave`;
+              return (
+                <SummaryCard key={key} label={`${displayName} (${data.total ?? "not configured"})`} value={data.used} total={data.total} tone="teal" />
+              );
+            })}
           </>
         )}
         <SummaryCard label="Pending Approval" value={pendingCount} tone="amber" />
