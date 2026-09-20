@@ -154,7 +154,7 @@ export function PrintableLogbook() {
       <Section title="2. Case Logs">
         {data.cases.length === 0 ? <p>No cases recorded.</p> : (
           <table className="w-full text-left border-collapse text-sm">
-            <thead><tr className="border-b border-black"><th className="py-2">Date</th><th>{hideUhid ? "Age / Gender" : "UHID / Age"}</th><th>Chief Complaint</th><th>Final Diagnosis</th><th>Status</th></tr></thead>
+            <thead><tr className="border-b border-black"><th className="py-2">Date</th><th>{hideUhid ? "Age / Gender" : "Patient ID / Age"}</th><th>Chief Complaint</th><th>Final Diagnosis</th><th>Status</th></tr></thead>
             <tbody>
               {data.cases.map((c: any) => (
                 <tr key={c.id} className="border-b border-gray-300">

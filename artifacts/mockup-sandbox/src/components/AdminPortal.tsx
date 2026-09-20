@@ -242,7 +242,7 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
         <p className="text-xs font-bold uppercase tracking-wider text-teal-600">College administration</p>
         <h1 className="text-xl font-bold text-slate-900 tracking-tight">Departments, faculty and HODs, college-wide</h1>
         <p className="text-sm text-slate-500 max-w-2xl">
-          Create and manage departments, appoint HODs, and provision faculty accounts. Resident approval stays with each department's HOD — this console only creates the resident account, it never approves one.
+          Create and manage departments, appoint HODs, and provision faculty accounts. Students and faculty added through this console bypass the payment gate and are immediately approved.
         </p>
       </div>
 

@@ -248,7 +248,7 @@ export function Dashboard() {
               </div>
             ) : (
               <Table>
-                <TableHeader><TableRow><TableHead>#</TableHead><TableHead>Date</TableHead><TableHead>Type</TableHead><TableHead>Entry</TableHead>{!hideUhid && <TableHead>Patient UHID</TableHead>}<TableHead>Status</TableHead></TableRow></TableHeader>
+                <TableHeader><TableRow><TableHead>#</TableHead><TableHead>Date</TableHead><TableHead>Type</TableHead><TableHead>Entry</TableHead>{!hideUhid && <TableHead>Patient ID</TableHead>}<TableHead>Status</TableHead></TableRow></TableHeader>
                 <TableBody>
                   {recent.map((item, index) => (
                     <TableRow key={`${item.type}-${item.number}`}>
