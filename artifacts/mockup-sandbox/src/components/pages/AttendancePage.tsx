@@ -42,10 +42,7 @@ export function AttendancePage() {
   const [reason, setReason] = React.useState("");
 
   const [leaves, setLeaves] = React.useState<LeaveRecord[]>([]);
-  const [balance, setBalance] = React.useState({
-    casual: { used: 0, total: null as number | null },
-    academic: { used: 0, total: null as number | null }
-  });
+  const [balance, setBalance] = React.useState<Record<string, { used: number, total: number | null }>>({});
   const [balanceError, setBalanceError] = React.useState<string | null>(null);
   const user = React.useMemo(() => getCurrentUser(), []);
 
@@ -55,7 +52,7 @@ export function AttendancePage() {
     try {
       const [leavesResponse, balanceData] = await Promise.all([
         apiGet(`/api/students/${user.studentProfileId}/leave-records`),
-        apiGet<{casual: any, academic: any}>(`/api/students/${user.studentProfileId}/leave-balance`)
+        apiGet<Record<string, { used: number, total: number | null }>>(`/api/students/${user.studentProfileId}/leave-balance`)
       ]);
 
       // Backend wraps leave-records in { data: [] }
@@ -138,8 +135,13 @@ export function AttendancePage() {
           </div>
         ) : (
           <>
-            <SummaryCard label={`Casual Leave (${balance.casual.total ?? "not configured"})`} value={balance.casual.used} total={balance.casual.total} tone="teal" />
-            <SummaryCard label={`Academic Leave (${balance.academic.total ?? "not configured"})`} value={balance.academic.used} total={balance.academic.total} tone="teal" />
+            {Object.entries(balance).map(([key, data]) => {
+              const leaveType = dept.leaveTypes?.find(t => t.value === key);
+              const displayName = leaveType ? leaveType.name : `${key} Leave`;
+              return (
+                <SummaryCard key={key} label={`${displayName} (${data.total ?? "not configured"})`} value={data.used} total={data.total} tone="teal" />
+              );
+            })}
           </>
         )}
         <SummaryCard label="Pending Approval" value={pendingCount} tone="amber" />

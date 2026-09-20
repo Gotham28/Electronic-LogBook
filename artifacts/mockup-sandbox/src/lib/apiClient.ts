@@ -130,6 +130,7 @@ export type AdminDepartment = {
   residentCount?: number;
   pendingCount?: number;
   mirrorDepartmentId: number | null;
+  mirrorCode: string | null;
 };
 
 export type AdminUserRow = {
@@ -176,7 +177,10 @@ export function backfillTestDepartments(): Promise<{ provisioned: number[]; skip
   return apiPost("/api/superadmin/departments/backfill-test-departments");
 }
 
+export function resetTestCredentials(departmentId: number): Promise<{ mirrorCode: string }> {
+  return apiPost(`/api/superadmin/departments/${departmentId}/reset-test-credentials`);
+}
+
 export function deleteAdminDepartment(id: number) {
   return apiDelete(`/api/superadmin/departments/${id}`);
 }
-

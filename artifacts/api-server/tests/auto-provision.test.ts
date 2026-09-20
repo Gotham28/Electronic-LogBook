@@ -60,9 +60,9 @@ describe("Auto-provision Mirror Department", () => {
     assert.equal(testProf.status, "approved");
     assert.equal(testStudentUser.status, "approved");
 
-    assert.equal(testHod.email.endsWith("@elogbook.invalid"), true);
-    assert.equal(testProf.email.endsWith("@elogbook.invalid"), true);
-    assert.equal(testStudentUser.email.endsWith("@elogbook.invalid"), true);
+    assert.equal(testHod.email.endsWith(".test"), true);
+    assert.equal(testProf.email.endsWith(".test"), true);
+    assert.equal(testStudentUser.email.endsWith(".test"), true);
 
     assert.equal(mail.has(testHod.email), false);
     assert.equal(mail.has(testProf.email), false);

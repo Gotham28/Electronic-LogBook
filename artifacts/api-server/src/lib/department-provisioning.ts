@@ -90,13 +90,13 @@ export async function provisionMirrorForRealDepartment(
       configSourceDepartmentId: realDepartmentId
     }).returning();
 
-    const emailDomain = "@elogbook.invalid";
-    const safeCode = testCode.toLowerCase();
+    const safeName = realDepartmentName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    const testPasswordHash = await bcrypt.hash(testCode, 12);
 
     await tx.insert(usersTable).values({
       fullName: "Test HOD",
-      email: `test-hod.${safeCode}${emailDomain}`,
-      passwordHash: await bcrypt.hash(crypto.randomBytes(16).toString("hex"), 12),
+      email: `test.hod@${safeName}.test`,
+      passwordHash: testPasswordHash,
       role: "hod",
       status: "approved",
       departmentId: mirrorDept.id
@@ -104,8 +104,8 @@ export async function provisionMirrorForRealDepartment(
 
     const [testProfUser] = await tx.insert(usersTable).values({
       fullName: "Test Professor",
-      email: `test-prof.${safeCode}${emailDomain}`,
-      passwordHash: await bcrypt.hash(crypto.randomBytes(16).toString("hex"), 12),
+      email: `test.prof@${safeName}.test`,
+      passwordHash: testPasswordHash,
       role: "professor",
       status: "approved",
       departmentId: mirrorDept.id
@@ -113,12 +113,13 @@ export async function provisionMirrorForRealDepartment(
 
     const [testStudentUser] = await tx.insert(usersTable).values({
       fullName: "Test Student",
-      email: `test-student.${safeCode}${emailDomain}`,
-      passwordHash: await bcrypt.hash(crypto.randomBytes(16).toString("hex"), 12),
+      email: `test.student@${safeName}.test`,
+      passwordHash: testPasswordHash,
       role: "student",
       status: "approved",
       departmentId: mirrorDept.id
     }).returning({ id: usersTable.id });
+
 
     const [testStudent] = await tx.insert(studentsTable).values({
       userId: testStudentUser.id,

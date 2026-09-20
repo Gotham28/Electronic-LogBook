@@ -19,7 +19,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
-import { formatLogbookDate, expectedCompletionDate } from "@/lib/logbook-config";
+import { formatLogbookDate } from "@/lib/logbook-config";
 import { apiGet } from "@/lib/apiClient";
 import { getCurrentUser, isDemoMode } from "@/lib/session";
 import { useDepartment } from "@/lib/department-context";
@@ -138,7 +138,7 @@ export function Dashboard() {
                   <ProfileField label="Registration number" value={logs.profile?.registrationNumber || "—"} />
                   <ProfileField label="Department" value={logs.profile?.department || "Unassigned"} />
                   <ProfileField label="Date of joining" value={formatLogbookDate(logs.profile?.dateOfJoining || "—")} />
-                  <ProfileField label="Expected completion" value={formatLogbookDate(expectedCompletionDate(logs.profile?.dateOfJoining, deptConfig?.programDurationMonths) || "Not configured")} />
+
                 </div>
               </CardContent>
             </Card>

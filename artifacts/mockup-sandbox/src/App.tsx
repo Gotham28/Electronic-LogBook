@@ -1,5 +1,5 @@
 import { useEffect, useState, type ComponentType } from "react";
-import { Route, Switch } from "wouter";
+import { Route, Switch, useLocation } from "wouter";
 import { AppLayout, type RoleType } from "@/components/layout/AppLayout";
 import { Dashboard } from "@/components/Dashboard";
 import { ProfessorPortal } from "@/components/ProfessorPortal";
@@ -130,6 +130,7 @@ function getPreviewPath(): string | null {
 }
 
 function App() {
+  const [, setLocation] = useLocation();
   const previewPath = getPreviewPath();
   const currentUser = getCurrentUser();
   
@@ -218,6 +219,7 @@ function App() {
             void apiPost("/api/auth/logout", {}).catch(() => {});
             clearSession();
             setIsAuthenticated(false);
+            setLocation("/");
           }}
         />
         <Toaster position="top-right" richColors />
@@ -235,6 +237,7 @@ function App() {
         void apiPost("/api/auth/logout", {}).catch(() => {});
         clearSession();
         setIsAuthenticated(false);
+        setLocation("/");
       }}
     >
       <Switch>

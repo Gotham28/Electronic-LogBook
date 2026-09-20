@@ -9,8 +9,7 @@ const router: IRouter = Router();
 
 // Registration only needs the directory, not department rosters or staff identities.
 router.get("/", async (_req, res) => {
-  res.json(await db.select({ id: departmentsTable.id, name: departmentsTable.name, code: departmentsTable.code,
-    programDurationMonths: departmentConfigsTable.programDurationMonths }).from(departmentsTable)
+  res.json(await db.select({ id: departmentsTable.id, name: departmentsTable.name, code: departmentsTable.code }).from(departmentsTable)
     .innerJoin(usersTable, and(eq(usersTable.departmentId, departmentsTable.id), eq(usersTable.role, "hod"), eq(usersTable.status, "approved")))
     .leftJoin(departmentConfigsTable, eq(departmentConfigsTable.departmentId, departmentsTable.id))
     .where(eq(departmentsTable.isTest, false))
@@ -212,20 +211,12 @@ router.get("/:departmentId/analytics", requireRole(["hod"]), async (req, res) =>
     // Status field: since there's no separate registration status column yet,
     // we treat all students as "Active" (they are in the DB = admitted).
     // Future: add a status column to studentsTable.
-    const [program] = await db.select().from(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, configSourceId));
     const students = studentsInDept.map((s, i) => ({
       number:             i + 1,
       name:               s.fullName,
       department:         deptMatch[0].name,
       registrationNumber: s.registrationNumber,
       dateOfJoining:      s.dateOfJoining,
-      expectedCompletion: (() => {
-        if (!program?.programDurationMonths) return null;
-        const d = new Date(s.dateOfJoining);
-        if (Number.isNaN(d.getTime())) return null;
-        d.setUTCMonth(d.getUTCMonth() + program.programDurationMonths);
-        return d.toISOString().split("T")[0];
-      })(),
       status:  "Active" as const,
     }));
 

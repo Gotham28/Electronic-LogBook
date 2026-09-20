@@ -61,6 +61,7 @@ type LeaveRequest = {
   toDate: string;
   reason: string;
   status: string;
+  remainingBalance: number | null;
 };
 
 const paths: Record<string, string> = {
@@ -663,7 +664,10 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
                       <TableRow key={leave.id}>
                         <TableCell className="font-bold">{idx + 1}</TableCell>
                         <TableCell className="font-semibold">{leave.residentName}</TableCell>
-                        <TableCell>{leave.type}</TableCell>
+                        <TableCell>
+                          <div className="font-medium">{leave.type}</div>
+                          <div className="text-[10px] text-slate-500">{leave.remainingBalance !== null ? `${leave.remainingBalance} days remaining` : 'No limit'}</div>
+                        </TableCell>
                         <TableCell>{leave.reason}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
