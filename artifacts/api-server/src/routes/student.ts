@@ -222,6 +222,179 @@ router.get("/:studentId/logs", requireAuth, async (req, res) => {
   }
 });
 
+// Progress — per-item log counts (category, procedure, academic type) by verified/pending.
+// Unlike /:studentId/logs above, which is assignment-scoped ("Faculty inspection is
+// assignment-scoped. HODs retain department-wide oversight." — student.ts:178), this
+// endpoint deliberately does NOT filter by supervisorId. Progress counts represent the
+// student's total training progress across all supervisors, not what one supervisor
+// personally reviewed. A professor calling this route sees the same totals as the HOD,
+// because the purpose is to assess training completeness, not to scope inspection.
+router.get("/:studentId/progress", requireAuth, async (req, res) => {
+  try {
+    const studentId = parseInt(String(req.params.studentId), 10);
+    if (isNaN(studentId)) {
+      res.status(400).json({ message: "Invalid studentId format" });
+      return;
+    }
+
+    // Defense-in-depth: re-resolve the student row and re-check departmentId,
+    // mirroring /:studentId/logs (student.ts:147-176), even though studentAccess
+    // (line 26) already covers this. AGENTS.md §3 treats a missing re-check as a
+    // defect, not redundant code.
+    const studentMatch = await db.select({
+      id: studentsTable.id,
+      userId: studentsTable.userId,
+      departmentId: usersTable.departmentId,
+    })
+    .from(studentsTable)
+    .innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
+    .where(eq(studentsTable.id, studentId))
+    .limit(1);
+
+    if (studentMatch.length === 0) {
+      res.status(404).json({ message: "Student not found" });
+      return;
+    }
+
+    const caller = req.user!;
+    const student = studentMatch[0];
+    if (caller.role === "student" && caller.id !== student.userId) {
+      res.status(403).json({ message: "You may only view your own progress" });
+      return;
+    }
+    if (["professor", "hod"].includes(caller.role) && caller.departmentId !== student.departmentId) {
+      res.status(403).json({ message: "This student is outside your department" });
+      return;
+    }
+
+    // All three queries filter by studentId only — no supervisorId filter.
+    // See the comment block above this handler for why.
+    const [caseCounts, procedureCounts, academicCounts] = await Promise.all([
+      // Query 1: case_logs grouped by category and status.
+      // NULL category (rows predating migration 0005) is a valid group — passed through as null.
+      db.select({
+        category: caseLogsTable.category,
+        status: caseLogsTable.status,
+        count: count(),
+      })
+      .from(caseLogsTable)
+      .where(and(eq(caseLogsTable.studentId, studentId), isNull(caseLogsTable.deletedAt)))
+      .groupBy(caseLogsTable.category, caseLogsTable.status),
+
+      // Query 2: procedure_logs grouped by procedureGroup, procedureName, competencyLevel, status.
+      db.select({
+        procedureGroup: procedureLogsTable.procedureGroup,
+        procedureName: procedureLogsTable.procedureName,
+        competencyLevel: procedureLogsTable.competencyLevel,
+        status: procedureLogsTable.status,
+        count: count(),
+      })
+      .from(procedureLogsTable)
+      .where(and(eq(procedureLogsTable.studentId, studentId), isNull(procedureLogsTable.deletedAt)))
+      .groupBy(procedureLogsTable.procedureGroup, procedureLogsTable.procedureName, procedureLogsTable.competencyLevel, procedureLogsTable.status),
+
+      // Query 3: academic_logs grouped by activityType and status.
+      // academic_logs has no deletedAt column — no deletedAt filter here.
+      db.select({
+        activityType: academicLogsTable.activityType,
+        status: academicLogsTable.status,
+        count: count(),
+      })
+      .from(academicLogsTable)
+      .where(eq(academicLogsTable.studentId, studentId))
+      .groupBy(academicLogsTable.activityType, academicLogsTable.status),
+    ]);
+
+    // Reshape raw per-status rows into the response shape.
+    // "verified" counts rows with status="verified". "pending" counts rows with
+    // status="pending". Rows with status="rejected" are counted in neither.
+
+    // --- Case categories ---
+    const caseCategoryMap = new Map<string | null, { verified: number; pending: number }>();
+    for (const row of caseCounts) {
+      const key = row.category ?? null;
+      if (!caseCategoryMap.has(key)) {
+        caseCategoryMap.set(key, { verified: 0, pending: 0 });
+      }
+      const entry = caseCategoryMap.get(key)!;
+      if (row.status === "verified") entry.verified += Number(row.count);
+      // case_logs.status has no NOT NULL constraint (unlike procedure_logs.status and
+      // academic_logs.status) — a NULL status is treated as pending, matching the
+      // column's DEFAULT 'pending' semantics.
+      else if (row.status === "pending" || row.status === null) entry.pending += Number(row.count);
+    }
+    const caseCategories = Array.from(caseCategoryMap.entries()).map(([value, counts]) => ({
+      value,
+      verified: counts.verified,
+      pending: counts.pending,
+    }));
+
+    // --- Procedures (group+name totals, with byCompetency breakdown) ---
+    const procedureMap = new Map<string, {
+      group: string;
+      name: string;
+      verified: number;
+      pending: number;
+      competencyMap: Map<string, { verified: number; pending: number }>;
+    }>();
+    for (const row of procedureCounts) {
+      const key = `${row.procedureGroup}\0${row.procedureName}`;
+      if (!procedureMap.has(key)) {
+        procedureMap.set(key, {
+          group: row.procedureGroup,
+          name: row.procedureName,
+          verified: 0,
+          pending: 0,
+          competencyMap: new Map(),
+        });
+      }
+      const entry = procedureMap.get(key)!;
+      if (row.status === "verified") entry.verified += Number(row.count);
+      else if (row.status === "pending") entry.pending += Number(row.count);
+
+      if (!entry.competencyMap.has(row.competencyLevel)) {
+        entry.competencyMap.set(row.competencyLevel, { verified: 0, pending: 0 });
+      }
+      const compEntry = entry.competencyMap.get(row.competencyLevel)!;
+      if (row.status === "verified") compEntry.verified += Number(row.count);
+      else if (row.status === "pending") compEntry.pending += Number(row.count);
+    }
+    const procedures = Array.from(procedureMap.values()).map((entry) => ({
+      group: entry.group,
+      name: entry.name,
+      verified: entry.verified,
+      pending: entry.pending,
+      byCompetency: Array.from(entry.competencyMap.entries()).map(([level, counts]) => ({
+        level,
+        verified: counts.verified,
+        pending: counts.pending,
+      })),
+    }));
+
+    // --- Academics ---
+    const academicMap = new Map<string, { verified: number; pending: number }>();
+    for (const row of academicCounts) {
+      if (!academicMap.has(row.activityType)) {
+        academicMap.set(row.activityType, { verified: 0, pending: 0 });
+      }
+      const entry = academicMap.get(row.activityType)!;
+      if (row.status === "verified") entry.verified += Number(row.count);
+      else if (row.status === "pending") entry.pending += Number(row.count);
+    }
+    const academics = Array.from(academicMap.entries()).map(([value, counts]) => ({
+      value,
+      verified: counts.verified,
+      pending: counts.pending,
+    }));
+
+    // Counts only — no patient text, no UHID, no free-text field (AGENTS.md §8).
+    res.json({ caseCategories, procedures, academics });
+  } catch (error) {
+    req.log.error({ studentId: req.params.studentId, status: 500 }, "Error fetching student progress");
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
 // Postings
 router.get("/:studentId/postings", async (req, res) => {
   try {
