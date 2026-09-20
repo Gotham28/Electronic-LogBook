@@ -3,12 +3,9 @@ export const demoData = {
     department: { id: 1, name: "General Pediatrics", code: "peds" },
     hod: { id: 3, name: "Dr. Priya Sharma", fullName: "Dr. Priya Sharma" },
     config: {
-      programDurationMonths: 36,
       requiredCases: 150,
       requiredProcedures: 80,
       requiredAcademic: 60,
-      casualLeaveAllowance: 20,
-      academicLeaveAllowance: 14,
     },
     procedures: [
       { id: 1, name: "Lumbar Puncture", group: "Emergency / Diagnostics", required: 15 },

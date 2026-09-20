@@ -14,14 +14,4 @@ export function todayForInput(): string {
   return local.toISOString().slice(0, 10);
 }
 
-export function expectedCompletionDate(joiningDate: string, durationMonths?: number | null): string {
-  if (!joiningDate || !durationMonths) return "";
-  const [year, month, day] = joiningDate.split("-").map(Number);
-  if (!year || !month || !day) return "";
-  const date = new Date(year, month - 1 + durationMonths, day);
-  if (Number.isNaN(date.getTime())) return "";
-  const completionYear = date.getFullYear();
-  const completionMonth = String(date.getMonth() + 1).padStart(2, "0");
-  const completionDay = String(date.getDate()).padStart(2, "0");
-  return `${completionYear}-${completionMonth}-${completionDay}`;
-}
+

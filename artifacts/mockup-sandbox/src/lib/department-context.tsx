@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 
 export type DepartmentConfig = {
   requiredCases: number; requiredProcedures: number; requiredAcademic: number;
-  programDurationMonths: number | null; casualLeaveAllowance: number | null; academicLeaveAllowance: number | null;
   enabledFeatures: Record<string, boolean>;
 };
 export type CatalogItem = { id: number; name: string; value: string; required: number; period: "total" | "month" };

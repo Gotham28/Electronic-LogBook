@@ -17,7 +17,7 @@ test("public directory exposes only registration metadata, never staff or studen
   const directory = await call("/departments");
   assert.equal(directory.status, 200);
   assert.deepEqual(directory.body.map((d: any) => d.name).sort(), ["Cardiology", "Dermatology", "Pediatrics"]);
-  assert.ok(directory.body.every((d: any) => Object.keys(d).sort().join(",") === "code,id,name,programDurationMonths"));
+  assert.ok(directory.body.every((d: any) => Object.keys(d).sort().join(",") === "code,id,name"));
   for (const path of ["/admin/roster", "/admin/students/pending", "/assignments", "/assignments/types",
     "/departments/1/catalog", "/departments/1/professors", "/departments/1/analytics", "/students/1/postings", "/student/1/thesis"]) {
     assert.equal((await call(path)).status, 401, path);

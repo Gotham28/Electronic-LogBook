@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, usersTable, studentsTable, departmentsTable, departmentConfigsTable, procedureTypesTable, caseLogsTable, procedureLogsTable, academicLogsTable, departmentCatalogTable, paymentsTable, leaveRecordsTable, leaveApplicationsTable, assessmentsTable, appraisalsTable, assignmentRecipientsTable, attendanceLogsTable, certificationsTable, postingsTable, thesisMilestonesTable, researchTable, auditTable, assignmentsTable, assignmentTypesTable } from "@workspace/db";
-import { eq, and, count, inArray, sql, or } from "drizzle-orm";
+import { eq, and, count, inArray, sql, or, like } from "drizzle-orm";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { requireAuth, requireRole, requireDepartment } from "../middlewares/auth.js";
@@ -336,11 +336,53 @@ router.get("/leaves/pending", async (req, res) => {
       .innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
       .where(and(eq(leaveRecordsTable.status, "pending"), eq(usersTable.departmentId, req.user!.departmentId!)));
 
+    const { resolveConfigDepartmentId } = await import("../lib/department-config-source.js");
+    const { departmentCatalogTable } = await import("@workspace/db");
+    
+    const configSourceId = await resolveConfigDepartmentId(req.user!.departmentId!);
+    const leaveTypes = await db.select({ value: departmentCatalogTable.value, required: departmentCatalogTable.required }).from(departmentCatalogTable).where(and(eq(departmentCatalogTable.departmentId, configSourceId), eq(departmentCatalogTable.kind, "leave_type")));
+    const limits = Object.fromEntries(leaveTypes.map(t => [t.value, t.required]));
+
+    const currentYear = new Date().getFullYear().toString();
+    const studentIds = [...new Set(pendingLeaves.map(l => l.residentId))];
+    let usedMap: Record<number, Record<string, number>> = {};
+    
+    if (studentIds.length > 0) {
+      const allRelevantLeaves = await db.select({ 
+        studentId: leaveRecordsTable.studentId, 
+        leaveType: leaveRecordsTable.leaveType, 
+        startDate: leaveRecordsTable.startDate, 
+        endDate: leaveRecordsTable.endDate 
+      })
+      .from(leaveRecordsTable)
+      .where(and(inArray(leaveRecordsTable.studentId, studentIds), inArray(leaveRecordsTable.status, ['approved', 'pending']), like(leaveRecordsTable.startDate, `${currentYear}-%`)));
+
+      for (const l of allRelevantLeaves) {
+        if (!l.startDate || !l.endDate) continue;
+        const lStart = new Date(l.startDate);
+        const lEnd = new Date(l.endDate);
+        const diffDays = Math.ceil((lEnd.getTime() - lStart.getTime()) / (1000 * 3600 * 24)) + 1;
+        if (diffDays > 0) {
+          usedMap[l.studentId] = usedMap[l.studentId] || {};
+          usedMap[l.studentId][l.leaveType] = (usedMap[l.studentId][l.leaveType] || 0) + diffDays;
+        }
+      }
+    }
+
     const mappedLeaves = pendingLeaves.map(leave => {
       const start = new Date(leave.fromDate).getTime();
       const end = new Date(leave.toDate).getTime();
       const diff = Math.ceil((end - start) / (1000 * 3600 * 24)) + 1;
-      return { ...leave, totalDays: isNaN(diff) ? 1 : diff };
+      
+      const total = limits[leave.type];
+      let remainingBalance: number | null = null;
+      if (typeof total === 'number') {
+        const used = usedMap[leave.residentId]?.[leave.type] || 0;
+        // Remaining balance shows how many days are left, considering ALL approved/pending leaves
+        remainingBalance = total - used;
+      }
+
+      return { ...leave, totalDays: isNaN(diff) ? 1 : diff, remainingBalance };
     });
 
     res.json(mappedLeaves);
