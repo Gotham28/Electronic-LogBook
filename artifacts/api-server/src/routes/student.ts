@@ -495,36 +495,36 @@ router.get("/:studentId/leave-balance", requireAuth, async (req, res) => {
 
     const currentYear = new Date().getFullYear().toString();
     
-    const approvedLeaves = await db.select({
+    const configSourceId = await resolveConfigDepartmentId(caller.departmentId!);
+    const leaveTypes = await db.select({ name: departmentCatalogTable.name, value: departmentCatalogTable.value, required: departmentCatalogTable.required }).from(departmentCatalogTable).where(and(eq(departmentCatalogTable.departmentId, configSourceId), eq(departmentCatalogTable.kind, "leave_type")));
+    
+    const relevantLeaves = await db.select({
       leaveType: leaveRecordsTable.leaveType,
       startDate: leaveRecordsTable.startDate,
       endDate: leaveRecordsTable.endDate
     })
     .from(leaveRecordsTable)
-    .where(sql`${leaveRecordsTable.studentId} = ${studentId} AND ${leaveRecordsTable.status} = 'approved' AND ${leaveRecordsTable.startDate} LIKE ${currentYear + '-%'}`);
+    .where(sql`${leaveRecordsTable.studentId} = ${studentId} AND ${leaveRecordsTable.status} IN ('approved', 'pending') AND ${leaveRecordsTable.startDate} LIKE ${currentYear + '-%'}`);
 
-    let casualUsed = 0;
-    let academicUsed = 0;
-
-    for (const l of approvedLeaves) {
+    const usedMap: Record<string, number> = {};
+    for (const l of relevantLeaves) {
       if (!l.startDate || !l.endDate) continue;
       const start = new Date(l.startDate);
       const end = new Date(l.endDate);
       const diffTime = end.getTime() - start.getTime();
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 to include both start and end dates
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
       
       if (diffDays > 0) {
-        if (l.leaveType === 'casual') casualUsed += diffDays;
-        else if (l.leaveType === 'academic') academicUsed += diffDays;
+        usedMap[l.leaveType] = (usedMap[l.leaveType] || 0) + diffDays;
       }
     }
 
-    const configSourceId = await resolveConfigDepartmentId(caller.departmentId!);
-    const [config] = await db.select().from(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, configSourceId));
-    res.json({
-      casual: { used: casualUsed, total: config?.casualLeaveAllowance ?? null },
-      academic: { used: academicUsed, total: config?.academicLeaveAllowance ?? null }
-    });
+    const balances: Record<string, { used: number, total: number | null }> = {};
+    for (const type of leaveTypes) {
+      if (caller.role === "student" && type.value.toLowerCase() === "maternity") continue;
+      balances[type.value] = { used: usedMap[type.value] || 0, total: type.required || null };
+    }
+    res.json(balances);
   } catch (error) {
     req.log.error({ studentId: req.params.studentId, status: 500 }, "Error fetching leave balance");
     res.status(500).json({ message: "Internal server error" });
@@ -567,23 +567,59 @@ router.post("/:studentId/leave-records", validate(z.object({ startDate: dateSche
       return;
     }
 
-    const [catalogEntry] = await db.select().from(departmentCatalogTable)
-      .where(and(eq(departmentCatalogTable.departmentId, studentUser.departmentId!), eq(departmentCatalogTable.kind, "leave_type"), eq(departmentCatalogTable.value, leaveType))).limit(1);
+    const currentYear = new Date().getFullYear().toString();
+    const result = await db.transaction(async (tx) => {
+      // 1. Lock the student's leave records to prevent race conditions during submission
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(
+        ('x' || substr(md5('leave_records' || ${studentId}::text), 1, 16))::bit(64)::bigint
+      )`);
 
-    if (!catalogEntry) {
-      res.status(400).json({ message: "Invalid leave type for this department" });
-      return;
-    }
+      const [catalogEntry] = await tx.select().from(departmentCatalogTable)
+        .where(and(eq(departmentCatalogTable.departmentId, studentUser.departmentId!), eq(departmentCatalogTable.kind, "leave_type"), eq(departmentCatalogTable.value, leaveType))).limit(1);
 
-    const [inserted] = await db.insert(leaveRecordsTable).values({
-      studentId,
-      startDate: startDate || fromDate,
-      endDate: endDate || toDate,
-      leaveType,
-      reason,
-      status: "pending"
-    }).returning();
-    res.status(201).json({ success: true, leave: { ...inserted, number: inserted.id } });
+      if (!catalogEntry) {
+        return { status: 400, body: { message: "Invalid leave type for this department" } };
+      }
+
+      const start = new Date(startDate || fromDate);
+      const end = new Date(endDate || toDate);
+      const diffTime = end.getTime() - start.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+      
+      if (diffDays <= 0) {
+        return { status: 400, body: { message: "End date must be after start date" } };
+      }
+
+      const relevantLeaves = await tx.select({ startDate: leaveRecordsTable.startDate, endDate: leaveRecordsTable.endDate })
+        .from(leaveRecordsTable)
+        .where(sql`${leaveRecordsTable.studentId} = ${studentId} AND ${leaveRecordsTable.leaveType} = ${leaveType} AND ${leaveRecordsTable.status} IN ('approved', 'pending') AND ${leaveRecordsTable.startDate} LIKE ${currentYear + '-%'}`);
+      
+      let used = 0;
+      for (const l of relevantLeaves) {
+        if (!l.startDate || !l.endDate) continue;
+        const lStart = new Date(l.startDate);
+        const lEnd = new Date(l.endDate);
+        const lDiffTime = lEnd.getTime() - lStart.getTime();
+        used += Math.ceil(lDiffTime / (1000 * 60 * 60 * 24)) + 1;
+      }
+
+      if (catalogEntry.required > 0 && used + diffDays > catalogEntry.required) {
+        return { status: 400, body: { message: `Requested leave exceeds remaining balance (Remaining: ${catalogEntry.required - used} days)` } };
+      }
+
+      const [inserted] = await tx.insert(leaveRecordsTable).values({
+        studentId,
+        startDate: startDate || fromDate,
+        endDate: endDate || toDate,
+        leaveType,
+        reason,
+        status: "pending"
+      }).returning();
+      
+      return { status: 201, body: { success: true, leave: { ...inserted, number: inserted.id } } };
+    });
+
+    res.status(result.status).json(result.body);
   } catch (error) {
     // Never the error object itself: a failed insert throws DrizzleQueryError, whose
     // message carries the SQL plus every bound parameter - including the leave reason,

@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { expectedCompletionDate, formatLogbookDate, todayForInput } from "@/lib/logbook-config";
+import { formatLogbookDate, todayForInput } from "@/lib/logbook-config";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { apiGet, apiPost } from "@/lib/apiClient";
 import { PaymentStep } from "@/components/PaymentStep";
@@ -41,7 +41,7 @@ export function RegistrationPage({
 
   const [emailVerified, setEmailVerified] = React.useState(false);
   const [verificationToken, setVerificationToken] = React.useState("");
-  const [departments, setDepartments] = React.useState<Array<{ id: number; name: string; programDurationMonths: number | null }>>([]);
+  const [departments, setDepartments] = React.useState<Array<{ id: number; name: string }>>([]);
   const [departmentError, setDepartmentError] = React.useState("");
   const [departmentsLoading, setDepartmentsLoading] = React.useState(true);
   const loadDepartments = React.useCallback(async () => {
@@ -65,7 +65,7 @@ export function RegistrationPage({
     return () => clearTimeout(timer);
   }, [countdown]);
 
-  const completionDate = expectedCompletionDate(form.joiningDate, departments.find((d) => String(d.id) === form.department)?.programDurationMonths);
+
   const joiningYear = form.joiningDate ? new Date(`${form.joiningDate}T00:00:00`).getFullYear() : "";
   const passwordsMatch = Boolean(form.password) && form.password === form.confirmPassword;
 
@@ -242,7 +242,6 @@ export function RegistrationPage({
                   </Field>
                   <div className="grid grid-cols-2 gap-3">
                     <Summary label="Joining year" value={String(joiningYear)} />
-                    <Summary label="Expected completion" value={completionDate ? formatLogbookDate(completionDate) : "—"} />
                   </div>
                   <Field label="Create password" htmlFor="registration-password"><Input id="registration-password" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} minLength={8} required /></Field>
                   <Field label="Confirm password" htmlFor="registration-confirm-password">

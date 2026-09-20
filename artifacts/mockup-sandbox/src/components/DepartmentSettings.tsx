@@ -11,8 +11,7 @@ import { Label } from "@/components/ui/label";
 
 const configFields = [
   ["requiredCases", "Required clinical cases", true], ["requiredProcedures", "Required procedures", true],
-  ["requiredAcademic", "Required academic activities", true], ["programDurationMonths", "Program duration (months)", true],
-  ["casualLeaveAllowance", "Casual leave allowance (days)", true], ["academicLeaveAllowance", "Academic leave allowance (days)", true],
+  ["requiredAcademic", "Required academic activities", true],
 ] as const;
 
 // Lists longer than this start collapsed and get a search box when expanded.
@@ -203,7 +202,7 @@ export function DepartmentSettings() {
         <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); void save(() => apiPost("/api/admin/department/config",
           { ...Object.fromEntries(configFields.map(([key, _label, optional]) => [key, optional && config[key] === "" ? null : Number(config[key])])) }), "Department requirements saved"); }}>
           {configFields.map(([key, label, optional]) => <div className="space-y-2" key={key}><Label htmlFor={`config-${key}`}>{label}</Label>
-            <Input id={`config-${key}`} type="number" step="1" min={key === "programDurationMonths" ? 1 : 0} max={key === "programDurationMonths" ? 240 : 100000}
+            <Input id={`config-${key}`} type="number" step="1" min={0} max={100000}
               required={!optional} value={config[key]} onChange={(e) => setConfig({ ...config, [key]: e.target.value })} /></div>)}
           <Button disabled={busy} type="submit">Save requirements</Button>
         </form>
