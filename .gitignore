@@ -60,3 +60,13 @@ repomix-output*.xml
 *.debug.cjs
 live_schema*
 check_*.cjs
+
+diff.txt
+lib/db/scratch.js
+lib/db/scratch.mjs
+lib/db/src/backfill-allowances.ts
+lib/db/src/trace-endpoints.ts
+lib/db/src/verify-allowances.ts
+student_old.ts
+
+artifacts/api-server/data/
