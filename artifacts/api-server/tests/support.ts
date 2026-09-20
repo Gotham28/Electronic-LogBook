@@ -9,7 +9,7 @@ import { engine, migrationConnection, db, departmentsTable, usersTable, students
 
 process.env.JWT_SECRET = randomBytes(48).toString("hex");
 process.env.NODE_ENV = "test";
-process.env.LOG_LEVEL = "silent";
+process.env.LOG_LEVEL = "error";
 process.env.ALLOWED_ORIGINS = "http://localhost:5173";
 // Tests capture outbound codes; this transport is never part of the application bundle.
 export const mail = new Map<string, string>();
@@ -32,8 +32,7 @@ export async function setup() {
     const [department] = await db.insert(departmentsTable).values({ name, code: "TEST-" + index }).returning();
     departmentIds.push(department.id);
     await db.insert(departmentConfigsTable).values({ departmentId: department.id, requiredCases: 7 + index,
-      requiredProcedures: 11 + index, requiredAcademic: 3 + index, programDurationMonths: 24 + index,
-      casualLeaveAllowance: 9 + index, academicLeaveAllowance: 4 + index });
+      requiredProcedures: 11 + index, requiredAcademic: 3 + index });
     await db.insert(procedureTypesTable).values({ departmentId: department.id, name: "Test procedure " + index, group: "Test group " + index, required: 2 + index });
     await db.insert(departmentCatalogTable).values([
       { departmentId: department.id, kind: "posting", name: "Test unit " + index, value: "unit-" + index },
@@ -42,10 +41,10 @@ export async function setup() {
       { departmentId: department.id, kind: "competency_level", name: "Assisted", value: "assisted" },
       { departmentId: department.id, kind: "competency_level", name: "Performed under supervision", value: "performed_under_supervision" },
       { departmentId: department.id, kind: "competency_level", name: "Performed independently", value: "performed_independently" },
-      { departmentId: department.id, kind: "leave_type", name: "Casual Leave", value: "casual", period: "total" },
-      { departmentId: department.id, kind: "leave_type", name: "Academic Leave", value: "academic", period: "total" },
-      { departmentId: department.id, kind: "leave_type", name: "Medical Leave", value: "medical", period: "total" },
-      { departmentId: department.id, kind: "leave_type", name: "Maternity / Paternity Leave", value: "maternity_paternity", period: "total" }
+      { departmentId: department.id, kind: "leave_type", name: "Casual Leave", value: "casual", period: "total", required: 9 + index },
+      { departmentId: department.id, kind: "leave_type", name: "Academic Leave", value: "academic", period: "total", required: 4 + index },
+      { departmentId: department.id, kind: "leave_type", name: "Medical Leave", value: "medical", period: "total", required: 15 },
+      { departmentId: department.id, kind: "leave_type", name: "Maternity / Paternity Leave", value: "maternity", period: "total" }
     ]);
     for (const kind of ["hod", "faculty", "faculty2", "student", "student2", "pending"] as const) {
       const role = kind.startsWith("faculty") ? "professor" : kind === "hod" ? "hod" : "student";

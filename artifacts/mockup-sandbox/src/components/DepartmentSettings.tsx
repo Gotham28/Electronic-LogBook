@@ -9,10 +9,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-const configFields = [
-  ["requiredCases", "Required clinical cases", true], ["requiredProcedures", "Required procedures", true],
-  ["requiredAcademic", "Required academic activities", true], ["programDurationMonths", "Program duration (months)", true],
-  ["casualLeaveAllowance", "Casual leave allowance (days)", true], ["academicLeaveAllowance", "Academic leave allowance (days)", true],
+const computedRequirementsFields = [
+  ["requiredCases", "Required clinical cases (computed)"],
+  ["requiredProcedures", "Required procedures (computed)"],
+  ["requiredAcademic", "Required academic activities (computed)"],
 ] as const;
 
 // Lists longer than this start collapsed and get a search box when expanded.
@@ -85,12 +85,12 @@ function SearchableSection<T extends { id: number; name: string }>({
 
 export function DepartmentSettings() {
   const data = useDepartment();
-  const [config, setConfig] = React.useState<Record<string, string>>(() => Object.fromEntries(configFields.map(([key]) => [key, data.config?.[key]?.toString() ?? ""])));
   const [procedure, setProcedure] = React.useState({ name: "", group: "", required: "" });
   const [entry, setEntry] = React.useState({ kind: "posting", name: "", required: "", period: "total" });
   const [busy, setBusy] = React.useState(false);
   const [targets, setTargets] = React.useState<Record<number, string>>({});
   const [academicTargets, setAcademicTargets] = React.useState<Record<number, string>>({});
+  const [leaveTargets, setLeaveTargets] = React.useState<Record<number, string>>({});
 
   const [deleteTarget, setDeleteTarget] = React.useState<{id: number, type: "procedure" | "posting" | "academic" | "case_category" | "competency_level" | "leave_type", name: string, count: number | null} | null>(null);
   const [deleting, setDeleting] = React.useState(false);
@@ -200,13 +200,12 @@ export function DepartmentSettings() {
 
     <div className="grid gap-6 lg:grid-cols-2">
       <Card><CardHeader><CardTitle>Department requirements</CardTitle></CardHeader><CardContent>
-        <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); void save(() => apiPost("/api/admin/department/config",
-          { ...Object.fromEntries(configFields.map(([key, _label, optional]) => [key, optional && config[key] === "" ? null : Number(config[key])])) }), "Department requirements saved"); }}>
-          {configFields.map(([key, label, optional]) => <div className="space-y-2" key={key}><Label htmlFor={`config-${key}`}>{label}</Label>
-            <Input id={`config-${key}`} type="number" step="1" min={key === "programDurationMonths" ? 1 : 0} max={key === "programDurationMonths" ? 240 : 100000}
-              required={!optional} value={config[key]} onChange={(e) => setConfig({ ...config, [key]: e.target.value })} /></div>)}
-          <Button disabled={busy} type="submit">Save requirements</Button>
-        </form>
+        <div className="space-y-3">
+          {computedRequirementsFields.map(([key, label]) => <div key={key} className="flex items-center justify-between py-1 border-b border-slate-100 last:border-0">
+            <span className="text-sm text-slate-500">{label}</span>
+            <span className="text-sm font-medium text-slate-800">{data.config?.[key] == null ? <span className="text-slate-400 italic">Not tracked</span> : data.config[key]}</span>
+          </div>)}
+        </div>
       </CardContent></Card>
 
       <Card><CardHeader><CardTitle>Add procedure type</CardTitle></CardHeader><CardContent>
@@ -290,10 +289,10 @@ export function DepartmentSettings() {
           title="Leave types"
           items={data.leaveTypes ?? []}
           emptyText="No leave types configured."
-          renderItem={(item) => <div className="flex items-center gap-2 rounded-xl bg-slate-50 p-3">
-            <span className="flex-1">{item.name}</span>
-            <Button variant="ghost" size="sm" type="button" disabled={busy || deleting} onClick={() => confirmDelete(item.id, "leave_type", item.name)} className="text-rose-700 hover:bg-rose-100 h-8 w-8 p-0"><Trash2 className="h-4 w-4" /></Button>
-          </div>}
+          renderItem={(item) => <form className="flex flex-wrap items-center gap-2 rounded-xl bg-slate-50 p-3" onSubmit={(e) => { e.preventDefault(); void save(() => apiPatch(`/api/admin/department/catalog/${item.id}`, { required: Number(leaveTargets[item.id] ?? item.required), period: item.period }), "Leave allowance updated"); }}>
+            <span className="flex-1 text-sm">{item.name}</span><Input className="w-16" type="number" min={0} max={365} required aria-label={`Allowance for ${item.name}`} value={leaveTargets[item.id] ?? item.required} onChange={(e) => setLeaveTargets({ ...leaveTargets, [item.id]: e.target.value })} /><Button size="sm" variant="outline" disabled={busy} type="submit">Save</Button>
+            <Button variant="outline" size="sm" type="button" disabled={busy || deleting} onClick={() => confirmDelete(item.id, "leave_type", item.name)} className="text-rose-700 border-rose-200 hover:bg-rose-50 px-2"><Trash2 className="h-4 w-4" /></Button>
+          </form>}
         />
       </div>
     </CardContent></Card>

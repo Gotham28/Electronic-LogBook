@@ -18,8 +18,7 @@ export function GrievanceOfficerPage() {
 
           <div className="my-8 p-6 bg-slate-50 rounded-2xl border border-slate-200">
             <h2 className="text-lg font-bold text-slate-900 mb-2">Grievance Officer: Gautam P</h2>
-            <p className="mb-1"><strong>Email:</strong> <a href="mailto:gothoslabs@gmail.com" className="text-teal-600 hover:underline">gothoslabs@gmail.com</a></p>
-            <p><strong>Address:</strong> Roses apartments, Kakkad, Kannur, Kerala, 670001</p>
+            <p><strong>Email:</strong> <a href="mailto:gothoslabs@gmail.com" className="text-teal-600 hover:underline">gothoslabs@gmail.com</a></p>
           </div>
 
           <h3 className="text-lg font-bold text-slate-900 mt-8 mb-3">You may contact the Grievance Officer regarding:</h3>

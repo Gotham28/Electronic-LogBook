@@ -1,11 +1,12 @@
 import { Router } from "express";
 import { db, usersTable, studentsTable, departmentsTable, departmentConfigsTable, procedureTypesTable, caseLogsTable, procedureLogsTable, academicLogsTable, departmentCatalogTable, paymentsTable, leaveRecordsTable, leaveApplicationsTable, assessmentsTable, appraisalsTable, assignmentRecipientsTable, attendanceLogsTable, certificationsTable, postingsTable, thesisMilestonesTable, researchTable, auditTable, assignmentsTable, assignmentTypesTable } from "@workspace/db";
-import { eq, and, count, inArray, sql, or } from "drizzle-orm";
+import { eq, and, count, inArray, sql, or, like } from "drizzle-orm";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { requireAuth, requireRole, requireDepartment } from "../middlewares/auth.js";
 import { completionPercent, configSchema, dateSchema, emailSchema, nameSchema, passwordSchema, targetSchema, validate } from "../lib/validation.js";
 import { resolveConfigDepartmentId } from "../lib/department-config-source.js";
+import { recomputeProcedureRequirement, recomputeCatalogRequirements } from "../lib/department-requirements.js";
 import { sendAccountCreatedEmail } from "../lib/mailer.js";
 
 const router = Router();
@@ -335,11 +336,53 @@ router.get("/leaves/pending", async (req, res) => {
       .innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
       .where(and(eq(leaveRecordsTable.status, "pending"), eq(usersTable.departmentId, req.user!.departmentId!)));
 
+    const { resolveConfigDepartmentId } = await import("../lib/department-config-source.js");
+    const { departmentCatalogTable } = await import("@workspace/db");
+    
+    const configSourceId = await resolveConfigDepartmentId(req.user!.departmentId!);
+    const leaveTypes = await db.select({ value: departmentCatalogTable.value, required: departmentCatalogTable.required }).from(departmentCatalogTable).where(and(eq(departmentCatalogTable.departmentId, configSourceId), eq(departmentCatalogTable.kind, "leave_type")));
+    const limits = Object.fromEntries(leaveTypes.map(t => [t.value, t.required]));
+
+    const currentYear = new Date().getFullYear().toString();
+    const studentIds = [...new Set(pendingLeaves.map(l => l.residentId))];
+    let usedMap: Record<number, Record<string, number>> = {};
+    
+    if (studentIds.length > 0) {
+      const allRelevantLeaves = await db.select({ 
+        studentId: leaveRecordsTable.studentId, 
+        leaveType: leaveRecordsTable.leaveType, 
+        startDate: leaveRecordsTable.startDate, 
+        endDate: leaveRecordsTable.endDate 
+      })
+      .from(leaveRecordsTable)
+      .where(and(inArray(leaveRecordsTable.studentId, studentIds), inArray(leaveRecordsTable.status, ['approved', 'pending']), like(leaveRecordsTable.startDate, `${currentYear}-%`)));
+
+      for (const l of allRelevantLeaves) {
+        if (!l.startDate || !l.endDate) continue;
+        const lStart = new Date(l.startDate);
+        const lEnd = new Date(l.endDate);
+        const diffDays = Math.ceil((lEnd.getTime() - lStart.getTime()) / (1000 * 3600 * 24)) + 1;
+        if (diffDays > 0) {
+          usedMap[l.studentId] = usedMap[l.studentId] || {};
+          usedMap[l.studentId][l.leaveType] = (usedMap[l.studentId][l.leaveType] || 0) + diffDays;
+        }
+      }
+    }
+
     const mappedLeaves = pendingLeaves.map(leave => {
       const start = new Date(leave.fromDate).getTime();
       const end = new Date(leave.toDate).getTime();
       const diff = Math.ceil((end - start) / (1000 * 3600 * 24)) + 1;
-      return { ...leave, totalDays: isNaN(diff) ? 1 : diff };
+      
+      const total = limits[leave.type];
+      let remainingBalance: number | null = null;
+      if (typeof total === 'number') {
+        const used = usedMap[leave.residentId]?.[leave.type] || 0;
+        // Remaining balance shows how many days are left, considering ALL approved/pending leaves
+        remainingBalance = total - used;
+      }
+
+      return { ...leave, totalDays: isNaN(diff) ? 1 : diff, remainingBalance };
     });
 
     res.json(mappedLeaves);
@@ -418,21 +461,12 @@ router.post("/department/config", validate(configSchema), async (req, res) => {
       return;
     }
 
-    const { requiredCases, requiredProcedures, requiredAcademic, enabledFeatures } = req.body;
-
-    const toNullableInt = (v: unknown) =>
-      v === null || v === undefined || v === "" ? null : parseInt(String(v), 10);
+    const { enabledFeatures } = req.body;
 
     const existing = await db.select().from(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, departmentId));
     
     if (existing.length > 0) {
       const [updated] = await db.update(departmentConfigsTable).set({
-        programDurationMonths: req.body.programDurationMonths,
-        casualLeaveAllowance: req.body.casualLeaveAllowance,
-        academicLeaveAllowance: req.body.academicLeaveAllowance,
-        requiredCases: toNullableInt(requiredCases),
-        requiredProcedures: toNullableInt(requiredProcedures),
-        requiredAcademic: toNullableInt(requiredAcademic),
         enabledFeatures: enabledFeatures ?? existing[0].enabledFeatures
       }).where(eq(departmentConfigsTable.departmentId, departmentId)).returning();
       res.json(updated);
@@ -440,12 +474,6 @@ router.post("/department/config", validate(configSchema), async (req, res) => {
     } else {
       const [inserted] = await db.insert(departmentConfigsTable).values({
         departmentId,
-        programDurationMonths: req.body.programDurationMonths,
-        casualLeaveAllowance: req.body.casualLeaveAllowance,
-        academicLeaveAllowance: req.body.academicLeaveAllowance,
-        requiredCases: toNullableInt(requiredCases),
-        requiredProcedures: toNullableInt(requiredProcedures),
-        requiredAcademic: toNullableInt(requiredAcademic),
         enabledFeatures: enabledFeatures ?? {}
       }).returning();
       res.json(inserted);
@@ -502,6 +530,7 @@ router.post("/department/procedures", validate(z.object({ name: nameSchema, grou
       group,
       required: req.body.required,
     }).returning();
+    await recomputeProcedureRequirement(departmentId);
     res.json(inserted);
   } catch (error) {
     req.log.error({ departmentId: req.user!.departmentId, status: 500 }, "Error adding procedure");
@@ -589,6 +618,9 @@ router.post("/department/catalog", validate(z.object({ kind: z.enum(["posting", 
   const [dept] = await db.select({ configSourceDepartmentId: departmentsTable.configSourceDepartmentId }).from(departmentsTable).where(eq(departmentsTable.id, req.user!.departmentId!));
   if (dept?.configSourceDepartmentId !== null) { res.status(403).json({ message: "Test departments cannot modify mirrored settings" }); return; }
   const [row] = await db.insert(departmentCatalogTable).values({ ...req.body, departmentId: req.user!.departmentId! }).returning();
+  if (req.body.kind === "case_category" || req.body.kind === "academic") {
+    await recomputeCatalogRequirements(req.user!.departmentId!);
+  }
   res.status(201).json(row);
 });
 
@@ -598,6 +630,7 @@ router.patch("/department/procedures/:id", validate(z.object({ required: targetS
   const [row] = await db.update(procedureTypesTable).set({ required: req.body.required })
     .where(and(eq(procedureTypesTable.id, Number(req.params.id)), eq(procedureTypesTable.departmentId, req.user!.departmentId!))).returning();
   if (!row) { res.status(404).json({ message: "Procedure not found" }); return; }
+  await recomputeProcedureRequirement(req.user!.departmentId!);
   res.json(row);
 });
 
@@ -607,6 +640,9 @@ router.patch("/department/catalog/:id", validate(z.object({ required: targetSche
   const [row] = await db.update(departmentCatalogTable).set(req.body)
     .where(and(eq(departmentCatalogTable.id, Number(req.params.id)), eq(departmentCatalogTable.departmentId, req.user!.departmentId!))).returning();
   if (!row) { res.status(404).json({ message: "Training option not found" }); return; }
+  if (row.kind === "case_category" || row.kind === "academic") {
+    await recomputeCatalogRequirements(req.user!.departmentId!);
+  }
   res.json(row);
 });
 
@@ -841,6 +877,10 @@ router.delete("/department/catalog/:id", async (req, res) => {
       res.status(403).json({ message: "Catalog entry not found in your department" });
       return;
     }
+
+    if (deleted.kind === "case_category" || deleted.kind === "academic") {
+      await recomputeCatalogRequirements(departmentId!);
+    }
     
     res.json({ message: "Catalog entry deleted successfully" });
   } catch (error) {
@@ -894,6 +934,8 @@ router.delete("/department/procedures/:id", async (req, res) => {
       res.status(403).json({ message: "Procedure type not found in your department" });
       return;
     }
+
+    await recomputeProcedureRequirement(departmentId!);
     
     res.json({ message: "Procedure type deleted successfully" });
   } catch (error) {

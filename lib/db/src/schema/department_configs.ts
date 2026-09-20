@@ -8,9 +8,6 @@ export const departmentConfigsTable = pgTable("department_configs", {
   requiredCases: integer("required_cases"),
   requiredProcedures: integer("required_procedures"),
   requiredAcademic: integer("required_academic"),
-  programDurationMonths: integer("program_duration_months"),
-  casualLeaveAllowance: integer("casual_leave_allowance"),
-  academicLeaveAllowance: integer("academic_leave_allowance"),
   enabledFeatures: jsonb("enabled_features").$type<Record<string, boolean>>().notNull().default({}),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
