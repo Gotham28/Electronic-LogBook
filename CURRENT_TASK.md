@@ -1,4 +1,4 @@
-# Current Task
+# Current Task — Fix the mirror-test-department review findings
 
 ## Feature
 Make the entire "Department requirements" card in DepartmentSettings.tsx view-only for the HOD — remove the remaining editable fields (Program duration, Casual leave allowance, Academic leave allowance) and the "Save requirements" form, alongside the three fields PR #49 already made read-only.

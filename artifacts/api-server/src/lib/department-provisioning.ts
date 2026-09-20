@@ -130,63 +130,64 @@ export async function provisionMirrorForRealDepartment(
       specialty: mirrorDept.name
     }).returning({ id: studentsTable.id });
 
-    // Insert dummy logs to populate the student progress bar for testing
-    const dummyDate = new Date().toISOString().slice(0, 10);
-    
-    await tx.insert(caseLogsTable).values([
-      {
-        studentId: testStudent.id,
-        supervisorId: testProfUser.id,
-        date: dummyDate,
-        patientUhid: "ID-001",
-        patientAge: "45",
-        patientGender: "male",
-        diagnosisFinal: "Essential Hypertension",
-        category: "General Medicine",
-        status: "verified",
-        reviewedBy: testProfUser.id,
-        reviewedAt: new Date()
-      },
-      {
-        studentId: testStudent.id,
-        supervisorId: testProfUser.id,
-        date: dummyDate,
-        patientUhid: "ID-002",
-        patientAge: "30",
-        patientGender: "female",
-        diagnosisFinal: "Type 2 Diabetes Mellitus",
-        category: "Endocrinology",
-        status: "pending"
-      }
-    ]);
+    // Insert test fixture logs using the source department's own catalog.
+    // category comes from department_catalog (kind = 'case_category'),
+    // procedureGroup / procedureName come from procedure_types.
+    // All via configSourceDepartmentId (= realDepartmentId). If the source
+    // has no catalog rows, skip — do not invent values (AGENTS.md §7).
+    const sourceCaseCategories = await tx.select({
+      name: departmentCatalogTable.name,
+      value: departmentCatalogTable.value,
+    }).from(departmentCatalogTable).where(
+      and(eq(departmentCatalogTable.departmentId, realDepartmentId), eq(departmentCatalogTable.kind, "case_category"))
+    );
 
-    await tx.insert(procedureLogsTable).values([
-      {
+    const sourceProcedures = await tx.select({
+      name: procedureTypesTable.name,
+      group: procedureTypesTable.group,
+    }).from(procedureTypesTable).where(
+      eq(procedureTypesTable.departmentId, realDepartmentId)
+    );
+
+    const dummyDate = new Date().toISOString().slice(0, 10);
+
+    // Case logs — one per source case_category, up to 2
+    if (sourceCaseCategories.length > 0) {
+      const caseRows = sourceCaseCategories.slice(0, 2).map((cat, idx) => ({
         studentId: testStudent.id,
         supervisorId: testProfUser.id,
-        procedureGroup: "Basic Procedures",
-        procedureName: "Venipuncture",
         date: dummyDate,
-        patientUhid: "ID-003",
-        patientAge: "25",
-        competencyLevel: "performed_independently",
-        facultyVerifiedLevel: "performed_independently",
-        status: "verified",
-        reviewedBy: testProfUser.id,
-        reviewedAt: new Date()
-      },
-      {
+        patientUhid: `TEST-UHID-${idx + 1}`,
+        patientAge: String(20 + idx * 10),
+        patientGender: (idx === 0 ? "male" : "female") as "male" | "female",
+        diagnosisFinal: `[TEST DATA] Synthetic fixture for ${cat.name}`,
+        category: cat.value,
+        status: idx === 0 ? ("verified" as const) : ("pending" as const),
+        ...(idx === 0 ? { reviewedBy: testProfUser.id, reviewedAt: new Date() } : {}),
+      }));
+      await tx.insert(caseLogsTable).values(caseRows);
+    }
+
+    // Procedure logs — one per source procedure_type, up to 2
+    if (sourceProcedures.length > 0) {
+      const procRows = sourceProcedures.slice(0, 2).map((proc, idx) => ({
         studentId: testStudent.id,
         supervisorId: testProfUser.id,
-        procedureGroup: "Basic Procedures",
-        procedureName: "ABG Sampling",
+        procedureGroup: proc.group,
+        procedureName: proc.name,
         date: dummyDate,
-        patientUhid: "ID-004",
-        patientAge: "50",
-        competencyLevel: "performed_under_supervision",
-        status: "pending"
-      }
-    ]);
+        patientUhid: `TEST-UHID-P${idx + 1}`,
+        patientAge: String(25 + idx * 15),
+        competencyLevel: idx === 0 ? "performed_independently" : "performed_under_supervision",
+        status: idx === 0 ? ("verified" as const) : ("pending" as const),
+        ...(idx === 0 ? {
+          facultyVerifiedLevel: "performed_independently",
+          reviewedBy: testProfUser.id,
+          reviewedAt: new Date(),
+        } : {}),
+      }));
+      await tx.insert(procedureLogsTable).values(procRows);
+    }
 
     return { created: true, mirrorDepartmentId: mirrorDept.id };
   });

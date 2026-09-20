@@ -249,7 +249,7 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
         <p className="text-xs font-bold uppercase tracking-wider text-teal-600">College administration</p>
         <h1 className="text-xl font-bold text-slate-900 tracking-tight">Departments, faculty and HODs, college-wide</h1>
         <p className="text-sm text-slate-500 max-w-2xl">
-          Create and manage departments, appoint HODs, and provision faculty accounts. Students and faculty added through this console bypass the payment gate and are immediately approved.
+          Create and manage departments, appoint HODs, and provision faculty accounts. Students added through this console bypass the payment gate and are immediately approved; faculty accounts are created pre-approved.
         </p>
       </div>
 
@@ -870,7 +870,7 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
               <div className="bg-blue-50/50 border-b border-blue-100 p-3 sm:px-6 flex items-start gap-3">
                 <Info className="h-5 w-5 text-blue-500 shrink-0 mt-0.5" />
                 <p className="text-sm text-blue-800 leading-relaxed">
-                  <strong>Approval stays with the HOD.</strong> A resident added here appears in {department.name}'s own pending queue — this console never approves a resident directly.
+                  <strong>Immediately approved.</strong> A resident added here is created with approved status and does not enter {department.name}'s HOD queue. Self-registered students still go through the HOD's approval flow.
                 </p>
               </div>
 

@@ -275,7 +275,22 @@ router.post("/departments/:id/replace-hod", validate(replaceHodBody), async (req
 // the expected, correct outcome for any department with real clinical
 // activity — it is not a bug to engineer around.
 // ---------------------------------------------------------------------------
-async function deleteDepartmentCascade(tx: any, targetDepartmentId: number, isMirror: boolean = false): Promise<void> {
+export async function deleteDepartmentCascade(tx: any, targetDepartmentId: number, isMirror: boolean = false): Promise<void> {
+  // Guard: when called as a mirror delete, re-verify inside the transaction
+  // that the department is actually a test department. Same inline pattern as
+  // the impersonation gate (see superadmin.ts impersonate route).
+  if (isMirror) {
+    const [targetDept] = await tx.select({
+      isTest: departmentsTable.isTest,
+    }).from(departmentsTable).where(eq(departmentsTable.id, targetDepartmentId)).limit(1);
+
+    if (!targetDept || !targetDept.isTest) {
+      const err: any = new Error("Refusing to hard-delete a non-test department as a mirror");
+      err.statusOverride = 403;
+      throw err;
+    }
+  }
+
   // 2. Collect user IDs, student IDs, and assignment IDs in this department
   const deptUsers = await tx.select({ id: usersTable.id }).from(usersTable)
     .where(eq(usersTable.departmentId, targetDepartmentId));
@@ -302,36 +317,43 @@ async function deleteDepartmentCascade(tx: any, targetDepartmentId: number, isMi
   //    Both assignments and assignment_types reference users.id, so they go before users.
   //    Everything references departments.id, so department is last.
 
+  // ── Conflict check + mirror cleanup ──────────────────────────────────
+  // The `checkedTables` list is the single source of truth for which
+  // tables carry student-side or user-side references. Both the conflict
+  // count (non-mirror) and the mirror delete loop derive from it, so the
+  // two cannot diverge.
+  const checkedTables: Array<{ name: string; table: any; uFields: any[]; sFields: any[] }> = [
+    { name: "case_logs",          table: caseLogsTable,          uFields: [caseLogsTable.supervisorId, caseLogsTable.reviewedBy],                   sFields: [caseLogsTable.studentId] },
+    { name: "procedure_logs",     table: procedureLogsTable,     uFields: [procedureLogsTable.supervisorId, procedureLogsTable.reviewedBy],          sFields: [procedureLogsTable.studentId] },
+    { name: "academic_logs",      table: academicLogsTable,      uFields: [academicLogsTable.supervisorId, academicLogsTable.reviewedBy],            sFields: [academicLogsTable.studentId] },
+    { name: "leave_records",      table: leaveRecordsTable,      uFields: [leaveRecordsTable.reviewedBy],                                           sFields: [leaveRecordsTable.studentId] },
+    { name: "postings",           table: postingsTable,          uFields: [postingsTable.supervisorId],                                              sFields: [postingsTable.studentId] },
+    { name: "research",           table: researchTable,          uFields: [researchTable.guideId, researchTable.coGuideId],                          sFields: [researchTable.studentId] },
+    { name: "assessments",        table: assessmentsTable,       uFields: [assessmentsTable.assessorId],                                             sFields: [assessmentsTable.studentId] },
+    { name: "attendance_logs",    table: attendanceLogsTable,    uFields: [attendanceLogsTable.verifiedBy],                                          sFields: [attendanceLogsTable.studentId] },
+    { name: "leave_applications", table: leaveApplicationsTable, uFields: [leaveApplicationsTable.approvedBy],                                      sFields: [leaveApplicationsTable.studentId] },
+    { name: "thesis_milestones",  table: thesisMilestonesTable,  uFields: [thesisMilestonesTable.guideId, thesisMilestonesTable.coGuideId],          sFields: [thesisMilestonesTable.studentId] },
+    { name: "appraisals",         table: appraisalsTable,        uFields: [appraisalsTable.evaluatorId],                                             sFields: [appraisalsTable.studentId] },
+    { name: "audit",              table: auditTable,             uFields: [auditTable.performedById],                                                sFields: [] },
+  ];
+
   const conflicts: string[] = [];
   if (studentIds.length > 0 || userIds.length > 0) {
-    const checkTable = async (tableName: string, table: any, uFields: any[], sFields: any[]) => {
+    for (const entry of checkedTables) {
       const conditions = [];
       if (studentIds.length > 0) {
-        for (const field of sFields) conditions.push(inArray(field, studentIds));
+        for (const field of entry.sFields) conditions.push(inArray(field, studentIds));
       }
       if (userIds.length > 0) {
-        for (const field of uFields) conditions.push(inArray(field, userIds));
+        for (const field of entry.uFields) conditions.push(inArray(field, userIds));
       }
-      if (conditions.length === 0) return;
+      if (conditions.length === 0) continue;
 
-      const [result] = await tx.select({ count: sql<number>`cast(count(*) as integer)` }).from(table).where(or(...conditions));
+      const [result] = await tx.select({ count: sql<number>`cast(count(*) as integer)` }).from(entry.table).where(or(...conditions));
       if (result && result.count > 0) {
-        conflicts.push(`${tableName} (${result.count} rows)`);
+        conflicts.push(`${entry.name} (${result.count} rows)`);
       }
-    };
-
-    await checkTable("case_logs", caseLogsTable, [caseLogsTable.supervisorId, caseLogsTable.reviewedBy], [caseLogsTable.studentId]);
-    await checkTable("procedure_logs", procedureLogsTable, [procedureLogsTable.supervisorId, procedureLogsTable.reviewedBy], [procedureLogsTable.studentId]);
-    await checkTable("academic_logs", academicLogsTable, [academicLogsTable.supervisorId, academicLogsTable.reviewedBy], [academicLogsTable.studentId]);
-    await checkTable("leave_records", leaveRecordsTable, [leaveRecordsTable.reviewedBy], [leaveRecordsTable.studentId]);
-    await checkTable("postings", postingsTable, [postingsTable.supervisorId], [postingsTable.studentId]);
-    await checkTable("research", researchTable, [researchTable.guideId, researchTable.coGuideId], [researchTable.studentId]);
-    await checkTable("assessments", assessmentsTable, [assessmentsTable.assessorId], [assessmentsTable.studentId]);
-    await checkTable("attendance_logs", attendanceLogsTable, [attendanceLogsTable.verifiedBy], [attendanceLogsTable.studentId]);
-    await checkTable("leave_applications", leaveApplicationsTable, [leaveApplicationsTable.approvedBy], [leaveApplicationsTable.studentId]);
-    await checkTable("thesis_milestones", thesisMilestonesTable, [thesisMilestonesTable.guideId, thesisMilestonesTable.coGuideId], [thesisMilestonesTable.studentId]);
-    await checkTable("appraisals", appraisalsTable, [appraisalsTable.evaluatorId], [appraisalsTable.studentId]);
-    await checkTable("audit", auditTable, [auditTable.performedById], []);
+    }
   }
 
   if (conflicts.length > 0 && !isMirror) {
@@ -341,9 +363,23 @@ async function deleteDepartmentCascade(tx: any, targetDepartmentId: number, isMi
     throw err;
   }
 
-  if (isMirror && studentIds.length > 0) {
-    await tx.delete(caseLogsTable).where(inArray(caseLogsTable.studentId, studentIds));
-    await tx.delete(procedureLogsTable).where(inArray(procedureLogsTable.studentId, studentIds));
+  // For mirror (test) departments, delete all rows from the 12 checked
+  // tables before touching students/users. Audit is last in checkedTables
+  // and references usersTable.id (NOT NULL FK), so it is already in the
+  // correct position — the loop deletes it before the user-delete at the
+  // bottom of this function.
+  if (isMirror) {
+    for (const entry of checkedTables) {
+      const conditions = [];
+      if (studentIds.length > 0) {
+        for (const field of entry.sFields) conditions.push(inArray(field, studentIds));
+      }
+      if (userIds.length > 0) {
+        for (const field of entry.uFields) conditions.push(inArray(field, userIds));
+      }
+      if (conditions.length === 0) continue;
+      await tx.delete(entry.table).where(or(...conditions));
+    }
   }
 
   if (assignmentIds.length > 0) {
@@ -387,9 +423,9 @@ router.delete("/departments/:id", async (req, res) => {
         throw err;
       }
 
-      // Look up any mirror departments
-      const mirrors = await tx.select({ id: departmentsTable.id }).from(departmentsTable)
-        .where(eq(departmentsTable.configSourceDepartmentId, departmentId));
+      // Look up any mirror departments — only isTest=true departments
+      const mirrors = await tx.select({ id: departmentsTable.id, isTest: departmentsTable.isTest }).from(departmentsTable)
+        .where(and(eq(departmentsTable.configSourceDepartmentId, departmentId), eq(departmentsTable.isTest, true)));
       
       // Delete mirrors completely before touching the target department
       for (const mirror of mirrors) {
@@ -406,6 +442,11 @@ router.delete("/departments/:id", async (req, res) => {
     if (error.statusOverride === 404) {
       req.log.info({ departmentId, status: 404 }, "Department delete: not found");
       res.status(404).json({ message: "Department not found" });
+      return;
+    }
+    if (error.statusOverride === 403) {
+      req.log.error({ departmentId, userId: req.user!.id, status: 403 }, "Department delete refused: non-test department flagged as mirror");
+      res.status(403).json({ message: error.message });
       return;
     }
     if (error.statusOverride === 409) {
