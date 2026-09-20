@@ -729,11 +729,11 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
               )}
 
               <Tabs value={dialogTab} onValueChange={(v) => { setDialogTab(v); setLogFilter(null); }} className="w-full">
-                <TabsList className="bg-slate-100 p-1 rounded-lg">
-                  <TabsTrigger value="progress" className="text-xs">Training Progress</TabsTrigger>
-                  <TabsTrigger value="case-logs" className="text-xs">Clinical Case Logs</TabsTrigger>
-                  <TabsTrigger value="proc-logs" className="text-xs">Procedure Logs</TabsTrigger>
-                  <TabsTrigger value="acad-logs" className="text-xs">Academic Activity</TabsTrigger>
+                <TabsList className="bg-slate-100 p-1 rounded-lg w-full h-auto flex flex-nowrap sm:flex-wrap justify-start overflow-x-auto gap-1">
+                  <TabsTrigger value="progress" className="text-xs whitespace-nowrap">Training Progress</TabsTrigger>
+                  <TabsTrigger value="case-logs" className="text-xs whitespace-nowrap">Clinical Case Logs</TabsTrigger>
+                  <TabsTrigger value="proc-logs" className="text-xs whitespace-nowrap">Procedure Logs</TabsTrigger>
+                  <TabsTrigger value="acad-logs" className="text-xs whitespace-nowrap">Academic Activity</TabsTrigger>
                 </TabsList>
 
                 {/* ── Progress Tab ─────────────────────────────────────────── */}
@@ -1439,8 +1439,9 @@ function ProgressSection({
   const chartHeight = Math.max(items.length * 45 + 30, 100);
 
   return (
-    <div style={{ height: chartHeight, width: "100%" }}>
-      <ChartContainer config={progressChartConfig} className="h-full w-full">
+    <div className="w-full overflow-x-auto">
+      <div style={{ height: chartHeight, minWidth: "600px", width: "100%" }}>
+        <ChartContainer config={progressChartConfig} className="h-full w-full">
         <BarChart
           data={chartData}
           layout="vertical"
@@ -1565,6 +1566,7 @@ function ProgressSection({
           />
         </BarChart>
       </ChartContainer>
+      </div>
     </div>
   );
 }
