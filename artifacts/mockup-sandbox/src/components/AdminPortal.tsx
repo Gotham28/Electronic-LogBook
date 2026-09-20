@@ -19,6 +19,7 @@ import {
   deleteAdminDepartment,
   impersonateAdminUser,
   backfillTestDepartments,
+  resetTestCredentials,
   deactivateAdminUser,
   type AdminDepartment,
   type AdminUserRow
@@ -100,7 +101,13 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
       });
       
       setDeptCounts(countsMap);
-      
+
+      // Auto-sync test account passwords to their deterministic value (= mirrorCode)
+      // for all departments that have a mirror. Fire-and-forget — failures are silent.
+      data.filter((d: AdminDepartment) => d.mirrorDepartmentId).forEach((d: AdminDepartment) => {
+        resetTestCredentials(d.id).catch(() => {});
+      });
+
     } catch (err: any) {
       setError(err.message || "Failed to load departments.");
     } finally {
@@ -927,42 +934,62 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
               ) : !mirrorRoster.length ? (
                 <p className="p-8 text-center text-sm text-slate-500">No test accounts in this department.</p>
               ) : (
-                <Table>
-                  <TableHeader className="bg-white">
-                    <TableRow className="hover:bg-transparent">
-                      <TableHead>Name</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Role</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Action</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {mirrorRoster.map(u => (
-                      <TableRow key={u.id}>
-                        <TableCell className="font-semibold text-slate-900">{u.fullName}</TableCell>
-                        <TableCell className="text-slate-500 text-sm">{u.email}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="capitalize">{u.role}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={u.status === "approved" ? "default" : "secondary"} className={`rounded-full ${u.status === 'approved' ? 'bg-slate-900' : ''}`}>
-                            {u.status === "rejected" ? "Deactivated" : u.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            {u.status === "approved" && (
-                              <Button size="sm" variant="outline" onClick={() => handleImpersonate(u.id)} className="h-8 px-3">
-                                Log in as
-                              </Button>
-                            )}
-                          </div>
-                        </TableCell>
+                <div className="space-y-4 p-4">
+                  {/* Credentials card */}
+                  <div className="rounded-lg border border-teal-200 bg-teal-50 p-4">
+                    <p className="text-xs font-bold uppercase tracking-wider text-teal-700 mb-3">Test Login Credentials</p>
+                    <p className="text-xs text-teal-600 mb-3">
+                      Password for all accounts: <span className="font-mono font-bold text-teal-900 bg-white px-2 py-0.5 rounded border border-teal-200">{department.mirrorCode}</span>
+                    </p>
+                    <div className="grid gap-2">
+                      {mirrorRoster.map(u => (
+                        <div key={u.id} className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 bg-white rounded border border-teal-100 px-3 py-2 text-sm">
+                          <Badge variant="outline" className="capitalize w-fit shrink-0">{u.role}</Badge>
+                          <span className="font-mono text-slate-700 text-xs break-all">{u.email}</span>
+                          <span className="text-slate-400 text-xs shrink-0 sm:ml-auto">password: <span className="font-mono font-medium text-slate-700">{department.mirrorCode}</span></span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Roster table */}
+                  <Table>
+                    <TableHeader className="bg-white">
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead>Name</TableHead>
+                        <TableHead>Email (login ID)</TableHead>
+                        <TableHead>Role</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Action</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {mirrorRoster.map(u => (
+                        <TableRow key={u.id}>
+                          <TableCell className="font-semibold text-slate-900">{u.fullName}</TableCell>
+                          <TableCell className="text-slate-500 text-sm font-mono">{u.email}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="capitalize">{u.role}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={u.status === "approved" ? "default" : "secondary"} className={`rounded-full ${u.status === 'approved' ? 'bg-slate-900' : ''}`}>
+                              {u.status === "rejected" ? "Deactivated" : u.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              {u.status === "approved" && (
+                                <Button size="sm" variant="outline" onClick={() => handleImpersonate(u.id)} className="h-8 px-3">
+                                  Log in as
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               )}
             </TabsContent>
           </Tabs>
