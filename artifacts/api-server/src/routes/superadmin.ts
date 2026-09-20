@@ -48,12 +48,13 @@ router.get("/departments", async (req, res) => {
 
     const mirrors = await db.select({
       id: departmentsTable.id,
+      code: departmentsTable.code,
       configSourceDepartmentId: departmentsTable.configSourceDepartmentId,
     }).from(departmentsTable).where(eq(departmentsTable.isTest, true));
 
-    const mirrorByRealDeptId = new Map(mirrors.filter(m => m.configSourceDepartmentId !== null).map((m) => [m.configSourceDepartmentId!, m.id]));
+    const mirrorByRealDeptId = new Map(mirrors.filter(m => m.configSourceDepartmentId !== null).map((m) => [m.configSourceDepartmentId!, { id: m.id, code: m.code }]));
 
-    res.json(departments.map((d) => ({ ...d, hod: hodByDept.get(d.id) || null, mirrorDepartmentId: mirrorByRealDeptId.get(d.id) ?? null })));
+    res.json(departments.map((d) => ({ ...d, hod: hodByDept.get(d.id) || null, mirrorDepartmentId: mirrorByRealDeptId.get(d.id)?.id ?? null, mirrorCode: mirrorByRealDeptId.get(d.id)?.code ?? null })));
   } catch (error) {
     req.log.error({ userId: req.user!.id, status: 500 }, "Error listing departments");
     res.status(500).json({ message: "Internal server error" });
@@ -131,6 +132,55 @@ router.post("/departments/backfill-test-departments", async (req, res) => {
     res.json({ provisioned, skipped, failed });
   } catch (error) {
     req.log.error({ userId: req.user!.id, status: 500 }, "Error backfilling mirror test departments");
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/superadmin/departments/:id/reset-test-credentials
+// Resets all test accounts in a mirror department to the deterministic password
+// (= the mirror dept code, e.g. "TEST-2"). Safe to call repeatedly.
+// ---------------------------------------------------------------------------
+router.post("/departments/:id/reset-test-credentials", async (req, res) => {
+  const realDepartmentId = Number(req.params.id);
+  try {
+    const [mirror] = await db.select({
+      id: departmentsTable.id,
+      code: departmentsTable.code,
+    }).from(departmentsTable)
+      .where(and(eq(departmentsTable.configSourceDepartmentId, realDepartmentId), eq(departmentsTable.isTest, true)))
+      .limit(1);
+
+    if (!mirror) {
+      res.status(404).json({ message: "No test department found for this department" });
+      return;
+    }
+
+    const [source] = await db.select({ name: departmentsTable.name })
+      .from(departmentsTable).where(eq(departmentsTable.id, realDepartmentId)).limit(1);
+
+    const newPasswordHash = await bcrypt.hash(mirror.code, 12);
+    const safeName = source
+      ? source.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")
+      : mirror.code.toLowerCase();
+
+    // Update password and email for each role to the clean, readable format
+    await db.update(usersTable)
+      .set({ passwordHash: newPasswordHash, email: `test.hod@${safeName}.test` })
+      .where(and(eq(usersTable.departmentId, mirror.id), eq(usersTable.role, "hod")));
+
+    await db.update(usersTable)
+      .set({ passwordHash: newPasswordHash, email: `test.prof@${safeName}.test` })
+      .where(and(eq(usersTable.departmentId, mirror.id), eq(usersTable.role, "professor")));
+
+    await db.update(usersTable)
+      .set({ passwordHash: newPasswordHash, email: `test.student@${safeName}.test` })
+      .where(and(eq(usersTable.departmentId, mirror.id), eq(usersTable.role, "student")));
+
+    req.log.info({ adminId: req.user!.id, mirrorDepartmentId: mirror.id }, "Test credentials reset");
+    res.json({ mirrorCode: mirror.code });
+  } catch (error) {
+    req.log.error({ userId: req.user!.id, status: 500 }, "Error resetting test credentials");
     res.status(500).json({ message: "Internal server error" });
   }
 });
