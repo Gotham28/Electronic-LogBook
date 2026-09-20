@@ -1,134 +1,88 @@
-# HANDOFF.md — Dispatch 48
+# HANDOFF — Dispatch 49: Department Requirements card fully view-only
 
-Supersedes dispatch 47's HANDOFF.md.
-
-## Files modified
-
-- `artifacts/api-server/src/lib/department-requirements.ts`
-- `artifacts/api-server/tests/access.test.ts`
+## File changed
+- `artifacts/mockup-sandbox/src/components/DepartmentSettings.tsx`
 
 ---
 
-## Build item 1 — atomic upsert in `department-requirements.ts`
-
-Both `recomputeProcedureRequirement` and `recomputeCatalogRequirements` previously
-performed a SELECT to check for an existing `department_configs` row, then branched to
-a separate INSERT or UPDATE. Two near-simultaneous calls for a new department could both
-see "no row" and both attempt INSERT, causing an unhandled unique-constraint violation on
-`department_configs.departmentId`.
-
-Both functions now use a single atomic Drizzle upsert (`.onConflictDoUpdate`), matching
-the convention established in `department-provisioning.ts:30-31`. The two SUM queries are
-unchanged. Only the write mechanism changed.
-
-### Diff — `artifacts/api-server/src/lib/department-requirements.ts`
+## Exact diff
 
 ```diff
-@@ -17,25 +17,8 @@
- 
-   const requiredProcedures = Number(row?.total ?? 0);
- 
--  const existing = await db
--    .select({ id: departmentConfigsTable.id })
--    .from(departmentConfigsTable)
--    .where(eq(departmentConfigsTable.departmentId, departmentId))
--    .limit(1);
+--- a/artifacts/mockup-sandbox/src/components/DepartmentSettings.tsx
++++ b/artifacts/mockup-sandbox/src/components/DepartmentSettings.tsx
+@@ -11,16 +11,13 @@
+-const computedFields = [
++const allRequirementsFields = [
+   ["requiredCases", "Required clinical cases (computed)"],
+   ["requiredProcedures", "Required procedures (computed)"],
+   ["requiredAcademic", "Required academic activities (computed)"],
+-] as const;
 -
--  if (existing.length > 0) {
--    await db
--      .update(departmentConfigsTable)
--      .set({ requiredProcedures })
--      .where(eq(departmentConfigsTable.departmentId, departmentId));
--  } else {
--    await db.insert(departmentConfigsTable).values({
--      departmentId,
--      requiredProcedures,
--      // requiredCases / requiredAcademic left at schema default (0)
--      // programDurationMonths / casualLeaveAllowance / academicLeaveAllowance left null
--    });
--  }
-+  await db.insert(departmentConfigsTable).values({ departmentId, requiredProcedures })
-+    .onConflictDoUpdate({ target: departmentConfigsTable.departmentId, set: { requiredProcedures } });
- }
- 
- /**
-@@ -58,25 +41,7 @@
-   const requiredCases = Number(casesRow?.total ?? 0);
-   const requiredAcademic = Number(academicRow?.total ?? 0);
- 
--  const existing = await db
--    .select({ id: departmentConfigsTable.id })
--    .from(departmentConfigsTable)
--    .where(eq(departmentConfigsTable.departmentId, departmentId))
--    .limit(1);
--
--  if (existing.length > 0) {
--    await db
--      .update(departmentConfigsTable)
--      .set({ requiredCases, requiredAcademic })
--      .where(eq(departmentConfigsTable.departmentId, departmentId));
--  } else {
--    await db.insert(departmentConfigsTable).values({
--      departmentId,
--      requiredCases,
--      requiredAcademic,
--      // requiredProcedures left at schema default (0)
--      // programDurationMonths / casualLeaveAllowance / academicLeaveAllowance left null
--    });
--  }
-+  await db.insert(departmentConfigsTable).values({ departmentId, requiredCases, requiredAcademic })
-+    .onConflictDoUpdate({ target: departmentConfigsTable.departmentId, set: { requiredCases, requiredAcademic } });
- }
+-const editableFields = [
+-  ["programDurationMonths", "Program duration (months)", true],
+-  ["casualLeaveAllowance", "Casual leave allowance (days)", true],
+-  ["academicLeaveAllowance", "Academic leave allowance (days)", true],
++  ["programDurationMonths", "Program duration (months)"],
++  ["casualLeaveAllowance", "Casual leave allowance (days)"],
++  ["academicLeaveAllowance", "Academic leave allowance (days)"],
+ ] as const;
+
+@@ -92,7 +89,6 @@
+ export function DepartmentSettings() {
+   const data = useDepartment();
+-  const [config, setConfig] = React.useState<Record<string, string>>(() => Object.fromEntries(editableFields.map(([key]) => [key, data.config?.[key]?.toString() ?? ""])));
+   const [procedure, setProcedure] = React.useState({ name: "", group: "", required: "" });
+
+@@ -203,17 +198,10 @@
+     <div className="grid gap-6 lg:grid-cols-2">
+       <Card><CardHeader><CardTitle>Department requirements</CardTitle></CardHeader><CardContent>
+-        <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); void save(() => apiPost("/api/admin/department/config",
+-          Object.fromEntries(editableFields.map(([key, _label, optional]) => [key, optional && config[key] === "" ? null : Number(config[key])]))), "Department requirements saved"); }}>
+-          {computedFields.map(([key, label]) => <div className="space-y-2" key={key}><Label>{label}</Label>
++        <div className="space-y-4">
++          {allRequirementsFields.map(([key, label]) => <div className="space-y-2" key={key}><Label>{label}</Label>
+             <p className="flex h-10 items-center rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-700">{data.config?.[key] ?? 0}</p></div>)}
+-          {editableFields.map(([key, label, optional]) => <div className="space-y-2" key={key}><Label htmlFor={`config-${key}`}>{label}</Label>
+-            <Input id={`config-${key}`} type="number" step="1" min={key === "programDurationMonths" ? 1 : 0} max={key === "programDurationMonths" ? 240 : 100000}
+-              required={!optional} value={config[key]} onChange={(e) => setConfig({ ...config, [key]: e.target.value })} /></div>)}
+-          <Button disabled={busy} type="submit">Save requirements</Button>
+-        </form>
++        </div>
+       </CardContent></Card>
 ```
 
 ---
 
-## Build item 2 — real test coverage in `access.test.ts`
+## `apiPost` import status
 
-Inserted a block of 6 lines into the test
-`"HOD requirements and training catalog are database-backed and reject cross-department updates"`,
-immediately after the existing `assert.equal(option.status, 201)` line (the `academic`/`period: "month"` entry)
-and before the cross-department PATCH assertion.
+**Present and used.** Line 3 of the file still imports `apiPost`:
 
-### Value derivation
-
-| Assertion | Value | Derivation |
-|---|---|---|
-| `requiredCases` after one `case_category`/`total` row at `required: 5` | **5** | `departmentIds[2]` starts with zero `case_category` catalog rows → SUM = 5 |
-| `requiredAcademic` after one more `academic`/`total` row at `required: 7` | **12** | Existing seed row "Test discussion 2" at `required: 5` + new row at `required: 7` = 12. The `period: "month"` "Custom seminar" added earlier in this test is excluded from the sum. |
-
-### Diff — `artifacts/api-server/tests/access.test.ts`
-
-```diff
-@@ -212,6 +212,12 @@
-   assert.equal((await call("/departments/" + departmentIds[2] + "/catalog", "student2")).body.config.requiredCases, 9);
-   const option = await call("/admin/department/catalog", "hod2", "POST", { kind: "academic", name: "Custom seminar", value: "custom-seminar", required: 2, period: "month" });
-   assert.equal(option.status, 201);
-+  const caseCategory = await call("/admin/department/catalog", "hod2", "POST", { kind: "case_category", name: "Custom case type", value: "custom-case-type", required: 5, period: "total" });
-+  assert.equal(caseCategory.status, 201);
-+  assert.equal((await call("/departments/" + departmentIds[2] + "/catalog", "student2")).body.config.requiredCases, 5);
-+  const academicTotal = await call("/admin/department/catalog", "hod2", "POST", { kind: "academic", name: "Custom total seminar", value: "custom-total-seminar", required: 7, period: "total" });
-+  assert.equal(academicTotal.status, 201);
-+  assert.equal((await call("/departments/" + departmentIds[2] + "/catalog", "student2")).body.config.requiredAcademic, 12);
-   assert.equal((await call("/admin/department/catalog/" + option.body.id, "hod0", "PATCH", { required: 200, period: "total" })).status, 404);
- });
+```ts
+import { apiPost, apiPatch, apiGet, apiDelete } from "@/lib/apiClient";
 ```
+
+`apiPost` is called in two remaining places:
+1. **"Add procedure type" form** (~line 211): `apiPost("/api/admin/department/procedures", ...)`
+2. **"Training Catalog" form** (~line 236): `apiPost("/api/admin/department/catalog", ...)`
+
+The import was not touched. No other imports were changed.
 
 ---
 
-## Commands run
+## What was done
 
-None. No shell commands, no typecheck, no test run, no git commands.
+| Step | Action |
+|---|---|
+| Arrays | Merged `computedFields` (3 entries) and `editableFields` (3 entries) into `allRequirementsFields` (6 entries). The `(computed)` suffix is kept only on `requiredCases`, `requiredProcedures`, `requiredAcademic`. The three previously editable fields keep their plain labels: "Program duration (months)", "Casual leave allowance (days)", "Academic leave allowance (days)". |
+| State | Removed `config`/`setConfig` React state (was only used by the deleted form). |
+| Card | Replaced the `<form>` (with `<Input>` fields and "Save requirements" `<Button>`) with a plain `<div className="space-y-4">` that maps `allRequirementsFields` using the exact read-only pattern (`<Label>` + `<p className="flex h-10 items-center rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-700">`). |
 
-## Not touched
+---
 
-- `admin.ts` call sites — untouched, already correct.
-- `validation.ts` — untouched.
-- `DepartmentSettings.tsx` — untouched.
-- `tests/support.ts` — untouched.
-- No schema changes, migrations, or backfills.
-- No secrets or credentials.
+## What was NOT touched
 
-## Noticed but not changed
-
-Nothing outside scope was observed that requires flagging.
+- Backend routes (`admin.ts`, `validation.ts`, `department-requirements.ts`) — untouched.
+- "Add procedure type" card — untouched.
+- "Training Catalog" card — untouched.
+- `apiPost` import — retained.
+- No other files were modified.
