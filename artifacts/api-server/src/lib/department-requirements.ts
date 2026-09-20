@@ -10,15 +10,17 @@ import { eq, and, sum } from "drizzle-orm";
  * other columns untouched.
  */
 export async function recomputeProcedureRequirement(departmentId: number): Promise<void> {
-  const [row] = await db
-    .select({ total: sum(procedureTypesTable.required) })
-    .from(procedureTypesTable)
-    .where(eq(procedureTypesTable.departmentId, departmentId));
+  await db.transaction(async (tx) => {
+    const [row] = await tx
+      .select({ total: sum(procedureTypesTable.required) })
+      .from(procedureTypesTable)
+      .where(eq(procedureTypesTable.departmentId, departmentId));
 
-  const requiredProcedures = Number(row?.total ?? 0);
+    const requiredProcedures = row?.total != null ? Number(row.total) : null;
 
-  await db.insert(departmentConfigsTable).values({ departmentId, requiredProcedures })
-    .onConflictDoUpdate({ target: departmentConfigsTable.departmentId, set: { requiredProcedures } });
+    await tx.insert(departmentConfigsTable).values({ departmentId, requiredProcedures })
+      .onConflictDoUpdate({ target: departmentConfigsTable.departmentId, set: { requiredProcedures } });
+  });
 }
 
 /**
@@ -33,31 +35,33 @@ export async function recomputeProcedureRequirement(departmentId: number): Promi
  * leaving all other columns untouched.
  */
 export async function recomputeCatalogRequirements(departmentId: number): Promise<void> {
-  const [casesRow] = await db
-    .select({ total: sum(departmentCatalogTable.required) })
-    .from(departmentCatalogTable)
-    .where(
-      and(
-        eq(departmentCatalogTable.departmentId, departmentId),
-        eq(departmentCatalogTable.kind, "case_category"),
-        eq(departmentCatalogTable.period, "total"),
-      ),
-    );
+  await db.transaction(async (tx) => {
+    const [casesRow] = await tx
+      .select({ total: sum(departmentCatalogTable.required) })
+      .from(departmentCatalogTable)
+      .where(
+        and(
+          eq(departmentCatalogTable.departmentId, departmentId),
+          eq(departmentCatalogTable.kind, "case_category"),
+          eq(departmentCatalogTable.period, "total"),
+        ),
+      );
 
-  const [academicRow] = await db
-    .select({ total: sum(departmentCatalogTable.required) })
-    .from(departmentCatalogTable)
-    .where(
-      and(
-        eq(departmentCatalogTable.departmentId, departmentId),
-        eq(departmentCatalogTable.kind, "academic"),
-        eq(departmentCatalogTable.period, "total"),
-      ),
-    );
+    const [academicRow] = await tx
+      .select({ total: sum(departmentCatalogTable.required) })
+      .from(departmentCatalogTable)
+      .where(
+        and(
+          eq(departmentCatalogTable.departmentId, departmentId),
+          eq(departmentCatalogTable.kind, "academic"),
+          eq(departmentCatalogTable.period, "total"),
+        ),
+      );
 
-  const requiredCases = Number(casesRow?.total ?? 0);
-  const requiredAcademic = Number(academicRow?.total ?? 0);
+    const requiredCases = casesRow?.total != null ? Number(casesRow.total) : null;
+    const requiredAcademic = academicRow?.total != null ? Number(academicRow.total) : null;
 
-  await db.insert(departmentConfigsTable).values({ departmentId, requiredCases, requiredAcademic })
-    .onConflictDoUpdate({ target: departmentConfigsTable.departmentId, set: { requiredCases, requiredAcademic } });
+    await tx.insert(departmentConfigsTable).values({ departmentId, requiredCases, requiredAcademic })
+      .onConflictDoUpdate({ target: departmentConfigsTable.departmentId, set: { requiredCases, requiredAcademic } });
+  });
 }
