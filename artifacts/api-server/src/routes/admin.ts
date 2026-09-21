@@ -944,4 +944,94 @@ router.delete("/department/procedures/:id", async (req, res) => {
   }
 });
 
+// GET /department/procedure-groups
+router.get("/department/procedure-groups", async (req, res) => {
+  try {
+    const departmentId = req.user?.departmentId;
+    if (!departmentId) {
+      res.status(400).json({ message: "No department assigned" });
+      return;
+    }
+
+    const configSourceId = await resolveConfigDepartmentId(departmentId);
+    
+    const groups = await db.select({
+      id: procedureTypesTable.group,
+      name: procedureTypesTable.group,
+      count: count(),
+    })
+    .from(procedureTypesTable)
+    .where(eq(procedureTypesTable.departmentId, configSourceId))
+    .groupBy(procedureTypesTable.group);
+
+    res.json(groups);
+  } catch (error) {
+    req.log.error({ departmentId: req.user!.departmentId, status: 500 }, "Error fetching procedure groups");
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// GET /department/procedure-groups/:id/usage-count
+router.get("/department/procedure-groups/:id/usage-count", async (req, res) => {
+  try {
+    const groupName = req.params.id;
+    const departmentId = req.user?.departmentId;
+    if (!departmentId) {
+      res.status(400).json({ message: "No department assigned" });
+      return;
+    }
+
+    const configSourceId = await resolveConfigDepartmentId(departmentId);
+
+    const [countRes] = await db.select({ count: count() })
+      .from(procedureTypesTable)
+      .where(and(
+        eq(procedureTypesTable.group, groupName),
+        eq(procedureTypesTable.departmentId, configSourceId)
+      ));
+    
+    res.json({ count: countRes?.count || 0 });
+  } catch (error) {
+    req.log.error({ groupName: req.params.id, status: 500 }, "Error getting procedure group usage count");
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// DELETE /department/procedure-groups/:id
+router.delete("/department/procedure-groups/:id", async (req, res) => {
+  try {
+    const groupName = req.params.id;
+    const departmentId = req.user?.departmentId;
+    if (!departmentId) {
+      res.status(400).json({ message: "No department assigned" });
+      return;
+    }
+
+    const [dept] = await db.select({ configSourceDepartmentId: departmentsTable.configSourceDepartmentId }).from(departmentsTable).where(eq(departmentsTable.id, departmentId));
+    if (dept?.configSourceDepartmentId !== null) {
+      res.status(403).json({ message: "Test departments cannot modify mirrored settings" });
+      return;
+    }
+
+    const configSourceId = await resolveConfigDepartmentId(departmentId);
+
+    const [countRes] = await db.select({ count: count() })
+      .from(procedureTypesTable)
+      .where(and(
+        eq(procedureTypesTable.group, groupName),
+        eq(procedureTypesTable.departmentId, configSourceId)
+      ));
+
+    if (countRes && countRes.count > 0) {
+      res.status(403).json({ message: "This group is still used by procedure types and cannot be removed." });
+      return;
+    }
+
+    res.json({ message: "Procedure group deleted successfully" });
+  } catch (error) {
+    req.log.error({ groupName: req.params.id, status: 500 }, "Error deleting procedure group");
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
 export default router;
