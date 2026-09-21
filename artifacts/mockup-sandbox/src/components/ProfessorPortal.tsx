@@ -126,7 +126,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
   const [currentIndex, setCurrentIndex] = React.useState(0);
   const [remarks, setRemarks] = React.useState("");
   const [grade, setGrade] = React.useState("A");
-  const [competencyOverride, setCompetencyOverride] = React.useState("performed_independently");
+  const [competencyOverride, setCompetencyOverride] = React.useState(competencyLevels[0]?.value ?? "");
   const [evaluatedLogs, setEvaluatedLogs] = React.useState<Record<string, any>>({});
   const [departmentFilter, setDepartmentFilter] = React.useState("all");
 
@@ -207,6 +207,13 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
     }
   }, [reviews.length, currentIndex]);
 
+  // Reset competencyOverride to default level only when navigating to a new queue item
+  React.useEffect(() => {
+    if (competencyLevels.length > 0) {
+      setCompetencyOverride(competencyLevels[0].value);
+    }
+  }, [currentIndex]);
+
   // ── Fetch /logs and /progress in parallel when selectedMentee changes ────────
   React.useEffect(() => {
     if (!selectedMentee) {
@@ -276,7 +283,10 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
     try {
       await apiPatch(`/api/logs/${currentItem.logType}/${currentItem.dbId}/review`, {
         status,
-        comments: remarks || defaultRemarks
+        comments: remarks || defaultRemarks,
+        ...(currentItem.logType === "procedure" && competencyOverride
+          ? { facultyVerifiedLevel: competencyOverride }
+          : {})
       });
       
       // Optimistic update for evaluatedLogs mapping
