@@ -1,7 +1,7 @@
 import * as React from "react";
 import { toast } from "sonner";
 import { apiPost, apiPatch, apiGet, apiDelete } from "@/lib/apiClient";
-import { Trash2, AlertTriangle, ChevronDown, Search } from "lucide-react";
+import { Trash2, AlertTriangle, ChevronDown, Search, SlidersHorizontal, ClipboardList, LibraryBig } from "lucide-react";
 import { useDepartment } from "@/lib/department-context";
 import { Button } from "@/components/ui/button";
 
@@ -31,17 +31,17 @@ function SearchableSection<T extends { id: number; name: string }>({
   const q = query.trim().toLowerCase();
   const visible = q ? items.filter((item) => item.name.toLowerCase().includes(q)) : items;
   return (
-    <section>
+    <section className="rounded-2xl border border-slate-200/80 bg-white/80 p-2 shadow-sm shadow-slate-200/40">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        className="flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2 text-left hover:bg-slate-50"
+        className="flex w-full items-center justify-between gap-2 rounded-xl px-3 py-3 text-left transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
       >
         <span className="flex items-center gap-2 font-semibold">
-          {title}
+          <span className="text-sm tracking-tight text-slate-800">{title}</span>
           {items.length > 0 && (
-            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+              <span className="rounded-full bg-teal-50 px-2 py-0.5 text-[11px] font-semibold text-teal-700">
               {items.length}
             </span>
           )}
@@ -141,7 +141,20 @@ export function DepartmentSettings() {
   }
 
   return <div className="space-y-6">
-    <p className="text-sm text-slate-500">Configure training for {data.department.name}. An empty optional allowance or duration means it has not been configured.</p>
+    <div className="relative overflow-hidden rounded-3xl border border-teal-100 bg-gradient-to-br from-slate-950 via-slate-900 to-teal-950 px-6 py-7 text-white shadow-lg shadow-slate-200/60 sm:px-8">
+      <div className="absolute -right-16 -top-20 h-56 w-56 rounded-full bg-teal-400/15 blur-3xl" />
+      <div className="relative flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+        <div className="max-w-2xl">
+          <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-teal-300"><SlidersHorizontal className="h-4 w-4" /> Department setup</div>
+          <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Training references</h2>
+          <p className="mt-2 text-sm leading-6 text-slate-300">Keep {data.department.name} requirements, procedures, and catalog options in one clear place.</p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2 rounded-2xl border border-white/10 bg-white/10 px-4 py-3 backdrop-blur-sm">
+          <LibraryBig className="h-5 w-5 text-teal-300" />
+          <div><p className="text-[11px] uppercase tracking-wider text-slate-400">Active department</p><p className="text-sm font-semibold">{data.department.name}</p></div>
+        </div>
+      </div>
+    </div>
 
     {deleteTarget && (
       <Card className="border-rose-200 bg-rose-50/30 shadow-sm">
@@ -198,17 +211,17 @@ export function DepartmentSettings() {
       </Card>
     )}
 
-    <div className="grid gap-6 lg:grid-cols-2">
-      <Card><CardHeader><CardTitle>Department requirements</CardTitle></CardHeader><CardContent>
+    <div className="grid gap-5 lg:grid-cols-[0.85fr_1.15fr]">
+      <Card className="border-slate-200/80 shadow-sm shadow-slate-200/50"><CardHeader className="border-b border-slate-100 bg-slate-50/70 pb-4"><CardTitle className="flex items-center gap-2 text-base"><ClipboardList className="h-4 w-4 text-teal-600" /> Department requirements</CardTitle><p className="text-xs text-slate-500">Computed from your active configuration</p></CardHeader><CardContent className="p-5">
         <div className="space-y-3">
-          {computedRequirementsFields.map(([key, label]) => <div key={key} className="flex items-center justify-between py-1 border-b border-slate-100 last:border-0">
+          {computedRequirementsFields.map(([key, label]) => <div key={key} className="flex items-center justify-between gap-4 border-b border-slate-100 py-3 last:border-0">
             <span className="text-sm text-slate-500">{label}</span>
             <span className="text-sm font-medium text-slate-800">{data.config?.[key] == null ? <span className="text-slate-400 italic">Not tracked</span> : data.config[key]}</span>
           </div>)}
         </div>
       </CardContent></Card>
 
-      <Card><CardHeader><CardTitle>Add procedure type</CardTitle></CardHeader><CardContent>
+      <Card className="border-slate-200/80 shadow-sm shadow-slate-200/50"><CardHeader className="border-b border-slate-100 bg-slate-50/70 pb-4"><CardTitle className="text-base">Add procedure type</CardTitle><p className="text-xs text-slate-500">Set the target once, then update it inline below.</p></CardHeader><CardContent className="p-5">
         <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); void save(async () => {
           await apiPost("/api/admin/department/procedures", { ...procedure, required: Number(procedure.required) });
           setProcedure({ name: "", group: "", required: "" });
@@ -233,8 +246,8 @@ export function DepartmentSettings() {
         </div>
       </CardContent></Card>
     </div>
-    <Card><CardHeader><CardTitle>Training Catalog</CardTitle></CardHeader><CardContent className="space-y-6">
-      <form className="grid items-end gap-4 md:grid-cols-4" onSubmit={(e) => { e.preventDefault(); void save(async () => {
+    <Card className="border-slate-200/80 shadow-sm shadow-slate-200/50"><CardHeader className="border-b border-slate-100 bg-slate-50/70 pb-4"><CardTitle className="text-base">Training catalog</CardTitle><p className="text-xs text-slate-500">Manage the options residents select while logging their work.</p></CardHeader><CardContent className="space-y-6 p-5">
+      <form className="rounded-2xl border border-dashed border-teal-200 bg-teal-50/40 p-4 grid items-end gap-4 md:grid-cols-4" onSubmit={(e) => { e.preventDefault(); void save(async () => {
         await apiPost("/api/admin/department/catalog", { ...entry, value: entry.name.trim(), required: entry.kind === "posting" ? 0 : Number(entry.required) });
         setEntry({ ...entry, name: "", required: "" });
       }, "Training option added"); }}>
