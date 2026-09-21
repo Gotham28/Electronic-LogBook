@@ -761,3 +761,77 @@ form", on branch `fix/superadmin-add-resident-form-defaults` (cut fresh off `mai
 console", on branch `fix/superadmin-resident-auto-approve` (cut fresh off `main` @
 `ef6c740`).
 **PR** — [#36](https://github.com/Gotham28/Electronic-LogBook/pull/36).
+
+### 2026-09-21 — Fix test-department isolation and complete department-config mirroring
+
+**What changed**
+- Root cause (audit, dispatch 1): case-log submission → test prof queue → test HOD view
+  already worked end-to-end correctly. The actual bug: `student.ts`'s leave-record and
+  procedure-log POST handlers looked up `departmentCatalogTable` rows (`leave_type`,
+  `competency_level`) using the caller's own `departmentId` instead of
+  `resolveConfigDepartmentId()`; since a test/mirror department carries no catalog rows of
+  its own, every such submission 400'd outright — which is why the professor/HOD saw
+  nothing.
+- Fixed both lookups to resolve through `resolveConfigDepartmentId()`. Also found and fixed
+  (developer-approved expansion, not in the original file list): `assignments.ts`'s
+  `assignmentTypesTable` reads weren't routed through the resolver, and its write path had
+  no 403 guard against mirror-department writes — added the same guard already used in
+  `admin.ts`.
+- A deadlock surfaced during verification: the leave-records fix called
+  `resolveConfigDepartmentId()` (which always queries the shared `db`) from inside an
+  already-open `db.transaction()` holding an advisory lock. Fixed by resolving the id before
+  the transaction opens.
+- Five new tests added to `mirror-department.test.ts` (submission success, cross-department
+  visibility, assignment-type mirroring, the new write guard, and its full 401/403/201
+  evidence). Three rounds of test-only bugs found and fixed during verification (wrong id
+  field, wrong API response shape, wrong leave-type balance) — all diagnosed by reading the
+  actual application code the tests exercised, not guessed.
+- Manual verification surfaced two unrelated bugs, handled separately from this task: an
+  unhandled `pg.Pool` error crashing the whole server on an idle Neon disconnect (reported,
+  not fixed — needs its own task), and an infinite refetch loop in `AppLayout.tsx` from an
+  unstable `useEffect` dependency (root-caused and fixed in a standalone dispatch, disclosed
+  separately).
+
+**Files**
+- `artifacts/api-server/src/routes/student.ts`, `artifacts/api-server/src/routes/assignments.ts`
+- `artifacts/api-server/tests/mirror-department.test.ts`
+- `.agents/runs/dispatch-59` through `-64` (audit + four fix rounds), `HANDOFF.md`
+
+**Evidence**
+- `pnpm test` (`artifacts/api-server`): 144 tests, 140 pass, 4 fail — the 4 failures
+  confirmed pre-existing and unrelated via git-stash-isolated re-run against baseline,
+  independently reproduced by the code-review evidence lens.
+- `pnpm typecheck`: 8 pre-existing errors, confirmed identical against baseline the same
+  way; no new errors introduced.
+- `code-review`: four Opus-tier lenses (scope/rules/evidence/blast-radius), verdict
+  **accept with fixes**, no Critical findings. One code-side Major finding (missing evidence
+  case) closed by dispatch 64; two accepted as documented limitations; one requires a manual
+  pilot-database check (below); one (unrelated file in the working tree) left untouched per
+  developer instruction.
+- Manual verification: developer confirmed live, via admin impersonation, that a test
+  student's procedure-log submission now reaches the test professor's and test HOD's review
+  queues.
+
+**Left open**
+- Developer to run a read-only check on the pilot database for any pre-existing
+  `assignment_types` rows owned by a mirror department, before merging — the new write
+  guard could make such rows invisible/uncreatable-against going forward.
+- The frontend supervisor-picker question from the original audit (whether it ever passes a
+  resolved/real department id where it should use the caller's own) was never resolved — no
+  frontend source was read for this task.
+- Two accepted, documented limitations from code review: a new cross-department FK link
+  (mirror assignment → real department's assignment type) that's unreachable through any
+  current app route; and the deadlock fix being unverifiable by this test suite since it
+  runs on PGlite, which has no connection pool unlike production's `pg.Pool`.
+- `artifacts/mockup-sandbox/src/components/ProfessorPortal.tsx` has an unrelated,
+  pre-existing uncommitted change in the working tree — explicitly left alone per developer
+  instruction, not part of this commit.
+- `artifacts/mockup-sandbox/src/components/layout/AppLayout.tsx`'s infinite-loop fix and the
+  unhandled `pg.Pool` crash are unrelated bugs found during this task's manual verification
+  — the AppLayout fix needs its own separate commit/PR; the pool crash needs its own
+  separate task.
+
+**Commit** — `b5af17f` "fix: resolve test-department config lookups through the
+mirror-department resolver", on branch `fix/test-department-config-mirroring` (cut fresh
+off `origin/main`).
+**PR** — [#66](https://github.com/Gotham28/Electronic-LogBook/pull/66).
