@@ -49,7 +49,6 @@ export function PrivacyPolicyPage() {
             <div className="mt-4 p-4 bg-slate-50 rounded-xl border border-slate-200">
               <p className="font-semibold text-slate-900">Gautam P</p>
               <p>Email: <a href="mailto:gothoslabs@gmail.com" className="text-teal-600 hover:underline">gothoslabs@gmail.com</a></p>
-              <p>Address: Roses apartments, Kakkad, Kannur, Kerala, 670001</p>
             </div>
           </section>
         </div>
