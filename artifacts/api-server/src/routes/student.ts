@@ -858,9 +858,19 @@ router.post("/:studentId/procedure-logs", validate(z.object({ supervisorId: idSc
       eq(procedureTypesTable.departmentId, configSourceId), eq(procedureTypesTable.name, procedureName), eq(procedureTypesTable.group, procedureGroup))).limit(1);
     if (!option) { res.status(400).json({ message: "Select a procedure from your department" }); return; }
 
-    const [compLevel] = await db.select({ id: departmentCatalogTable.id }).from(departmentCatalogTable).where(and(
-      eq(departmentCatalogTable.departmentId, req.user!.departmentId!), eq(departmentCatalogTable.kind, "competency_level"), eq(departmentCatalogTable.value, competencyLevel))).limit(1);
-    if (!compLevel) { res.status(400).json({ message: "Invalid competency level for your department" }); return; }
+    const [config] = await db.select({ enabledFeatures: departmentConfigsTable.enabledFeatures }).from(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, configSourceId)).limit(1);
+    const enabledFeatures = config?.enabledFeatures as Record<string, boolean> | null;
+    
+    if (enabledFeatures?.procedureExperience) {
+      const [compLevel] = await db.select({ id: departmentCatalogTable.id }).from(departmentCatalogTable).where(and(
+        eq(departmentCatalogTable.departmentId, req.user!.departmentId!), eq(departmentCatalogTable.kind, "competency_level"), eq(departmentCatalogTable.value, competencyLevel))).limit(1);
+      if (!compLevel) { res.status(400).json({ message: "Invalid competency level for your department" }); return; }
+    } else {
+      if (competencyLevel !== "N/A") {
+        res.status(400).json({ message: "Procedure experience is not enabled for your department" });
+        return;
+      }
+    }
     const [inserted] = await db.insert(procedureLogsTable).values({
       studentId, supervisorId: supervisorIdNum, procedureGroup, procedureName, date, 
       patientUhid, patientAge, competencyLevel, status: "pending"
