@@ -9,10 +9,14 @@ const router: IRouter = Router();
 
 // PATCH /api/logs/:logType/:logId/review
 router.patch("/:logType/:logId/review", requireAuth, requireRole(["professor", "hod"]), requireDepartment,
-  validate(z.object({ status: z.enum(["verified", "rejected"]), comments: z.string().max(10000).optional() }).strict()), async (req, res) => {
+  validate(z.object({
+    status: z.enum(["verified", "rejected"]),
+    comments: z.string().max(10000).optional(),
+    facultyVerifiedLevel: z.string().max(500).optional()
+  }).strict()), async (req, res) => {
   try {
     const { logType, logId } = req.params;
-    const { status, comments } = req.body;
+    const { status, comments, facultyVerifiedLevel } = req.body;
 
     const id = parseInt(String(logId), 10);
     if (isNaN(id)) {
@@ -79,6 +83,11 @@ router.patch("/:logType/:logId/review", requireAuth, requireRole(["professor", "
       reviewedBy: reviewer.id,
       reviewedAt: new Date()
     };
+    // facultyVerifiedLevel only exists on procedureLogsTable — do not spread it into
+    // updateData used by case/academic/conference tables which have no such column.
+    const procedureUpdateData = logType === "procedure"
+      ? { ...updateData, facultyVerifiedLevel: facultyVerifiedLevel || null }
+      : updateData;
     const departmentStudents = db.select({ id: studentsTable.id }).from(studentsTable)
       .innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
       .where(and(eq(usersTable.departmentId, reviewer.departmentId!), eq(usersTable.status, "approved")));
@@ -87,7 +96,7 @@ router.patch("/:logType/:logId/review", requireAuth, requireRole(["professor", "
       updatedRows = await db.update(caseLogsTable).set(updateData).where(and(eq(caseLogsTable.id, id), eq(caseLogsTable.status, "pending"), isNull(caseLogsTable.deletedAt),
         inArray(caseLogsTable.studentId, departmentStudents), reviewer.role === "professor" ? eq(caseLogsTable.supervisorId, reviewer.id) : undefined)).returning();
     } else if (logType === "procedure") {
-      updatedRows = await db.update(procedureLogsTable).set(updateData).where(and(eq(procedureLogsTable.id, id), eq(procedureLogsTable.status, "pending"), isNull(procedureLogsTable.deletedAt),
+      updatedRows = await db.update(procedureLogsTable).set(procedureUpdateData).where(and(eq(procedureLogsTable.id, id), eq(procedureLogsTable.status, "pending"), isNull(procedureLogsTable.deletedAt),
         inArray(procedureLogsTable.studentId, departmentStudents), reviewer.role === "professor" ? eq(procedureLogsTable.supervisorId, reviewer.id) : undefined)).returning();
     } else if (logType === "academic") {
       updatedRows = await db.update(academicLogsTable).set(updateData).where(and(eq(academicLogsTable.id, id), eq(academicLogsTable.status, "pending"),

@@ -25,8 +25,9 @@ type ProcedureLog = {
   procedureName: string;
   age: string;
   experience: string;
-  verifiedCompetency: string;
-  status: "pending" | "verified" | "revision";
+  facultyVerifiedLevel: string | null;
+  facultyRemarks: string | null;
+  status: "pending" | "verified" | "rejected";
   procedureGroup: string;
   patientAge: string;
   competencyLevel: string;
@@ -56,6 +57,12 @@ export function ProcedureLogsPage() {
     experience: competencyLevels[0]?.value ?? "",
     supervisorId: "",
   });
+
+  React.useEffect(() => {
+    if (competencyLevels.length > 0 && !form.experience) {
+      setForm((prev) => ({ ...prev, experience: competencyLevels[0].value }));
+    }
+  }, [competencyLevels, form.experience]);
   const loggedCounts = React.useMemo(
     () => Object.fromEntries(PROCEDURE_REQUIREMENTS.map((requirement) => [
       requirement.name,
@@ -214,7 +221,13 @@ export function ProcedureLogsPage() {
               </Field>
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={isSubmitting}>Save draft</Button>
-                <Button type="submit" disabled={isSubmitting}>
+                <Button 
+                  type="submit" 
+                  disabled={
+                    isSubmitting || 
+                    (Boolean(config?.enabledFeatures?.procedureExperience) && (!competencyLevels.length || !form.experience))
+                  }
+                >
                   {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Send to faculty
                 </Button>
@@ -301,7 +314,7 @@ export function ProcedureLogsPage() {
             </Empty>
           ) : (
             <Table>
-              <TableHeader><TableRow><TableHead>Number</TableHead><TableHead>Date</TableHead><TableHead>Group</TableHead><TableHead>Procedure</TableHead>{!hideUhid && <TableHead>Patient ID</TableHead>}<TableHead>Age</TableHead>{config?.enabledFeatures?.procedureExperience && <TableHead>Experience</TableHead>}<TableHead>Verified competency</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Number</TableHead><TableHead>Date</TableHead><TableHead>Group</TableHead><TableHead>Procedure</TableHead>{!hideUhid && <TableHead>Patient ID</TableHead>}<TableHead>Age</TableHead>{config?.enabledFeatures?.procedureExperience && <TableHead>Experience</TableHead>}<TableHead>Verified competency</TableHead><TableHead>Remarks</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
               <TableBody>
                 {logs.map((log) => (
                   <TableRow key={log.id}>
@@ -312,7 +325,12 @@ export function ProcedureLogsPage() {
                     {!hideUhid && <TableCell className="font-semibold text-teal-800">{log.patientUhid}</TableCell>}
                     <TableCell>{log.patientAge || log.age}</TableCell>
                     {config?.enabledFeatures?.procedureExperience && <TableCell className="text-xs">{log.competencyLevel}</TableCell>}
-                    <TableCell className="text-xs">{log.verifiedCompetency || (log.status === 'verified' ? log.competencyLevel : 'Pending verification')}</TableCell>
+                    <TableCell className="text-xs">{log.facultyVerifiedLevel ? (competencyLevels.find(c => c.value === log.facultyVerifiedLevel)?.name || log.facultyVerifiedLevel) : 'Pending verification'}</TableCell>
+                    <TableCell className="text-xs max-w-[160px]">
+                      {log.facultyRemarks
+                        ? <span title={log.facultyRemarks} className="block truncate cursor-help text-slate-600">{log.facultyRemarks}</span>
+                        : <span className="text-slate-400">—</span>}
+                    </TableCell>
                     <TableCell>{statusBadge(log.status)}</TableCell>
                     <TableCell className="text-right">
                       {log.status === "pending" && (
@@ -338,6 +356,6 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function statusBadge(status: ProcedureLog["status"]) {
   if (status === "verified") return <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700"><CheckCircle2 className="mr-1 h-3 w-3" /> Verified</Badge>;
-  if (status === "revision") return <Badge className="border-rose-200 bg-rose-50 text-rose-700"><AlertCircle className="mr-1 h-3 w-3" /> Revision</Badge>;
+  if (status === "rejected") return <Badge className="border-rose-200 bg-rose-50 text-rose-700"><AlertCircle className="mr-1 h-3 w-3" /> Rejected</Badge>;
   return <Badge className="border-amber-200 bg-amber-50 text-amber-700"><Clock className="mr-1 h-3 w-3" /> Pending</Badge>;
 }
