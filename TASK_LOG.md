@@ -831,5 +831,7 @@ console", on branch `fix/superadmin-resident-auto-approve` (cut fresh off `main`
   — the AppLayout fix needs its own separate commit/PR; the pool crash needs its own
   separate task.
 
-**Commit** — pending.
-**PR** — pending.
+**Commit** — `b5af17f` "fix: resolve test-department config lookups through the
+mirror-department resolver", on branch `fix/test-department-config-mirroring` (cut fresh
+off `origin/main`).
+**PR** — [#66](https://github.com/Gotham28/Electronic-LogBook/pull/66).
