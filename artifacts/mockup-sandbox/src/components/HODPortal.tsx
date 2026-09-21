@@ -80,7 +80,7 @@ const paths: Record<string, string> = {
 
 export function HODPortal({ activeTab }: { activeTab?: string }) {
   const [location, setLocation] = useLocation();
-  const { department, hod, config } = useDepartment();
+  const { department, config } = useDepartment();
   const currentTab = React.useMemo(() => {
     if (activeTab) return activeTab;
     if (location === "/" || location === "/mentees") return "mentees";
@@ -318,18 +318,6 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
 
   return (
     <div className="space-y-6 pb-12">
-      <Card className="overflow-hidden border-teal-100 bg-gradient-to-r from-teal-800 via-teal-700 to-cyan-600 text-white">
-        <CardContent className="p-6 md:p-8">
-          <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-[.18em] text-teal-100">Department leadership</p>
-              <h2 className="mt-2 text-3xl font-bold">{hod?.name || getCurrentUser()?.name}</h2>
-              <p className="mt-2 text-sm text-teal-50">HOD, Department of {department.name}</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
       {analyticsError && (
         <div role="alert" className="flex items-center justify-between gap-4 rounded-md border border-rose-200 bg-rose-50 px-4 py-3">
           <p className="text-sm font-medium text-rose-700">{analyticsError}</p>
