@@ -2,9 +2,10 @@ import { Router } from "express";
 import { z } from "zod";
 import { and, eq, desc, inArray, ilike, lt } from "drizzle-orm";
 import { db, assignmentsTable as assignments, assignmentRecipientsTable as recipients,
-  assignmentTypesTable as types, studentsTable as students, usersTable as users, auditTable } from "@workspace/db";
+  assignmentTypesTable as types, studentsTable as students, usersTable as users, auditTable, departmentsTable } from "@workspace/db";
 import { requireAuth, requireDepartment, requireRole } from "../middlewares/auth.js";
 import { idSchema, nameSchema, validate } from "../lib/validation.js";
+import { resolveConfigDepartmentId } from "../lib/department-config-source.js";
 
 const router = Router();
 router.use(requireAuth, requireRole(["student", "professor", "hod"]), requireDepartment);
@@ -16,11 +17,14 @@ const createSchema = z.object({ typeId: idSchema, title: nameSchema,
 }).strict();
 
 router.get("/types", async (req, res) => {
+  const configSourceId = await resolveConfigDepartmentId(req.user!.departmentId!);
   res.json(await db.select({ id: types.id, name: types.name, description: types.description })
-    .from(types).where(eq(types.departmentId, req.user!.departmentId!)).orderBy(types.name));
+    .from(types).where(eq(types.departmentId, configSourceId)).orderBy(types.name));
 });
 
 router.post("/types", staff, validate(typeSchema), async (req, res) => {
+  const [dept] = await db.select({ configSourceDepartmentId: departmentsTable.configSourceDepartmentId }).from(departmentsTable).where(eq(departmentsTable.id, req.user!.departmentId!));
+  if (dept?.configSourceDepartmentId !== null) { res.status(403).json({ message: "Test departments cannot modify mirrored settings" }); return; }
   const [created] = await db.insert(types).values({ ...req.body, departmentId: req.user!.departmentId!, createdBy: req.user!.id })
     .returning({ id: types.id, name: types.name, description: types.description });
   res.status(201).json(created);
@@ -38,9 +42,10 @@ router.post("/", staff, validate(createSchema), async (req, res) => {
   const body = req.body as z.infer<typeof createSchema>;
   if (Date.parse(body.dueAt) <= Date.now()) { res.status(400).json({ message: "Due date must be in the future" }); return; }
   const caller = req.user!;
+  const configSourceId = await resolveConfigDepartmentId(caller.departmentId!);
   const created = await db.transaction(async (tx) => {
     const [type] = await tx.select({ id: types.id }).from(types)
-      .where(and(eq(types.id, body.typeId), eq(types.departmentId, caller.departmentId!))).limit(1);
+      .where(and(eq(types.id, body.typeId), eq(types.departmentId, configSourceId))).limit(1);
     const targets = await tx.select({ id: students.id }).from(students).innerJoin(users, eq(students.userId, users.id))
       .where(and(inArray(students.id, body.studentIds), eq(users.departmentId, caller.departmentId!),
         eq(users.role, "student"), eq(users.status, "approved"))).for("share");

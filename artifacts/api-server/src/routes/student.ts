@@ -569,13 +569,14 @@ router.post("/:studentId/leave-records", validate(z.object({ startDate: dateSche
     }
 
     const currentYear = new Date().getFullYear().toString();
+    const configSourceId = await resolveConfigDepartmentId(studentUser.departmentId!);
     const result = await db.transaction(async (tx) => {
       const hashBuffer = crypto.createHash("md5").update(`leave_lock_${studentId}`).digest();
       const hash = hashBuffer.readInt32BE(0);
       await tx.execute(sql`SELECT pg_advisory_xact_lock(${hash})`);
 
       const [catalogEntry] = await tx.select().from(departmentCatalogTable)
-        .where(and(eq(departmentCatalogTable.departmentId, studentUser.departmentId!), eq(departmentCatalogTable.kind, "leave_type"), eq(departmentCatalogTable.value, leaveType))).limit(1);
+        .where(and(eq(departmentCatalogTable.departmentId, configSourceId), eq(departmentCatalogTable.kind, "leave_type"), eq(departmentCatalogTable.value, leaveType))).limit(1);
 
       if (!catalogEntry) {
         return { status: 400, body: { message: "Invalid leave type for this department" } };
@@ -863,7 +864,7 @@ router.post("/:studentId/procedure-logs", validate(z.object({ supervisorId: idSc
     
     if (enabledFeatures?.procedureExperience) {
       const [compLevel] = await db.select({ id: departmentCatalogTable.id }).from(departmentCatalogTable).where(and(
-        eq(departmentCatalogTable.departmentId, req.user!.departmentId!), eq(departmentCatalogTable.kind, "competency_level"), eq(departmentCatalogTable.value, competencyLevel))).limit(1);
+        eq(departmentCatalogTable.departmentId, configSourceId), eq(departmentCatalogTable.kind, "competency_level"), eq(departmentCatalogTable.value, competencyLevel))).limit(1);
       if (!compLevel) { res.status(400).json({ message: "Invalid competency level for your department" }); return; }
     } else {
       if (competencyLevel !== "N/A") {
