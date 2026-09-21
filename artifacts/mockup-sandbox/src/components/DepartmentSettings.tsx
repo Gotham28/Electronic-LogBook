@@ -1,7 +1,7 @@
 import * as React from "react";
 import { toast } from "sonner";
 import { apiPost, apiPatch, apiGet, apiDelete } from "@/lib/apiClient";
-import { Trash2, AlertTriangle, ChevronDown, Search, SlidersHorizontal, ClipboardList, LibraryBig } from "lucide-react";
+import { Trash2, AlertTriangle, ChevronDown, Search, SlidersHorizontal, ClipboardList } from "lucide-react";
 import { useDepartment } from "@/lib/department-context";
 import { Button } from "@/components/ui/button";
 
@@ -143,15 +143,11 @@ export function DepartmentSettings() {
   return <div className="space-y-6">
     <div className="relative overflow-hidden rounded-3xl border border-teal-100 bg-gradient-to-br from-slate-950 via-slate-900 to-teal-950 px-6 py-7 text-white shadow-lg shadow-slate-200/60 sm:px-8">
       <div className="absolute -right-16 -top-20 h-56 w-56 rounded-full bg-teal-400/15 blur-3xl" />
-      <div className="relative flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+      <div className="relative">
         <div className="max-w-2xl">
           <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-teal-300"><SlidersHorizontal className="h-4 w-4" /> Department setup</div>
           <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Training references</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-300">Keep {data.department.name} requirements, procedures, and catalog options in one clear place.</p>
-        </div>
-        <div className="flex shrink-0 items-center gap-2 rounded-2xl border border-white/10 bg-white/10 px-4 py-3 backdrop-blur-sm">
-          <LibraryBig className="h-5 w-5 text-teal-300" />
-          <div><p className="text-[11px] uppercase tracking-wider text-slate-400">Active department</p><p className="text-sm font-semibold">{data.department.name}</p></div>
+          <p className="mt-2 text-sm leading-6 text-slate-300">Department of {data.department.name}</p>
         </div>
       </div>
     </div>
