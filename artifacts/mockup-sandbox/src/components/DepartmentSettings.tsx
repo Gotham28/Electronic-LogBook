@@ -19,7 +19,7 @@ const computedRequirementsFields = [
 // Lists longer than this start collapsed and get a search box when expanded.
 const COLLAPSE_THRESHOLD = 5;
 
-function SearchableSection<T extends { id: number; name: string }>({
+function SearchableSection<T extends { id: number | string; name: string }>({
   title, items, emptyText, renderItem,
 }: {
   title: string;
