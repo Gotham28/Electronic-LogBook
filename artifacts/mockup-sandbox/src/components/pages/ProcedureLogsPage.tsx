@@ -36,7 +36,7 @@ type ProcedureLog = {
 
 
 export function ProcedureLogsPage() {
-  const { procedures: PROCEDURE_REQUIREMENTS, competencyLevels } = useDepartment();
+  const { procedures: PROCEDURE_REQUIREMENTS, competencyLevels, config } = useDepartment();
   const PROCEDURE_GROUPS = React.useMemo(() => Object.fromEntries([...new Set(PROCEDURE_REQUIREMENTS.map((p) => p.group))].map((group) => [group, PROCEDURE_REQUIREMENTS.filter((p) => p.group === group).map((p) => p.name)])), [PROCEDURE_REQUIREMENTS]);
   const REQUIRED_PROCEDURE_COUNT = PROCEDURE_REQUIREMENTS.reduce((sum, p) => sum + p.required, 0);
   const groupNames: Record<string, string> = Object.fromEntries(Object.keys(PROCEDURE_GROUPS).map((group) => [group, group]));
@@ -125,7 +125,7 @@ export function ProcedureLogsPage() {
         date: form.date,
         patientUhid: hideUhid ? "N/A" : form.patientUhid,
         patientAge: form.age,
-        competencyLevel: form.experience,
+        competencyLevel: config?.enabledFeatures?.procedureExperience ? form.experience : "N/A",
         supervisorId: form.supervisorId,
       };
       
@@ -191,14 +191,16 @@ export function ProcedureLogsPage() {
                 {!hideUhid && <Field label="Patient ID"><Input value={form.patientUhid} onChange={(e) => setForm({ ...form, patientUhid: e.target.value })} required /></Field>}
                 <Field label="Age"><Input value={form.age} onChange={(e) => setForm({ ...form, age: e.target.value })} placeholder="e.g. 4 months" required /></Field>
               </div>
-              <Field label="Procedure experience">
-                <Select value={form.experience} onValueChange={(value) => setForm({ ...form, experience: value })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {competencyLevels.map((c) => <SelectItem key={c.id} value={c.value}>{c.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </Field>
+              {config?.enabledFeatures?.procedureExperience && (
+                <Field label="Procedure experience">
+                  <Select value={form.experience} onValueChange={(value) => setForm({ ...form, experience: value })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {competencyLevels.map((c) => <SelectItem key={c.id} value={c.value}>{c.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </Field>
+              )}
               <p className="rounded-xl border border-teal-100 bg-teal-50 p-3 text-[11px] leading-5 text-teal-800">
                 Verified competency is not self-selected. It is assigned by a faculty member during procedure review.
               </p>
@@ -299,7 +301,7 @@ export function ProcedureLogsPage() {
             </Empty>
           ) : (
             <Table>
-              <TableHeader><TableRow><TableHead>Number</TableHead><TableHead>Date</TableHead><TableHead>Group</TableHead><TableHead>Procedure</TableHead>{!hideUhid && <TableHead>Patient ID</TableHead>}<TableHead>Age</TableHead><TableHead>Experience</TableHead><TableHead>Verified competency</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Number</TableHead><TableHead>Date</TableHead><TableHead>Group</TableHead><TableHead>Procedure</TableHead>{!hideUhid && <TableHead>Patient ID</TableHead>}<TableHead>Age</TableHead>{config?.enabledFeatures?.procedureExperience && <TableHead>Experience</TableHead>}<TableHead>Verified competency</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
               <TableBody>
                 {logs.map((log) => (
                   <TableRow key={log.id}>
@@ -309,7 +311,7 @@ export function ProcedureLogsPage() {
                     <TableCell className="font-semibold">{log.procedureName}</TableCell>
                     {!hideUhid && <TableCell className="font-semibold text-teal-800">{log.patientUhid}</TableCell>}
                     <TableCell>{log.patientAge || log.age}</TableCell>
-                    <TableCell className="text-xs">{log.competencyLevel}</TableCell>
+                    {config?.enabledFeatures?.procedureExperience && <TableCell className="text-xs">{log.competencyLevel}</TableCell>}
                     <TableCell className="text-xs">{log.verifiedCompetency || (log.status === 'verified' ? log.competencyLevel : 'Pending verification')}</TableCell>
                     <TableCell>{statusBadge(log.status)}</TableCell>
                     <TableCell className="text-right">

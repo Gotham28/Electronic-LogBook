@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const computedRequirementsFields = [
   ["requiredCases", "Required clinical cases"],
@@ -91,16 +92,28 @@ export function DepartmentSettings() {
   const [targets, setTargets] = React.useState<Record<number, string>>({});
   const [academicTargets, setAcademicTargets] = React.useState<Record<number, string>>({});
   const [leaveTargets, setLeaveTargets] = React.useState<Record<number, string>>({});
+  const [procedureGroups, setProcedureGroups] = React.useState<{id: string, name: string, count: number}[]>([]);
+  const [isAddingNewGroup, setIsAddingNewGroup] = React.useState(false);
 
-  const [deleteTarget, setDeleteTarget] = React.useState<{id: number, type: "procedure" | "posting" | "academic" | "case_category" | "competency_level" | "leave_type", name: string, count: number | null} | null>(null);
+  const fetchGroups = React.useCallback(() => {
+    apiGet<{id: string, name: string, count: number}[]>("/api/admin/department/procedure-groups").then(setProcedureGroups).catch(console.error);
+  }, []);
+
+  React.useEffect(() => {
+    fetchGroups();
+  }, [fetchGroups, data.department.id]);
+
+  const [deleteTarget, setDeleteTarget] = React.useState<{id: number | string, type: "procedure" | "posting" | "academic" | "case_category" | "competency_level" | "leave_type" | "procedure_group", name: string, count: number | null} | null>(null);
   const [deleting, setDeleting] = React.useState(false);
   const [deleteError, setDeleteError] = React.useState<string | null>(null);
 
-  const confirmDelete = async (id: number, type: "procedure" | "posting" | "academic" | "case_category" | "competency_level" | "leave_type", name: string) => {
+  const confirmDelete = async (id: number | string, type: "procedure" | "posting" | "academic" | "case_category" | "competency_level" | "leave_type" | "procedure_group", name: string) => {
     setDeleteTarget({ id, type, name, count: null });
     setDeleteError(null);
     try {
-      const endpoint = type === "procedure" ? `/api/admin/department/procedures/${id}/usage-count` : `/api/admin/department/catalog/${id}/usage-count`;
+      const endpoint = type === "procedure" ? `/api/admin/department/procedures/${id}/usage-count` 
+        : type === "procedure_group" ? `/api/admin/department/procedure-groups/${encodeURIComponent(id as string)}/usage-count` 
+        : `/api/admin/department/catalog/${id}/usage-count`;
       const res = await apiGet<{ count: number }>(endpoint);
       setDeleteTarget({ id, type, name, count: res.count });
     } catch (err: any) {
@@ -113,7 +126,9 @@ export function DepartmentSettings() {
     setDeleting(true);
     setDeleteError(null);
     try {
-      const endpoint = deleteTarget.type === "procedure" ? `/api/admin/department/procedures/${deleteTarget.id}` : `/api/admin/department/catalog/${deleteTarget.id}`;
+      const endpoint = deleteTarget.type === "procedure" ? `/api/admin/department/procedures/${deleteTarget.id}` 
+        : deleteTarget.type === "procedure_group" ? `/api/admin/department/procedure-groups/${encodeURIComponent(deleteTarget.id as string)}` 
+        : `/api/admin/department/catalog/${deleteTarget.id}`;
       await apiDelete(endpoint);
       toast.success(`${deleteTarget.name} deleted successfully`);
       try {
@@ -135,7 +150,7 @@ export function DepartmentSettings() {
 
   async function save(operation: () => Promise<unknown>, message: string) {
     setBusy(true);
-    try { await operation(); await data.refresh(); toast.success(message); }
+    try { await operation(); await data.refresh(); fetchGroups(); toast.success(message); }
     catch (err) { toast.error(err instanceof Error ? err.message : "Could not save settings"); }
     finally { setBusy(false); }
   }
@@ -224,12 +239,37 @@ export function DepartmentSettings() {
         <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); void save(async () => {
           await apiPost("/api/admin/department/procedures", { ...procedure, required: Number(procedure.required) });
           setProcedure({ name: "", group: "", required: "" });
+          setIsAddingNewGroup(false);
         }, "Procedure type added"); }}>
           <div className="space-y-2"><Label htmlFor="procedure-name">Procedure name</Label><Input id="procedure-name" required maxLength={160} value={procedure.name} onChange={(e) => setProcedure({ ...procedure, name: e.target.value })} /></div>
-          <div className="space-y-2"><Label htmlFor="procedure-group">Group</Label><Input id="procedure-group" required maxLength={160} value={procedure.group} onChange={(e) => setProcedure({ ...procedure, group: e.target.value })} /></div>
+          <div className="space-y-2">
+            <Label htmlFor="procedure-group">Group</Label>
+            {isAddingNewGroup ? (
+              <Input id="procedure-group" required maxLength={160} value={procedure.group} onChange={(e) => setProcedure({ ...procedure, group: e.target.value })} placeholder="Enter new group name" />
+            ) : (
+              <Select value={procedure.group} onValueChange={(v) => { if (v === "NEW_GROUP") { setIsAddingNewGroup(true); setProcedure({ ...procedure, group: "" }); } else { setProcedure({ ...procedure, group: v }); } }}>
+                <SelectTrigger id="procedure-group"><SelectValue placeholder="Select a group" /></SelectTrigger>
+                <SelectContent>
+                  {procedureGroups.map(g => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}
+                  <SelectItem value="NEW_GROUP" className="font-semibold text-teal-700">+ Add new group</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
+          </div>
           <div className="space-y-2"><Label htmlFor="procedure-required">Required count</Label><Input id="procedure-required" type="number" required min={0} max={100000} value={procedure.required} onChange={(e) => setProcedure({ ...procedure, required: e.target.value })} /></div>
           <Button disabled={busy} type="submit">Add procedure type</Button>
         </form>
+        <div className="mt-6 border-t pt-4">
+          <SearchableSection
+            title="Procedure groups"
+            items={procedureGroups}
+            emptyText="No procedure groups."
+            renderItem={(g) => <div className="flex items-center gap-2 rounded-xl bg-slate-50 p-3">
+              <span className="flex-1 text-sm">{g.name} <span className="text-xs text-slate-500">({g.count} procedure types)</span></span>
+              <Button variant="ghost" size="sm" type="button" disabled={busy || deleting} onClick={() => confirmDelete(g.id, "procedure_group", g.name)} className="text-rose-700 hover:bg-rose-100 h-8 w-8 p-0"><Trash2 className="h-4 w-4" /></Button>
+            </div>}
+          />
+        </div>
         <div className="mt-6 border-t pt-4">
           <SearchableSection
             title="Configured procedure types"
@@ -250,7 +290,7 @@ export function DepartmentSettings() {
         await apiPost("/api/admin/department/catalog", { ...entry, value: entry.name.trim(), required: entry.kind === "posting" ? 0 : Number(entry.required) });
         setEntry({ ...entry, name: "", required: "" });
       }, "Training option added"); }}>
-        <div className="space-y-2"><Label htmlFor="catalog-kind">Category</Label><select id="catalog-kind" className="h-11 w-full rounded-xl border bg-white px-3 text-sm" value={entry.kind} onChange={(e) => setEntry({ ...entry, kind: e.target.value })}><option value="posting">Posting / rotation</option><option value="academic">Academic activity</option><option value="case_category">Case Category</option><option value="competency_level">Experience level</option><option value="leave_type">Leave type</option></select></div>
+        <div className="space-y-2"><Label htmlFor="catalog-kind">Category</Label><select id="catalog-kind" className="h-11 w-full rounded-xl border bg-white px-3 text-sm" value={entry.kind} onChange={(e) => setEntry({ ...entry, kind: e.target.value })}><option value="posting">Ward/Posting</option><option value="academic">Academic activity</option><option value="case_category">Case Category</option><option value="competency_level">Experience level</option><option value="leave_type">Leave type</option></select></div>
         <div className="space-y-2"><Label htmlFor="catalog-name">Name</Label><Input id="catalog-name" required maxLength={160} value={entry.name} onChange={(e) => setEntry({ ...entry, name: e.target.value })} /></div>
         {(entry.kind === "academic" || entry.kind === "case_category") && <><div className="space-y-2"><Label htmlFor="catalog-required">Required count</Label><Input id="catalog-required" type="number" min={0} max={100000} required value={entry.required} onChange={(e) => setEntry({ ...entry, required: e.target.value })} /></div>
           <div className="space-y-2"><Label htmlFor="catalog-period">Period</Label><select id="catalog-period" className="h-11 w-full rounded-xl border bg-white px-3 text-sm" value={entry.period} onChange={(e) => setEntry({ ...entry, period: e.target.value })}><option value="total">Overall</option><option value="month">Per month</option></select></div></>}
@@ -258,7 +298,7 @@ export function DepartmentSettings() {
       </form>
       <div className="grid gap-6 md:grid-cols-2">
         <SearchableSection
-          title="Postings / rotations"
+          title="Ward/Posting"
           items={data.postings}
           emptyText="No postings configured."
           renderItem={(item) => <div className="flex items-center gap-2 rounded-xl bg-slate-50 p-3">
@@ -286,15 +326,17 @@ export function DepartmentSettings() {
             <Button variant="outline" size="sm" type="button" disabled={busy || deleting} onClick={() => confirmDelete(item.id, "case_category", item.name)} className="text-rose-700 border-rose-200 hover:bg-rose-50 px-2"><Trash2 className="h-4 w-4" /></Button>
           </form>}
         />
-        <SearchableSection
-          title="Experience levels"
-          items={data.competencyLevels ?? []}
-          emptyText="No experience levels configured."
-          renderItem={(item) => <div className="flex items-center gap-2 rounded-xl bg-slate-50 p-3">
-            <span className="flex-1">{item.name}</span>
-            <Button variant="ghost" size="sm" type="button" disabled={busy || deleting} onClick={() => confirmDelete(item.id, "competency_level", item.name)} className="text-rose-700 hover:bg-rose-100 h-8 w-8 p-0"><Trash2 className="h-4 w-4" /></Button>
-          </div>}
-        />
+        {data.config?.enabledFeatures?.procedureExperience && (
+          <SearchableSection
+            title="Experience levels"
+            items={data.competencyLevels ?? []}
+            emptyText="No experience levels configured."
+            renderItem={(item) => <div className="flex items-center gap-2 rounded-xl bg-slate-50 p-3">
+              <span className="flex-1">{item.name}</span>
+              <Button variant="ghost" size="sm" type="button" disabled={busy || deleting} onClick={() => confirmDelete(item.id, "competency_level", item.name)} className="text-rose-700 hover:bg-rose-100 h-8 w-8 p-0"><Trash2 className="h-4 w-4" /></Button>
+            </div>}
+          />
+        )}
       </div>
       <div className="grid gap-6 md:grid-cols-2 mt-8 pt-8 border-t">
         <SearchableSection
