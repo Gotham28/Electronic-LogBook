@@ -10,9 +10,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 const computedRequirementsFields = [
-  ["requiredCases", "Required clinical cases (computed)"],
-  ["requiredProcedures", "Required procedures (computed)"],
-  ["requiredAcademic", "Required academic activities (computed)"],
+  ["requiredCases", "Required clinical cases"],
+  ["requiredProcedures", "Required procedures"],
+  ["requiredAcademic", "Required academic activities"],
 ] as const;
 
 // Lists longer than this start collapsed and get a search box when expanded.
@@ -211,16 +211,19 @@ export function DepartmentSettings() {
       </Card>
     )}
 
-    <div className="grid gap-5 lg:grid-cols-[0.85fr_1.15fr]">
-      <Card className="border-slate-200/80 shadow-sm shadow-slate-200/50"><CardHeader className="border-b border-slate-100 bg-slate-50/70 pb-4"><CardTitle className="flex items-center gap-2 text-base"><ClipboardList className="h-4 w-4 text-teal-600" /> Department requirements</CardTitle><p className="text-xs text-slate-500">Computed from your active configuration</p></CardHeader><CardContent className="p-5">
-        <div className="space-y-3">
-          {computedRequirementsFields.map(([key, label]) => <div key={key} className="flex items-center justify-between gap-4 border-b border-slate-100 py-3 last:border-0">
-            <span className="text-sm text-slate-500">{label}</span>
-            <span className="text-sm font-medium text-slate-800">{data.config?.[key] == null ? <span className="text-slate-400 italic">Not tracked</span> : data.config[key]}</span>
-          </div>)}
-        </div>
-      </CardContent></Card>
+    <section aria-labelledby="requirements-heading" className="space-y-3">
+      <div className="flex items-end justify-between gap-4 px-1">
+        <div><div className="flex items-center gap-2"><ClipboardList className="h-4 w-4 text-teal-600" /><h3 id="requirements-heading" className="text-base font-semibold text-slate-900">Department requirements</h3></div><p className="mt-1 text-xs text-slate-500">Current targets for {data.department.name}</p></div>
+        <span className="hidden rounded-full bg-teal-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-teal-700 sm:inline-flex">At a glance</span>
+      </div>
+      <div className="grid w-full grid-cols-1 gap-3 md:grid-cols-3">
+        {computedRequirementsFields.map(([key, label], index) => <Card key={key} className={`overflow-hidden border-0 shadow-sm ring-1 ring-inset ${index === 0 ? "bg-gradient-to-br from-teal-50 to-white ring-teal-100" : index === 1 ? "bg-gradient-to-br from-sky-50 to-white ring-sky-100" : "bg-gradient-to-br from-violet-50 to-white ring-violet-100"}`}>
+          <CardContent className="relative p-5"><div className={`absolute right-0 top-0 h-20 w-20 -translate-y-1/3 translate-x-1/3 rounded-full blur-2xl ${index === 0 ? "bg-teal-200/50" : index === 1 ? "bg-sky-200/50" : "bg-violet-200/50"}`} /><p className="relative max-w-[13rem] text-xs font-semibold leading-5 text-slate-600">{label}</p><p className="relative mt-3 text-3xl font-semibold tracking-tight text-slate-950">{data.config?.[key] == null ? <span className="text-sm font-medium italic text-slate-400">Not tracked</span> : data.config[key]}</p><p className="relative mt-1 text-[11px] text-slate-500">Target total</p></CardContent>
+        </Card>)}
+      </div>
+    </section>
 
+    <div className="grid gap-5">
       <Card className="border-slate-200/80 shadow-sm shadow-slate-200/50"><CardHeader className="border-b border-slate-100 bg-slate-50/70 pb-4"><CardTitle className="text-base">Add procedure type</CardTitle><p className="text-xs text-slate-500">Set the target once, then update it inline below.</p></CardHeader><CardContent className="p-5">
         <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); void save(async () => {
           await apiPost("/api/admin/department/procedures", { ...procedure, required: Number(procedure.required) });
