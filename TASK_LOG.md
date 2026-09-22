@@ -835,3 +835,60 @@ console", on branch `fix/superadmin-resident-auto-approve` (cut fresh off `main`
 mirror-department resolver", on branch `fix/test-department-config-mirroring` (cut fresh
 off `origin/main`).
 **PR** — [#66](https://github.com/Gotham28/Electronic-LogBook/pull/66).
+
+---
+
+### 2026-09-22 — Land the deferred AppLayout infinite-loop fix and ProfessorPortal remarks-text change
+
+**What changed**
+- Two pieces of work left uncommitted since the 2026-09-21 close-out (PR #66), reviewed and
+  closed out now.
+- `AppLayout.tsx`: fixed the infinite refetch loop in the student notification `useEffect`
+  (dispatch-65) — narrowed its dependency array from the whole `currentUser` object to
+  `currentUser?.studentProfileId`, matching the stable pattern already used by the sibling
+  effect two lines above.
+- `ProfessorPortal.tsx`: developer's own manual edit — whitespace/reindentation of the
+  `ProgressSection` chart JSX block, plus the `handleApprove`/`handleReject` default
+  remarks strings changed from `"Approved without conditions."` / `"Please expand on case
+  findings."` to `"No remarks"` / `"No remarks."`. Confirmed via `git diff -w` that exactly
+  2 lines are real content changes; everything else in that file's diff is pure whitespace.
+- `code-review` (4-lens, Sonnet/medium): verdict **accept with fixes** — no Critical, no
+  code-correctness findings. One Major (the AppLayout bugfix and the unrelated
+  ProfessorPortal.tsx change were bundled in one uncommitted diff) resolved by splitting
+  into two commits below rather than re-dispatching; `close-task`'s staging rules forbid
+  hunk-level (`git add -p`) staging, so ProfessorPortal.tsx's whitespace and text changes
+  — both from the same manual edit — landed together in one commit rather than three.
+
+**Files**
+- `artifacts/mockup-sandbox/src/components/layout/AppLayout.tsx`
+- `artifacts/mockup-sandbox/src/components/ProfessorPortal.tsx`
+- `.agents/runs/dispatch-65-fix-applayout-infinite-loop.md`, `HANDOFF.md`
+
+**Evidence**
+- AppLayout.tsx fix verified correct by 3 independent code-review lenses reading the code
+  directly: the effect body reads only `currentUser.studentProfileId` and `activeRole` (no
+  other field), so narrowing the dependency cannot miss a change that matters; sibling
+  effects confirmed untouched via diff; `AppLayout` has exactly one renderer (`App.tsx:234`)
+  and no stale-notification scenario found.
+- **Not verified live.** No dev server was run against the app to watch the refetch loop
+  actually stop. Claude Code attempted to first confirm `DATABASE_URL`'s host (without ever
+  printing the credential) so it could safely start the servers — that read was blocked by
+  the sandbox's own credential-materialization guard, and per standing repo caution local
+  `.env` has pointed at production before, so no server was started. This is an accepted,
+  explicit gap, not a claim of "verified."
+- ProfessorPortal.tsx remarks-text change: searched the whole `mockup-sandbox` tree for
+  `remarks`/`comments` consumers — no min-length validation, no search/filter, no
+  hardcoded old-string references anywhere; new default strings render correctly (still
+  truthy) wherever shown (`CaseLogsPage.tsx:413-416`, `ProfessorPortal.tsx:443`).
+
+**Left open**
+- Live browser verification of the AppLayout fix (above) — recommend a 30-second manual
+  check: log in as the demo student account, watch the Network tab for ~15s, confirm
+  `/api/students/:id/assessments` and `/api/students/:id/logs` stop firing repeatedly.
+- The unhandled `pg.Pool` crash on idle Neon disconnect (from the 2026-09-21 entry) remains
+  unaddressed — still needs its own task.
+
+**Commit** — `29ef2df` "fix(mockup-sandbox): stop infinite refetch loop in AppLayout
+notification effect" and `53a80e2` "style(mockup-sandbox): reformat ProgressSection JSX and
+simplify review-remarks defaults", on branch `fix/test-department-config-mirroring`.
+**PR** — pending.
