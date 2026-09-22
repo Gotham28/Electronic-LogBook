@@ -260,7 +260,7 @@ export function AppLayout({
       }
     })();
     return () => { cancelled = true; };
-  }, [activeRole, currentUser]);
+  }, [activeRole, currentUser?.studentProfileId]);
 
   // Faculty / HOD: load action-required items
   React.useEffect(() => {
