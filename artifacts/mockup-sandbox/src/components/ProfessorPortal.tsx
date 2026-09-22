@@ -174,13 +174,13 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
       setLoading(true);
       setError(null);
       const user = getCurrentUser();
-      
+
       if (!user?.id) {
         setError("Not logged in");
         setLoading(false);
         return;
       }
-      
+
       const json = await apiGet(`/api/professors/${user.id}/review-queue`);
       setData(json);
     } catch (e: any) {
@@ -199,7 +199,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
   const mentees = departmentFilter === "all"
     ? allStudents
     : allStudents.filter((student: any) => student.department === departmentFilter);
-    
+
   // Auto-clamp currentIndex if the review queue shrinks after an action
   React.useEffect(() => {
     if (reviews.length > 0 && currentIndex >= reviews.length) {
@@ -278,7 +278,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
 
   const handleReviewAction = async (status: "verified" | "rejected", defaultRemarks: string) => {
     if (!currentItem || isSubmitting) return;
-    
+
     setIsSubmitting(true);
     try {
       await apiPatch(`/api/logs/${currentItem.logType}/${currentItem.dbId}/review`, {
@@ -288,7 +288,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
           ? { facultyVerifiedLevel: competencyOverride }
           : {})
       });
-      
+
       // Optimistic update for evaluatedLogs mapping
       setEvaluatedLogs(prev => ({
         ...prev,
@@ -296,7 +296,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
       }));
 
       toast.success(status === "verified" ? `Number ${currentItem.id} verified` : `Revision Requested for ${currentItem.id}`);
-      
+
       setRemarks("");
       // Refresh real data so the roster updates and the queue shrinks
       await fetchProfessorData();
@@ -307,8 +307,8 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
     }
   };
 
-  const handleApprove = () => handleReviewAction("verified", "Approved without conditions.");
-  const handleReject = () => handleReviewAction("rejected", "Please expand on case findings.");
+  const handleApprove = () => handleReviewAction("verified", "No remarks");
+  const handleReject = () => handleReviewAction("rejected", "No remarks.");
 
   // ── Helper: derive faculty role from review-queue response ────────────────────
   // data?.faculty?.role === "hod" means this portal is rendering in HOD context.
@@ -912,9 +912,9 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                         {(() => {
                           const rows = logFilter?.tab === "proc-logs"
                             ? (menteeLogs?.procedureLogs ?? []).filter((log: any) =>
-                                log.procedureName === (logFilter as any).name &&
-                                log.procedureGroup === (logFilter as any).group
-                              )
+                              log.procedureName === (logFilter as any).name &&
+                              log.procedureGroup === (logFilter as any).group
+                            )
                             : (menteeLogs?.procedureLogs ?? []);
                           if (!rows.length) {
                             return <TableRow><TableCell colSpan={4} className="text-center text-sm text-slate-500 py-6">No procedure logs found.</TableCell></TableRow>;
@@ -1259,9 +1259,9 @@ function ProgressTabContent({
   const totalCaseVerified = progress.caseCategories.reduce((s, c) => s + c.verified, 0);
   const totalProcVerified = progress.procedures.reduce((s, p) => s + p.verified, 0);
   const totalAcadVerified = progress.academics.reduce((s, a) => s + a.verified, 0);
-  const totalCasePending  = progress.caseCategories.reduce((s, c) => s + c.pending, 0);
-  const totalProcPending  = progress.procedures.reduce((s, p) => s + p.pending, 0);
-  const totalAcadPending  = progress.academics.reduce((s, a) => s + a.pending, 0);
+  const totalCasePending = progress.caseCategories.reduce((s, c) => s + c.pending, 0);
+  const totalProcPending = progress.procedures.reduce((s, p) => s + p.pending, 0);
+  const totalAcadPending = progress.academics.reduce((s, a) => s + a.pending, 0);
 
   // ── Group procedures by group name ────────────────────────────────────────────
   const procGroups: Map<string, ProcBarItem[]> = new Map();
@@ -1452,130 +1452,130 @@ function ProgressSection({
     <div className="w-full overflow-x-auto">
       <div style={{ height: chartHeight, minWidth: "600px", width: "100%" }}>
         <ChartContainer config={progressChartConfig} className="h-full w-full">
-        <BarChart
-          data={chartData}
-          layout="vertical"
-          margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
-        >
-          <XAxis type="number" hide />
-          <YAxis
-            dataKey="name"
-            type="category"
-            axisLine={false}
-            tickLine={false}
-            tick={{ fontSize: 12, fill: "#334155" }}
-            width={160}
-          />
-          <ChartTooltip
-            cursor={{ fill: "rgba(241, 245, 249, 0.5)" }}
-            content={({ active, payload }) => {
-              if (!active || !payload || !payload.length) return null;
-              const data = payload[0].payload;
-              const isDone = data.done && data.required !== null;
-              const vColor = isDone ? "bg-emerald-500" : "bg-teal-600";
-              const pColor = isDone ? "bg-emerald-300" : "bg-teal-200";
+          <BarChart
+            data={chartData}
+            layout="vertical"
+            margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
+          >
+            <XAxis type="number" hide />
+            <YAxis
+              dataKey="name"
+              type="category"
+              axisLine={false}
+              tickLine={false}
+              tick={{ fontSize: 12, fill: "#334155" }}
+              width={160}
+            />
+            <ChartTooltip
+              cursor={{ fill: "rgba(241, 245, 249, 0.5)" }}
+              content={({ active, payload }) => {
+                if (!active || !payload || !payload.length) return null;
+                const data = payload[0].payload;
+                const isDone = data.done && data.required !== null;
+                const vColor = isDone ? "bg-emerald-500" : "bg-teal-600";
+                const pColor = isDone ? "bg-emerald-300" : "bg-teal-200";
 
-              return (
-                <div className="min-w-[200px] rounded-xl border border-slate-200 bg-white p-3 shadow-lg z-50">
-                  <p className="mb-2.5 text-sm font-bold text-slate-900">{data.name}</p>
-                  <div className="space-y-1.5 text-xs text-slate-600">
-                    <div className="flex items-center justify-between gap-4">
-                      <span className="flex items-center gap-1.5">
-                        <span className={`h-2.5 w-2.5 rounded-sm ${vColor}`}></span>Verified:
-                      </span>
-                      <span className="font-semibold text-slate-900">{data.verifiedVal}</span>
-                    </div>
-                    <div className="flex items-center justify-between gap-4">
-                      <span className="flex items-center gap-1.5">
-                        <span className={`h-2.5 w-2.5 rounded-sm ${pColor}`}></span>Pending:
-                      </span>
-                      <span className="font-semibold text-slate-900">{data.pendingVal}</span>
-                    </div>
-                    {data.required !== null ? (
-                      <>
-                        <div className="flex items-center justify-between gap-4">
-                          <span className="flex items-center gap-1.5">
-                            <span className="h-2.5 w-2.5 rounded-sm bg-slate-200"></span>Remaining:
-                          </span>
-                          <span className="font-semibold text-slate-900">{data.remainingVal}</span>
-                        </div>
-                        <div className="mt-2.5 flex items-center justify-between gap-4 border-t border-slate-100 pt-2.5 text-sm font-bold text-slate-900">
-                          <span>Target:</span>
-                          <span>{data.required}</span>
-                        </div>
-                      </>
-                    ) : (
-                      <div className="mt-2 border-t border-slate-100 pt-2 text-[10px] italic text-slate-500">
-                        Not in current catalog
+                return (
+                  <div className="min-w-[200px] rounded-xl border border-slate-200 bg-white p-3 shadow-lg z-50">
+                    <p className="mb-2.5 text-sm font-bold text-slate-900">{data.name}</p>
+                    <div className="space-y-1.5 text-xs text-slate-600">
+                      <div className="flex items-center justify-between gap-4">
+                        <span className="flex items-center gap-1.5">
+                          <span className={`h-2.5 w-2.5 rounded-sm ${vColor}`}></span>Verified:
+                        </span>
+                        <span className="font-semibold text-slate-900">{data.verifiedVal}</span>
                       </div>
-                    )}
-                    {data.byCompetency && data.byCompetency.length > 0 && (
-                      <div className="mt-2.5 border-t border-slate-100 pt-2.5">
-                        <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                          By Competency
-                        </p>
-                        <div className="space-y-1.5">
-                          {data.byCompetency.map((comp: any) => (
-                            <div key={comp.level} className="flex items-center justify-between gap-4 text-[11px]">
-                              <span className="max-w-[140px] truncate text-slate-600">{comp.level}</span>
-                              <span className="whitespace-nowrap font-semibold text-slate-900">
-                                {comp.verified}V · {comp.pending}P
-                              </span>
-                            </div>
-                          ))}
-                        </div>
+                      <div className="flex items-center justify-between gap-4">
+                        <span className="flex items-center gap-1.5">
+                          <span className={`h-2.5 w-2.5 rounded-sm ${pColor}`}></span>Pending:
+                        </span>
+                        <span className="font-semibold text-slate-900">{data.pendingVal}</span>
                       </div>
-                    )}
+                      {data.required !== null ? (
+                        <>
+                          <div className="flex items-center justify-between gap-4">
+                            <span className="flex items-center gap-1.5">
+                              <span className="h-2.5 w-2.5 rounded-sm bg-slate-200"></span>Remaining:
+                            </span>
+                            <span className="font-semibold text-slate-900">{data.remainingVal}</span>
+                          </div>
+                          <div className="mt-2.5 flex items-center justify-between gap-4 border-t border-slate-100 pt-2.5 text-sm font-bold text-slate-900">
+                            <span>Target:</span>
+                            <span>{data.required}</span>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="mt-2 border-t border-slate-100 pt-2 text-[10px] italic text-slate-500">
+                          Not in current catalog
+                        </div>
+                      )}
+                      {data.byCompetency && data.byCompetency.length > 0 && (
+                        <div className="mt-2.5 border-t border-slate-100 pt-2.5">
+                          <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                            By Competency
+                          </p>
+                          <div className="space-y-1.5">
+                            {data.byCompetency.map((comp: any) => (
+                              <div key={comp.level} className="flex items-center justify-between gap-4 text-[11px]">
+                                <span className="max-w-[140px] truncate text-slate-600">{comp.level}</span>
+                                <span className="whitespace-nowrap font-semibold text-slate-900">
+                                  {comp.verified}V · {comp.pending}P
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              );
-            }}
-          />
-          <Bar
-            dataKey="verifiedVal"
-            stackId="a"
-            isAnimationActive={false}
-            onClick={(_, index) => onItemClick(items[index])}
-          >
-            {chartData.map((entry, index) => {
-              const isDone = entry.done && entry.required !== null;
-              return (
-                <Cell
-                  key={`cell-ver-${index}`}
-                  fill={isDone ? "#10b981" : "#0d9488"}
-                  className="cursor-pointer"
-                />
-              );
-            })}
-          </Bar>
-          <Bar
-            dataKey="pendingVal"
-            stackId="a"
-            isAnimationActive={false}
-            onClick={(_, index) => onItemClick(items[index])}
-          >
-            {chartData.map((entry, index) => {
-              const isDone = entry.done && entry.required !== null;
-              return (
-                <Cell
-                  key={`cell-pen-${index}`}
-                  fill={isDone ? "#6ee7b7" : "#99f6e4"}
-                  className="cursor-pointer"
-                />
-              );
-            })}
-          </Bar>
-          <Bar
-            dataKey="remainingVal"
-            stackId="a"
-            fill="#f1f5f9"
-            radius={[0, 4, 4, 0]}
-            isAnimationActive={false}
-            onClick={(_, index) => onItemClick(items[index])}
-            className="cursor-pointer"
-          />
-        </BarChart>
-      </ChartContainer>
+                );
+              }}
+            />
+            <Bar
+              dataKey="verifiedVal"
+              stackId="a"
+              isAnimationActive={false}
+              onClick={(_, index) => onItemClick(items[index])}
+            >
+              {chartData.map((entry, index) => {
+                const isDone = entry.done && entry.required !== null;
+                return (
+                  <Cell
+                    key={`cell-ver-${index}`}
+                    fill={isDone ? "#10b981" : "#0d9488"}
+                    className="cursor-pointer"
+                  />
+                );
+              })}
+            </Bar>
+            <Bar
+              dataKey="pendingVal"
+              stackId="a"
+              isAnimationActive={false}
+              onClick={(_, index) => onItemClick(items[index])}
+            >
+              {chartData.map((entry, index) => {
+                const isDone = entry.done && entry.required !== null;
+                return (
+                  <Cell
+                    key={`cell-pen-${index}`}
+                    fill={isDone ? "#6ee7b7" : "#99f6e4"}
+                    className="cursor-pointer"
+                  />
+                );
+              })}
+            </Bar>
+            <Bar
+              dataKey="remainingVal"
+              stackId="a"
+              fill="#f1f5f9"
+              radius={[0, 4, 4, 0]}
+              isAnimationActive={false}
+              onClick={(_, index) => onItemClick(items[index])}
+              className="cursor-pointer"
+            />
+          </BarChart>
+        </ChartContainer>
       </div>
     </div>
   );
