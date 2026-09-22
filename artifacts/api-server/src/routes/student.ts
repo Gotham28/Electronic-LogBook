@@ -5,7 +5,7 @@ import {
   academicLogsTable, usersTable, departmentsTable, departmentConfigsTable,
   postingsTable, leaveRecordsTable, appraisalsTable, researchTable, assessmentsTable, procedureTypesTable, departmentCatalogTable, certificationsTable, conferencesTable
 } from "@workspace/db";
-import { eq, and, or, desc, count, sql, isNull } from "drizzle-orm";
+import { eq, and, or, desc, count, sql, isNull, aliasedTable } from "drizzle-orm";
 import { requireAuth, requireRole, requireDepartment } from "../middlewares/auth.js";
 import { studentAccess } from "../middlewares/student-access.js";
 import { z } from "zod";
@@ -145,18 +145,24 @@ router.get("/:studentId/logs", requireAuth, async (req, res) => {
     }
 
     // Fetch profile
+    const mentorsTable = aliasedTable(usersTable, "mentors");
+
     const studentMatch = await db.select({
       id: studentsTable.id,
       userId: studentsTable.userId,
+      name: usersTable.fullName,
       registrationNumber: studentsTable.registrationNumber,
       dateOfJoining: studentsTable.dateOfJoining,
       batch: studentsTable.batch,
       department: departmentsTable.name,
       departmentId: usersTable.departmentId,
+      mentorName: mentorsTable.fullName,
+      mentorRole: mentorsTable.role,
     })
     .from(studentsTable)
     .innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
     .leftJoin(departmentsTable, eq(usersTable.departmentId, departmentsTable.id))
+    .leftJoin(mentorsTable, eq(studentsTable.mentorId, mentorsTable.id))
     .where(eq(studentsTable.id, studentId))
     .limit(1);
 

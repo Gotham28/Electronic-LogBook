@@ -2,7 +2,7 @@ import * as React from "react";
 import { getCurrentUser, isDemoMode } from "@/lib/session";
 import { apiGet } from "@/lib/apiClient";
 import { formatLogbookDate } from "@/lib/logbook-config";
-import { Printer, X } from "lucide-react";
+import { Printer, X, BookOpen } from "lucide-react";
 
 class PrintErrorBoundary extends React.Component<{children: React.ReactNode}, {error: Error | null}> {
   constructor(props: {children: React.ReactNode}) {
@@ -24,6 +24,63 @@ class PrintErrorBoundary extends React.Component<{children: React.ReactNode}, {e
     }
     return this.props.children;
   }
+}
+
+function CoverPage({ profile }: { profile: any }) {
+  if (!profile) return null;
+
+  const residentName = profile.name ?? "—";
+  const batch = profile.batch ?? "—";
+  const department = profile.department ?? "—";
+  const mentorName = profile.mentorName;
+  const mentorRole = profile.mentorRole === "hod" ? "Head of Department" : profile.mentorRole === "professor" ? "Professor" : "Supervisor";
+  const printedDate = new Date().toLocaleString("en-IN", { 
+    year: "numeric", month: "long", day: "numeric", 
+    hour: "2-digit", minute: "2-digit" 
+  });
+  
+  const dateRange = profile.dateOfJoining 
+    ? `${new Date(profile.dateOfJoining).toLocaleDateString("en-IN", { month: "short", year: "numeric" })} - Present` 
+    : "Present";
+
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[95vh] print:min-h-screen break-after-page text-[#1E3A5F]" style={{ fontFamily: "Spectral, Georgia, 'Times New Roman', serif" }}>
+      {/* App Mark */}
+      <div className="flex flex-col items-center mb-16">
+        <div className="flex items-center justify-center w-20 h-20 rounded-full bg-[#1E3A5F] text-white mb-4">
+          <BookOpen size={40} />
+        </div>
+        <h1 className="text-3xl font-bold tracking-widest uppercase">eLogbook</h1>
+      </div>
+
+      {/* Title */}
+      <div className="text-center mb-16">
+        <h2 className="text-5xl font-bold mb-4">Resident Logbook</h2>
+        <h3 className="text-2xl font-medium opacity-90">Department of {department}</h3>
+      </div>
+
+      {/* Resident Details */}
+      <div className="text-center mb-16 border-t-2 border-b-2 border-[#1E3A5F] py-8 w-3/4 max-w-lg">
+        <h4 className="text-3xl font-bold mb-2">{residentName}</h4>
+        <p className="text-lg opacity-80">Batch of {batch}</p>
+        <p className="text-md opacity-80 mt-2">Period: {dateRange}</p>
+      </div>
+
+      {/* Guide/Supervisor Details */}
+      {mentorName && (
+        <div className="text-center mb-16">
+          <p className="text-sm uppercase tracking-widest opacity-70 mb-2">Under the Guidance of</p>
+          <h5 className="text-2xl font-bold">{mentorName}</h5>
+          <p className="text-lg opacity-80">{mentorRole}</p>
+        </div>
+      )}
+
+      {/* Footer Timestamp */}
+      <div className="mt-auto pt-16 text-center opacity-60 text-sm">
+        <p>Generated on {printedDate}</p>
+      </div>
+    </div>
+  );
 }
 
 export function PrintableLogbook() {
@@ -121,6 +178,7 @@ export function PrintableLogbook() {
 
   return (
     <PrintErrorBoundary>
+      <CoverPage profile={data.profile} />
       <div className="bg-white p-8 font-serif text-black max-w-[1000px] mx-auto">
         <div className="mb-12 border-b-2 border-black pb-4 text-center">
         <h1 className="text-3xl font-bold uppercase tracking-wider">Department of {department}</h1>
