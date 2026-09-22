@@ -891,4 +891,4 @@ off `origin/main`).
 **Commit** — `29ef2df` "fix(mockup-sandbox): stop infinite refetch loop in AppLayout
 notification effect" and `53a80e2` "style(mockup-sandbox): reformat ProgressSection JSX and
 simplify review-remarks defaults", on branch `fix/test-department-config-mirroring`.
-**PR** — pending.
+**PR** — [#68](https://github.com/Gotham28/Electronic-LogBook/pull/68).
