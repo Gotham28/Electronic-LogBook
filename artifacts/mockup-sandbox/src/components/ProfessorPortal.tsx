@@ -57,9 +57,11 @@ import {
   FileText,
   X,
   RefreshCw,
+  Trash2,
+  Pencil,
 } from "lucide-react";
 import { formatLogbookDate } from "@/lib/logbook-config";
-import { apiGet, apiPatch, apiPost } from "@/lib/apiClient";
+import { apiGet, apiPatch, apiPost, apiDelete } from "@/lib/apiClient";
 import { getCurrentUser, isDemoMode } from "@/lib/session";
 import { useDepartment } from "@/lib/department-context";
 import {
@@ -1990,35 +1992,53 @@ function AssessmentEditForm({ assessment, studentId, busy, onDone }: {
     } finally { setSubmitting(false); }
   }
 
+  async function handleDelete() {
+    if (!window.confirm("Are you sure you want to completely remove this assessment?")) return;
+    setSubmitting(true);
+    try {
+      await apiDelete(`/api/students/${studentId}/assessments/${assessment.id}`);
+      toast.success("Assessment removed");
+      onDone();
+    } catch (e: any) {
+      toast.error(e.message || "Failed to remove assessment");
+      setSubmitting(false);
+    }
+  }
+
   if (!editing) {
     return (
-      <Button variant="ghost" size="sm" className="h-7 text-xs text-teal-700 hover:bg-teal-50" onClick={() => setEditing(true)}>
-        Edit Score
-      </Button>
+      <div className="flex items-center gap-1 mt-3 border-t border-slate-100 pt-3">
+        <Button variant="ghost" size="sm" className="h-7 text-xs text-teal-700 hover:text-teal-800 hover:bg-teal-50 gap-1.5 px-2" onClick={() => setEditing(true)}>
+          <Pencil className="h-3.5 w-3.5" /> Edit Score
+        </Button>
+        <Button variant="ghost" size="sm" className="h-7 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 gap-1.5 px-2" disabled={submitting || busy} onClick={handleDelete}>
+          <Trash2 className="h-3.5 w-3.5" /> Remove
+        </Button>
+      </div>
     );
   }
 
   return (
-    <div className="mt-3 border-t border-slate-100 pt-3 space-y-2">
-      <div className="grid grid-cols-2 gap-2">
+    <div className="mt-3 border-t border-slate-100 pt-3 space-y-3 bg-slate-50/50 -mx-4 px-4 pb-1 rounded-b-xl">
+      <div className="grid grid-cols-[1fr_80px] gap-2">
         <Input 
           value={examName} 
           onChange={(e) => setExamName(e.target.value)} 
           placeholder="Exam Name" 
-          className="text-xs h-8" 
+          className="text-xs h-8 bg-white" 
         />
         <Input 
           type="number"
           value={marks} 
           onChange={(e) => setMarks(e.target.value)} 
-          placeholder="Marks (0-100)" 
-          className="text-xs h-8" 
+          placeholder="Marks" 
+          className="text-xs h-8 bg-white text-center" 
           min="0" max="100"
         />
       </div>
-      <div className="flex gap-2">
-        <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white text-xs gap-1.5 h-7" disabled={submitting || busy || !examName || marks === ""} onClick={submit}>
-          Save
+      <div className="flex items-center gap-2 pb-2">
+        <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white text-xs gap-1.5 h-7 px-4" disabled={submitting || busy || !examName || marks === ""} onClick={submit}>
+          Save Changes
         </Button>
         <Button size="sm" variant="ghost" className="text-slate-500 text-xs h-7" disabled={submitting || busy} onClick={() => {
           setEditing(false);

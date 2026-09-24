@@ -804,6 +804,39 @@ router.patch("/:studentId/assessments/:assessmentId", requireAuth, requireRole([
   }
 });
 
+// DELETE /students/:studentId/assessments/:assessmentId
+router.delete("/:studentId/assessments/:assessmentId", requireAuth, requireRole(["professor", "hod"]), async (req, res) => {
+  try {
+    const caller = req.user!;
+    const studentId = parseInt(String(req.params.studentId), 10);
+    const assessmentId = parseInt(String(req.params.assessmentId), 10);
+    if (isNaN(studentId) || isNaN(assessmentId)) { res.status(400).json({ message: "Invalid id format" }); return; }
+
+    const [assessment] = await db.select({ id: assessmentsTable.id, assessorId: assessmentsTable.assessorId })
+      .from(assessmentsTable).where(and(eq(assessmentsTable.id, assessmentId), eq(assessmentsTable.studentId, studentId))).limit(1);
+    
+    if (!assessment) { res.status(404).json({ message: "Assessment not found" }); return; }
+
+    if (caller.role === "professor" && assessment.assessorId !== caller.id) {
+      res.status(403).json({ message: "You may only delete assessments you recorded" }); return;
+    }
+
+    const [studentUser] = await db.select({ departmentId: usersTable.departmentId })
+      .from(studentsTable).innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
+      .where(eq(studentsTable.id, studentId)).limit(1);
+
+    if (!studentUser || studentUser.departmentId !== caller.departmentId) {
+      res.status(403).json({ message: "Student is outside your department" }); return;
+    }
+
+    await db.delete(assessmentsTable).where(eq(assessmentsTable.id, assessmentId));
+    res.json({ message: "Assessment deleted" });
+  } catch (error) {
+    req.log.error({ studentId: req.params.studentId, assessmentId: req.params.assessmentId, status: 500 }, "Error deleting assessment");
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
 router.get("/:studentId/thesis", async (req, res) => {
   try {
     const studentId = parseInt(String(req.params.studentId), 10);
