@@ -117,7 +117,7 @@ type LogFilter =
 
 export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; embedded?: boolean }) {
   const hideUhid = isDemoMode();
-  const { competencyLevels, caseCategories: deptCaseCategories, procedures: deptProcedures, academics: deptAcademics } = useDepartment();
+  const { config, competencyLevels, caseCategories: deptCaseCategories, procedures: deptProcedures, academics: deptAcademics } = useDepartment();
   const [location, setLocation] = useLocation();
   const [data, setData] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
@@ -474,7 +474,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-4 space-y-4">
-                    {currentItem.type === "Procedure" && (
+                    {currentItem.type === "Procedure" && config?.enabledFeatures?.procedureExperience && (
                       <div className="space-y-2">
                         <label className="text-xs font-semibold text-slate-700">Verified Competency Level</label>
                         <Select value={competencyOverride} onValueChange={setCompetencyOverride}>

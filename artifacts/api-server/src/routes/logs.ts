@@ -1,9 +1,10 @@
 import { Router, type IRouter } from "express";
-import { db, caseLogsTable, procedureLogsTable, academicLogsTable, studentsTable, usersTable, conferencesTable } from "@workspace/db";
+import { db, caseLogsTable, procedureLogsTable, academicLogsTable, studentsTable, usersTable, conferencesTable, departmentConfigsTable } from "@workspace/db";
 import { eq, and, inArray, isNull } from "drizzle-orm";
 import { requireAuth, requireRole, requireDepartment } from "../middlewares/auth.js";
 import { z } from "zod";
 import { validate } from "../lib/validation.js";
+import { resolveConfigDepartmentId } from "../lib/department-config-source.js";
 
 const router: IRouter = Router();
 
@@ -86,9 +87,19 @@ router.patch("/:logType/:logId/review", requireAuth, requireRole(["professor", "
     };
     // facultyVerifiedLevel only exists on procedureLogsTable — do not spread it into
     // updateData used by case/academic/conference tables which have no such column.
-    const procedureUpdateData = logType === "procedure"
-      ? { ...updateData, facultyVerifiedLevel: facultyVerifiedLevel || null }
-      : updateData;
+    const procedureUpdateData: any = { ...updateData };
+    if (logType === "procedure") {
+      const configSourceId = await resolveConfigDepartmentId(reviewer.departmentId!);
+      const [config] = await db.select({ enabledFeatures: departmentConfigsTable.enabledFeatures })
+        .from(departmentConfigsTable)
+        .where(eq(departmentConfigsTable.departmentId, configSourceId))
+        .limit(1);
+      
+      const enabledFeatures = config?.enabledFeatures as Record<string, boolean> | undefined;
+      if (enabledFeatures?.procedureExperience && facultyVerifiedLevel !== undefined) {
+        procedureUpdateData.facultyVerifiedLevel = facultyVerifiedLevel || null;
+      }
+    }
     const academicUpdateData = logType === "academic"
       ? { ...updateData, facultyGrade: facultyGrade || null }
       : updateData;
