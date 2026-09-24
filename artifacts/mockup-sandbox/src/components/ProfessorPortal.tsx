@@ -793,15 +793,15 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
               )}
 
               <Tabs value={dialogTab} onValueChange={(v) => { setDialogTab(v); setLogFilter(null); }} className="w-full">
-                <TabsList className="bg-slate-100 p-1 rounded-lg w-full h-auto flex flex-nowrap sm:flex-wrap justify-start overflow-x-auto gap-1">
-                  <TabsTrigger value="progress" className="text-xs whitespace-nowrap">Training Progress</TabsTrigger>
-                  <TabsTrigger value="case-logs" className="text-xs whitespace-nowrap">Clinical Case Logs</TabsTrigger>
-                  <TabsTrigger value="proc-logs" className="text-xs whitespace-nowrap">Procedure Logs</TabsTrigger>
-                  <TabsTrigger value="acad-logs" className="text-xs whitespace-nowrap">Academic Activity</TabsTrigger>
-                  <TabsTrigger value="postings" className="text-xs whitespace-nowrap">Postings</TabsTrigger>
-                  <TabsTrigger value="thesis" className="text-xs whitespace-nowrap">Thesis</TabsTrigger>
-                  <TabsTrigger value="certifications" className="text-xs whitespace-nowrap">Certifications</TabsTrigger>
-                  <TabsTrigger value="assessments" className="text-xs whitespace-nowrap">Assessments</TabsTrigger>
+                <TabsList className="w-full flex justify-start overflow-x-auto gap-2 border-b border-slate-200 bg-transparent p-0 rounded-none h-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                  <TabsTrigger value="progress" className="relative h-10 rounded-none border-b-2 border-transparent bg-transparent px-3 pb-2 pt-2 font-medium text-slate-500 hover:text-slate-800 data-[state=active]:border-teal-600 data-[state=active]:text-teal-700 data-[state=active]:bg-transparent data-[state=active]:shadow-none text-xs whitespace-nowrap transition-colors">Training Progress</TabsTrigger>
+                  <TabsTrigger value="case-logs" className="relative h-10 rounded-none border-b-2 border-transparent bg-transparent px-3 pb-2 pt-2 font-medium text-slate-500 hover:text-slate-800 data-[state=active]:border-teal-600 data-[state=active]:text-teal-700 data-[state=active]:bg-transparent data-[state=active]:shadow-none text-xs whitespace-nowrap transition-colors">Clinical Case Logs</TabsTrigger>
+                  <TabsTrigger value="proc-logs" className="relative h-10 rounded-none border-b-2 border-transparent bg-transparent px-3 pb-2 pt-2 font-medium text-slate-500 hover:text-slate-800 data-[state=active]:border-teal-600 data-[state=active]:text-teal-700 data-[state=active]:bg-transparent data-[state=active]:shadow-none text-xs whitespace-nowrap transition-colors">Procedure Logs</TabsTrigger>
+                  <TabsTrigger value="acad-logs" className="relative h-10 rounded-none border-b-2 border-transparent bg-transparent px-3 pb-2 pt-2 font-medium text-slate-500 hover:text-slate-800 data-[state=active]:border-teal-600 data-[state=active]:text-teal-700 data-[state=active]:bg-transparent data-[state=active]:shadow-none text-xs whitespace-nowrap transition-colors">Academic Activity</TabsTrigger>
+                  <TabsTrigger value="postings" className="relative h-10 rounded-none border-b-2 border-transparent bg-transparent px-3 pb-2 pt-2 font-medium text-slate-500 hover:text-slate-800 data-[state=active]:border-teal-600 data-[state=active]:text-teal-700 data-[state=active]:bg-transparent data-[state=active]:shadow-none text-xs whitespace-nowrap transition-colors">Postings</TabsTrigger>
+                  <TabsTrigger value="thesis" className="relative h-10 rounded-none border-b-2 border-transparent bg-transparent px-3 pb-2 pt-2 font-medium text-slate-500 hover:text-slate-800 data-[state=active]:border-teal-600 data-[state=active]:text-teal-700 data-[state=active]:bg-transparent data-[state=active]:shadow-none text-xs whitespace-nowrap transition-colors">Thesis</TabsTrigger>
+                  <TabsTrigger value="certifications" className="relative h-10 rounded-none border-b-2 border-transparent bg-transparent px-3 pb-2 pt-2 font-medium text-slate-500 hover:text-slate-800 data-[state=active]:border-teal-600 data-[state=active]:text-teal-700 data-[state=active]:bg-transparent data-[state=active]:shadow-none text-xs whitespace-nowrap transition-colors">Certifications</TabsTrigger>
+                  <TabsTrigger value="assessments" className="relative h-10 rounded-none border-b-2 border-transparent bg-transparent px-3 pb-2 pt-2 font-medium text-slate-500 hover:text-slate-800 data-[state=active]:border-teal-600 data-[state=active]:text-teal-700 data-[state=active]:bg-transparent data-[state=active]:shadow-none text-xs whitespace-nowrap transition-colors">Assessments</TabsTrigger>
                 </TabsList>
 
                 {/* ── Progress Tab ─────────────────────────────────────────── */}
