@@ -14,6 +14,8 @@ export const certificationsTable = pgTable("certifications", {
   issueDate: timestamp("issue_date").notNull(),
   expiryDate: timestamp("expiry_date").notNull(),
   certificateUrl: text("certificate_url").notNull(),
+  status: text("status", { enum: ["pending", "verified", "rejected"] }).notNull().default("pending"),
+  facultyRemarks: text("faculty_remarks"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

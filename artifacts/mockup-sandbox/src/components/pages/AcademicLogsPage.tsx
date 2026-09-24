@@ -176,7 +176,7 @@ export function AcademicLogsPage() {
       <div className="grid gap-4 sm:grid-cols-3">
         <Summary label="Awaiting review" value={logs.filter((log) => log.status === "pending").length} />
         <Summary label="Verified activities" value={logs.filter((log) => log.status === "verified").length} />
-        <Summary label="All academic activities" value={logs.length} />
+        <Summary label="Valid academic activities" value={logs.filter((log) => log.status !== "rejected").length} />
       </div>
 
       <Card>
@@ -185,7 +185,7 @@ export function AcademicLogsPage() {
         </CardHeader>
         <CardContent className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-4">
           {academicOptions.map((requirement) => {
-            const logged = logs.filter((log) => log.type === requirement.value && (requirement.period !== "month" || log.date.startsWith(todayForInput().slice(0, 7)))).length;
+            const logged = logs.filter((log) => log.type === requirement.value && log.status !== "rejected" && (requirement.period !== "month" || log.date.startsWith(todayForInput().slice(0, 7)))).length;
             return (
               <div key={requirement.name} className="rounded-2xl border border-teal-100 bg-teal-50/50 p-4">
                 <p className="text-sm font-bold text-slate-900">{requirement.name}</p>

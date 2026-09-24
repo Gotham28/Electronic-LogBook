@@ -58,7 +58,18 @@ export function CertificationsPage() {
             <TableBody>{certificates.map((item) => <TableRow key={item.id}>
               <TableCell className="font-semibold">{item.title}</TableCell><TableCell>{item.provider || "Not recorded"}</TableCell>
               <TableCell>{formatLogbookDate(item.issueDate)}</TableCell><TableCell>{formatLogbookDate(item.expiryDate)}</TableCell>
-              <TableCell>{item.expiryDate.slice(0, 10) < new Date().toISOString().slice(0, 10) ? "Expired" : "Current (self-reported)"}</TableCell>
+              <TableCell>
+                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                  (item as any).status === "verified" ? "bg-emerald-100 text-emerald-700" :
+                  (item as any).status === "rejected" ? "bg-rose-100 text-rose-700" :
+                  "bg-amber-100 text-amber-700"
+                }`}>
+                  {(item as any).status === "verified" ? "Verified" : (item as any).status === "rejected" ? "Rejected" : "Pending review"}
+                </span>
+                {(item as any).facultyRemarks && (
+                  <p className="mt-0.5 text-[10px] text-slate-500 italic">{(item as any).facultyRemarks}</p>
+                )}
+              </TableCell>
             </TableRow>)}</TableBody>
           </Table>}
         </CardContent>
