@@ -453,7 +453,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
 
                     {evaluatedLogs[currentItem.id] && (
                       <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center justify-between">
-                        <span>Evaluated Status: <strong>{evaluatedLogs[currentItem.id].status.toUpperCase()}</strong> ({evaluatedLogs[currentItem.id].remarks})</span>
+                        <span>Evaluated Status: <strong>{evaluatedLogs[currentItem.id].status.toUpperCase()}</strong> {evaluatedLogs[currentItem.id].remarks ? `(${evaluatedLogs[currentItem.id].remarks})` : "(No remark)"}</span>
                         <Badge className="bg-emerald-600">Saved</Badge>
                       </div>
                     )}

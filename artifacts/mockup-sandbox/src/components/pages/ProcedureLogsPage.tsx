@@ -327,9 +327,11 @@ export function ProcedureLogsPage() {
                     {config?.enabledFeatures?.procedureExperience && <TableCell className="text-xs">{log.competencyLevel}</TableCell>}
                     <TableCell className="text-xs">{log.facultyVerifiedLevel ? (competencyLevels.find(c => c.value === log.facultyVerifiedLevel)?.name || log.facultyVerifiedLevel) : 'Pending verification'}</TableCell>
                     <TableCell className="text-xs max-w-[160px]">
-                      {log.facultyRemarks
-                        ? <span title={log.facultyRemarks} className="block truncate cursor-help text-slate-600">{log.facultyRemarks}</span>
-                        : <span className="text-slate-400">—</span>}
+                      {log.status === "pending"
+                        ? <span className="text-slate-400">—</span>
+                        : log.facultyRemarks
+                          ? <span title={log.facultyRemarks} className="block truncate cursor-help text-slate-600">{log.facultyRemarks}</span>
+                          : <span className="text-slate-500">No remark</span>}
                     </TableCell>
                     <TableCell>{statusBadge(log.status)}</TableCell>
                     <TableCell className="text-right">

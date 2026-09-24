@@ -42,6 +42,7 @@ type CaseLog = {
   learningPoints: string;
   status: "pending" | "verified" | "rejected";
   remarks: string;
+  facultyRemarks?: string | null;
 };
 
 const emptyForm = {
@@ -410,10 +411,10 @@ export function CaseLogsPage() {
                 <Detail label="Management and interventions" value={selectedLog.managementPlan || selectedLog.management} />
                 <Detail label="Outcome / follow-up" value={selectedLog.outcome} />
                 <Detail label="Learning points" value={selectedLog.learningPoints} />
-                {(selectedLog.comments || selectedLog.remarks) && (
+                {selectedLog.status !== "pending" && (
                   <div className="rounded-2xl border border-teal-100 bg-teal-50/70 p-4">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-teal-700">Faculty remarks</p>
-                    <p className="mt-1 text-sm text-teal-950">{selectedLog.comments || selectedLog.remarks}</p>
+                    <p className="mt-1 text-sm text-teal-950">{selectedLog.facultyRemarks || "No remark"}</p>
                   </div>
                 )}
               </div>
