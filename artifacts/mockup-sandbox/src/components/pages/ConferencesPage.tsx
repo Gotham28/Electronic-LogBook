@@ -179,7 +179,7 @@ export function ConferencesPage() {
             </Empty>
           ) : (
             <Table>
-              <TableHeader><TableRow><TableHead>Number</TableHead><TableHead>Date</TableHead><TableHead>Conference</TableHead><TableHead>Role</TableHead><TableHead>Location</TableHead><TableHead>Reviewing faculty</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Number</TableHead><TableHead>Date</TableHead><TableHead>Conference</TableHead><TableHead>Role</TableHead><TableHead>Location</TableHead><TableHead>Reviewing faculty</TableHead><TableHead>Remarks</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
               <TableBody>
                 {logs.map((log) => (
                   <TableRow key={log.id}>
@@ -189,6 +189,13 @@ export function ConferencesPage() {
                     <TableCell><Badge variant="outline" className="border-teal-100 bg-teal-50 text-teal-800 capitalize">{log.role}</Badge></TableCell>
                     <TableCell>{log.location ? <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{log.location}</span> : "—"}</TableCell>
                     <TableCell>{log.faculty}</TableCell>
+                    <TableCell className="text-xs max-w-[160px]">
+                      {log.status === "pending"
+                        ? <span className="text-slate-400">—</span>
+                        : log.facultyRemarks
+                          ? <span title={log.facultyRemarks} className="block truncate cursor-help text-slate-600">{log.facultyRemarks}</span>
+                          : <span className="text-slate-500">No remark</span>}
+                    </TableCell>
                     <TableCell>{log.status === "verified" ? <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700"><CheckCircle2 className="mr-1 h-3 w-3" /> Verified</Badge> : log.status === "rejected" ? <Badge className="border-rose-200 bg-rose-50 text-rose-700"><CheckCircle2 className="mr-1 h-3 w-3" /> Rejected</Badge> : <Badge className="border-amber-200 bg-amber-50 text-amber-700"><Clock className="mr-1 h-3 w-3" /> Pending</Badge>}</TableCell>
                   </TableRow>
                 ))}

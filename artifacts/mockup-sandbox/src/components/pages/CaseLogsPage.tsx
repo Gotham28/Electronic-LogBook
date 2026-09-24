@@ -40,8 +40,9 @@ type CaseLog = {
   management: string;
   outcome: string;
   learningPoints: string;
-  status: "pending" | "verified" | "revision";
+  status: "pending" | "verified" | "rejected";
   remarks: string;
+  facultyRemarks?: string | null;
 };
 
 const emptyForm = {
@@ -87,7 +88,7 @@ export function CaseLogsPage() {
     if (!caseCategories) return {};
     return Object.fromEntries(caseCategories.map((cat: any) => [
       cat.value,
-      caseLogs.filter((log) => log.category === cat.value).length,
+      caseLogs.filter((log) => log.category?.trim().toLowerCase() === cat.value?.trim().toLowerCase()).length,
     ]));
   }, [caseCategories, caseLogs]);
 
@@ -350,6 +351,7 @@ export function CaseLogsPage() {
                   <TableHead>Age</TableHead>
                   <TableHead>Category</TableHead>
                   <TableHead>Diagnosis</TableHead>
+                  <TableHead>Remarks</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Record</TableHead>
                 </TableRow>
@@ -369,6 +371,13 @@ export function CaseLogsPage() {
                         : <span className="text-slate-400 text-xs">—</span>}
                     </TableCell>
                     <TableCell><p className="max-w-sm font-semibold text-slate-900">{log.diagnosisProvisional || log.diagnosis}</p></TableCell>
+                    <TableCell className="text-xs max-w-[160px]">
+                      {log.status === "pending"
+                        ? <span className="text-slate-400">—</span>
+                        : log.facultyRemarks
+                          ? <span title={log.facultyRemarks} className="block truncate cursor-help text-slate-600">{log.facultyRemarks}</span>
+                          : <span className="text-slate-500">No remark</span>}
+                    </TableCell>
                     <TableCell>{statusBadge(log.status)}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
@@ -410,10 +419,10 @@ export function CaseLogsPage() {
                 <Detail label="Management and interventions" value={selectedLog.managementPlan || selectedLog.management} />
                 <Detail label="Outcome / follow-up" value={selectedLog.outcome} />
                 <Detail label="Learning points" value={selectedLog.learningPoints} />
-                {(selectedLog.comments || selectedLog.remarks) && (
+                {selectedLog.status !== "pending" && (
                   <div className="rounded-2xl border border-teal-100 bg-teal-50/70 p-4">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-teal-700">Faculty remarks</p>
-                    <p className="mt-1 text-sm text-teal-950">{selectedLog.comments || selectedLog.remarks}</p>
+                    <p className="mt-1 text-sm text-teal-950">{selectedLog.facultyRemarks || "No remark"}</p>
                   </div>
                 )}
               </div>
@@ -435,6 +444,6 @@ function Detail({ label, value }: { label: string; value: string }) {
 
 function statusBadge(status: CaseLog["status"]) {
   if (status === "verified") return <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700"><CheckCircle2 className="mr-1 h-3 w-3" /> Verified</Badge>;
-  if (status === "revision") return <Badge className="border-rose-200 bg-rose-50 text-rose-700"><AlertCircle className="mr-1 h-3 w-3" /> Revision</Badge>;
+  if (status === "rejected") return <Badge className="border-rose-200 bg-rose-50 text-rose-700"><AlertCircle className="mr-1 h-3 w-3" /> Rejected</Badge>;
   return <Badge className="border-amber-200 bg-amber-50 text-amber-700"><Clock className="mr-1 h-3 w-3" /> Pending</Badge>;
 }

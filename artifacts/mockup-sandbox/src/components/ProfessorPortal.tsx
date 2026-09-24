@@ -117,7 +117,7 @@ type LogFilter =
 
 export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; embedded?: boolean }) {
   const hideUhid = isDemoMode();
-  const { competencyLevels, caseCategories: deptCaseCategories, procedures: deptProcedures, academics: deptAcademics } = useDepartment();
+  const { config, competencyLevels, caseCategories: deptCaseCategories, procedures: deptProcedures, academics: deptAcademics } = useDepartment();
   const [location, setLocation] = useLocation();
   const [data, setData] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
@@ -125,7 +125,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [currentIndex, setCurrentIndex] = React.useState(0);
   const [remarks, setRemarks] = React.useState("");
-  const [grade, setGrade] = React.useState("A");
+  const [grade, setGrade] = React.useState("");
   const [competencyOverride, setCompetencyOverride] = React.useState(competencyLevels[0]?.value ?? "");
   const [evaluatedLogs, setEvaluatedLogs] = React.useState<Record<string, any>>({});
   const [departmentFilter, setDepartmentFilter] = React.useState("all");
@@ -183,6 +183,19 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
       
       const json = await apiGet(`/api/professors/${user.id}/review-queue`);
       setData(json);
+
+      setEvaluatedLogs((prev) => {
+        const freshReviewIds = new Set((json.pendingReviews || []).map((r: any) => String(r.id)));
+        const next = { ...prev };
+        let changed = false;
+        for (const key of Object.keys(next)) {
+          if (!freshReviewIds.has(key)) {
+            delete next[key];
+            changed = true;
+          }
+        }
+        return changed ? next : prev;
+      });
     } catch (e: any) {
       setError(e.message || "Failed to load review queue");
     } finally {
@@ -276,28 +289,32 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
 
   const currentItem = reviews[currentIndex];
 
-  const handleReviewAction = async (status: "verified" | "rejected", defaultRemarks: string) => {
+  const handleReviewAction = async (status: "verified" | "rejected") => {
     if (!currentItem || isSubmitting) return;
     
     setIsSubmitting(true);
     try {
       await apiPatch(`/api/logs/${currentItem.logType}/${currentItem.dbId}/review`, {
         status,
-        comments: remarks || defaultRemarks,
+        comments: remarks,
         ...(currentItem.logType === "procedure" && competencyOverride
           ? { facultyVerifiedLevel: competencyOverride }
+          : {}),
+        ...(currentItem.logType === "academic" && grade
+          ? { facultyGrade: grade }
           : {})
       });
       
       // Optimistic update for evaluatedLogs mapping
       setEvaluatedLogs(prev => ({
         ...prev,
-        [currentItem.id]: { status, remarks: remarks || defaultRemarks, grade },
+        [currentItem.id]: { status, remarks, grade },
       }));
 
       toast.success(status === "verified" ? `Number ${currentItem.id} verified` : `Revision Requested for ${currentItem.id}`);
       
       setRemarks("");
+      setGrade("");
       // Refresh real data so the roster updates and the queue shrinks
       await fetchProfessorData();
     } catch (err: any) {
@@ -307,8 +324,8 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
     }
   };
 
-  const handleApprove = () => handleReviewAction("verified", "Approved without conditions.");
-  const handleReject = () => handleReviewAction("rejected", "Please expand on case findings.");
+  const handleApprove = () => handleReviewAction("verified");
+  const handleReject = () => handleReviewAction("rejected");
 
   // ── Helper: derive faculty role from review-queue response ────────────────────
   // data?.faculty?.role === "hod" means this portal is rendering in HOD context.
@@ -331,7 +348,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
 
           <div className="flex items-center gap-3">
             <div className="bg-teal-500/10 border border-teal-500/30 px-4 py-2 rounded-xl text-right">
-              <p className="text-xl font-extrabold text-teal-300">{reviews.length - Object.keys(evaluatedLogs).length}</p>
+              <p className="text-xl font-extrabold text-teal-300">{Math.max(0, reviews.length - Object.keys(evaluatedLogs).length)}</p>
               <p className="text-[11px] text-slate-300 font-medium">Pending Review Items</p>
             </div>
           </div>
@@ -345,7 +362,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
         {!embedded && (
           <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-white p-1 shadow-sm sm:w-auto">
             <TabsTrigger value="review-queue" className="gap-2 text-xs font-semibold">
-              <FileCheck className="h-4 w-4" /> Sequential Review Queue ({reviews.length - Object.keys(evaluatedLogs).length})
+              <FileCheck className="h-4 w-4" /> Sequential Review Queue ({Math.max(0, reviews.length - Object.keys(evaluatedLogs).length)})
             </TabsTrigger>
             <TabsTrigger value="mentees" className="gap-2 text-xs font-semibold">
               <UserCheck className="h-4 w-4" /> All Students ({allStudents.length})
@@ -440,7 +457,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
 
                     {evaluatedLogs[currentItem.id] && (
                       <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center justify-between">
-                        <span>Evaluated Status: <strong>{evaluatedLogs[currentItem.id].status.toUpperCase()}</strong> ({evaluatedLogs[currentItem.id].remarks})</span>
+                        <span>Evaluated Status: <strong>{evaluatedLogs[currentItem.id].status.toUpperCase()}</strong> {evaluatedLogs[currentItem.id].remarks ? `(${evaluatedLogs[currentItem.id].remarks})` : "(No remark)"}</span>
                         <Badge className="bg-emerald-600">Saved</Badge>
                       </div>
                     )}
@@ -457,7 +474,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-4 space-y-4">
-                    {currentItem.type === "Procedure" && (
+                    {currentItem.type === "Procedure" && config?.enabledFeatures?.procedureExperience && (
                       <div className="space-y-2">
                         <label className="text-xs font-semibold text-slate-700">Verified Competency Level</label>
                         <Select value={competencyOverride} onValueChange={setCompetencyOverride}>
@@ -1119,9 +1136,13 @@ function ProgressTabContent({
   // Catalog-ordered items first
   for (const cat of deptCaseCategories) {
     if (cat.required === 0) continue; // not tracked
-    const match = progress.caseCategories.find((c) => c.value === cat.value);
-    const verified = match?.verified ?? 0;
-    const pending = match?.pending ?? 0;
+    
+    const matches = progress.caseCategories.filter(
+      (c) => c.value?.trim().toLowerCase() === cat.value?.trim().toLowerCase()
+    );
+    const verified = matches.reduce((sum, m) => sum + (m.verified ?? 0), 0);
+    const pending = matches.reduce((sum, m) => sum + (m.pending ?? 0), 0);
+
     caseBarItems.push({
       key: cat.value,
       label: cat.name,
@@ -1135,7 +1156,9 @@ function ProgressTabContent({
   // Uncatalogued items (present in progress but absent from catalog, or value === null)
   for (const item of progress.caseCategories) {
     const key = item.value ?? "__null__";
-    const alreadyIncluded = deptCaseCategories.some((c) => c.value === item.value && c.required > 0);
+    const alreadyIncluded = deptCaseCategories.some(
+      (c) => c.value?.trim().toLowerCase() === item.value?.trim().toLowerCase() && c.required > 0
+    );
     if (!alreadyIncluded) {
       caseBarItems.push({
         key,
