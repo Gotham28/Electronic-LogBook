@@ -351,6 +351,7 @@ export function CaseLogsPage() {
                   <TableHead>Age</TableHead>
                   <TableHead>Category</TableHead>
                   <TableHead>Diagnosis</TableHead>
+                  <TableHead>Remarks</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Record</TableHead>
                 </TableRow>
@@ -370,6 +371,13 @@ export function CaseLogsPage() {
                         : <span className="text-slate-400 text-xs">—</span>}
                     </TableCell>
                     <TableCell><p className="max-w-sm font-semibold text-slate-900">{log.diagnosisProvisional || log.diagnosis}</p></TableCell>
+                    <TableCell className="text-xs max-w-[160px]">
+                      {log.status === "pending"
+                        ? <span className="text-slate-400">—</span>
+                        : log.facultyRemarks
+                          ? <span title={log.facultyRemarks} className="block truncate cursor-help text-slate-600">{log.facultyRemarks}</span>
+                          : <span className="text-slate-500">No remark</span>}
+                    </TableCell>
                     <TableCell>{statusBadge(log.status)}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">

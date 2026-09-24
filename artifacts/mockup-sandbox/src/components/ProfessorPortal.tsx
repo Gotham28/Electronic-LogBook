@@ -289,14 +289,14 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
 
   const currentItem = reviews[currentIndex];
 
-  const handleReviewAction = async (status: "verified" | "rejected", defaultRemarks: string) => {
+  const handleReviewAction = async (status: "verified" | "rejected") => {
     if (!currentItem || isSubmitting) return;
     
     setIsSubmitting(true);
     try {
       await apiPatch(`/api/logs/${currentItem.logType}/${currentItem.dbId}/review`, {
         status,
-        comments: remarks || defaultRemarks,
+        comments: remarks,
         ...(currentItem.logType === "procedure" && competencyOverride
           ? { facultyVerifiedLevel: competencyOverride }
           : {})
@@ -305,7 +305,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
       // Optimistic update for evaluatedLogs mapping
       setEvaluatedLogs(prev => ({
         ...prev,
-        [currentItem.id]: { status, remarks: remarks || defaultRemarks, grade },
+        [currentItem.id]: { status, remarks, grade },
       }));
 
       toast.success(status === "verified" ? `Number ${currentItem.id} verified` : `Revision Requested for ${currentItem.id}`);
@@ -320,8 +320,8 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
     }
   };
 
-  const handleApprove = () => handleReviewAction("verified", "Approved without conditions.");
-  const handleReject = () => handleReviewAction("rejected", "Please expand on case findings.");
+  const handleApprove = () => handleReviewAction("verified");
+  const handleReject = () => handleReviewAction("rejected");
 
   // ── Helper: derive faculty role from review-queue response ────────────────────
   // data?.faculty?.role === "hod" means this portal is rendering in HOD context.
