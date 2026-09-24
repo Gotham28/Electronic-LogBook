@@ -12,7 +12,8 @@ router.patch("/:logType/:logId/review", requireAuth, requireRole(["professor", "
   validate(z.object({
     status: z.enum(["verified", "rejected"]),
     comments: z.string().max(10000).optional(),
-    facultyVerifiedLevel: z.string().max(500).optional()
+    facultyVerifiedLevel: z.string().max(500).optional(),
+    facultyGrade: z.enum(["A+", "A", "B+", "B", "C"]).optional()
   }).strict()), async (req, res) => {
   try {
     const { logType, logId } = req.params;
