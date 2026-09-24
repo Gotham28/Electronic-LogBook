@@ -57,9 +57,11 @@ import {
   FileText,
   X,
   RefreshCw,
+  Trash2,
+  Pencil,
 } from "lucide-react";
 import { formatLogbookDate } from "@/lib/logbook-config";
-import { apiGet, apiPatch, apiPost } from "@/lib/apiClient";
+import { apiGet, apiPatch, apiPost, apiDelete } from "@/lib/apiClient";
 import { getCurrentUser, isDemoMode } from "@/lib/session";
 import { useDepartment } from "@/lib/department-context";
 import {
@@ -139,6 +141,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
   const [menteePostings, setMenteePostings] = React.useState<any[]>([]);
   const [menteeThesis, setMenteeThesis] = React.useState<any | null>(null);
   const [menteeCerts, setMenteeCerts] = React.useState<any[]>([]);
+  const [menteeAssessments, setMenteeAssessments] = React.useState<any[]>([]);
   const [reviewBusy, setReviewBusy] = React.useState(false);
 
 
@@ -243,6 +246,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
       setMenteePostings([]);
       setMenteeThesis(null);
       setMenteeCerts([]);
+      setMenteeAssessments([]);
       return;
     }
     let mounted = true;
@@ -286,6 +290,12 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
         const certsResp = await apiGet(`/api/students/${selectedMentee.id}/certifications`);
         if (mounted) setMenteeCerts(Array.isArray(certsResp) ? certsResp : []);
       } catch { /* certs tab will show empty, 403 is expected for non-mentees */ }
+
+      // Fetch assessments
+      try {
+        const assessResp = await apiGet(`/api/students/${selectedMentee.id}/assessments`);
+        if (mounted) setMenteeAssessments(Array.isArray(assessResp) ? assessResp : (assessResp?.data || []));
+      } catch { /* assessments tab will show empty */ }
 
       if (mounted) setMenteeLogsLoading(false);
     };
@@ -791,6 +801,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                   <TabsTrigger value="postings" className="text-xs whitespace-nowrap">Postings</TabsTrigger>
                   <TabsTrigger value="thesis" className="text-xs whitespace-nowrap">Thesis</TabsTrigger>
                   <TabsTrigger value="certifications" className="text-xs whitespace-nowrap">Certifications</TabsTrigger>
+                  <TabsTrigger value="assessments" className="text-xs whitespace-nowrap">Assessments</TabsTrigger>
                 </TabsList>
 
                 {/* ── Progress Tab ─────────────────────────────────────────── */}
@@ -1154,6 +1165,42 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                               try {
                                 const resp = await apiGet(`/api/students/${selectedMentee.id}/certifications`);
                                 setMenteeCerts(Array.isArray(resp) ? resp : []);
+                              } finally { setReviewBusy(false); }
+                            }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </TabsContent>
+
+                {/* ── Assessments Tab ─────────────────────────────────────────── */}
+                <TabsContent value="assessments" className="pt-3">
+                  {menteeAssessments.length === 0 ? (
+                    <p className="text-sm text-slate-500 py-6 text-center">No assessments found for this student.</p>
+                  ) : (
+                    <div className="space-y-4">
+                      {menteeAssessments.map((assessment: any) => (
+                        <div key={assessment.id} className="rounded-xl border border-slate-200 bg-white p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="font-semibold text-slate-900 text-sm">{assessment.examName}</p>
+                              <p className="text-xs text-slate-500 mt-0.5">{assessment.type === "annual" ? "Annual" : "Quarterly"} · {formatLogbookDate(assessment.date)}</p>
+                              <p className="mt-1 text-xs font-medium text-teal-800">Assessor ID: {assessment.assessorId}</p>
+                            </div>
+                            <span className="shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold bg-slate-100 text-slate-900">
+                              {assessment.marks} / 100
+                            </span>
+                          </div>
+                          <AssessmentEditForm
+                            assessment={assessment}
+                            studentId={selectedMentee.id}
+                            busy={reviewBusy}
+                            onDone={async () => {
+                              setReviewBusy(true);
+                              try {
+                                const resp = await apiGet(`/api/students/${selectedMentee.id}/assessments`);
+                                setMenteeAssessments(Array.isArray(resp) ? resp : (resp?.data || []));
                               } finally { setReviewBusy(false); }
                             }}
                           />
@@ -1913,6 +1960,92 @@ function CertReviewForm({ cert, studentId, busy, onDone }: {
         </Button>
         <Button size="sm" variant="outline" className="border-rose-200 text-rose-700 hover:bg-rose-50 text-xs gap-1.5" disabled={submitting || busy} onClick={() => submit("rejected")}>
           <XCircle className="h-3.5 w-3.5" /> Reject
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ── AssessmentEditForm ─────────────────────────────────────────────────────────────
+
+function AssessmentEditForm({ assessment, studentId, busy, onDone }: {
+  assessment: any; studentId: number; busy: boolean; onDone: () => void;
+}) {
+  const [examName, setExamName] = React.useState(assessment.examName || "");
+  const [marks, setMarks] = React.useState(String(assessment.marks ?? ""));
+  const [submitting, setSubmitting] = React.useState(false);
+  const [editing, setEditing] = React.useState(false);
+
+  async function submit() {
+    if (!examName || marks === "") return;
+    setSubmitting(true);
+    try {
+      await apiPatch(`/api/students/${studentId}/assessments/${assessment.id}`, { 
+        examName, 
+        marks: parseInt(marks, 10)
+      });
+      toast.success("Assessment updated");
+      setEditing(false);
+      onDone();
+    } catch (e: any) {
+      toast.error(e.message || "Failed to update assessment");
+    } finally { setSubmitting(false); }
+  }
+
+  async function handleDelete() {
+    if (!window.confirm("Are you sure you want to completely remove this assessment?")) return;
+    setSubmitting(true);
+    try {
+      await apiDelete(`/api/students/${studentId}/assessments/${assessment.id}`);
+      toast.success("Assessment removed");
+      onDone();
+    } catch (e: any) {
+      toast.error(e.message || "Failed to remove assessment");
+      setSubmitting(false);
+    }
+  }
+
+  if (!editing) {
+    return (
+      <div className="flex items-center gap-1 mt-3 border-t border-slate-100 pt-3">
+        <Button variant="ghost" size="sm" className="h-7 text-xs text-teal-700 hover:text-teal-800 hover:bg-teal-50 gap-1.5 px-2" onClick={() => setEditing(true)}>
+          <Pencil className="h-3.5 w-3.5" /> Edit Score
+        </Button>
+        <Button variant="ghost" size="sm" className="h-7 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 gap-1.5 px-2" disabled={submitting || busy} onClick={handleDelete}>
+          <Trash2 className="h-3.5 w-3.5" /> Remove
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-3 border-t border-slate-100 pt-3 space-y-3 bg-slate-50/50 -mx-4 px-4 pb-1 rounded-b-xl">
+      <div className="grid grid-cols-[1fr_80px] gap-2">
+        <Input 
+          value={examName} 
+          onChange={(e) => setExamName(e.target.value)} 
+          placeholder="Exam Name" 
+          className="text-xs h-8 bg-white" 
+        />
+        <Input 
+          type="number"
+          value={marks} 
+          onChange={(e) => setMarks(e.target.value)} 
+          placeholder="Marks" 
+          className="text-xs h-8 bg-white text-center" 
+          min="0" max="100"
+        />
+      </div>
+      <div className="flex items-center gap-2 pb-2">
+        <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white text-xs gap-1.5 h-7 px-4" disabled={submitting || busy || !examName || marks === ""} onClick={submit}>
+          Save Changes
+        </Button>
+        <Button size="sm" variant="ghost" className="text-slate-500 text-xs h-7" disabled={submitting || busy} onClick={() => {
+          setEditing(false);
+          setExamName(assessment.examName || "");
+          setMarks(String(assessment.marks ?? ""));
+        }}>
+          Cancel
         </Button>
       </div>
     </div>
