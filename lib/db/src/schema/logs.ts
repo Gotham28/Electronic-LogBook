@@ -70,6 +70,7 @@ export const academicLogsTable = pgTable("academic_logs", {
   supervisorId: integer("supervisor_id").references(() => usersTable.id),
   status: text("status", { enum: ["pending", "verified", "rejected"] }).notNull().default("pending"),
   facultyRemarks: text("faculty_remarks"),
+  facultyGrade: text("faculty_grade", { enum: ["A+", "A", "B+", "B", "C"] }),
   reviewedBy: integer("reviewed_by").references(() => usersTable.id),
   reviewedAt: timestamp("reviewed_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),

@@ -16,7 +16,7 @@ router.patch("/:logType/:logId/review", requireAuth, requireRole(["professor", "
   }).strict()), async (req, res) => {
   try {
     const { logType, logId } = req.params;
-    const { status, comments, facultyVerifiedLevel } = req.body;
+    const { status, comments, facultyVerifiedLevel, facultyGrade } = req.body;
 
     const id = parseInt(String(logId), 10);
     if (isNaN(id)) {
@@ -88,6 +88,9 @@ router.patch("/:logType/:logId/review", requireAuth, requireRole(["professor", "
     const procedureUpdateData = logType === "procedure"
       ? { ...updateData, facultyVerifiedLevel: facultyVerifiedLevel || null }
       : updateData;
+    const academicUpdateData = logType === "academic"
+      ? { ...updateData, facultyGrade: facultyGrade || null }
+      : updateData;
     const departmentStudents = db.select({ id: studentsTable.id }).from(studentsTable)
       .innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
       .where(and(eq(usersTable.departmentId, reviewer.departmentId!), eq(usersTable.status, "approved")));
@@ -99,7 +102,7 @@ router.patch("/:logType/:logId/review", requireAuth, requireRole(["professor", "
       updatedRows = await db.update(procedureLogsTable).set(procedureUpdateData).where(and(eq(procedureLogsTable.id, id), eq(procedureLogsTable.status, "pending"), isNull(procedureLogsTable.deletedAt),
         inArray(procedureLogsTable.studentId, departmentStudents), reviewer.role === "professor" ? eq(procedureLogsTable.supervisorId, reviewer.id) : undefined)).returning();
     } else if (logType === "academic") {
-      updatedRows = await db.update(academicLogsTable).set(updateData).where(and(eq(academicLogsTable.id, id), eq(academicLogsTable.status, "pending"),
+      updatedRows = await db.update(academicLogsTable).set(academicUpdateData).where(and(eq(academicLogsTable.id, id), eq(academicLogsTable.status, "pending"),
         inArray(academicLogsTable.studentId, departmentStudents), reviewer.role === "professor" ? eq(academicLogsTable.supervisorId, reviewer.id) : undefined)).returning();
     } else if (logType === "conference") {
       updatedRows = await db.update(conferencesTable).set(updateData).where(and(eq(conferencesTable.id, id), eq(conferencesTable.status, "pending"),

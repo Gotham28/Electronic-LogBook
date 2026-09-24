@@ -125,7 +125,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [currentIndex, setCurrentIndex] = React.useState(0);
   const [remarks, setRemarks] = React.useState("");
-  const [grade, setGrade] = React.useState("A");
+  const [grade, setGrade] = React.useState("");
   const [competencyOverride, setCompetencyOverride] = React.useState(competencyLevels[0]?.value ?? "");
   const [evaluatedLogs, setEvaluatedLogs] = React.useState<Record<string, any>>({});
   const [departmentFilter, setDepartmentFilter] = React.useState("all");
@@ -299,6 +299,9 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
         comments: remarks,
         ...(currentItem.logType === "procedure" && competencyOverride
           ? { facultyVerifiedLevel: competencyOverride }
+          : {}),
+        ...(currentItem.logType === "academic" && grade
+          ? { facultyGrade: grade }
           : {})
       });
       
@@ -311,6 +314,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
       toast.success(status === "verified" ? `Number ${currentItem.id} verified` : `Revision Requested for ${currentItem.id}`);
       
       setRemarks("");
+      setGrade("");
       // Refresh real data so the roster updates and the queue shrinks
       await fetchProfessorData();
     } catch (err: any) {

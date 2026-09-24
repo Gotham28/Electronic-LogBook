@@ -219,7 +219,7 @@ export function AcademicLogsPage() {
             </Empty>
           ) : (
             <Table>
-              <TableHeader><TableRow><TableHead>Number</TableHead><TableHead>Date</TableHead><TableHead>Activity</TableHead><TableHead>Presentation</TableHead><TableHead>Topic / conference</TableHead><TableHead>Reviewing faculty member</TableHead><TableHead>Remarks</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Number</TableHead><TableHead>Date</TableHead><TableHead>Activity</TableHead><TableHead>Presentation</TableHead><TableHead>Topic / conference</TableHead><TableHead>Reviewing faculty member</TableHead><TableHead>Grade</TableHead><TableHead>Remarks</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
               <TableBody>
                 {logs.map((log) => (
                   <TableRow key={log.id}>
@@ -229,6 +229,13 @@ export function AcademicLogsPage() {
                     <TableCell>{log.presentationType}</TableCell>
                     <TableCell className="max-w-sm font-semibold">{log.topic}</TableCell>
                     <TableCell>{log.faculty}</TableCell>
+                    <TableCell className="font-medium">
+                      {log.status === "pending"
+                        ? <span className="text-slate-400">—</span>
+                        : log.facultyGrade
+                          ? <span className="font-bold text-teal-800">{log.facultyGrade}</span>
+                          : <span className="text-slate-500">No grade</span>}
+                    </TableCell>
                     <TableCell className="text-xs max-w-[160px]">
                       {log.status === "pending"
                         ? <span className="text-slate-400">—</span>
