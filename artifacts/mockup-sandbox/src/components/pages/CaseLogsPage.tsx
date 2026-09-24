@@ -40,7 +40,7 @@ type CaseLog = {
   management: string;
   outcome: string;
   learningPoints: string;
-  status: "pending" | "verified" | "revision";
+  status: "pending" | "verified" | "rejected";
   remarks: string;
 };
 
@@ -435,6 +435,6 @@ function Detail({ label, value }: { label: string; value: string }) {
 
 function statusBadge(status: CaseLog["status"]) {
   if (status === "verified") return <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700"><CheckCircle2 className="mr-1 h-3 w-3" /> Verified</Badge>;
-  if (status === "revision") return <Badge className="border-rose-200 bg-rose-50 text-rose-700"><AlertCircle className="mr-1 h-3 w-3" /> Revision</Badge>;
+  if (status === "rejected") return <Badge className="border-rose-200 bg-rose-50 text-rose-700"><AlertCircle className="mr-1 h-3 w-3" /> Rejected</Badge>;
   return <Badge className="border-amber-200 bg-amber-50 text-amber-700"><Clock className="mr-1 h-3 w-3" /> Pending</Badge>;
 }

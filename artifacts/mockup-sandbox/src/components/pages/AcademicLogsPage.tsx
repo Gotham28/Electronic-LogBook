@@ -1,5 +1,5 @@
 import * as React from "react";
-import { CheckCircle2, Clock, GraduationCap, PlusCircle, Loader2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, Clock, GraduationCap, PlusCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { apiGet, apiPost } from "@/lib/apiClient";
 import { getCurrentUser } from "@/lib/session";
@@ -22,7 +22,7 @@ type AcademicLog = {
   presentationType: string;
   topic: string;
   faculty: string;
-  status: "pending" | "verified";
+  status: "pending" | "verified" | "rejected";
 };
 
 
@@ -228,7 +228,7 @@ export function AcademicLogsPage() {
                     <TableCell>{log.presentationType}</TableCell>
                     <TableCell className="max-w-sm font-semibold">{log.topic}</TableCell>
                     <TableCell>{log.faculty}</TableCell>
-                    <TableCell>{log.status === "verified" ? <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700"><CheckCircle2 className="mr-1 h-3 w-3" /> Verified</Badge> : <Badge className="border-amber-200 bg-amber-50 text-amber-700"><Clock className="mr-1 h-3 w-3" /> Pending</Badge>}</TableCell>
+                    <TableCell>{log.status === "verified" ? <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700"><CheckCircle2 className="mr-1 h-3 w-3" /> Verified</Badge> : log.status === "rejected" ? <Badge className="border-rose-200 bg-rose-50 text-rose-700"><AlertCircle className="mr-1 h-3 w-3" /> Rejected</Badge> : <Badge className="border-amber-200 bg-amber-50 text-amber-700"><Clock className="mr-1 h-3 w-3" /> Pending</Badge>}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
