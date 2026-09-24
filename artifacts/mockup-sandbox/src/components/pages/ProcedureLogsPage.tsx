@@ -66,7 +66,7 @@ export function ProcedureLogsPage() {
   const loggedCounts = React.useMemo(
     () => Object.fromEntries(PROCEDURE_REQUIREMENTS.map((requirement) => [
       requirement.name,
-      logs.filter((log) => log.procedureName === requirement.name).length,
+      logs.filter((log) => log.procedureName === requirement.name && log.status !== "rejected").length,
     ])),
     [logs, PROCEDURE_REQUIREMENTS],
   );
@@ -240,7 +240,7 @@ export function ProcedureLogsPage() {
       {!PROCEDURE_REQUIREMENTS.length && <p className="rounded-xl bg-teal-50 p-4 text-sm text-teal-800">Your HOD has not configured procedure types for this department yet.</p>}
       <div className="grid gap-4 md:grid-cols-2">
         {(Object.keys(PROCEDURE_GROUPS) as ProcedureGroup[]).map((group) => {
-          const completed = logs.filter((log) => log.procedureGroup === group).length;
+          const completed = logs.filter((log) => log.procedureGroup === group && log.status !== "rejected").length;
           return (
             <Card key={group} className={group === "emergency" ? "border-cyan-100" : "border-teal-100"}>
               <CardContent className="flex items-center justify-between p-5">

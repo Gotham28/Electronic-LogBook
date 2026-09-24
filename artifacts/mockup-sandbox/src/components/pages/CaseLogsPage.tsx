@@ -88,7 +88,7 @@ export function CaseLogsPage() {
     if (!caseCategories) return {};
     return Object.fromEntries(caseCategories.map((cat: any) => [
       cat.value,
-      caseLogs.filter((log) => log.category?.trim().toLowerCase() === cat.value?.trim().toLowerCase()).length,
+      caseLogs.filter((log) => log.category?.trim().toLowerCase() === cat.value?.trim().toLowerCase() && log.status !== "rejected").length,
     ]));
   }, [caseCategories, caseLogs]);
 
@@ -273,7 +273,7 @@ export function CaseLogsPage() {
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-slate-700">Progress by category</h3>
             <span className="text-xs text-slate-500">
-              {hasTarget ? `${caseLogs.length} of ${totalRequired} total cases logged` : `${caseLogs.length} cases logged`}
+              {hasTarget ? `${caseLogs.filter(l => l.status !== "rejected").length} of ${totalRequired} total cases logged` : `${caseLogs.filter(l => l.status !== "rejected").length} cases logged`}
             </span>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
