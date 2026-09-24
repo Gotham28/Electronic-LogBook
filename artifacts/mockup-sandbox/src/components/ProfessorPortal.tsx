@@ -183,6 +183,19 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
       
       const json = await apiGet(`/api/professors/${user.id}/review-queue`);
       setData(json);
+
+      setEvaluatedLogs((prev) => {
+        const freshReviewIds = new Set((json.pendingReviews || []).map((r: any) => String(r.id)));
+        const next = { ...prev };
+        let changed = false;
+        for (const key of Object.keys(next)) {
+          if (!freshReviewIds.has(key)) {
+            delete next[key];
+            changed = true;
+          }
+        }
+        return changed ? next : prev;
+      });
     } catch (e: any) {
       setError(e.message || "Failed to load review queue");
     } finally {
@@ -331,7 +344,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
 
           <div className="flex items-center gap-3">
             <div className="bg-teal-500/10 border border-teal-500/30 px-4 py-2 rounded-xl text-right">
-              <p className="text-xl font-extrabold text-teal-300">{reviews.length - Object.keys(evaluatedLogs).length}</p>
+              <p className="text-xl font-extrabold text-teal-300">{Math.max(0, reviews.length - Object.keys(evaluatedLogs).length)}</p>
               <p className="text-[11px] text-slate-300 font-medium">Pending Review Items</p>
             </div>
           </div>
@@ -345,7 +358,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
         {!embedded && (
           <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-white p-1 shadow-sm sm:w-auto">
             <TabsTrigger value="review-queue" className="gap-2 text-xs font-semibold">
-              <FileCheck className="h-4 w-4" /> Sequential Review Queue ({reviews.length - Object.keys(evaluatedLogs).length})
+              <FileCheck className="h-4 w-4" /> Sequential Review Queue ({Math.max(0, reviews.length - Object.keys(evaluatedLogs).length)})
             </TabsTrigger>
             <TabsTrigger value="mentees" className="gap-2 text-xs font-semibold">
               <UserCheck className="h-4 w-4" /> All Students ({allStudents.length})
@@ -1119,9 +1132,13 @@ function ProgressTabContent({
   // Catalog-ordered items first
   for (const cat of deptCaseCategories) {
     if (cat.required === 0) continue; // not tracked
-    const match = progress.caseCategories.find((c) => c.value === cat.value);
-    const verified = match?.verified ?? 0;
-    const pending = match?.pending ?? 0;
+    
+    const matches = progress.caseCategories.filter(
+      (c) => c.value?.trim().toLowerCase() === cat.value?.trim().toLowerCase()
+    );
+    const verified = matches.reduce((sum, m) => sum + (m.verified ?? 0), 0);
+    const pending = matches.reduce((sum, m) => sum + (m.pending ?? 0), 0);
+
     caseBarItems.push({
       key: cat.value,
       label: cat.name,
@@ -1135,7 +1152,9 @@ function ProgressTabContent({
   // Uncatalogued items (present in progress but absent from catalog, or value === null)
   for (const item of progress.caseCategories) {
     const key = item.value ?? "__null__";
-    const alreadyIncluded = deptCaseCategories.some((c) => c.value === item.value && c.required > 0);
+    const alreadyIncluded = deptCaseCategories.some(
+      (c) => c.value?.trim().toLowerCase() === item.value?.trim().toLowerCase() && c.required > 0
+    );
     if (!alreadyIncluded) {
       caseBarItems.push({
         key,

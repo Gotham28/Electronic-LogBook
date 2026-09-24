@@ -87,7 +87,7 @@ export function CaseLogsPage() {
     if (!caseCategories) return {};
     return Object.fromEntries(caseCategories.map((cat: any) => [
       cat.value,
-      caseLogs.filter((log) => log.category === cat.value).length,
+      caseLogs.filter((log) => log.category?.trim().toLowerCase() === cat.value?.trim().toLowerCase()).length,
     ]));
   }, [caseCategories, caseLogs]);
 
