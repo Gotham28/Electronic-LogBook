@@ -10,6 +10,8 @@ export const postingsTable = pgTable("postings", {
   startDate: text("start_date").notNull(),
   endDate: text("end_date").notNull(),
   supervisorId: integer("supervisor_id").references(() => usersTable.id),
+  status: text("status", { enum: ["pending", "verified", "rejected"] }).notNull().default("pending"),
+  facultyRemarks: text("faculty_remarks"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

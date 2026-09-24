@@ -794,15 +794,29 @@ router.post("/:studentId/thesis", validate(z.object({ thesisTitle: z.string().tr
 });
 
 router.get("/:studentId/certifications", async (req, res) => {
-  // certifications carries no supervisor/guide relationship (lib/db/src/schema/certifications.ts) -
-  // same as leave-records, the owning student and department HOD are the only legitimate readers.
-  // Body matches studentAccess's own 403 exactly, for the same reason as leave-records above:
-  // a role-based rejection here must not be distinguishable from "no such student" (sec 1b).
-  if (req.user!.role === "professor") {
-    res.status(403).json({ message: "Student is outside your access scope" });
-    return;
+  try {
+    const studentId = parseInt(String(req.params.studentId), 10);
+    const caller = req.user!;
+
+    // Professors may only see certifications for their direct mentees (studentsTable.mentorId = caller.id).
+    // Leave-records remain a separate 403 because they can disclose health conditions (AGENTS.md §8).
+    // Certifications carry no such sensitivity — but we still scope them to mentee relationship.
+    if (caller.role === "professor") {
+      const [mentee] = await db
+        .select({ id: studentsTable.id })
+        .from(studentsTable)
+        .where(and(eq(studentsTable.id, studentId), eq(studentsTable.mentorId, caller.id)))
+        .limit(1);
+      if (!mentee) {
+        res.status(403).json({ message: "Student is outside your access scope" });
+        return;
+      }
+    }
+    res.json(await db.select().from(certificationsTable).where(eq(certificationsTable.studentId, Number(req.params.studentId))).orderBy(desc(certificationsTable.createdAt)));
+  } catch (error) {
+    req.log.error({ studentId: req.params.studentId, status: 500 }, "Error fetching certifications");
+    res.status(500).json({ message: "Internal server error" });
   }
-  res.json(await db.select().from(certificationsTable).where(eq(certificationsTable.studentId, Number(req.params.studentId))).orderBy(desc(certificationsTable.createdAt)));
 });
 
 router.post("/:studentId/certifications", validate(z.object({ title: nameSchema, provider: nameSchema, issueDate: dateSchema,
@@ -811,6 +825,142 @@ router.post("/:studentId/certifications", validate(z.object({ title: nameSchema,
   const [row] = await db.insert(certificationsTable).values({ ...req.body, studentId: Number(req.params.studentId),
     issueDate: new Date(req.body.issueDate + "T00:00:00Z"), expiryDate: new Date(req.body.expiryDate + "T00:00:00Z") }).returning();
   res.status(201).json(row);
+});
+
+// ── Faculty Review Endpoints ──────────────────────────────────────────────────
+// Professors and HODs can approve / reject postings, thesis milestones, and
+// certifications for students in their department.
+// Professors are additionally scoped to their mentee relationship (AGENTS.md §3, §4).
+
+const reviewBody = z.object({
+  status: z.enum(["verified", "rejected"]),
+  remarks: z.string().max(4000).optional(),
+}).strict();
+
+// PATCH /:studentId/postings/:postingId/review
+router.patch("/:studentId/postings/:postingId/review", requireAuth, requireRole(["professor", "hod"]),
+  validate(reviewBody), async (req, res) => {
+  try {
+    const studentId = parseInt(String(req.params.studentId), 10);
+    const postingId = parseInt(String(req.params.postingId), 10);
+    if (isNaN(studentId) || isNaN(postingId)) { res.status(400).json({ message: "Invalid id" }); return; }
+    const reviewer = req.user!;
+
+    // Resolve the posting — confirm it exists and belongs to this student (§3)
+    const [posting] = await db.select({ supervisorId: postingsTable.supervisorId, studentId: postingsTable.studentId })
+      .from(postingsTable).where(and(eq(postingsTable.id, postingId), eq(postingsTable.studentId, studentId))).limit(1);
+    if (!posting) { res.status(404).json({ message: "Posting not found" }); return; }
+
+    // Professors may only review postings where they are the named supervisor (§3)
+    if (reviewer.role === "professor" && posting.supervisorId !== reviewer.id) {
+      res.status(403).json({ message: "Posting not assigned to you" }); return;
+    }
+
+    // Confirm student is in reviewer's department (§3, §4 — uses usersTable.departmentId)
+    const [studentRow] = await db.select({ departmentId: usersTable.departmentId })
+      .from(studentsTable).innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
+      .where(eq(studentsTable.id, studentId)).limit(1);
+    if (!studentRow || studentRow.departmentId !== reviewer.departmentId) {
+      res.status(403).json({ message: "Posting not assigned to you" }); return;
+    }
+
+    const [updated] = await db.update(postingsTable)
+      .set({ status: req.body.status, facultyRemarks: req.body.remarks ?? null })
+      .where(eq(postingsTable.id, postingId)).returning();
+    res.json(updated);
+  } catch (error) {
+    req.log.error({ studentId: req.params.studentId, postingId: req.params.postingId, status: 500 }, "Error reviewing posting");
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// PATCH /:studentId/thesis/review
+router.patch("/:studentId/thesis/review", requireAuth, requireRole(["professor", "hod"]),
+  validate(z.object({
+    protocolStatus: z.enum(["pending", "submitted", "approved"]).optional(),
+    midTermStatus: z.enum(["pending", "submitted", "approved"]).optional(),
+    finalSubmissionStatus: z.enum(["pending", "submitted", "approved"]).optional(),
+    remarks: z.string().max(4000).optional(),
+  }).strict()), async (req, res) => {
+  try {
+    const studentId = parseInt(String(req.params.studentId), 10);
+    if (isNaN(studentId)) { res.status(400).json({ message: "Invalid studentId" }); return; }
+    const reviewer = req.user!;
+
+    // Resolve the thesis
+    const [thesis] = await db.select({ guideId: researchTable.guideId, coGuideId: researchTable.coGuideId })
+      .from(researchTable).where(eq(researchTable.studentId, studentId)).limit(1);
+    if (!thesis) { res.status(404).json({ message: "Thesis not found" }); return; }
+
+    // Professors must be guide or co-guide (§3)
+    if (reviewer.role === "professor" &&
+        thesis.guideId !== reviewer.id && thesis.coGuideId !== reviewer.id) {
+      res.status(403).json({ message: "You are not the guide for this thesis" }); return;
+    }
+
+    // Confirm student is in reviewer's department (§3, §4)
+    const [studentRow] = await db.select({ departmentId: usersTable.departmentId })
+      .from(studentsTable).innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
+      .where(eq(studentsTable.id, studentId)).limit(1);
+    if (!studentRow || studentRow.departmentId !== reviewer.departmentId) {
+      res.status(403).json({ message: "You are not the guide for this thesis" }); return;
+    }
+
+    const { protocolStatus, midTermStatus, finalSubmissionStatus, remarks } = req.body;
+    const updateSet: Record<string, unknown> = { updatedAt: new Date() };
+    if (protocolStatus !== undefined) updateSet.protocolStatus = protocolStatus;
+    if (midTermStatus !== undefined) updateSet.midTermStatus = midTermStatus;
+    if (finalSubmissionStatus !== undefined) updateSet.finalSubmissionStatus = finalSubmissionStatus;
+    if (remarks !== undefined) updateSet.facultyRemarks = remarks ?? null;
+
+    const [updated] = await db.update(researchTable).set(updateSet)
+      .where(eq(researchTable.studentId, studentId)).returning();
+    res.json({ data: updated });
+  } catch (error) {
+    req.log.error({ studentId: req.params.studentId, status: 500 }, "Error reviewing thesis");
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// PATCH /:studentId/certifications/:certId/review
+router.patch("/:studentId/certifications/:certId/review", requireAuth, requireRole(["professor", "hod"]),
+  validate(reviewBody), async (req, res) => {
+  try {
+    const studentId = parseInt(String(req.params.studentId), 10);
+    const certId = req.params.certId; // UUID
+    if (isNaN(studentId)) { res.status(400).json({ message: "Invalid studentId" }); return; }
+    const reviewer = req.user!;
+
+    // Confirm certification belongs to this student (§3)
+    const [cert] = await db.select({ id: certificationsTable.id })
+      .from(certificationsTable)
+      .where(and(eq(certificationsTable.id, certId), eq(certificationsTable.studentId, studentId))).limit(1);
+    if (!cert) { res.status(404).json({ message: "Certification not found" }); return; }
+
+    // Professors must have this student as a direct mentee (§3, §4)
+    if (reviewer.role === "professor") {
+      const [mentee] = await db.select({ id: studentsTable.id })
+        .from(studentsTable)
+        .where(and(eq(studentsTable.id, studentId), eq(studentsTable.mentorId, reviewer.id))).limit(1);
+      if (!mentee) { res.status(403).json({ message: "Student is outside your access scope" }); return; }
+    }
+
+    // Confirm student is in reviewer's department (§3, §4)
+    const [studentRow] = await db.select({ departmentId: usersTable.departmentId })
+      .from(studentsTable).innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
+      .where(eq(studentsTable.id, studentId)).limit(1);
+    if (!studentRow || studentRow.departmentId !== reviewer.departmentId) {
+      res.status(403).json({ message: "Student is outside your access scope" }); return;
+    }
+
+    const [updated] = await db.update(certificationsTable)
+      .set({ status: req.body.status, facultyRemarks: req.body.remarks ?? null })
+      .where(eq(certificationsTable.id, certId)).returning();
+    res.json(updated);
+  } catch (error) {
+    req.log.error({ studentId: req.params.studentId, certId: req.params.certId, status: 500 }, "Error reviewing certification");
+    res.status(500).json({ message: "Internal server error" });
+  }
 });
 
 // POST LOGS

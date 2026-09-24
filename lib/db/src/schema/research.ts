@@ -21,6 +21,7 @@ export const researchTable = pgTable("research", {
   protocolStatus: researchStatusEnum("protocol_status").default("pending").notNull(),
   midTermStatus: researchStatusEnum("mid_term_status").default("pending").notNull(),
   finalSubmissionStatus: researchStatusEnum("final_submission_status").default("pending").notNull(),
+  facultyRemarks: text("faculty_remarks"),
   publicationProofUrl: text("publication_proof_url"),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
