@@ -881,5 +881,6 @@ off `origin/main`).
 - Outside the repo, this task left an Antigravity `permissions.allow` rule pair and an `icacls`
   Modify grant for `d:\testdata-cleanup`; remove them when finished.
 
-**Commit** — pending.
-**PR** — pending.
+**Commit** — `6c96cb0` "docs: record clean-up SQL for one test account in TASK_LOG.md", on branch
+`docs/task-log-testdata-cleanup-sql` (cut fresh off `origin/main` @ `e771315`).
+**PR** — [#72](https://github.com/Gotham28/Electronic-LogBook/pull/72).
