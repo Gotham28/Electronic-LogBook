@@ -474,7 +474,7 @@ router.post("/department/config", validate(configSchema), async (req, res) => {
     } else {
       const [inserted] = await db.insert(departmentConfigsTable).values({
         departmentId,
-        enabledFeatures: enabledFeatures ?? {}
+        enabledFeatures: { procedureExperience: true, ...(enabledFeatures ?? {}) }
       }).returning();
       res.json(inserted);
       return;
