@@ -27,8 +27,14 @@ export async function provisionDepartment(input: unknown, initialPassword: unkno
       .where(and(eq(usersTable.departmentId, department.id), eq(usersTable.role, "hod"), eq(usersTable.status, "approved"))).limit(1);
     if (hod) throw new Error("An active HOD already exists. No accounts or credentials were changed.");
     const [created] = await tx.insert(usersTable).values({ ...setup.hod, passwordHash, role: "hod", status: "approved", departmentId: department.id }).returning({ id: usersTable.id });
-    if (setup.config) await tx.insert(departmentConfigsTable).values({ ...setup.config, departmentId: department.id })
-      .onConflictDoUpdate({ target: departmentConfigsTable.departmentId, set: setup.config });
+    if (setup.config) {
+      const enabledFeatures = { procedureExperience: true, ...setup.config.enabledFeatures };
+      await tx.insert(departmentConfigsTable).values({ ...setup.config, enabledFeatures, departmentId: department.id })
+        .onConflictDoUpdate({ target: departmentConfigsTable.departmentId, set: { ...setup.config, enabledFeatures } });
+    } else {
+      await tx.insert(departmentConfigsTable).values({ departmentId: department.id })
+        .onConflictDoNothing();
+    }
     if (setup.procedures?.length) await tx.insert(procedureTypesTable).values(setup.procedures.map((p) => ({ ...p, departmentId: department.id })));
     
     const catalog = setup.catalog?.map((p) => ({ ...p, departmentId: department.id })) || [];

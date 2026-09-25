@@ -8,7 +8,7 @@ export const departmentConfigsTable = pgTable("department_configs", {
   requiredCases: integer("required_cases"),
   requiredProcedures: integer("required_procedures"),
   requiredAcademic: integer("required_academic"),
-  enabledFeatures: jsonb("enabled_features").$type<Record<string, boolean>>().notNull().default({}),
+  enabledFeatures: jsonb("enabled_features").$type<Record<string, boolean>>().notNull().default({ procedureExperience: true }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

@@ -206,6 +206,9 @@ export function ProcedureLogsPage() {
                       {competencyLevels.map((c) => <SelectItem key={c.id} value={c.value}>{c.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
+                  {competencyLevels.length === 0 && (
+                    <p className="text-sm text-slate-600">No procedure experience levels are set up for your department. Ask your HOD to add them in Department Settings.</p>
+                  )}
                 </Field>
               )}
               <p className="rounded-xl border border-teal-100 bg-teal-50 p-3 text-[11px] leading-5 text-teal-800">

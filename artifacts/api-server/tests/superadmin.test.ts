@@ -447,6 +447,9 @@ test("admin can delete an empty department, cascading to users/config/catalog/pr
   // Seed dependent rows directly in the test database
   await db.insert(departmentConfigsTable).values({
     departmentId: deptId, requiredCases: 5, requiredProcedures: 5, requiredAcademic: 5,
+  }).onConflictDoUpdate({
+    target: departmentConfigsTable.departmentId,
+    set: { requiredCases: 5, requiredProcedures: 5, requiredAcademic: 5 }
   });
   await db.insert(departmentCatalogTable).values({
     departmentId: deptId, kind: "posting", name: "Delete test unit", value: "del-unit",
