@@ -836,51 +836,59 @@ mirror-department resolver", on branch `fix/test-department-config-mirroring` (c
 off `origin/main`).
 **PR** — [#66](https://github.com/Gotham28/Electronic-LogBook/pull/66).
 
-### 2026-09-24 — Clean-up SQL for one test account (no repo change)
+---
+
+### 2026-09-22 — Land the deferred AppLayout infinite-loop fix and ProfessorPortal remarks-text change
 
 **What changed**
-- No repo file changed. Two SQL files outside the repo, `d:\testdata-cleanup\01_counts.sql` and
-  `02_delete.sql`, were fixed and then reworked for a web SQL editor (dispatches 66, 67, 68; records
-  in `.agents/runs/`). They are for the developer to review and run by hand. Nothing was run.
-- `01_counts.sql` is five standalone queries: a schema-existence check (31 columns, Missing first),
-  account lookup, row counts for the 14 student tables, a list of file URLs to save before deleting,
-  and info-only audit/payment counts.
-- `02_delete.sql` is one DO block: strict single-account lookup by email, a mandatory
-  `expected_student_id` cross-check, 14 deletes each keyed only on that student id, and `dry_run` on
-  by default (a dry run ends in a deliberate error and changes nothing). It has no COMMIT, ROLLBACK
-  or top-level BEGIN, because it is meant for a web SQL editor.
-- Run on Gemini 3.1 Pro (High): Sonnet 4.6's quota was exhausted. Dispatch 66 took six attempts
-  (quota, read permission twice, a forbidden `ls`, Windows file ownership, then success); 67 and 68
-  each succeeded first time.
+- Two pieces of work left uncommitted since the 2026-09-21 close-out (PR #66), reviewed and
+  closed out now.
+- `AppLayout.tsx`: fixed the infinite refetch loop in the student notification `useEffect`
+  (dispatch-65) — narrowed its dependency array from the whole `currentUser` object to
+  `currentUser?.studentProfileId`, matching the stable pattern already used by the sibling
+  effect two lines above.
+- `ProfessorPortal.tsx`: developer's own manual edit — whitespace/reindentation of the
+  `ProgressSection` chart JSX block, plus the `handleApprove`/`handleReject` default
+  remarks strings changed from `"Approved without conditions."` / `"Please expand on case
+  findings."` to `"No remarks"` / `"No remarks."`. Confirmed via `git diff -w` that exactly
+  2 lines are real content changes; everything else in that file's diff is pure whitespace.
+- `code-review` (4-lens, Sonnet/medium): verdict **accept with fixes** — no Critical, no
+  code-correctness findings. One Major (the AppLayout bugfix and the unrelated
+  ProfessorPortal.tsx change were bundled in one uncommitted diff) resolved by splitting
+  into two commits below rather than re-dispatching; `close-task`'s staging rules forbid
+  hunk-level (`git add -p`) staging, so ProfessorPortal.tsx's whitespace and text changes
+  — both from the same manual edit — landed together in one commit rather than three.
+
+**Files**
+- `artifacts/mockup-sandbox/src/components/layout/AppLayout.tsx`
+- `artifacts/mockup-sandbox/src/components/ProfessorPortal.tsx`
+- `.agents/runs/dispatch-65-fix-applayout-infinite-loop.md`, `HANDOFF.md`
 
 **Evidence**
-- No database command was run. No tests run (SQL only).
-- Read from the schema and raw migrations: the 14 `student_id` foreign keys all point at
-  `students.id`; no other table has a foreign key into any of the 14 (Drizzle schema and
-  `lib/db/migrations` both searched), so delete order does not matter.
-- Read from disk after each dispatch: 14 `DELETE FROM <t> WHERE student_id = target_student_id;`
-  lines and no other DML in `02_delete.sql`; no `COMMIT`/`ROLLBACK`/`START TRANSACTION`;
-  `01_counts.sql` is SELECT-only. After the comment-only fix (dispatch 68), a SHA-256 of all
-  non-comment lines matched the value taken before it, so no code line changed.
-- A first version of the Query 1 comment pasted an instruction sentence instead of stating that
-  `academic_logs.faculty_grade` has no migration; caught on read-back and fixed.
-- Not run: the four-lens `code-review` (Opus tier, AGENTS.md §15.2). Review was Claude Code only,
-  so the tier classification is unratcheted.
+- AppLayout.tsx fix verified correct by 3 independent code-review lenses reading the code
+  directly: the effect body reads only `currentUser.studentProfileId` and `activeRole` (no
+  other field), so narrowing the dependency cannot miss a change that matters; sibling
+  effects confirmed untouched via diff; `AppLayout` has exactly one renderer (`App.tsx:234`)
+  and no stale-notification scenario found.
+- **Not verified live.** No dev server was run against the app to watch the refetch loop
+  actually stop. Claude Code attempted to first confirm `DATABASE_URL`'s host (without ever
+  printing the credential) so it could safely start the servers — that read was blocked by
+  the sandbox's own credential-materialization guard, and per standing repo caution local
+  `.env` has pointed at production before, so no server was started. This is an accepted,
+  explicit gap, not a claim of "verified."
+- ProfessorPortal.tsx remarks-text change: searched the whole `mockup-sandbox` tree for
+  `remarks`/`comments` consumers — no min-length validation, no search/filter, no
+  hardcoded old-string references anywhere; new default strings render correctly (still
+  truthy) wherever shown (`CaseLogsPage.tsx:413-416`, `ProfessorPortal.tsx:443`).
 
 **Left open**
-- `academic_logs.faculty_grade` has no migration in `migrations/` or `lib/db/migrations/`. Run
-  query 1 of `01_counts.sql`; if `Missing`, code from `195bc20` onward that reads it can fail on the
-  live DB.
-- `audit.before_state` / `after_state` (jsonb) may hold dummy data; not deleted, by instruction.
-- `registration_otps` and `password_resets` are keyed by email, not user id, and were not checked
-  for leftover rows.
-- Query 4 prints file URLs; if storage uses signed URLs they can carry tokens.
-- `AGENTS.md` §6 says there is no migration history; `lib/db/migrations/` holds `0001`–`0008`.
-  Left unedited.
-- Developer to fill placeholders and run by hand: `<TEST_EMAIL>`, `expected_student_id`, `dry_run`.
-- Outside the repo, this task left an Antigravity `permissions.allow` rule pair and an `icacls`
-  Modify grant for `d:\testdata-cleanup`; remove them when finished.
+- Live browser verification of the AppLayout fix (above) — recommend a 30-second manual
+  check: log in as the demo student account, watch the Network tab for ~15s, confirm
+  `/api/students/:id/assessments` and `/api/students/:id/logs` stop firing repeatedly.
+- The unhandled `pg.Pool` crash on idle Neon disconnect (from the 2026-09-21 entry) remains
+  unaddressed — still needs its own task.
 
-**Commit** — `6c96cb0` "docs: record clean-up SQL for one test account in TASK_LOG.md", on branch
-`docs/task-log-testdata-cleanup-sql` (cut fresh off `origin/main` @ `e771315`).
-**PR** — [#72](https://github.com/Gotham28/Electronic-LogBook/pull/72).
+**Commit** — `29ef2df` "fix(mockup-sandbox): stop infinite refetch loop in AppLayout
+notification effect" and `53a80e2` "style(mockup-sandbox): reformat ProgressSection JSX and
+simplify review-remarks defaults", on branch `fix/test-department-config-mirroring`.
+**PR** — [#68](https://github.com/Gotham28/Electronic-LogBook/pull/68).
