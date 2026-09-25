@@ -63,6 +63,7 @@ import {
 import { formatLogbookDate } from "@/lib/logbook-config";
 import { apiGet, apiPatch, apiPost, apiDelete } from "@/lib/apiClient";
 import { getCurrentUser, isDemoMode } from "@/lib/session";
+import { QuarterlyAppraisalSection } from "@/components/QuarterlyAppraisalSection";
 import { useDepartment } from "@/lib/department-context";
 import {
   ChartContainer,
@@ -759,6 +760,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
               </form>
             </CardContent>
           </Card>
+          <QuarterlyAppraisalSection />
         </TabsContent>
       </Tabs>
 
