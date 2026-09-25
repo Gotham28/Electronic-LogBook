@@ -1,13 +1,13 @@
 /**
- * Tests for migration 0010 (procedureExperience on for every department).
+ * Tests for migration 0011 (procedureExperience on for every department).
  *
  * Migration-level tests use isolated PGlite instances.
  * Provisioning and admin-route tests use the shared setup() and server.
  *
  * Approach for migration fixture tests:
- *   Apply migrations 0001-0009 manually to a fresh PGlite (bypassing the runner
- *   so 0010 has not yet run). Insert fixtures in the pre-0010 shape. Execute the
- *   0010 SQL text directly and assert the post-migration state. Run 0010 again to
+ *   Apply migrations 0001-0010 manually to a fresh PGlite (bypassing the runner
+ *   so 0011 has not yet run). Insert fixtures in the pre-0011 shape. Execute the
+ *   0011 SQL text directly and assert the post-migration state. Run 0011 again to
  *   verify idempotency.
  */
 import { test, describe, before, after } from "node:test";
@@ -22,8 +22,8 @@ import { provisionDepartment } from "../src/lib/department-provisioning.js";
 
 const migrationsBaseUrl = new URL("../../../lib/db/migrations/", import.meta.url);
 
-/** Apply migrations 0001-0009 only, to a fresh PGlite, outside the runner. */
-async function applyMigrationsUpTo0009(database: PGlite): Promise<void> {
+/** Apply migrations 0001-0010 only, to a fresh PGlite, outside the runner. */
+async function applyMigrationsUpTo0010(database: PGlite): Promise<void> {
   const names = [
     "0001_baseline.sql",
     "0002_departments_assignments.sql",
@@ -34,6 +34,7 @@ async function applyMigrationsUpTo0009(database: PGlite): Promise<void> {
     "0007_conferences.sql",
     "0008_leave_allowance_restructure.sql",
     "0009_review_status.sql",
+    "0010_quarterly_appraisal_scores.sql",
   ];
   for (const name of names) {
     const sql = await readFile(new URL(name, migrationsBaseUrl), "utf8");
@@ -43,14 +44,14 @@ async function applyMigrationsUpTo0009(database: PGlite): Promise<void> {
 
 // ─── Migration registration check ─────────────────────────────────────────
 
-test("0010 is registered in the runner and runs through applyMigrations on a fresh PGlite", async () => {
+test("0011 is registered in the runner and runs through applyMigrations on a fresh PGlite", async () => {
   const database = new PGlite();
   try {
     await applyMigrations(migrationConnection(database));
     const { rows } = await database.query<{ name: string }>(
-      "SELECT name FROM elogbook_migrations WHERE name = '0010_procedure_experience_all_departments.sql'"
+      "SELECT name FROM elogbook_migrations WHERE name = '0011_procedure_experience_all_departments.sql'"
     );
-    assert.equal(rows.length, 1, "0010 must appear in elogbook_migrations");
+    assert.equal(rows.length, 1, "0011 must appear in elogbook_migrations");
   } finally {
     await database.close();
   }
@@ -58,10 +59,10 @@ test("0010 is registered in the runner and runs through applyMigrations on a fre
 
 // ─── Migration effect tests ────────────────────────────────────────────────
 
-test("0010: every real department gets procedureExperience:true, test department untouched", async () => {
+test("0011: every real department gets procedureExperience:true, test department untouched", async () => {
   const database = new PGlite();
   try {
-    await applyMigrationsUpTo0009(database);
+    await applyMigrationsUpTo0010(database);
 
     // Fixtures (serial IDs will be 1, 2, 3, 4 in order):
     //   1 = real, config row with other key, existing levels → levels not re-seeded
@@ -85,8 +86,8 @@ test("0010: every real department gets procedureExperience:true, test department
         (1, 'competency_level', 'Pre-existing Level', 'pre_existing', 0, 'total');
     `);
 
-    const sql0010 = await readFile(new URL("0010_procedure_experience_all_departments.sql", migrationsBaseUrl), "utf8");
-    await database.exec(sql0010);
+    const sql0011 = await readFile(new URL("0011_procedure_experience_all_departments.sql", migrationsBaseUrl), "utf8");
+    await database.exec(sql0011);
 
     // Dept 1: procedureExperience:true AND attendedConferences preserved.
     const { rows: d1 } = await database.query<{ enabled_features: any }>(
@@ -102,7 +103,7 @@ test("0010: every real department gets procedureExperience:true, test department
     const { rows: d2 } = await database.query<{ enabled_features: any }>(
       "SELECT enabled_features FROM department_configs WHERE department_id = 2"
     );
-    assert.equal(d2.length, 1, "dept 2 must have a config row after 0010");
+    assert.equal(d2.length, 1, "dept 2 must have a config row after 0011");
     assert.equal((d2[0].enabled_features as Record<string, boolean>).procedureExperience, true,
       "dept 2: procedureExperience must be true");
 
@@ -156,10 +157,10 @@ test("0010: every real department gets procedureExperience:true, test department
   }
 });
 
-test("0010 idempotency: running twice produces identical results", async () => {
+test("0011 idempotency: running twice produces identical results", async () => {
   const database = new PGlite();
   try {
-    await applyMigrationsUpTo0009(database);
+    await applyMigrationsUpTo0010(database);
 
     await database.exec(`
       INSERT INTO departments (name, code) VALUES ('Dept-A', 'IDEMP-A'), ('Dept-B', 'IDEMP-B');
@@ -167,9 +168,9 @@ test("0010 idempotency: running twice produces identical results", async () => {
         VALUES (1, '{"attendedConferences": true}'::jsonb);
     `);
 
-    const sql0010 = await readFile(new URL("0010_procedure_experience_all_departments.sql", migrationsBaseUrl), "utf8");
+    const sql0011 = await readFile(new URL("0011_procedure_experience_all_departments.sql", migrationsBaseUrl), "utf8");
 
-    await database.exec(sql0010);
+    await database.exec(sql0011);
     const { rows: after1configs } = await database.query(
       "SELECT department_id, enabled_features FROM department_configs ORDER BY department_id"
     );
@@ -177,7 +178,7 @@ test("0010 idempotency: running twice produces identical results", async () => {
       "SELECT department_id, kind, value FROM department_catalog ORDER BY department_id, value"
     );
 
-    await database.exec(sql0010);
+    await database.exec(sql0011);
     const { rows: after2configs } = await database.query(
       "SELECT department_id, enabled_features FROM department_configs ORDER BY department_id"
     );
@@ -185,19 +186,19 @@ test("0010 idempotency: running twice produces identical results", async () => {
       "SELECT department_id, kind, value FROM department_catalog ORDER BY department_id, value"
     );
 
-    assert.deepEqual(after1configs, after2configs, "config rows must be identical after running 0010 twice");
-    assert.deepEqual(after1catalog, after2catalog, "catalog rows must be identical after running 0010 twice");
+    assert.deepEqual(after1configs, after2configs, "config rows must be identical after running 0011 twice");
+    assert.deepEqual(after1catalog, after2catalog, "catalog rows must be identical after running 0011 twice");
   } finally {
     await database.close();
   }
 });
 
-test("0010 column default: config row inserted without enabled_features gets procedureExperience:true", async () => {
+test("0011 column default: config row inserted without enabled_features gets procedureExperience:true", async () => {
   const database = new PGlite();
   try {
-    await applyMigrationsUpTo0009(database);
-    const sql0010 = await readFile(new URL("0010_procedure_experience_all_departments.sql", migrationsBaseUrl), "utf8");
-    await database.exec(sql0010);
+    await applyMigrationsUpTo0010(database);
+    const sql0011 = await readFile(new URL("0011_procedure_experience_all_departments.sql", migrationsBaseUrl), "utf8");
+    await database.exec(sql0011);
 
     // After step 1 sets the default, a new row inserted without enabled_features uses it.
     await database.exec(`
@@ -210,7 +211,7 @@ test("0010 column default: config row inserted without enabled_features gets pro
     );
     assert.equal(rows.length, 1);
     assert.equal((rows[0].enabled_features as Record<string, boolean>).procedureExperience, true,
-      "column default after 0010 must produce procedureExperience:true");
+      "column default after 0011 must produce procedureExperience:true");
   } finally {
     await database.close();
   }

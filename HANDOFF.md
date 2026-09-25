@@ -33,8 +33,8 @@ Agent ran: no shell commands. All work done via file-reading and file-editing to
 
 | File | Change |
 |---|---|
-| `lib/db/migrations/0010_procedure_experience_all_departments.sql` | **New.** SQL migration. |
-| `lib/db/src/migrations.ts` | Registered `0010_procedure_experience_all_departments.sql` as last entry of `files` array (line 13). |
+| `lib/db/migrations/0011_procedure_experience_all_departments.sql` | **New.** SQL migration. |
+| `lib/db/src/migrations.ts` | Registered `0011_procedure_experience_all_departments.sql` as last entry of `files` array (line 13). |
 | `lib/db/src/schema/department_configs.ts` | Line 11: `.default({})` → `.default({ procedureExperience: true })`. |
 | `artifacts/api-server/src/lib/department-provisioning.ts` | Lines 30-37: always ensures a config row; merges `procedureExperience:true` when `setup.config` is present. |
 | `artifacts/api-server/src/routes/admin.ts` | Line 477: insert branch now uses `{ procedureExperience: true, ...(enabledFeatures ?? {}) }`. |
@@ -42,13 +42,13 @@ Agent ran: no shell commands. All work done via file-reading and file-editing to
 | `artifacts/api-server/tests/procedure-experience-all-departments.test.ts` | **New.** Test file. |
 | `HANDOFF.md` | **Overwritten** (this file; supersedes dispatch-66 content). |
 
-**Not touched:** `student.ts`, `logs.ts`, migrations `0001`–`0009`, all other existing test files.
+**Not touched:** `student.ts`, `logs.ts`, migrations `0001`–`0010`, all other existing test files.
 
 ---
 
 ## What changed and why
 
-### `0010_procedure_experience_all_departments.sql`
+### `0011_procedure_experience_all_departments.sql`
 
 Four idempotent statements, in order:
 
@@ -61,7 +61,7 @@ Column names confirmed against `lib/db/src/schema/users.ts` (`departments.is_tes
 
 ### `lib/db/src/migrations.ts`
 
-Added `"0010_procedure_experience_all_departments.sql"` as the last entry in the `files` array (line 13). Nothing else changed.
+Added `"0011_procedure_experience_all_departments.sql"` as the last entry in the `files` array (line 13). Nothing else changed.
 
 ### `lib/db/src/schema/department_configs.ts`
 
@@ -180,17 +180,17 @@ This agent ran nothing against any database.
 
 ## Test approach
 
-**Migration-level tests** use isolated `new PGlite()` instances (closed after each test), never the shared engine from `database.ts`. The pre-0010 state is built by calling `applyMigrationsUpTo0009()` — a local helper that reads and applies migration files 0001–0009 directly via `database.exec()`, bypassing the runner's checksum tracking. Fixtures are then inserted in their pre-0010 shape (explicit `enabled_features` JSON without the `procedureExperience` key). The 0010 SQL text is then executed via `database.exec()` and the state is asserted.
+**Migration-level tests** use isolated `new PGlite()` instances (closed after each test), never the shared engine from `database.ts`. The pre-0011 state is built by calling `applyMigrationsUpTo0010()` — a local helper that reads and applies migration files 0001–0010 directly via `database.exec()`, bypassing the runner's checksum tracking. Fixtures are then inserted in their pre-0011 shape (explicit `enabled_features` JSON without the `procedureExperience` key). The 0011 SQL text is then executed via `database.exec()` and the state is asserted.
 
 **Provisioning and admin-route tests** use the shared `setup()` and a single `before`/`after` pair. Provisioning tests directly call `provisionDepartment()`, verifying both the database inserts and the resulting row for the real department, matching the approach in `auto-provision.test.ts`. Admin-route tests use `request()` against the running server.
 
 ### Test names in the new file
 
 ```
-0010 is registered in the runner and runs through applyMigrations on a fresh PGlite
-0010: every real department gets procedureExperience:true, test department untouched
-0010 idempotency: running twice produces identical results
-0010 column default: config row inserted without enabled_features gets procedureExperience:true
+0011 is registered in the runner and runs through applyMigrations on a fresh PGlite
+0011: every real department gets procedureExperience:true, test department untouched
+0011 idempotency: running twice produces identical results
+0011 column default: config row inserted without enabled_features gets procedureExperience:true
 [describe: provisioning] department provisioned without setup.config gets procedureExperience:true from column default
 [describe: provisioning] setup.config omitting procedureExperience key gets true from merge
 [describe: provisioning] setup.config with explicit procedureExperience:false stays false (spread overrides default)
@@ -242,7 +242,7 @@ Nothing expanded. The changes are exactly those listed in `CURRENT_TASK.md § Fi
 ## Send-back (dispatch 68)
 
 1. **Finding 1 (Migration seeded one competency level per department instead of four)**
-   - **Fix:** Replaced the four separate `INSERT` statements in step 4 of `0010_procedure_experience_all_departments.sql` with a single `INSERT ... SELECT` using a `CROSS JOIN (VALUES ...)` approach. This evaluates the `NOT EXISTS` guard exactly once against the original state, properly seeding all four default levels per eligible department. Updated the step 4 comment to accurately describe the single statement.
+   - **Fix:** Replaced the four separate `INSERT` statements in step 4 of `0011_procedure_experience_all_departments.sql` with a single `INSERT ... SELECT` using a `CROSS JOIN (VALUES ...)` approach. This evaluates the `NOT EXISTS` guard exactly once against the original state, properly seeding all four default levels per eligible department. Updated the step 4 comment to accurately describe the single statement.
 
 2. **Finding 2 (Provisioning tests bypassed the code they claimed to test)**
    - **Fix:** Rewrote the three provisioning tests in `procedure-experience-all-departments.test.ts`. They now each construct a realistic input payload and call `provisionDepartment()` directly, checking the database for the resulting configuration row, matching the style in `auto-provision.test.ts`.

@@ -332,6 +332,23 @@
     background: white !important;
   }
 
+  body.print-quarterly-appraisal * {
+    visibility: hidden !important;
+  }
+
+  body.print-quarterly-appraisal .quarterly-appraisal-print-target,
+  body.print-quarterly-appraisal .quarterly-appraisal-print-target * {
+    visibility: visible !important;
+  }
+
+  body.print-quarterly-appraisal .quarterly-appraisal-print-target {
+    position: absolute !important;
+    inset: 0 auto auto 0 !important;
+    width: 100% !important;
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+
   body[data-print-label]::before {
     content: attr(data-print-label);
     position: fixed;

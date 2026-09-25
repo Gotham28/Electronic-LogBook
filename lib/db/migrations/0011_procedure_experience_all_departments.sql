@@ -1,4 +1,4 @@
--- Migration 0010: Enable procedureExperience for every real department
+-- Migration 0011: Enable procedureExperience for every real department
 -- Idempotent: safe to re-run. Real departments only (is_test = false).
 -- The runner wraps this file in its own transaction; no BEGIN/COMMIT here.
 
@@ -26,7 +26,7 @@ WHERE department_configs.department_id = d.id
 -- 4. Insert the four default competency levels for every real department
 --    that currently has zero competency_level catalog rows.
 --    Done in a single statement so the NOT EXISTS guard is evaluated once.
---    Verbatim from department-provisioning.ts:37-40.
+--    Verbatim from the four default competency levels seeded in department-provisioning.ts.
 INSERT INTO department_catalog (department_id, kind, name, value, required, period)
 SELECT d.id, 'competency_level', v.name, v.value, 0, 'total'
 FROM departments d
