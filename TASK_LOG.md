@@ -835,3 +835,51 @@ console", on branch `fix/superadmin-resident-auto-approve` (cut fresh off `main`
 mirror-department resolver", on branch `fix/test-department-config-mirroring` (cut fresh
 off `origin/main`).
 **PR** — [#66](https://github.com/Gotham28/Electronic-LogBook/pull/66).
+
+### 2026-09-24 — Clean-up SQL for one test account (no repo change)
+
+**What changed**
+- No repo file changed. Two SQL files outside the repo, `d:\testdata-cleanup\01_counts.sql` and
+  `02_delete.sql`, were fixed and then reworked for a web SQL editor (dispatches 66, 67, 68; records
+  in `.agents/runs/`). They are for the developer to review and run by hand. Nothing was run.
+- `01_counts.sql` is five standalone queries: a schema-existence check (31 columns, Missing first),
+  account lookup, row counts for the 14 student tables, a list of file URLs to save before deleting,
+  and info-only audit/payment counts.
+- `02_delete.sql` is one DO block: strict single-account lookup by email, a mandatory
+  `expected_student_id` cross-check, 14 deletes each keyed only on that student id, and `dry_run` on
+  by default (a dry run ends in a deliberate error and changes nothing). It has no COMMIT, ROLLBACK
+  or top-level BEGIN, because it is meant for a web SQL editor.
+- Run on Gemini 3.1 Pro (High): Sonnet 4.6's quota was exhausted. Dispatch 66 took six attempts
+  (quota, read permission twice, a forbidden `ls`, Windows file ownership, then success); 67 and 68
+  each succeeded first time.
+
+**Evidence**
+- No database command was run. No tests run (SQL only).
+- Read from the schema and raw migrations: the 14 `student_id` foreign keys all point at
+  `students.id`; no other table has a foreign key into any of the 14 (Drizzle schema and
+  `lib/db/migrations` both searched), so delete order does not matter.
+- Read from disk after each dispatch: 14 `DELETE FROM <t> WHERE student_id = target_student_id;`
+  lines and no other DML in `02_delete.sql`; no `COMMIT`/`ROLLBACK`/`START TRANSACTION`;
+  `01_counts.sql` is SELECT-only. After the comment-only fix (dispatch 68), a SHA-256 of all
+  non-comment lines matched the value taken before it, so no code line changed.
+- A first version of the Query 1 comment pasted an instruction sentence instead of stating that
+  `academic_logs.faculty_grade` has no migration; caught on read-back and fixed.
+- Not run: the four-lens `code-review` (Opus tier, AGENTS.md §15.2). Review was Claude Code only,
+  so the tier classification is unratcheted.
+
+**Left open**
+- `academic_logs.faculty_grade` has no migration in `migrations/` or `lib/db/migrations/`. Run
+  query 1 of `01_counts.sql`; if `Missing`, code from `195bc20` onward that reads it can fail on the
+  live DB.
+- `audit.before_state` / `after_state` (jsonb) may hold dummy data; not deleted, by instruction.
+- `registration_otps` and `password_resets` are keyed by email, not user id, and were not checked
+  for leftover rows.
+- Query 4 prints file URLs; if storage uses signed URLs they can carry tokens.
+- `AGENTS.md` §6 says there is no migration history; `lib/db/migrations/` holds `0001`–`0008`.
+  Left unedited.
+- Developer to fill placeholders and run by hand: `<TEST_EMAIL>`, `expected_student_id`, `dry_run`.
+- Outside the repo, this task left an Antigravity `permissions.allow` rule pair and an `icacls`
+  Modify grant for `d:\testdata-cleanup`; remove them when finished.
+
+**Commit** — pending.
+**PR** — pending.
