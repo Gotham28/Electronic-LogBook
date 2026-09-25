@@ -9,6 +9,8 @@ import { formatLogbookDate } from "@/lib/logbook-config";
 import { apiGet } from "@/lib/apiClient";
 import { getCurrentUser } from "@/lib/session";
 import { toast } from "sonner";
+import { QuarterlyAppraisalRecord } from "@/components/QuarterlyAppraisalRecord";
+import type { QuarterlyAppraisal } from "@/lib/quarterly-appraisal";
 
 type Assessment = {
   number: number;
@@ -26,6 +28,9 @@ export function AssessmentsPage() {
   const user = React.useMemo(() => getCurrentUser(), []);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [appraisals, setAppraisals] = React.useState<QuarterlyAppraisal[]>([]);
+  const [appraisalsLoading, setAppraisalsLoading] = React.useState(false);
+  const [appraisalsError, setAppraisalsError] = React.useState<string | null>(null);
 
   const fetchAssessments = React.useCallback(async () => {
     if (!user?.studentProfileId) return;
@@ -47,6 +52,24 @@ export function AssessmentsPage() {
   React.useEffect(() => {
     fetchAssessments();
   }, [fetchAssessments]);
+
+  const fetchAppraisals = React.useCallback(async () => {
+    if (!user?.studentProfileId) return;
+    setAppraisalsLoading(true);
+    setAppraisalsError(null);
+    try {
+      const data = await apiGet("/api/appraisals/mine");
+      setAppraisals(Array.isArray(data) ? data : []);
+    } catch (e: any) {
+      setAppraisalsError(e?.message || "Could not load your quarterly appraisals");
+    } finally {
+      setAppraisalsLoading(false);
+    }
+  }, [user?.studentProfileId]);
+
+  React.useEffect(() => {
+    fetchAppraisals();
+  }, [fetchAppraisals]);
 
   return (
     <div className="space-y-6 pb-12">
@@ -106,6 +129,21 @@ export function AssessmentsPage() {
           )}
         </CardContent>
       </Card>
+
+      <section className="space-y-4" aria-labelledby="student-quarterly-appraisals-heading">
+        <div>
+          <p className="page-eyebrow">Faculty appraisal</p>
+          <h3 id="student-quarterly-appraisals-heading" className="mt-1 text-xl font-bold text-slate-900">Postgraduate Students Quarterly Appraisal Forms</h3>
+          <p className="mt-1 text-sm text-slate-500">Quarterly appraisals saved by your faculty and HOD appear here. You can print each form.</p>
+        </div>
+        {appraisalsLoading ? (
+          <Card className="border-white/70 bg-white/76"><CardContent className="p-8 text-center text-slate-500" role="status">Loading quarterly appraisals…</CardContent></Card>
+        ) : appraisalsError ? (
+          <Card className="border-rose-200 bg-white"><CardContent className="flex flex-wrap items-center justify-between gap-3 p-5" role="alert"><p className="text-sm text-rose-700">{appraisalsError}</p><Button size="sm" variant="outline" onClick={fetchAppraisals}>Try again</Button></CardContent></Card>
+        ) : appraisals.length === 0 ? (
+          <Card className="border-white/70 bg-white/76"><CardContent className="p-8 text-center text-sm text-slate-500">No quarterly appraisal forms have been saved for you yet.</CardContent></Card>
+        ) : appraisals.map((appraisal) => <QuarterlyAppraisalRecord key={appraisal.id} appraisal={appraisal} />)}
+      </section>
     </div>
   );
 }
