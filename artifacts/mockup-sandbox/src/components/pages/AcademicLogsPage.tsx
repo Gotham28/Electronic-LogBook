@@ -1,5 +1,5 @@
 import * as React from "react";
-import { CheckCircle2, Clock, GraduationCap, PlusCircle, Loader2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, Clock, GraduationCap, PlusCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { apiGet, apiPost } from "@/lib/apiClient";
 import { getCurrentUser } from "@/lib/session";
@@ -22,7 +22,8 @@ type AcademicLog = {
   presentationType: string;
   topic: string;
   faculty: string;
-  status: "pending" | "verified";
+  facultyRemarks?: string | null;
+  status: "pending" | "verified" | "rejected";
 };
 
 
@@ -175,7 +176,7 @@ export function AcademicLogsPage() {
       <div className="grid gap-4 sm:grid-cols-3">
         <Summary label="Awaiting review" value={logs.filter((log) => log.status === "pending").length} />
         <Summary label="Verified activities" value={logs.filter((log) => log.status === "verified").length} />
-        <Summary label="All academic activities" value={logs.length} />
+        <Summary label="Valid academic activities" value={logs.filter((log) => log.status !== "rejected").length} />
       </div>
 
       <Card>
@@ -184,7 +185,7 @@ export function AcademicLogsPage() {
         </CardHeader>
         <CardContent className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-4">
           {academicOptions.map((requirement) => {
-            const logged = logs.filter((log) => log.type === requirement.value && (requirement.period !== "month" || log.date.startsWith(todayForInput().slice(0, 7)))).length;
+            const logged = logs.filter((log) => log.type === requirement.value && log.status !== "rejected" && (requirement.period !== "month" || log.date.startsWith(todayForInput().slice(0, 7)))).length;
             return (
               <div key={requirement.name} className="rounded-2xl border border-teal-100 bg-teal-50/50 p-4">
                 <p className="text-sm font-bold text-slate-900">{requirement.name}</p>
@@ -218,7 +219,7 @@ export function AcademicLogsPage() {
             </Empty>
           ) : (
             <Table>
-              <TableHeader><TableRow><TableHead>Number</TableHead><TableHead>Date</TableHead><TableHead>Activity</TableHead><TableHead>Presentation</TableHead><TableHead>Topic / conference</TableHead><TableHead>Reviewing faculty member</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Number</TableHead><TableHead>Date</TableHead><TableHead>Activity</TableHead><TableHead>Presentation</TableHead><TableHead>Topic / conference</TableHead><TableHead>Reviewing faculty member</TableHead><TableHead>Grade</TableHead><TableHead>Remarks</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
               <TableBody>
                 {logs.map((log) => (
                   <TableRow key={log.id}>
@@ -228,7 +229,21 @@ export function AcademicLogsPage() {
                     <TableCell>{log.presentationType}</TableCell>
                     <TableCell className="max-w-sm font-semibold">{log.topic}</TableCell>
                     <TableCell>{log.faculty}</TableCell>
-                    <TableCell>{log.status === "verified" ? <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700"><CheckCircle2 className="mr-1 h-3 w-3" /> Verified</Badge> : <Badge className="border-amber-200 bg-amber-50 text-amber-700"><Clock className="mr-1 h-3 w-3" /> Pending</Badge>}</TableCell>
+                    <TableCell className="font-medium">
+                      {log.status === "pending"
+                        ? <span className="text-slate-400">—</span>
+                        : log.facultyGrade
+                          ? <span className="font-bold text-teal-800">{log.facultyGrade}</span>
+                          : <span className="text-slate-500">No grade</span>}
+                    </TableCell>
+                    <TableCell className="text-xs max-w-[160px]">
+                      {log.status === "pending"
+                        ? <span className="text-slate-400">—</span>
+                        : log.facultyRemarks
+                          ? <span title={log.facultyRemarks} className="block truncate cursor-help text-slate-600">{log.facultyRemarks}</span>
+                          : <span className="text-slate-500">No remark</span>}
+                    </TableCell>
+                    <TableCell>{log.status === "verified" ? <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700"><CheckCircle2 className="mr-1 h-3 w-3" /> Verified</Badge> : log.status === "rejected" ? <Badge className="border-rose-200 bg-rose-50 text-rose-700"><AlertCircle className="mr-1 h-3 w-3" /> Rejected</Badge> : <Badge className="border-amber-200 bg-amber-50 text-amber-700"><Clock className="mr-1 h-3 w-3" /> Pending</Badge>}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

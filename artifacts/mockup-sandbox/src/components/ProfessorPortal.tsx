@@ -57,9 +57,11 @@ import {
   FileText,
   X,
   RefreshCw,
+  Trash2,
+  Pencil,
 } from "lucide-react";
 import { formatLogbookDate } from "@/lib/logbook-config";
-import { apiGet, apiPatch, apiPost } from "@/lib/apiClient";
+import { apiGet, apiPatch, apiPost, apiDelete } from "@/lib/apiClient";
 import { getCurrentUser, isDemoMode } from "@/lib/session";
 import { useDepartment } from "@/lib/department-context";
 import {
@@ -117,7 +119,7 @@ type LogFilter =
 
 export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; embedded?: boolean }) {
   const hideUhid = isDemoMode();
-  const { competencyLevels, caseCategories: deptCaseCategories, procedures: deptProcedures, academics: deptAcademics } = useDepartment();
+  const { config, competencyLevels, caseCategories: deptCaseCategories, procedures: deptProcedures, academics: deptAcademics } = useDepartment();
   const [location, setLocation] = useLocation();
   const [data, setData] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
@@ -125,7 +127,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [currentIndex, setCurrentIndex] = React.useState(0);
   const [remarks, setRemarks] = React.useState("");
-  const [grade, setGrade] = React.useState("A");
+  const [grade, setGrade] = React.useState("");
   const [competencyOverride, setCompetencyOverride] = React.useState(competencyLevels[0]?.value ?? "");
   const [evaluatedLogs, setEvaluatedLogs] = React.useState<Record<string, any>>({});
   const [departmentFilter, setDepartmentFilter] = React.useState("all");
@@ -136,6 +138,12 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
   const [menteeProgress, setMenteeProgress] = React.useState<MenteeProgress | null>(null);
   const [menteeProgressError, setMenteeProgressError] = React.useState<string | null>(null);
   const [menteeLogsLoading, setMenteeLogsLoading] = React.useState(false);
+  const [menteePostings, setMenteePostings] = React.useState<any[]>([]);
+  const [menteeThesis, setMenteeThesis] = React.useState<any | null>(null);
+  const [menteeCerts, setMenteeCerts] = React.useState<any[]>([]);
+  const [menteeAssessments, setMenteeAssessments] = React.useState<any[]>([]);
+  const [reviewBusy, setReviewBusy] = React.useState(false);
+
 
   // Dialog inner tab & click-through filter
   const [dialogTab, setDialogTab] = React.useState("progress");
@@ -183,6 +191,19 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
 
       const json = await apiGet(`/api/professors/${user.id}/review-queue`);
       setData(json);
+
+      setEvaluatedLogs((prev) => {
+        const freshReviewIds = new Set((json.pendingReviews || []).map((r: any) => String(r.id)));
+        const next = { ...prev };
+        let changed = false;
+        for (const key of Object.keys(next)) {
+          if (!freshReviewIds.has(key)) {
+            delete next[key];
+            changed = true;
+          }
+        }
+        return changed ? next : prev;
+      });
     } catch (e: any) {
       setError(e.message || "Failed to load review queue");
     } finally {
@@ -222,6 +243,10 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
       setMenteeProgressError(null);
       setLogFilter(null);
       setDialogTab("progress");
+      setMenteePostings([]);
+      setMenteeThesis(null);
+      setMenteeCerts([]);
+      setMenteeAssessments([]);
       return;
     }
     let mounted = true;
@@ -248,11 +273,36 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
         }
       }
 
+      // Fetch postings — professors are scoped to their supervisorId
+      try {
+        const postingResp = await apiGet(`/api/students/${selectedMentee.id}/postings`);
+        if (mounted) setMenteePostings(postingResp.data || []);
+      } catch { /* postings tab will show empty */ }
+
+      // Fetch thesis — professors are scoped to guide/co-guide
+      try {
+        const thesisResp = await apiGet(`/api/students/${selectedMentee.id}/thesis`);
+        if (mounted) setMenteeThesis(thesisResp.data || null);
+      } catch { /* thesis tab will show empty */ }
+
+      // Fetch certifications — professors scoped to mentee relationship
+      try {
+        const certsResp = await apiGet(`/api/students/${selectedMentee.id}/certifications`);
+        if (mounted) setMenteeCerts(Array.isArray(certsResp) ? certsResp : []);
+      } catch { /* certs tab will show empty, 403 is expected for non-mentees */ }
+
+      // Fetch assessments
+      try {
+        const assessResp = await apiGet(`/api/students/${selectedMentee.id}/assessments`);
+        if (mounted) setMenteeAssessments(Array.isArray(assessResp) ? assessResp : (assessResp?.data || []));
+      } catch { /* assessments tab will show empty */ }
+
       if (mounted) setMenteeLogsLoading(false);
     };
     fetchBoth();
     return () => { mounted = false; };
   }, [selectedMentee]);
+
 
   if (loading) {
     return (
@@ -276,28 +326,32 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
 
   const currentItem = reviews[currentIndex];
 
-  const handleReviewAction = async (status: "verified" | "rejected", defaultRemarks: string) => {
+  const handleReviewAction = async (status: "verified" | "rejected") => {
     if (!currentItem || isSubmitting) return;
 
     setIsSubmitting(true);
     try {
       await apiPatch(`/api/logs/${currentItem.logType}/${currentItem.dbId}/review`, {
         status,
-        comments: remarks || defaultRemarks,
+        comments: remarks,
         ...(currentItem.logType === "procedure" && competencyOverride
           ? { facultyVerifiedLevel: competencyOverride }
+          : {}),
+        ...(currentItem.logType === "academic" && grade
+          ? { facultyGrade: grade }
           : {})
       });
 
       // Optimistic update for evaluatedLogs mapping
       setEvaluatedLogs(prev => ({
         ...prev,
-        [currentItem.id]: { status, remarks: remarks || defaultRemarks, grade },
+        [currentItem.id]: { status, remarks, grade },
       }));
 
       toast.success(status === "verified" ? `Number ${currentItem.id} verified` : `Revision Requested for ${currentItem.id}`);
 
       setRemarks("");
+      setGrade("");
       // Refresh real data so the roster updates and the queue shrinks
       await fetchProfessorData();
     } catch (err: any) {
@@ -307,8 +361,8 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
     }
   };
 
-  const handleApprove = () => handleReviewAction("verified", "No remarks");
-  const handleReject = () => handleReviewAction("rejected", "No remarks.");
+  const handleApprove = () => handleReviewAction("verified");
+  const handleReject = () => handleReviewAction("rejected");
 
   // ── Helper: derive faculty role from review-queue response ────────────────────
   // data?.faculty?.role === "hod" means this portal is rendering in HOD context.
@@ -331,7 +385,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
 
           <div className="flex items-center gap-3">
             <div className="bg-teal-500/10 border border-teal-500/30 px-4 py-2 rounded-xl text-right">
-              <p className="text-xl font-extrabold text-teal-300">{reviews.length - Object.keys(evaluatedLogs).length}</p>
+              <p className="text-xl font-extrabold text-teal-300">{Math.max(0, reviews.length - Object.keys(evaluatedLogs).length)}</p>
               <p className="text-[11px] text-slate-300 font-medium">Pending Review Items</p>
             </div>
           </div>
@@ -345,7 +399,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
         {!embedded && (
           <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-white p-1 shadow-sm sm:w-auto">
             <TabsTrigger value="review-queue" className="gap-2 text-xs font-semibold">
-              <FileCheck className="h-4 w-4" /> Sequential Review Queue ({reviews.length - Object.keys(evaluatedLogs).length})
+              <FileCheck className="h-4 w-4" /> Sequential Review Queue ({Math.max(0, reviews.length - Object.keys(evaluatedLogs).length)})
             </TabsTrigger>
             <TabsTrigger value="mentees" className="gap-2 text-xs font-semibold">
               <UserCheck className="h-4 w-4" /> All Students ({allStudents.length})
@@ -440,7 +494,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
 
                     {evaluatedLogs[currentItem.id] && (
                       <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center justify-between">
-                        <span>Evaluated Status: <strong>{evaluatedLogs[currentItem.id].status.toUpperCase()}</strong> ({evaluatedLogs[currentItem.id].remarks})</span>
+                        <span>Evaluated Status: <strong>{evaluatedLogs[currentItem.id].status.toUpperCase()}</strong> {evaluatedLogs[currentItem.id].remarks ? `(${evaluatedLogs[currentItem.id].remarks})` : "(No remark)"}</span>
                         <Badge className="bg-emerald-600">Saved</Badge>
                       </div>
                     )}
@@ -457,7 +511,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-4 space-y-4">
-                    {currentItem.type === "Procedure" && (
+                    {currentItem.type === "Procedure" && config?.enabledFeatures?.procedureExperience && (
                       <div className="space-y-2">
                         <label className="text-xs font-semibold text-slate-700">Verified Competency Level</label>
                         <Select value={competencyOverride} onValueChange={setCompetencyOverride}>
@@ -744,6 +798,10 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                   <TabsTrigger value="case-logs" className="text-xs whitespace-nowrap">Clinical Case Logs</TabsTrigger>
                   <TabsTrigger value="proc-logs" className="text-xs whitespace-nowrap">Procedure Logs</TabsTrigger>
                   <TabsTrigger value="acad-logs" className="text-xs whitespace-nowrap">Academic Activity</TabsTrigger>
+                  <TabsTrigger value="postings" className="text-xs whitespace-nowrap">Postings</TabsTrigger>
+                  <TabsTrigger value="thesis" className="text-xs whitespace-nowrap">Thesis</TabsTrigger>
+                  <TabsTrigger value="certifications" className="text-xs whitespace-nowrap">Certifications</TabsTrigger>
+                  <TabsTrigger value="assessments" className="text-xs whitespace-nowrap">Assessments</TabsTrigger>
                 </TabsList>
 
                 {/* ── Progress Tab ─────────────────────────────────────────── */}
@@ -990,6 +1048,167 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                     </Table>
                   )}
                 </TabsContent>
+
+                {/* ── Postings Tab ──────────────────────────────────────────── */}
+                <TabsContent value="postings" className="pt-3">
+                  {menteePostings.length === 0 ? (
+                    <p className="text-sm text-slate-500 py-6 text-center">No postings visible to you (either none logged or none assigned to you as supervisor).</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {menteePostings.map((posting: any) => (
+                        <div key={posting.id} className="rounded-xl border border-slate-200 bg-white p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="font-semibold text-slate-900 text-sm">{posting.ward}</p>
+                              <p className="text-xs text-slate-500 mt-0.5">{formatLogbookDate(posting.startDate)} – {formatLogbookDate(posting.endDate)}</p>
+                              {posting.facultyRemarks && (
+                                <p className="mt-1 text-xs text-slate-600 italic">Remarks: {posting.facultyRemarks}</p>
+                              )}
+                            </div>
+                            <span className={`shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                              posting.status === "verified" ? "bg-emerald-100 text-emerald-700" :
+                              posting.status === "rejected" ? "bg-rose-100 text-rose-700" :
+                              "bg-amber-100 text-amber-700"
+                            }`}>{posting.status === "verified" ? "Verified" : posting.status === "rejected" ? "Rejected" : "Pending"}</span>
+                          </div>
+                          <PostingReviewForm
+                            posting={posting}
+                            studentId={selectedMentee.id}
+                            busy={reviewBusy}
+                            onDone={async () => {
+                              setReviewBusy(true);
+                              try {
+                                const resp = await apiGet(`/api/students/${selectedMentee.id}/postings`);
+                                setMenteePostings(resp.data || []);
+                              } finally { setReviewBusy(false); }
+                            }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </TabsContent>
+
+                {/* ── Thesis Tab ────────────────────────────────────────────── */}
+                <TabsContent value="thesis" className="pt-3">
+                  {!menteeThesis ? (
+                    <p className="text-sm text-slate-500 py-6 text-center">No thesis recorded yet, or this student's thesis is not assigned to you as guide.</p>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="rounded-xl border border-slate-200 bg-white p-4">
+                        <p className="font-semibold text-slate-900 text-sm">{menteeThesis.thesisTitle}</p>
+                        {menteeThesis.facultyRemarks && (
+                          <p className="mt-1 text-xs text-slate-600 italic">Remarks: {menteeThesis.facultyRemarks}</p>
+                        )}
+                        <div className="mt-3 grid grid-cols-3 gap-3">
+                          {[
+                            ["Protocol", menteeThesis.protocolStatus, "protocolStatus"],
+                            ["Mid-Term", menteeThesis.midTermStatus, "midTermStatus"],
+                            ["Final Submission", menteeThesis.finalSubmissionStatus, "finalSubmissionStatus"],
+                          ].map(([label, status, field]) => (
+                            <div key={field} className="text-center rounded-lg border border-slate-100 p-2">
+                              <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">{label}</p>
+                              <span className={`inline-block mt-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                                status === "approved" ? "bg-emerald-100 text-emerald-700" :
+                                status === "submitted" ? "bg-blue-100 text-blue-700" :
+                                "bg-amber-100 text-amber-700"
+                              }`}>{String(status).charAt(0).toUpperCase() + String(status).slice(1)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <ThesisReviewForm
+                        thesis={menteeThesis}
+                        studentId={selectedMentee.id}
+                        busy={reviewBusy}
+                        onDone={async () => {
+                          setReviewBusy(true);
+                          try {
+                            const resp = await apiGet(`/api/students/${selectedMentee.id}/thesis`);
+                            setMenteeThesis(resp.data || null);
+                          } finally { setReviewBusy(false); }
+                        }}
+                      />
+                    </div>
+                  )}
+                </TabsContent>
+
+                {/* ── Certifications Tab ────────────────────────────────────── */}
+                <TabsContent value="certifications" className="pt-3">
+                  {menteeCerts.length === 0 ? (
+                    <p className="text-sm text-slate-500 py-6 text-center">No certifications visible to you (this student may not be your direct mentee).</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {menteeCerts.map((cert: any) => (
+                        <div key={cert.id} className="rounded-xl border border-slate-200 bg-white p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="font-semibold text-slate-900 text-sm">{cert.title}</p>
+                              <p className="text-xs text-slate-500 mt-0.5">{cert.provider} · Issued {formatLogbookDate(cert.issueDate)}</p>
+                              <a href={cert.certificateUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-teal-600 hover:underline mt-0.5 inline-block">View certificate ↗</a>
+                              {cert.facultyRemarks && (
+                                <p className="mt-1 text-xs text-slate-600 italic">Remarks: {cert.facultyRemarks}</p>
+                              )}
+                            </div>
+                            <span className={`shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                              cert.status === "verified" ? "bg-emerald-100 text-emerald-700" :
+                              cert.status === "rejected" ? "bg-rose-100 text-rose-700" :
+                              "bg-amber-100 text-amber-700"
+                            }`}>{cert.status === "verified" ? "Verified" : cert.status === "rejected" ? "Rejected" : "Pending"}</span>
+                          </div>
+                          <CertReviewForm
+                            cert={cert}
+                            studentId={selectedMentee.id}
+                            busy={reviewBusy}
+                            onDone={async () => {
+                              setReviewBusy(true);
+                              try {
+                                const resp = await apiGet(`/api/students/${selectedMentee.id}/certifications`);
+                                setMenteeCerts(Array.isArray(resp) ? resp : []);
+                              } finally { setReviewBusy(false); }
+                            }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </TabsContent>
+
+                {/* ── Assessments Tab ─────────────────────────────────────────── */}
+                <TabsContent value="assessments" className="pt-3">
+                  {menteeAssessments.length === 0 ? (
+                    <p className="text-sm text-slate-500 py-6 text-center">No assessments found for this student.</p>
+                  ) : (
+                    <div className="space-y-4">
+                      {menteeAssessments.map((assessment: any) => (
+                        <div key={assessment.id} className="rounded-xl border border-slate-200 bg-white p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="font-semibold text-slate-900 text-sm">{assessment.examName}</p>
+                              <p className="text-xs text-slate-500 mt-0.5">{assessment.type === "annual" ? "Annual" : "Quarterly"} · {formatLogbookDate(assessment.date)}</p>
+                              <p className="mt-1 text-xs font-medium text-teal-800">Assessor ID: {assessment.assessorId}</p>
+                            </div>
+                            <span className="shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold bg-slate-100 text-slate-900">
+                              {assessment.marks} / 100
+                            </span>
+                          </div>
+                          <AssessmentEditForm
+                            assessment={assessment}
+                            studentId={selectedMentee.id}
+                            busy={reviewBusy}
+                            onDone={async () => {
+                              setReviewBusy(true);
+                              try {
+                                const resp = await apiGet(`/api/students/${selectedMentee.id}/assessments`);
+                                setMenteeAssessments(Array.isArray(resp) ? resp : (resp?.data || []));
+                              } finally { setReviewBusy(false); }
+                            }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </TabsContent>
               </Tabs>
             </div>
           )}
@@ -1119,9 +1338,13 @@ function ProgressTabContent({
   // Catalog-ordered items first
   for (const cat of deptCaseCategories) {
     if (cat.required === 0) continue; // not tracked
-    const match = progress.caseCategories.find((c) => c.value === cat.value);
-    const verified = match?.verified ?? 0;
-    const pending = match?.pending ?? 0;
+    
+    const matches = progress.caseCategories.filter(
+      (c) => c.value?.trim().toLowerCase() === cat.value?.trim().toLowerCase()
+    );
+    const verified = matches.reduce((sum, m) => sum + (m.verified ?? 0), 0);
+    const pending = matches.reduce((sum, m) => sum + (m.pending ?? 0), 0);
+
     caseBarItems.push({
       key: cat.value,
       label: cat.name,
@@ -1135,7 +1358,9 @@ function ProgressTabContent({
   // Uncatalogued items (present in progress but absent from catalog, or value === null)
   for (const item of progress.caseCategories) {
     const key = item.value ?? "__null__";
-    const alreadyIncluded = deptCaseCategories.some((c) => c.value === item.value && c.required > 0);
+    const alreadyIncluded = deptCaseCategories.some(
+      (c) => c.value?.trim().toLowerCase() === item.value?.trim().toLowerCase() && c.required > 0
+    );
     if (!alreadyIncluded) {
       caseBarItems.push({
         key,
@@ -1605,4 +1830,224 @@ function renderLogStatusBadge(status: string) {
     default:
       return <Badge className="bg-amber-50 text-amber-700 border-amber-200 text-[10px]">Pending</Badge>;
   }
+}
+
+// ── PostingReviewForm ───────────────────────────────────────────────────────────
+
+function PostingReviewForm({ posting, studentId, busy, onDone }: {
+  posting: any; studentId: number; busy: boolean; onDone: () => void;
+}) {
+  const [remarks, setRemarks] = React.useState(posting.facultyRemarks ?? "");
+  const [submitting, setSubmitting] = React.useState(false);
+
+  async function submit(status: "verified" | "rejected") {
+    setSubmitting(true);
+    try {
+      await apiPatch(`/api/students/${studentId}/postings/${posting.id}/review`, { status, remarks: remarks || undefined });
+      toast.success(status === "verified" ? "Posting verified" : "Posting rejected");
+      onDone();
+    } catch (e: any) {
+      toast.error(e.message || "Failed to save review");
+    } finally { setSubmitting(false); }
+  }
+
+  return (
+    <div className="mt-3 border-t border-slate-100 pt-3 space-y-2">
+      <Textarea
+        placeholder="Optional remarks for the student…"
+        className="text-xs min-h-[60px]"
+        value={remarks}
+        onChange={(e) => setRemarks(e.target.value)}
+        maxLength={4000}
+      />
+      <div className="flex gap-2">
+        <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs gap-1.5" disabled={submitting || busy} onClick={() => submit("verified")}>
+          <CheckCircle2 className="h-3.5 w-3.5" /> Verify
+        </Button>
+        <Button size="sm" variant="outline" className="border-rose-200 text-rose-700 hover:bg-rose-50 text-xs gap-1.5" disabled={submitting || busy} onClick={() => submit("rejected")}>
+          <XCircle className="h-3.5 w-3.5" /> Reject
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ── ThesisReviewForm ────────────────────────────────────────────────────────────
+
+function ThesisReviewForm({ thesis, studentId, busy, onDone }: {
+  thesis: any; studentId: number; busy: boolean; onDone: () => void;
+}) {
+  const [protocolStatus, setProtocolStatus] = React.useState(thesis.protocolStatus ?? "pending");
+  const [midTermStatus, setMidTermStatus] = React.useState(thesis.midTermStatus ?? "pending");
+  const [finalStatus, setFinalStatus] = React.useState(thesis.finalSubmissionStatus ?? "pending");
+  const [remarks, setRemarks] = React.useState(thesis.facultyRemarks ?? "");
+  const [submitting, setSubmitting] = React.useState(false);
+
+  async function submit() {
+    setSubmitting(true);
+    try {
+      await apiPatch(`/api/students/${studentId}/thesis/review`, {
+        protocolStatus, midTermStatus, finalSubmissionStatus: finalStatus,
+        remarks: remarks || undefined,
+      });
+      toast.success("Thesis milestones updated");
+      onDone();
+    } catch (e: any) {
+      toast.error(e.message || "Failed to save review");
+    } finally { setSubmitting(false); }
+  }
+
+  const statusOpts = ["pending", "submitted", "approved"] as const;
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+      <p className="text-xs font-semibold text-slate-700">Update milestone statuses</p>
+      <div className="grid grid-cols-3 gap-3">
+        {([["Protocol", protocolStatus, setProtocolStatus], ["Mid-Term", midTermStatus, setMidTermStatus], ["Final Submission", finalStatus, setFinalStatus]] as const).map(([label, val, setter]) => (
+          <div key={label}>
+            <label className="text-[10px] font-semibold text-slate-500 uppercase">{label}</label>
+            <select className="mt-1 w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-xs" value={val} onChange={(e) => (setter as any)(e.target.value)}>
+              {statusOpts.map((o) => <option key={o} value={o}>{o.charAt(0).toUpperCase() + o.slice(1)}</option>)}
+            </select>
+          </div>
+        ))}
+      </div>
+      <Textarea
+        placeholder="Optional remarks for the student…"
+        className="text-xs min-h-[60px]"
+        value={remarks}
+        onChange={(e) => setRemarks(e.target.value)}
+        maxLength={4000}
+      />
+      <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white text-xs gap-1.5" disabled={submitting || busy} onClick={submit}>
+        <CheckCircle2 className="h-3.5 w-3.5" /> Save milestone update
+      </Button>
+    </div>
+  );
+}
+
+// ── CertReviewForm ─────────────────────────────────────────────────────────────
+
+function CertReviewForm({ cert, studentId, busy, onDone }: {
+  cert: any; studentId: number; busy: boolean; onDone: () => void;
+}) {
+  const [remarks, setRemarks] = React.useState(cert.facultyRemarks ?? "");
+  const [submitting, setSubmitting] = React.useState(false);
+
+  async function submit(status: "verified" | "rejected") {
+    setSubmitting(true);
+    try {
+      await apiPatch(`/api/students/${studentId}/certifications/${cert.id}/review`, { status, remarks: remarks || undefined });
+      toast.success(status === "verified" ? "Certification verified" : "Certification rejected");
+      onDone();
+    } catch (e: any) {
+      toast.error(e.message || "Failed to save review");
+    } finally { setSubmitting(false); }
+  }
+
+  return (
+    <div className="mt-3 border-t border-slate-100 pt-3 space-y-2">
+      <Textarea
+        placeholder="Optional remarks for the student…"
+        className="text-xs min-h-[60px]"
+        value={remarks}
+        onChange={(e) => setRemarks(e.target.value)}
+        maxLength={4000}
+      />
+      <div className="flex gap-2">
+        <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs gap-1.5" disabled={submitting || busy} onClick={() => submit("verified")}>
+          <CheckCircle2 className="h-3.5 w-3.5" /> Verify
+        </Button>
+        <Button size="sm" variant="outline" className="border-rose-200 text-rose-700 hover:bg-rose-50 text-xs gap-1.5" disabled={submitting || busy} onClick={() => submit("rejected")}>
+          <XCircle className="h-3.5 w-3.5" /> Reject
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ── AssessmentEditForm ─────────────────────────────────────────────────────────────
+
+function AssessmentEditForm({ assessment, studentId, busy, onDone }: {
+  assessment: any; studentId: number; busy: boolean; onDone: () => void;
+}) {
+  const [examName, setExamName] = React.useState(assessment.examName || "");
+  const [marks, setMarks] = React.useState(String(assessment.marks ?? ""));
+  const [submitting, setSubmitting] = React.useState(false);
+  const [editing, setEditing] = React.useState(false);
+
+  async function submit() {
+    if (!examName || marks === "") return;
+    setSubmitting(true);
+    try {
+      await apiPatch(`/api/students/${studentId}/assessments/${assessment.id}`, { 
+        examName, 
+        marks: parseInt(marks, 10)
+      });
+      toast.success("Assessment updated");
+      setEditing(false);
+      onDone();
+    } catch (e: any) {
+      toast.error(e.message || "Failed to update assessment");
+    } finally { setSubmitting(false); }
+  }
+
+  async function handleDelete() {
+    if (!window.confirm("Are you sure you want to completely remove this assessment?")) return;
+    setSubmitting(true);
+    try {
+      await apiDelete(`/api/students/${studentId}/assessments/${assessment.id}`);
+      toast.success("Assessment removed");
+      onDone();
+    } catch (e: any) {
+      toast.error(e.message || "Failed to remove assessment");
+      setSubmitting(false);
+    }
+  }
+
+  if (!editing) {
+    return (
+      <div className="flex items-center gap-1 mt-3 border-t border-slate-100 pt-3">
+        <Button variant="ghost" size="sm" className="h-7 text-xs text-teal-700 hover:text-teal-800 hover:bg-teal-50 gap-1.5 px-2" onClick={() => setEditing(true)}>
+          <Pencil className="h-3.5 w-3.5" /> Edit Score
+        </Button>
+        <Button variant="ghost" size="sm" className="h-7 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 gap-1.5 px-2" disabled={submitting || busy} onClick={handleDelete}>
+          <Trash2 className="h-3.5 w-3.5" /> Remove
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-3 border-t border-slate-100 pt-3 space-y-3 bg-slate-50/50 -mx-4 px-4 pb-1 rounded-b-xl">
+      <div className="grid grid-cols-[1fr_80px] gap-2">
+        <Input 
+          value={examName} 
+          onChange={(e) => setExamName(e.target.value)} 
+          placeholder="Exam Name" 
+          className="text-xs h-8 bg-white" 
+        />
+        <Input 
+          type="number"
+          value={marks} 
+          onChange={(e) => setMarks(e.target.value)} 
+          placeholder="Marks" 
+          className="text-xs h-8 bg-white text-center" 
+          min="0" max="100"
+        />
+      </div>
+      <div className="flex items-center gap-2 pb-2">
+        <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white text-xs gap-1.5 h-7 px-4" disabled={submitting || busy || !examName || marks === ""} onClick={submit}>
+          Save Changes
+        </Button>
+        <Button size="sm" variant="ghost" className="text-slate-500 text-xs h-7" disabled={submitting || busy} onClick={() => {
+          setEditing(false);
+          setExamName(assessment.examName || "");
+          setMarks(String(assessment.marks ?? ""));
+        }}>
+          Cancel
+        </Button>
+      </div>
+    </div>
+  );
 }

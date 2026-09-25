@@ -1,0 +1,6 @@
+ALTER TABLE "postings" ADD COLUMN "status" text DEFAULT 'pending' NOT NULL;
+ALTER TABLE "postings" ADD COLUMN "faculty_remarks" text;
+ALTER TABLE "research" ADD COLUMN "status" text DEFAULT 'pending' NOT NULL;
+ALTER TABLE "research" ADD COLUMN "faculty_remarks" text;
+ALTER TABLE "certifications" ADD COLUMN "status" text DEFAULT 'pending' NOT NULL;
+ALTER TABLE "certifications" ADD COLUMN "faculty_remarks" text;

@@ -30,6 +30,8 @@ type Posting = {
   endDate: string;
   supervisorId: number;
   supervisorName: string;
+  status: "pending" | "verified" | "rejected";
+  facultyRemarks: string | null;
 };
 
 import { apiGet, apiPost } from "@/lib/apiClient";
@@ -193,6 +195,7 @@ export function PostingsPage() {
                   <TableHead>Start Date</TableHead>
                   <TableHead>End Date</TableHead>
                   <TableHead>Supervisor</TableHead>
+                  <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -202,6 +205,18 @@ export function PostingsPage() {
                     <TableCell>{formatLogbookDate(item.startDate)}</TableCell>
                     <TableCell>{formatLogbookDate(item.endDate)}</TableCell>
                     <TableCell>{item.supervisorName}</TableCell>
+                    <TableCell>
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                        item.status === "verified" ? "bg-emerald-100 text-emerald-700" :
+                        item.status === "rejected" ? "bg-rose-100 text-rose-700" :
+                        "bg-amber-100 text-amber-700"
+                      }`}>
+                        {item.status === "verified" ? "Verified" : item.status === "rejected" ? "Rejected" : "Pending"}
+                      </span>
+                      {(item as any).facultyRemarks && (
+                        <p className="mt-0.5 text-[10px] text-slate-500 italic">{(item as any).facultyRemarks}</p>
+                      )}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
