@@ -248,13 +248,17 @@ export function AcademicLogsPage() {
                     <TableCell className="text-xs max-w-[160px]">
                       {log.status === "pending"
                         ? <span className="text-slate-400">—</span>
-                        : log.facultyRemarks
-                          ? <span title={log.facultyRemarks} className="block truncate cursor-help text-slate-600">{log.facultyRemarks}</span>
-                          : <span className="text-slate-500">No remark</span>}
+                        : log.status === "rejected"
+                          ? <span title={log.facultyRemarks || "No remark"} className={`block truncate cursor-help font-medium ${log.facultyRemarks ? "text-rose-700" : "text-slate-400"}`}>
+                              {log.facultyRemarks || "No remark"}
+                            </span>
+                          : log.facultyRemarks
+                            ? <span title={log.facultyRemarks} className="block truncate cursor-help text-slate-600">{log.facultyRemarks}</span>
+                            : <span className="text-slate-500">No remark</span>}
                     </TableCell>
                     <TableCell>{log.status === "verified" ? <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700"><CheckCircle2 className="mr-1 h-3 w-3" /> Verified</Badge> : log.status === "rejected" ? <Badge className="border-rose-200 bg-rose-50 text-rose-700"><AlertCircle className="mr-1 h-3 w-3" /> Rejected</Badge> : <Badge className="border-amber-200 bg-amber-50 text-amber-700"><Clock className="mr-1 h-3 w-3" /> Pending</Badge>}</TableCell>
                     <TableCell className="text-right">
-                      {log.status === "pending" && (
+                      {(log.status === "pending" || log.status === "rejected") && (
                         <Button variant="ghost" size="sm" className="text-teal-600 hover:text-teal-800 hover:bg-teal-50" onClick={() => {
                           setEditLogId(log.id);
                           setForm({

@@ -201,7 +201,7 @@ export function PostingsPage() {
                   <TableHead>End Date</TableHead>
                   <TableHead>Supervisor</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="text-right">Faculty Remarks</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -219,12 +219,9 @@ export function PostingsPage() {
                       }`}>
                         {item.status === "verified" ? "Verified" : item.status === "rejected" ? "Rejected" : "Pending"}
                       </span>
-                      {(item as any).facultyRemarks && (
-                        <p className="mt-0.5 text-[10px] text-slate-500 italic">{(item as any).facultyRemarks}</p>
-                      )}
                     </TableCell>
-                    <TableCell className="text-right">
-                      {item.status === "pending" && (
+                    <TableCell className="text-right max-w-[220px]">
+                      {item.status === "pending" ? (
                         <Button variant="ghost" size="sm" className="text-teal-600 hover:text-teal-800 hover:bg-teal-50" onClick={() => {
                           setEditId(item.id);
                           setWard(item.ward);
@@ -233,8 +230,19 @@ export function PostingsPage() {
                           setSupervisorId(String(item.supervisorId));
                           setOpen(true);
                         }}>
-                          <Edit3 className="h-4 w-4" />
+                          <Edit3 className="h-4 w-4" /> Edit
                         </Button>
+                      ) : (item as any).facultyRemarks ? (
+                        <span
+                          title={(item as any).facultyRemarks}
+                          className={`block truncate cursor-help text-sm font-medium ${
+                            item.status === "rejected" ? "text-rose-700" : "text-slate-600"
+                          }`}
+                        >
+                          {(item as any).facultyRemarks}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-slate-400">No remark</span>
                       )}
                     </TableCell>
                   </TableRow>
