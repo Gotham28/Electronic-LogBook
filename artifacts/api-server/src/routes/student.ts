@@ -158,6 +158,7 @@ router.get("/:studentId/logs", requireAuth, async (req, res) => {
       departmentId: usersTable.departmentId,
       mentorName: mentorsTable.fullName,
       mentorRole: mentorsTable.role,
+      specialty: studentsTable.specialty,
     })
     .from(studentsTable)
     .innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
@@ -217,11 +218,14 @@ router.get("/:studentId/logs", requireAuth, async (req, res) => {
         registrationNumber: studentMatch[0].registrationNumber,
         dateOfJoining: studentMatch[0].dateOfJoining,
         joiningYear: studentMatch[0].batch,
+        mentorName: studentMatch[0].mentorName,
+        mentorRole: studentMatch[0].mentorRole,
+        course: studentMatch[0].specialty,
       },
-      caseLogs: caseLogsRaw.map(r => ({ ...r.log, supervisorName: r.supervisorName })),
-      procedureLogs: procedureLogsRaw.map(r => ({ ...r.log, supervisorName: r.supervisorName })),
-      academicLogs: academicLogsRaw.map(r => ({ ...r.log, supervisorName: r.supervisorName })),
-      conferenceLogs: conferenceLogsRaw.map(r => ({ ...r.log, supervisorName: r.supervisorName })),
+      caseLogs: caseLogsRaw.map((r: any) => ({ ...r.log, supervisorName: r.supervisorName })),
+      procedureLogs: procedureLogsRaw.map((r: any) => ({ ...r.log, supervisorName: r.supervisorName })),
+      academicLogs: academicLogsRaw.map((r: any) => ({ ...r.log, supervisorName: r.supervisorName })),
+      conferenceLogs: conferenceLogsRaw.map((r: any) => ({ ...r.log, supervisorName: r.supervisorName })),
     });
   } catch (error) {
     req.log.error({ studentId: req.params.studentId, status: 500 }, "Error fetching student logs");
@@ -421,7 +425,8 @@ router.get("/:studentId/postings", async (req, res) => {
         endDate: postingsTable.endDate,
         supervisorId: postingsTable.supervisorId,
         supervisorName: usersTable.fullName,
-        status: postingsTable.status
+        status: postingsTable.status,
+        facultyRemarks: postingsTable.facultyRemarks,
       })
       .from(postingsTable)
       .leftJoin(usersTable, eq(postingsTable.supervisorId, usersTable.id))
@@ -1265,7 +1270,7 @@ const studentEditGuard = async (req: any, res: any, table: any, logId: any, stud
   
   const [log] = await db.select().from(table).where(and(eq(table.id, logId), eq(table.studentId, studentId)));
   if (!log) return { error: 404, message: "Log not found" };
-  if (log.status !== "pending") return { error: 400, message: "Only pending logs can be edited" };
+  if (log.status !== "pending" && log.status !== "rejected") return { error: 400, message: "Only pending or rejected logs can be edited" };
   
   return { error: null, log, caller };
 };
@@ -1289,9 +1294,10 @@ router.patch("/:studentId/case-logs/:logId", requireAuth, validate(z.object({ su
       req.body.supervisorId = parseInt(req.body.supervisorId, 10);
     }
 
-    const [updated] = await db.update(caseLogsTable).set(req.body)
-      .where(and(eq(caseLogsTable.id, logId), eq(caseLogsTable.studentId, studentId), eq(caseLogsTable.status, "pending"), isNull(caseLogsTable.deletedAt))).returning();
-    if (!updated) { res.status(400).json({ message: "Log no longer pending or not found" }); return; }
+    const updateBody = { ...req.body, status: "pending", facultyRemarks: null };
+    const [updated] = await db.update(caseLogsTable).set(updateBody)
+      .where(and(eq(caseLogsTable.id, logId), eq(caseLogsTable.studentId, studentId), isNull(caseLogsTable.deletedAt))).returning();
+    if (!updated) { res.status(400).json({ message: "Log not found" }); return; }
     res.json(updated);
   } catch (error) { res.status(500).json({ message: "Internal server error" }); }
 });
@@ -1335,9 +1341,10 @@ router.patch("/:studentId/procedure-logs/:logId", requireAuth, validate(z.object
       }
     }
 
-    const [updated] = await db.update(procedureLogsTable).set(req.body)
-      .where(and(eq(procedureLogsTable.id, logId), eq(procedureLogsTable.studentId, studentId), eq(procedureLogsTable.status, "pending"), isNull(procedureLogsTable.deletedAt))).returning();
-    if (!updated) { res.status(400).json({ message: "Log no longer pending or not found" }); return; }
+    const updateBody = { ...req.body, status: "pending", facultyRemarks: null, facultyVerifiedLevel: null };
+    const [updated] = await db.update(procedureLogsTable).set(updateBody)
+      .where(and(eq(procedureLogsTable.id, logId), eq(procedureLogsTable.studentId, studentId), isNull(procedureLogsTable.deletedAt))).returning();
+    if (!updated) { res.status(400).json({ message: "Log not found" }); return; }
     res.json(updated);
   } catch (error) { res.status(500).json({ message: "Internal server error" }); }
 });
@@ -1366,11 +1373,12 @@ router.patch("/:studentId/academic-logs/:logId", requireAuth, validate(z.object(
       if (!option) { res.status(400).json({ message: "Select an academic activity from your department" }); return; }
     }
 
-    const [updated] = await db.update(academicLogsTable).set(req.body)
-      .where(and(eq(academicLogsTable.id, logId), eq(academicLogsTable.studentId, studentId), eq(academicLogsTable.status, "pending"))).returning();
-    if (!updated) { res.status(400).json({ message: "Log no longer pending or not found" }); return; }
+    const updateBody = { ...req.body, status: "pending", facultyRemarks: null, facultyGrade: null };
+    const [updated] = await db.update(academicLogsTable).set(updateBody)
+      .where(and(eq(academicLogsTable.id, logId), eq(academicLogsTable.studentId, studentId))).returning();
+    if (!updated) { res.status(400).json({ message: "Log not found" }); return; }
     res.json(updated);
-  } catch (error: any) { res.status(500).json({ message: "Internal server error", detail: String(error), stack: error?.stack }); }
+  } catch (error: any) { res.status(500).json({ message: "Internal server error" }); }
 });
 
 // 4. Conference Logs
