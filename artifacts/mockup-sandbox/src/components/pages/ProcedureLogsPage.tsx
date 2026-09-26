@@ -341,13 +341,17 @@ export function ProcedureLogsPage() {
                     <TableCell className="text-xs max-w-[160px]">
                       {log.status === "pending"
                         ? <span className="text-slate-400">—</span>
-                        : log.facultyRemarks
-                          ? <span title={log.facultyRemarks} className="block truncate cursor-help text-slate-600">{log.facultyRemarks}</span>
-                          : <span className="text-slate-500">No remark</span>}
+                        : log.status === "rejected"
+                          ? <span title={log.facultyRemarks || "No remark"} className={`block truncate cursor-help font-medium ${log.facultyRemarks ? "text-rose-700" : "text-slate-400"}`}>
+                              {log.facultyRemarks || "No remark"}
+                            </span>
+                          : log.facultyRemarks
+                            ? <span title={log.facultyRemarks} className="block truncate cursor-help text-slate-600">{log.facultyRemarks}</span>
+                            : <span className="text-slate-500">No remark</span>}
                     </TableCell>
                     <TableCell>{statusBadge(log.status)}</TableCell>
                     <TableCell className="text-right">
-                      {log.status === "pending" && (
+                      {(log.status === "pending" || log.status === "rejected") && (
                         <>
                           <Button variant="ghost" size="sm" className="text-teal-600 hover:text-teal-800 hover:bg-teal-50" onClick={() => {
                             setEditLogId(log.id);
@@ -360,9 +364,11 @@ export function ProcedureLogsPage() {
                           }}>
                             <Edit3 className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="sm" className="text-rose-500 hover:text-rose-700 hover:bg-rose-50" onClick={() => handleDeleteProcedureLog(log.id)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          {log.status === "pending" && (
+                            <Button variant="ghost" size="sm" className="text-rose-500 hover:text-rose-700 hover:bg-rose-50" onClick={() => handleDeleteProcedureLog(log.id)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
                         </>
                       )}
                     </TableCell>
