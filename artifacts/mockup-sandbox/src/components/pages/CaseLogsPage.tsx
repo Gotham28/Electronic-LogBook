@@ -1,7 +1,7 @@
 import * as React from "react";
-import { AlertCircle, CheckCircle2, Clock, Eye, FileText, PlusCircle, Search, Loader2, Trash2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, Clock, Eye, FileText, PlusCircle, Search, Loader2, Trash2, Edit3 } from "lucide-react";
 import { toast } from "sonner";
-import { apiGet, apiPost, apiDelete } from "@/lib/apiClient";
+import { apiGet, apiPost, apiDelete, apiPatch } from "@/lib/apiClient";
 import { getCurrentUser, isDemoMode } from "@/lib/session";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -72,6 +72,7 @@ export function CaseLogsPage() {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [form, setForm] = React.useState(emptyForm);
+  const [editLogId, setEditLogId] = React.useState<number | null>(null);
 
   const user = React.useMemo(() => getCurrentUser(), []);
   const hideUhid = isDemoMode();
@@ -150,12 +151,17 @@ export function CaseLogsPage() {
         supervisorId: form.supervisorId,
       };
       
-      await apiPost(`/api/students/${user?.studentProfileId}/case-logs`, payload);
+      if (editLogId) {
+        await apiPatch(`/api/students/${user?.studentProfileId}/case-logs/${editLogId}`, payload);
+      } else {
+        await apiPost(`/api/students/${user?.studentProfileId}/case-logs`, payload);
+      }
       
       await fetchLogs();
       setForm({ ...emptyForm, date: todayForInput() });
       setIsModalOpen(false);
-      toast.success(`Case submitted successfully`);
+      setEditLogId(null);
+      toast.success(editLogId ? `Case updated successfully` : `Case submitted successfully`);
     } catch (err: any) {
       toast.error(err.message || "Failed to submit case log");
     } finally {
@@ -204,13 +210,16 @@ export function CaseLogsPage() {
             Structured histories, examinations, investigations, management and learning reflections for every presented case.
           </p>
         </div>
-        <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <Dialog open={isModalOpen} onOpenChange={(val) => { 
+          setIsModalOpen(val); 
+          if (!val) { setForm({ ...emptyForm, date: todayForInput() }); setEditLogId(null); } 
+        }}>
           <DialogTrigger asChild>
             <Button><PlusCircle className="h-4 w-4" /> Log clinical case</Button>
           </DialogTrigger>
           <DialogContent className="max-h-[90vh] overflow-y-auto rounded-2xl bg-white sm:max-w-3xl">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-xl"><FileText className="h-5 w-5 text-teal-600" /> New clinical case</DialogTitle>
+              <DialogTitle className="flex items-center gap-2 text-xl"><FileText className="h-5 w-5 text-teal-600" /> {editLogId ? "Edit clinical case" : "New clinical case"}</DialogTitle>
               <DialogDescription>Complete the clinical record before sending it to a faculty member.</DialogDescription>
             </DialogHeader>
             <form onSubmit={handleAddCase} className="space-y-5">
@@ -382,9 +391,26 @@ export function CaseLogsPage() {
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
                         {log.status === "pending" && (
-                          <Button variant="ghost" size="sm" className="text-rose-500 hover:text-rose-700 hover:bg-rose-50" onClick={() => handleDeleteCaseLog(log.id)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <>
+                            <Button variant="ghost" size="sm" className="text-teal-600 hover:text-teal-800 hover:bg-teal-50" onClick={() => {
+                              setEditLogId(log.id);
+                              setForm({
+                                date: log.date, patientUhid: log.patientUhid || "", age: log.patientAge || log.age || "",
+                                gender: (log.patientGender || log.gender || "male").charAt(0).toUpperCase() + (log.patientGender || log.gender || "male").slice(1),
+                                category: log.category || "", chiefComplaints: log.chiefComplaints || "",
+                                history: log.history || "", examination: log.examination || "", investigations: log.investigations || "",
+                                diagnosis: log.diagnosisFinal || log.diagnosisProvisional || log.diagnosis || "", differentialDiagnosis: log.differentialDiagnosis || "",
+                                management: log.managementPlan || log.management || "", outcome: log.outcome || "", learningPoints: log.learningPoints || "",
+                                supervisorId: String(log.supervisorId || ""),
+                              });
+                              setIsModalOpen(true);
+                            }}>
+                              <Edit3 className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="sm" className="text-rose-500 hover:text-rose-700 hover:bg-rose-50" onClick={() => handleDeleteCaseLog(log.id)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </>
                         )}
                         <Button variant="ghost" size="sm" onClick={() => setSelectedLog(log)}><Eye className="h-4 w-4" /> Details</Button>
                       </div>

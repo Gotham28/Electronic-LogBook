@@ -1853,6 +1853,8 @@ function PostingReviewForm({ posting, studentId, busy, onDone }: {
     } finally { setSubmitting(false); }
   }
 
+  if (posting.status !== "pending") return null;
+
   return (
     <div className="mt-3 border-t border-slate-100 pt-3 space-y-2">
       <Textarea
@@ -1946,6 +1948,8 @@ function CertReviewForm({ cert, studentId, busy, onDone }: {
       toast.error(e.message || "Failed to save review");
     } finally { setSubmitting(false); }
   }
+
+  if (cert.status !== "pending") return null;
 
   return (
     <div className="mt-3 border-t border-slate-100 pt-3 space-y-2">

@@ -1,7 +1,7 @@
 import * as React from "react";
-import { AlertCircle, CheckCircle2, Clock, PlusCircle, Stethoscope, Loader2, Trash2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, Clock, PlusCircle, Stethoscope, Loader2, Trash2, Edit3 } from "lucide-react";
 import { toast } from "sonner";
-import { apiGet, apiPost, apiDelete } from "@/lib/apiClient";
+import { apiGet, apiPost, apiDelete, apiPatch } from "@/lib/apiClient";
 import { getCurrentUser, isDemoMode } from "@/lib/session";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -57,6 +57,7 @@ export function ProcedureLogsPage() {
     experience: competencyLevels[0]?.value ?? "",
     supervisorId: "",
   });
+  const [editLogId, setEditLogId] = React.useState<number | null>(null);
 
   React.useEffect(() => {
     if (competencyLevels.length > 0 && !form.experience) {
@@ -136,10 +137,15 @@ export function ProcedureLogsPage() {
         supervisorId: form.supervisorId,
       };
       
-      await apiPost(`/api/students/${user?.studentProfileId}/procedure-logs`, payload);
+      if (editLogId) {
+        await apiPatch(`/api/students/${user?.studentProfileId}/procedure-logs/${editLogId}`, payload);
+      } else {
+        await apiPost(`/api/students/${user?.studentProfileId}/procedure-logs`, payload);
+      }
 
       await fetchLogs();
       setOpen(false);
+      setEditLogId(null);
       setForm({
         date: todayForInput(),
         group: initialGroup,
@@ -149,7 +155,7 @@ export function ProcedureLogsPage() {
         experience: competencyLevels[0]?.value ?? "",
         supervisorId: "",
       });
-      toast.success(`Procedure submitted successfully`);
+      toast.success(editLogId ? `Procedure updated successfully` : `Procedure submitted successfully`);
     } catch (err: any) {
       toast.error(err.message || "Failed to submit procedure log");
     } finally {
@@ -171,11 +177,14 @@ export function ProcedureLogsPage() {
           <h2 className="page-title mt-1">Procedure log</h2>
           <p className="mt-2 text-sm text-slate-500">Procedure exposure, with competency verified only by the reviewing faculty member.</p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={(val) => { 
+          setOpen(val); 
+          if (!val) { setForm({ date: todayForInput(), group: initialGroup, procedureName: "", patientUhid: "", age: "", experience: competencyLevels[0]?.value ?? "", supervisorId: "" }); setEditLogId(null); } 
+        }}>
           <DialogTrigger asChild><Button><PlusCircle className="h-4 w-4" /> Log procedure</Button></DialogTrigger>
           <DialogContent className="rounded-2xl bg-white sm:max-w-xl">
             <DialogHeader>
-              <DialogTitle>New procedure entry</DialogTitle>
+              <DialogTitle>{editLogId ? "Edit procedure entry" : "New procedure entry"}</DialogTitle>
               <DialogDescription>Select the required procedure and record the level of exposure.</DialogDescription>
             </DialogHeader>
             <form onSubmit={submit} className="space-y-4">
@@ -339,9 +348,22 @@ export function ProcedureLogsPage() {
                     <TableCell>{statusBadge(log.status)}</TableCell>
                     <TableCell className="text-right">
                       {log.status === "pending" && (
-                        <Button variant="ghost" size="sm" className="text-rose-500 hover:text-rose-700 hover:bg-rose-50" onClick={() => handleDeleteProcedureLog(log.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <>
+                          <Button variant="ghost" size="sm" className="text-teal-600 hover:text-teal-800 hover:bg-teal-50" onClick={() => {
+                            setEditLogId(log.id);
+                            setForm({
+                              date: log.date, group: log.procedureGroup, procedureName: log.procedureName,
+                              patientUhid: log.patientUhid === "N/A" ? "" : log.patientUhid, age: log.patientAge || log.age,
+                              experience: log.competencyLevel || "", supervisorId: String(log.supervisorId || ""),
+                            });
+                            setOpen(true);
+                          }}>
+                            <Edit3 className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" className="text-rose-500 hover:text-rose-700 hover:bg-rose-50" onClick={() => handleDeleteProcedureLog(log.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </>
                       )}
                     </TableCell>
                   </TableRow>
