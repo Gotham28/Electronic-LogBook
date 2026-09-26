@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Award, PlusCircle } from "lucide-react";
+import { Award, PlusCircle, Edit3 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatLogbookDate } from "@/lib/logbook-config";
-import { apiGet, apiPost } from "@/lib/apiClient";
+import { apiGet, apiPost, apiPatch } from "@/lib/apiClient";
 import { getCurrentUser } from "@/lib/session";
 
 type Certificate = { id: string; title: string; provider: string | null; issueDate: string; expiryDate: string; certificateUrl: string };
@@ -23,6 +23,7 @@ export function CertificationsPage() {
   const [loading, setLoading] = React.useState(true);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState("");
+  const [editId, setEditId] = React.useState<string | null>(null);
   
   const load = React.useCallback(async () => {
     setLoading(true); setError("");
@@ -37,8 +38,13 @@ export function CertificationsPage() {
   async function saveCertificate(event: React.FormEvent) {
     event.preventDefault(); setBusy(true);
     try {
-      await apiPost(`${base}/certifications`, certificate);
+      if (editId) {
+        await apiPatch(`${base}/certifications/${editId}`, certificate);
+      } else {
+        await apiPost(`${base}/certifications`, certificate);
+      }
       setCertificateOpen(false); setCertificate(emptyCertificate); toast.success("Certificate saved"); await load();
+      setEditId(null);
     } catch (err) { toast.error(err instanceof Error ? err.message : "Unable to save certificate"); }
     finally { setBusy(false); }
   }
@@ -54,7 +60,7 @@ export function CertificationsPage() {
         </CardHeader>
         <CardContent>
           {!certificates.length ? <p className="text-sm text-slate-500">No certificates recorded yet.</p> : <Table>
-            <TableHeader><TableRow>{["Certificate", "Issuing body", "Date issued", "Expiry", "Status"].map((label) => <TableHead key={label}>{label}</TableHead>)}</TableRow></TableHeader>
+            <TableHeader><TableRow>{["Certificate", "Issuing body", "Date issued", "Expiry", "Status", ""].map((label) => <TableHead key={label}>{label}</TableHead>)}</TableRow></TableHeader>
             <TableBody>{certificates.map((item) => <TableRow key={item.id}>
               <TableCell className="font-semibold">{item.title}</TableCell><TableCell>{item.provider || "Not recorded"}</TableCell>
               <TableCell>{formatLogbookDate(item.issueDate)}</TableCell><TableCell>{formatLogbookDate(item.expiryDate)}</TableCell>
@@ -70,14 +76,25 @@ export function CertificationsPage() {
                   <p className="mt-0.5 text-[10px] text-slate-500 italic">{(item as any).facultyRemarks}</p>
                 )}
               </TableCell>
+              <TableCell className="text-right">
+                {(item as any).status === "pending" && (
+                  <Button variant="ghost" size="sm" className="text-teal-600 hover:text-teal-800 hover:bg-teal-50" onClick={() => {
+                    setEditId(item.id);
+                    setCertificate({ title: item.title, provider: item.provider || "", issueDate: item.issueDate.split('T')[0], expiryDate: item.expiryDate.split('T')[0], certificateUrl: item.certificateUrl || "" });
+                    setCertificateOpen(true);
+                  }}>
+                    <Edit3 className="h-4 w-4" />
+                  </Button>
+                )}
+              </TableCell>
             </TableRow>)}</TableBody>
           </Table>}
         </CardContent>
       </Card>
     </>}
-    <Dialog open={certificateOpen} onOpenChange={(open) => { if (!busy) setCertificateOpen(open); }}>
+    <Dialog open={certificateOpen} onOpenChange={(open) => { if (!busy) { setCertificateOpen(open); if (!open) { setCertificate(emptyCertificate); setEditId(null); } } }}>
       <DialogContent onInteractOutside={(event) => event.preventDefault()} className="max-h-[90vh] overflow-y-auto bg-white">
-        <DialogHeader><DialogTitle>Add certificate</DialogTitle><DialogDescription>Record a completed course and a secure link to its certificate.</DialogDescription></DialogHeader>
+        <DialogHeader><DialogTitle>{editId ? "Edit certificate" : "Add certificate"}</DialogTitle><DialogDescription>Record a completed course and a secure link to its certificate.</DialogDescription></DialogHeader>
         <form onSubmit={saveCertificate} className="space-y-4">
           {(["title", "provider", "issueDate", "expiryDate", "certificateUrl"] as const).map((key) => <Field key={key} label={{ title: "Certificate", provider: "Issuing body", issueDate: "Date issued", expiryDate: "Expiry date", certificateUrl: "Certificate URL (HTTPS)" }[key]}>
             <Input required maxLength={key === "certificateUrl" ? 2000 : 160} type={key.endsWith("Date") ? "date" : key === "certificateUrl" ? "url" : "text"} value={certificate[key]} onChange={(e) => setCertificate({ ...certificate, [key]: e.target.value })} />

@@ -420,7 +420,8 @@ router.get("/:studentId/postings", async (req, res) => {
         startDate: postingsTable.startDate,
         endDate: postingsTable.endDate,
         supervisorId: postingsTable.supervisorId,
-        supervisorName: usersTable.fullName
+        supervisorName: usersTable.fullName,
+        status: postingsTable.status
       })
       .from(postingsTable)
       .leftJoin(usersTable, eq(postingsTable.supervisorId, usersTable.id))
@@ -944,7 +945,12 @@ router.patch("/:studentId/postings/:postingId/review", requireAuth, requireRole(
 
     const [updated] = await db.update(postingsTable)
       .set({ status: req.body.status, facultyRemarks: req.body.remarks ?? null })
-      .where(eq(postingsTable.id, postingId)).returning();
+      .where(and(eq(postingsTable.id, postingId), eq(postingsTable.status, "pending"))).returning();
+      
+    if (!updated) {
+      res.status(400).json({ message: "This log has already been reviewed" });
+      return;
+    }
     res.json(updated);
   } catch (error) {
     req.log.error({ studentId: req.params.studentId, postingId: req.params.postingId, status: 500 }, "Error reviewing posting");
@@ -1033,7 +1039,12 @@ router.patch("/:studentId/certifications/:certId/review", requireAuth, requireRo
 
     const [updated] = await db.update(certificationsTable)
       .set({ status: req.body.status, facultyRemarks: req.body.remarks ?? null })
-      .where(eq(certificationsTable.id, certId)).returning();
+      .where(and(eq(certificationsTable.id, certId), eq(certificationsTable.status, "pending"))).returning();
+      
+    if (!updated) {
+      res.status(400).json({ message: "This log has already been reviewed" });
+      return;
+    }
     res.json(updated);
   } catch (error) {
     req.log.error({ studentId: req.params.studentId, certId: req.params.certId, status: 500 }, "Error reviewing certification");
@@ -1138,6 +1149,7 @@ router.post("/:studentId/academic-logs", validate(z.object({ supervisorId: idSch
     }).returning();
     res.status(201).json(inserted);
   } catch (error) {
+    console.error("POST academic-logs error:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 });
@@ -1241,4 +1253,213 @@ router.delete("/:studentId/procedure-logs/:logId", requireAuth, async (req, res)
   }
 });
 
+// ==========================================
+// EDIT (PATCH) ROUTES FOR STUDENT LOGS
+// ==========================================
+
+const studentEditGuard = async (req: any, res: any, table: any, logId: any, studentId: number) => {
+  const caller = req.user!;
+  if (caller.role !== "student") return { error: 403, message: "Only students can edit logs" };
+  const [ownProfile] = await db.select({ id: studentsTable.id }).from(studentsTable).where(eq(studentsTable.userId, caller.id));
+  if (!ownProfile || ownProfile.id !== studentId) return { error: 403, message: "Forbidden: you can only edit your own logs" };
+  
+  const [log] = await db.select().from(table).where(and(eq(table.id, logId), eq(table.studentId, studentId)));
+  if (!log) return { error: 404, message: "Log not found" };
+  if (log.status !== "pending") return { error: 400, message: "Only pending logs can be edited" };
+  
+  return { error: null, log, caller };
+};
+
+// 1. Case Logs
+router.patch("/:studentId/case-logs/:logId", requireAuth, validate(z.object({ supervisorId: idSchema, date: dateSchema, patientAge: nameSchema,
+  patientGender: z.enum(["male", "female", "other"]), diagnosisFinal: z.string().trim().min(1).max(8000),
+  patientUhid: optionalText, chiefComplaints: optionalText, diagnosisProvisional: optionalText, history: optionalText,
+  examination: optionalText, investigations: optionalText, differentialDiagnosis: optionalText, managementPlan: optionalText,
+  outcome: optionalText, learningPoints: optionalText, category: optionalText }).strict().partial()), async (req, res) => {
+  try {
+    const studentId = parseInt(String(req.params.studentId), 10);
+    const logId = parseInt(String(req.params.logId), 10);
+    const guard = await studentEditGuard(req, res, caseLogsTable, logId, studentId);
+    if (guard.error) { res.status(guard.error).json({ message: guard.message }); return; }
+    
+    if (req.body.supervisorId) {
+      if (!(await validateSupervisor(parseInt(req.body.supervisorId, 10), guard.caller.departmentId!))) {
+        res.status(400).json({ message: "Invalid supervisorId" }); return;
+      }
+      req.body.supervisorId = parseInt(req.body.supervisorId, 10);
+    }
+
+    const [updated] = await db.update(caseLogsTable).set(req.body)
+      .where(and(eq(caseLogsTable.id, logId), eq(caseLogsTable.studentId, studentId), eq(caseLogsTable.status, "pending"), isNull(caseLogsTable.deletedAt))).returning();
+    if (!updated) { res.status(400).json({ message: "Log no longer pending or not found" }); return; }
+    res.json(updated);
+  } catch (error) { res.status(500).json({ message: "Internal server error" }); }
+});
+
+// 2. Procedure Logs
+router.patch("/:studentId/procedure-logs/:logId", requireAuth, validate(z.object({ supervisorId: idSchema, procedureGroup: nameSchema,
+  procedureName: nameSchema, date: dateSchema, patientUhid: nameSchema, patientAge: nameSchema,
+  competencyLevel: nameSchema }).strict().partial()), async (req, res) => {
+  try {
+    const studentId = parseInt(String(req.params.studentId), 10);
+    const logId = parseInt(String(req.params.logId), 10);
+    const guard = await studentEditGuard(req, res, procedureLogsTable, logId, studentId);
+    if (guard.error) { res.status(guard.error).json({ message: guard.message }); return; }
+    
+    if (req.body.supervisorId) {
+      if (!(await validateSupervisor(parseInt(req.body.supervisorId, 10), guard.caller.departmentId!))) {
+        res.status(400).json({ message: "Invalid supervisorId" }); return;
+      }
+      req.body.supervisorId = parseInt(req.body.supervisorId, 10);
+    }
+
+    if (req.body.procedureName || req.body.procedureGroup) {
+      const pName = req.body.procedureName || guard.log!.procedureName;
+      const pGroup = req.body.procedureGroup || guard.log!.procedureGroup;
+      const configSourceId = await resolveConfigDepartmentId(guard.caller.departmentId!);
+      const [option] = await db.select({ id: procedureTypesTable.id }).from(procedureTypesTable).where(and(
+        eq(procedureTypesTable.departmentId, configSourceId), eq(procedureTypesTable.name, pName), eq(procedureTypesTable.group, pGroup))).limit(1);
+      if (!option) { res.status(400).json({ message: "Select a procedure from your department" }); return; }
+    }
+
+    if (req.body.competencyLevel) {
+      const configSourceId = await resolveConfigDepartmentId(guard.caller.departmentId!);
+      const [config] = await db.select({ enabledFeatures: departmentConfigsTable.enabledFeatures }).from(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, configSourceId)).limit(1);
+      const enabledFeatures = config?.enabledFeatures as Record<string, boolean> | null;
+      if (enabledFeatures?.procedureExperience) {
+        const [compLevel] = await db.select({ id: departmentCatalogTable.id }).from(departmentCatalogTable).where(and(
+          eq(departmentCatalogTable.departmentId, configSourceId), eq(departmentCatalogTable.kind, "competency_level"), eq(departmentCatalogTable.value, req.body.competencyLevel))).limit(1);
+        if (!compLevel) { res.status(400).json({ message: "Invalid competency level for your department" }); return; }
+      } else if (req.body.competencyLevel !== "N/A") {
+        res.status(400).json({ message: "Procedure experience is not enabled for your department" }); return;
+      }
+    }
+
+    const [updated] = await db.update(procedureLogsTable).set(req.body)
+      .where(and(eq(procedureLogsTable.id, logId), eq(procedureLogsTable.studentId, studentId), eq(procedureLogsTable.status, "pending"), isNull(procedureLogsTable.deletedAt))).returning();
+    if (!updated) { res.status(400).json({ message: "Log no longer pending or not found" }); return; }
+    res.json(updated);
+  } catch (error) { res.status(500).json({ message: "Internal server error" }); }
+});
+
+// 3. Academic Logs
+router.patch("/:studentId/academic-logs/:logId", requireAuth, validate(z.object({ supervisorId: idSchema, activityType: nameSchema,
+  topic: z.string().trim().min(1).max(4000), date: dateSchema, presenter: optionalText,
+  presentationType: z.string().max(160).nullable().optional() }).strict().partial()), async (req, res) => {
+  try {
+    const studentId = parseInt(String(req.params.studentId), 10);
+    const logId = parseInt(String(req.params.logId), 10);
+    const guard = await studentEditGuard(req, res, academicLogsTable, logId, studentId);
+    if (guard.error) { res.status(guard.error).json({ message: guard.message }); return; }
+    
+    if (req.body.supervisorId) {
+      if (!(await validateSupervisor(parseInt(req.body.supervisorId, 10), guard.caller.departmentId!))) {
+        res.status(400).json({ message: "Invalid supervisorId" }); return;
+      }
+      req.body.supervisorId = parseInt(req.body.supervisorId, 10);
+    }
+
+    if (req.body.activityType) {
+      const configSourceId = await resolveConfigDepartmentId(guard.caller.departmentId!);
+      const [option] = await db.select({ id: departmentCatalogTable.id }).from(departmentCatalogTable).where(and(
+        eq(departmentCatalogTable.departmentId, configSourceId), eq(departmentCatalogTable.kind, "academic"), eq(departmentCatalogTable.value, req.body.activityType))).limit(1);
+      if (!option) { res.status(400).json({ message: "Select an academic activity from your department" }); return; }
+    }
+
+    const [updated] = await db.update(academicLogsTable).set(req.body)
+      .where(and(eq(academicLogsTable.id, logId), eq(academicLogsTable.studentId, studentId), eq(academicLogsTable.status, "pending"))).returning();
+    if (!updated) { res.status(400).json({ message: "Log no longer pending or not found" }); return; }
+    res.json(updated);
+  } catch (error: any) { res.status(500).json({ message: "Internal server error", detail: String(error), stack: error?.stack }); }
+});
+
+// 4. Conference Logs
+router.patch("/:studentId/conference-logs/:logId", requireAuth, validate(z.object({ supervisorId: idSchema.optional().nullable(), conferenceName: nameSchema,
+  role: z.enum(["attended", "presented"]), date: dateSchema, location: optionalText.nullable(),
+  certificateUrl: optionalText.nullable() }).strict().partial()), async (req, res) => {
+  try {
+    const studentId = parseInt(String(req.params.studentId), 10);
+    const logId = parseInt(String(req.params.logId), 10);
+    const guard = await studentEditGuard(req, res, conferencesTable, logId, studentId);
+    if (guard.error) { res.status(guard.error).json({ message: guard.message }); return; }
+    
+    if (req.body.supervisorId) {
+      if (!(await validateSupervisor(parseInt(req.body.supervisorId, 10), guard.caller.departmentId!))) {
+        res.status(400).json({ message: "Invalid supervisorId" }); return;
+      }
+      req.body.supervisorId = parseInt(req.body.supervisorId, 10);
+    }
+
+    const [updated] = await db.update(conferencesTable).set(req.body)
+      .where(and(eq(conferencesTable.id, logId), eq(conferencesTable.studentId, studentId), eq(conferencesTable.status, "pending"))).returning();
+    if (!updated) { res.status(400).json({ message: "Log no longer pending or not found" }); return; }
+    res.json(updated);
+  } catch (error) { res.status(500).json({ message: "Internal server error" }); }
+});
+
+// 5. Postings
+router.patch("/:studentId/postings/:postingId", requireAuth, validate(z.object({ ward: nameSchema, startDate: dateSchema, endDate: dateSchema,
+  supervisorId: idSchema }).strict().partial()), async (req, res) => {
+  try {
+    const studentId = parseInt(String(req.params.studentId), 10);
+    const postingId = parseInt(String(req.params.postingId), 10);
+    const guard = await studentEditGuard(req, res, postingsTable, postingId, studentId);
+    if (guard.error) { res.status(guard.error).json({ message: guard.message }); return; }
+    
+    const effStartDate = req.body.startDate || guard.log!.startDate;
+    const effEndDate = req.body.endDate || guard.log!.endDate;
+    if (effEndDate < effStartDate) {
+      res.status(400).json({ message: "End date must be on or after start date" }); return;
+    }
+
+    if (req.body.ward) {
+      const configSourceId = await resolveConfigDepartmentId(guard.caller.departmentId!);
+      const [option] = await db.select({ id: departmentCatalogTable.id }).from(departmentCatalogTable).where(and(
+        eq(departmentCatalogTable.departmentId, configSourceId), eq(departmentCatalogTable.kind, "posting"), eq(departmentCatalogTable.value, req.body.ward))).limit(1);
+      if (!option) { res.status(400).json({ message: "Select a posting from your department" }); return; }
+    }
+
+    if (req.body.supervisorId) {
+      if (!(await validateSupervisor(parseInt(req.body.supervisorId, 10), guard.caller.departmentId!))) {
+        res.status(400).json({ message: "Invalid supervisorId" }); return;
+      }
+      req.body.supervisorId = parseInt(req.body.supervisorId, 10);
+    }
+
+    const [updated] = await db.update(postingsTable).set(req.body)
+      .where(and(eq(postingsTable.id, postingId), eq(postingsTable.studentId, studentId), eq((postingsTable as any).status, "pending"))).returning();
+    if (!updated) { res.status(400).json({ message: "Log no longer pending or not found" }); return; }
+    res.json(updated);
+  } catch (error: any) { res.status(500).json({ message: "Internal server error", detail: String(error), stack: error?.stack }); }
+});
+
+// 6. Certifications
+router.patch("/:studentId/certifications/:certId", requireAuth, validate(z.object({ title: nameSchema, provider: nameSchema, issueDate: dateSchema,
+  expiryDate: dateSchema, certificateUrl: z.string().url().max(2000).refine((value) => new URL(value).protocol === "https:", "Use an HTTPS URL")
+}).strict().partial()), async (req, res) => {
+  try {
+    const studentId = parseInt(String(req.params.studentId), 10);
+    const certId = String(req.params.certId);
+    const guard = await studentEditGuard(req, res, certificationsTable, certId, studentId);
+    if (guard.error) { res.status(guard.error).json({ message: guard.message }); return; }
+
+    const effIssueDateRaw = req.body.issueDate ? new Date(req.body.issueDate + "T00:00:00Z") : guard.log!.issueDate;
+    const effExpiryDateRaw = req.body.expiryDate ? new Date(req.body.expiryDate + "T00:00:00Z") : guard.log!.expiryDate;
+    
+    if (effExpiryDateRaw < effIssueDateRaw) {
+      res.status(400).json({ message: "Expiry must be on or after issue date" }); return;
+    }
+
+    const updateSet = { ...req.body };
+    if (req.body.issueDate) updateSet.issueDate = new Date(req.body.issueDate + "T00:00:00Z");
+    if (req.body.expiryDate) updateSet.expiryDate = new Date(req.body.expiryDate + "T00:00:00Z");
+
+    const [updated] = await db.update(certificationsTable).set(updateSet)
+      .where(and(eq(certificationsTable.id, certId), eq(certificationsTable.studentId, studentId), eq((certificationsTable as any).status, "pending"))).returning();
+    if (!updated) { res.status(400).json({ message: "Log no longer pending or not found" }); return; }
+    res.json(updated);
+  } catch (error) { res.status(500).json({ message: "Internal server error" }); }
+});
+
 export default router;
+

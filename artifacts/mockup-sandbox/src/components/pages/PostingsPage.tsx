@@ -1,5 +1,5 @@
 import * as React from "react";
-import { CalendarDays, PlusCircle } from "lucide-react";
+import { CalendarDays, PlusCircle, Edit3 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -34,7 +34,7 @@ type Posting = {
   facultyRemarks: string | null;
 };
 
-import { apiGet, apiPost } from "@/lib/apiClient";
+import { apiGet, apiPost, apiPatch } from "@/lib/apiClient";
 import { getCurrentUser } from "@/lib/session";
 
 export function PostingsPage() {
@@ -51,6 +51,7 @@ export function PostingsPage() {
   const [startDate, setStartDate] = React.useState(todayForInput());
   const [endDate, setEndDate] = React.useState(todayForInput());
   const [supervisorId, setSupervisorId] = React.useState("");
+  const [editId, setEditId] = React.useState<number | null>(null);
 
   const fetchPostings = React.useCallback(async () => {
     if (!user?.studentProfileId) return;
@@ -86,14 +87,15 @@ export function PostingsPage() {
     }
 
     try {
-      await apiPost(`/api/students/${user.studentProfileId}/postings`, {
-        ward,
-        startDate,
-        endDate,
-        supervisorId
-      });
-      toast.success("Posting added successfully");
+      if (editId) {
+        await apiPatch(`/api/students/${user.studentProfileId}/postings/${editId}`, { ward, startDate, endDate, supervisorId });
+        toast.success("Posting updated successfully");
+      } else {
+        await apiPost(`/api/students/${user.studentProfileId}/postings`, { ward, startDate, endDate, supervisorId });
+        toast.success("Posting added successfully");
+      }
       setOpen(false);
+      setEditId(null);
       fetchPostings();
       setStartDate(todayForInput());
       setEndDate(todayForInput());
@@ -110,7 +112,10 @@ export function PostingsPage() {
           <h2 className="page-title mt-1">Postings &amp; rotations</h2>
           <p className="mt-2 text-sm text-slate-500">Track your individual ward postings and rotations.</p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={(val) => {
+          setOpen(val);
+          if (!val) { setWard(""); setStartDate(todayForInput()); setEndDate(todayForInput()); setSupervisorId(""); setEditId(null); }
+        }}>
           <DialogTrigger asChild>
             <Button>
               <PlusCircle className="h-4 w-4 mr-2" /> Add posting
@@ -118,7 +123,7 @@ export function PostingsPage() {
           </DialogTrigger>
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
-              <DialogTitle>Add Posting</DialogTitle>
+              <DialogTitle>{editId ? "Edit Posting" : "Add Posting"}</DialogTitle>
               <DialogDescription>
                 Log a new ward posting or rotation.
               </DialogDescription>
@@ -196,6 +201,7 @@ export function PostingsPage() {
                   <TableHead>End Date</TableHead>
                   <TableHead>Supervisor</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -215,6 +221,20 @@ export function PostingsPage() {
                       </span>
                       {(item as any).facultyRemarks && (
                         <p className="mt-0.5 text-[10px] text-slate-500 italic">{(item as any).facultyRemarks}</p>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {item.status === "pending" && (
+                        <Button variant="ghost" size="sm" className="text-teal-600 hover:text-teal-800 hover:bg-teal-50" onClick={() => {
+                          setEditId(item.id);
+                          setWard(item.ward);
+                          setStartDate(item.startDate);
+                          setEndDate(item.endDate);
+                          setSupervisorId(String(item.supervisorId));
+                          setOpen(true);
+                        }}>
+                          <Edit3 className="h-4 w-4" />
+                        </Button>
                       )}
                     </TableCell>
                   </TableRow>

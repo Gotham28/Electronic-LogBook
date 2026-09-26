@@ -1,7 +1,7 @@
 import * as React from "react";
-import { AlertCircle, CheckCircle2, Clock, GraduationCap, PlusCircle, Loader2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, Clock, GraduationCap, PlusCircle, Loader2, Edit3 } from "lucide-react";
 import { toast } from "sonner";
-import { apiGet, apiPost } from "@/lib/apiClient";
+import { apiGet, apiPost, apiPatch } from "@/lib/apiClient";
 import { getCurrentUser } from "@/lib/session";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -42,6 +42,7 @@ export function AcademicLogsPage() {
     topic: "",
     supervisorId: "",
   });
+  const [editLogId, setEditLogId] = React.useState<number | null>(null);
 
   const user = React.useMemo(() => getCurrentUser(), []);
   const [professors, setProfessors] = React.useState<any[]>([]);
@@ -102,12 +103,17 @@ export function AcademicLogsPage() {
         supervisorId: form.supervisorId,
       };
       
-      await apiPost(`/api/students/${user?.studentProfileId}/academic-logs`, payload);
+      if (editLogId) {
+        await apiPatch(`/api/students/${user?.studentProfileId}/academic-logs/${editLogId}`, payload);
+      } else {
+        await apiPost(`/api/students/${user?.studentProfileId}/academic-logs`, payload);
+      }
       
       await fetchLogs();
       setOpen(false);
+      setEditLogId(null);
       setForm({ ...form, topic: "", supervisorId: "" });
-      toast.success(`Academic activity submitted successfully`);
+      toast.success(editLogId ? `Academic activity updated successfully` : `Academic activity submitted successfully`);
     } catch (err: any) {
       toast.error(err.message || "Failed to submit academic log");
     } finally {
@@ -129,11 +135,14 @@ export function AcademicLogsPage() {
           <h2 className="page-title mt-1">Academic activities</h2>
           <p className="mt-2 text-sm text-slate-500">Presentations, journal clubs, seminars, symposia, mortality meetings and conferences.</p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={(val) => { 
+          setOpen(val); 
+          if (!val) { setForm({ date: todayForInput(), type: "", presentationType: "", topic: "", supervisorId: "" }); setEditLogId(null); } 
+        }}>
           <DialogTrigger asChild><Button><PlusCircle className="h-4 w-4" /> Log academic activity</Button></DialogTrigger>
           <DialogContent className="rounded-2xl bg-white sm:max-w-lg">
             <DialogHeader>
-              <DialogTitle>New academic activity</DialogTitle>
+              <DialogTitle>{editLogId ? "Edit academic activity" : "New academic activity"}</DialogTitle>
               <DialogDescription>Add attendance or presentation details for faculty verification.</DialogDescription>
             </DialogHeader>
             <form onSubmit={submit} className="space-y-4">
@@ -219,7 +228,7 @@ export function AcademicLogsPage() {
             </Empty>
           ) : (
             <Table>
-              <TableHeader><TableRow><TableHead>Number</TableHead><TableHead>Date</TableHead><TableHead>Activity</TableHead><TableHead>Presentation</TableHead><TableHead>Topic / conference</TableHead><TableHead>Reviewing faculty member</TableHead><TableHead>Grade</TableHead><TableHead>Remarks</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Number</TableHead><TableHead>Date</TableHead><TableHead>Activity</TableHead><TableHead>Presentation</TableHead><TableHead>Topic / conference</TableHead><TableHead>Reviewing faculty member</TableHead><TableHead>Grade</TableHead><TableHead>Remarks</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
               <TableBody>
                 {logs.map((log) => (
                   <TableRow key={log.id}>
@@ -244,6 +253,20 @@ export function AcademicLogsPage() {
                           : <span className="text-slate-500">No remark</span>}
                     </TableCell>
                     <TableCell>{log.status === "verified" ? <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700"><CheckCircle2 className="mr-1 h-3 w-3" /> Verified</Badge> : log.status === "rejected" ? <Badge className="border-rose-200 bg-rose-50 text-rose-700"><AlertCircle className="mr-1 h-3 w-3" /> Rejected</Badge> : <Badge className="border-amber-200 bg-amber-50 text-amber-700"><Clock className="mr-1 h-3 w-3" /> Pending</Badge>}</TableCell>
+                    <TableCell className="text-right">
+                      {log.status === "pending" && (
+                        <Button variant="ghost" size="sm" className="text-teal-600 hover:text-teal-800 hover:bg-teal-50" onClick={() => {
+                          setEditLogId(log.id);
+                          setForm({
+                            date: log.date, type: log.activityType || log.type, presentationType: log.presentationType === "—" ? "" : (log.presentationType || ""),
+                            topic: log.topic || "", supervisorId: String(log.supervisorId || ""),
+                          });
+                          setOpen(true);
+                        }}>
+                          <Edit3 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

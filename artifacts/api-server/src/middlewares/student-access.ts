@@ -16,11 +16,16 @@ export const studentAccess: RequestHandler = async (req, res, next) => {
     res.status(403).json({ message: "Student is outside your access scope" }); return;
   }
   const isRead = ["GET", "HEAD"].includes(req.method);
-  if (req.method === "POST" && req.path === "/assessments" && caller.role === "student") {
-    res.status(403).json({ message: "Only faculty can record assessments" }); return;
+  const isAssessmentPath = /^\/assessments(\/[^/]+)?$/.test(req.path);
+  if (["POST", "PATCH", "DELETE"].includes(req.method) && isAssessmentPath && caller.role === "student") {
+    res.status(403).json({ message: "Only faculty can modify assessments" }); return;
   }
-  const facultyAssessment = req.method === "POST" && req.path === "/assessments" && ["professor", "hod"].includes(caller.role);
-  if (!isRead && caller.role !== "student" && !facultyAssessment) {
+
+  const facultyAssessment = ["POST", "PATCH", "DELETE"].includes(req.method) && isAssessmentPath && ["professor", "hod"].includes(caller.role);
+  const isReviewPath = /^\/(postings\/[^/]+\/review|thesis\/review|certifications\/[^/]+\/review)$/.test(req.path);
+  const facultyReview = req.method === "PATCH" && isReviewPath && ["professor", "hod"].includes(caller.role);
+
+  if (!isRead && caller.role !== "student" && !facultyAssessment && !facultyReview) {
     res.status(403).json({ message: "Only the student can modify their records" }); return;
   }
   next();
