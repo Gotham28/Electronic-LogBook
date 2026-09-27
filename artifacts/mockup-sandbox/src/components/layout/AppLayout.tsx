@@ -312,8 +312,9 @@ export function AppLayout({
       const items: NotifItem[] = [];
       if (activeRole === "Faculty") {
         try {
-          const queue = await apiGet<any[]>(`/api/professors/${currentUser.id}/review-queue`);
-          const n = Array.isArray(queue) ? queue.length : 0;
+          // The review queue is an object; the items to review are in pendingReviews.
+          const queue = await apiGet<{ pendingReviews?: unknown[] }>(`/api/professors/${currentUser.id}/review-queue`);
+          const n = Array.isArray(queue?.pendingReviews) ? queue.pendingReviews.length : 0;
           if (n > 0) {
             items.push({
               id: "faculty_queue",
