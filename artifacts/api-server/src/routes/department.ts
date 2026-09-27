@@ -25,9 +25,12 @@ router.use("/:departmentId", (req, res, next) => {
 });
 
 router.get("/:departmentId/catalog", async (req, res) => {
+  // Logged on failure, so the log says which part broke.
+  let step = "resolve-config-source";
   try {
     const departmentId = req.user!.departmentId!;
     const configSourceId = await resolveConfigDepartmentId(departmentId);
+    step = "load-catalog";
     const [department, hod, config, procedures, catalog, postingSchedule] = await Promise.all([
       db.select({ id: departmentsTable.id, name: departmentsTable.name, code: departmentsTable.code }).from(departmentsTable).where(eq(departmentsTable.id, departmentId)).limit(1),
       db.select({ id: usersTable.id, name: usersTable.fullName }).from(usersTable)
@@ -46,8 +49,12 @@ router.get("/:departmentId/catalog", async (req, res) => {
       conferenceLevels: catalog.filter((item) => item.kind === "conference_level"),
       clinicalWorkCategories: catalog.filter((item) => item.kind === "clinical_work_category"),
       clinicalWorkSubtypes: catalog.filter((item) => item.kind === "clinical_work_subtype"), postingSchedule });
-  } catch (error) {
-    req.log.error({ departmentId: req.params.departmentId, status: 500 }, "Error resolving config department");
+  } catch (error: any) {
+    // The Postgres error code only (e.g. 42P01 missing table, 42703 missing column), never
+    // the error text, which can carry SQL parameters (AGENTS.md §8). Same rule as app.ts.
+    const code = error?.code ?? error?.cause?.code;
+    req.log.error({ departmentId: req.params.departmentId, step,
+      code: typeof code === "string" && /^[A-Z0-9]{5}$/.test(code) ? code : "UNEXPECTED", status: 500 }, "Error resolving config department");
     res.status(500).json({ message: "Internal server error" });
   }
 });
