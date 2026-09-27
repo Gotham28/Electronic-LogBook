@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { db, usersTable, departmentsTable, studentsTable, caseLogsTable, procedureLogsTable, academicLogsTable, departmentConfigsTable, departmentCatalogTable, procedureTypesTable } from "@workspace/db";
-import { eq, and, inArray, count, sql } from "drizzle-orm";
+import { db, usersTable, departmentsTable, studentsTable, caseLogsTable, procedureLogsTable, academicLogsTable, departmentConfigsTable, departmentCatalogTable, procedureTypesTable, clinicalWorkLogsTable } from "@workspace/db";
+import { eq, and, inArray, count, sql, isNull } from "drizzle-orm";
 import { requireAuth, requireDepartment, requireRole } from "../middlewares/auth.js";
 import { completionPercent, idSchema } from "../lib/validation.js";
 import { resolveConfigDepartmentId } from "../lib/department-config-source.js";
@@ -39,7 +39,9 @@ router.get("/:departmentId/catalog", async (req, res) => {
     res.json({ department: department[0], hod: hod[0] || null, config: config[0] || null, procedures,
       postings: catalog.filter((item) => item.kind === "posting"), academics: catalog.filter((item) => item.kind === "academic"), caseCategories: catalog.filter((item) => item.kind === "case_category"),
       competencyLevels: catalog.filter((item) => item.kind === "competency_level"), leaveTypes: catalog.filter((item) => item.kind === "leave_type"),
-      conferenceLevels: catalog.filter((item) => item.kind === "conference_level") });
+      conferenceLevels: catalog.filter((item) => item.kind === "conference_level"),
+      clinicalWorkCategories: catalog.filter((item) => item.kind === "clinical_work_category"),
+      clinicalWorkSubtypes: catalog.filter((item) => item.kind === "clinical_work_subtype") });
   } catch (error) {
     req.log.error({ departmentId: req.params.departmentId, status: 500 }, "Error resolving config department");
     res.status(500).json({ message: "Internal server error" });
@@ -142,13 +144,16 @@ router.get("/:departmentId/analytics", requireRole(["hod"]), async (req, res) =>
           .where(inArray(idCol, studentIds))
           .groupBy((tbl as any).status);
 
-      const [caseCounts, procCounts, acadCounts] = await Promise.all([
+      const [caseCounts, procCounts, acadCounts, clinicalCounts] = await Promise.all([
         countByStatus(caseLogsTable, caseLogsTable.studentId),
         countByStatus(procedureLogsTable, procedureLogsTable.studentId),
         countByStatus(academicLogsTable, academicLogsTable.studentId),
+        db.select({ status: clinicalWorkLogsTable.status, cnt: count() }).from(clinicalWorkLogsTable)
+          .where(and(inArray(clinicalWorkLogsTable.studentId, studentIds), isNull(clinicalWorkLogsTable.deletedAt)))
+          .groupBy(clinicalWorkLogsTable.status),
       ]);
 
-      for (const row of [...caseCounts, ...procCounts, ...acadCounts] as any[]) {
+      for (const row of [...caseCounts, ...procCounts, ...acadCounts, ...clinicalCounts] as any[]) {
         const s = row.status as "pending" | "verified" | "rejected";
         logStats[s] = (logStats[s] || 0) + Number(row.cnt);
       }

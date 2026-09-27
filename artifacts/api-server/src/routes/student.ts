@@ -3,7 +3,7 @@ import crypto from "crypto";
 import { 
   db, studentsTable, caseLogsTable, procedureLogsTable, 
   academicLogsTable, usersTable, departmentsTable, departmentConfigsTable,
-  postingsTable, leaveRecordsTable, appraisalsTable, researchTable, assessmentsTable, procedureTypesTable, departmentCatalogTable, certificationsTable, conferencesTable, awardsTable
+  postingsTable, leaveRecordsTable, appraisalsTable, researchTable, assessmentsTable, procedureTypesTable, departmentCatalogTable, certificationsTable, conferencesTable, awardsTable, clinicalWorkLogsTable
 } from "@workspace/db";
 import { eq, and, or, desc, count, sql, isNull, aliasedTable } from "drizzle-orm";
 import { requireAuth, requireRole, requireDepartment } from "../middlewares/auth.js";
@@ -11,6 +11,7 @@ import { studentAccess } from "../middlewares/student-access.js";
 import { z } from "zod";
 import { dateSchema, idSchema, nameSchema, validate } from "../lib/validation.js";
 import { resolveConfigDepartmentId } from "../lib/department-config-source.js";
+import { getDepartmentFeatures } from "../lib/department-features.js";
 
 const router: IRouter = Router();
 router.use(requireAuth, requireRole(["student", "professor", "hod"]), requireDepartment);
@@ -91,6 +92,11 @@ router.get("/:studentId/dashboard", requireAuth, async (req, res) => {
     const cases = calcCounts(caseLogsCounts);
     const procs = calcCounts(procLogsCounts);
     const acads = calcCounts(acadLogsCounts);
+    const { features } = await getDepartmentFeatures(student.departmentId!);
+    const clinicalWorks = features.clinicalWorks
+      ? calcCounts(await db.select({ status: clinicalWorkLogsTable.status, count: count() }).from(clinicalWorkLogsTable)
+        .where(and(eq(clinicalWorkLogsTable.studentId, studentId), isNull(clinicalWorkLogsTable.deletedAt))).groupBy(clinicalWorkLogsTable.status))
+      : null;
 
     const configSourceId = await resolveConfigDepartmentId(student.departmentId!);
     const [config] = await db.select().from(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, configSourceId));
@@ -123,11 +129,12 @@ router.get("/:studentId/dashboard", requireAuth, async (req, res) => {
         department: student.department || "Unassigned",
       },
       categories: [
-        { id: "cases", name: "Clinical Cases Presented", logged: cases.total, required: reqCases, verified: cases.verified, percentage: Math.min(100, Math.round((cases.verified / (reqCases || 1)) * 100)) },
-        { id: "procedures", name: "Required Procedures", logged: procs.total, required: reqProcs, verified: procs.verified, percentage: Math.min(100, Math.round((procs.verified / (reqProcs || 1)) * 100)) },
+        ...(features.hideCaseLogs ? [] : [{ id: "cases", name: "Clinical Cases Presented", logged: cases.total, required: reqCases, verified: cases.verified, percentage: Math.min(100, Math.round((cases.verified / (reqCases || 1)) * 100)) }]),
+        ...(features.hideProcedureLogs ? [] : [{ id: "procedures", name: "Required Procedures", logged: procs.total, required: reqProcs, verified: procs.verified, percentage: Math.min(100, Math.round((procs.verified / (reqProcs || 1)) * 100)) }]),
+        ...(clinicalWorks ? [{ id: "clinicalWorks", name: "Clinical Works", logged: clinicalWorks.total, required: 0, verified: clinicalWorks.verified, percentage: 0 }] : []),
         { id: "academics", name: "Case Discussions", logged: acads.total, required: reqAcad, verified: acads.verified, percentage: Math.min(100, Math.round((acads.verified / (reqAcad || 1)) * 100)) },
       ],
-      recentLogs: [...recentCases, ...recentProcs]
+      recentLogs: [...(features.hideCaseLogs ? [] : recentCases), ...(features.hideProcedureLogs ? [] : recentProcs)]
     });
   } catch (error) {
     req.log.error({ studentId: req.params.studentId, status: 500 }, "Error fetching dashboard");
@@ -208,8 +215,11 @@ router.get("/:studentId/logs", requireAuth, async (req, res) => {
     const conferenceFilter = caller.role === "professor"
       ? and(eq(conferencesTable.studentId, studentId), eq(conferencesTable.supervisorId, caller.id))
       : eq(conferencesTable.studentId, studentId);
+    const clinicalWorkFilter = caller.role === "professor"
+      ? and(eq(clinicalWorkLogsTable.studentId, studentId), eq(clinicalWorkLogsTable.supervisorId, caller.id), isNull(clinicalWorkLogsTable.deletedAt))
+      : and(eq(clinicalWorkLogsTable.studentId, studentId), isNull(clinicalWorkLogsTable.deletedAt));
 
-    const [caseLogsRaw, procedureLogsRaw, academicLogsRaw, conferenceLogsRaw] = await Promise.all([
+    const [caseLogsRaw, procedureLogsRaw, academicLogsRaw, conferenceLogsRaw, clinicalWorkLogsRaw] = await Promise.all([
       db.select({ log: caseLogsTable, supervisorName: usersTable.fullName })
         .from(caseLogsTable).leftJoin(usersTable, eq(caseLogsTable.supervisorId, usersTable.id))
         .where(caseFilter).orderBy(desc(caseLogsTable.createdAt)),
@@ -222,6 +232,9 @@ router.get("/:studentId/logs", requireAuth, async (req, res) => {
       db.select({ log: conferencesTable, supervisorName: usersTable.fullName })
         .from(conferencesTable).leftJoin(usersTable, eq(conferencesTable.supervisorId, usersTable.id))
         .where(conferenceFilter).orderBy(desc(conferencesTable.createdAt)),
+      db.select({ log: clinicalWorkLogsTable, supervisorName: usersTable.fullName })
+        .from(clinicalWorkLogsTable).leftJoin(usersTable, eq(clinicalWorkLogsTable.supervisorId, usersTable.id))
+        .where(clinicalWorkFilter).orderBy(desc(clinicalWorkLogsTable.createdAt)),
     ]);
 
     res.json({
@@ -238,6 +251,7 @@ router.get("/:studentId/logs", requireAuth, async (req, res) => {
       procedureLogs: procedureLogsRaw.map((r: any) => ({ ...r.log, supervisorName: r.supervisorName })),
       academicLogs: academicLogsRaw.map((r: any) => ({ ...r.log, supervisorName: r.supervisorName })),
       conferenceLogs: conferenceLogsRaw.map((r: any) => ({ ...r.log, supervisorName: r.supervisorName })),
+      clinicalWorkLogs: clinicalWorkLogsRaw.map((r: any) => ({ ...r.log, supervisorName: r.supervisorName })),
     });
   } catch (error) {
     req.log.error({ studentId: req.params.studentId, status: 500 }, "Error fetching student logs");
@@ -1308,6 +1322,114 @@ const studentEditGuard = async (req: any, res: any, table: any, logId: any, stud
   
   return { error: null, log, caller };
 };
+
+// ==========================================
+// CLINICAL WORKS (department flag: clinicalWorks)
+// ==========================================
+
+// Category must be in the department's catalog. A sub-type is required exactly when the HOD
+// has defined sub-types for that category, and must then belong to it.
+async function checkClinicalWorkCategory(configSourceId: number, category: string, subType: string | null | undefined) {
+  const [option] = await db.select({ id: departmentCatalogTable.id }).from(departmentCatalogTable).where(and(
+    eq(departmentCatalogTable.departmentId, configSourceId), eq(departmentCatalogTable.kind, "clinical_work_category"),
+    eq(departmentCatalogTable.value, category))).limit(1);
+  if (!option) return "Select a clinical work category from your department";
+  const subTypes = await db.select({ value: departmentCatalogTable.value }).from(departmentCatalogTable).where(and(
+    eq(departmentCatalogTable.departmentId, configSourceId), eq(departmentCatalogTable.kind, "clinical_work_subtype"),
+    eq(departmentCatalogTable.parentValue, category)));
+  if (subTypes.length === 0) return subType ? "This category has no sub-types" : null;
+  if (!subType) return "Select a sub-type for this category";
+  return subTypes.some((row) => row.value === subType) ? null : "Select a sub-type that belongs to this category";
+}
+
+const clinicalWorkBody = z.object({ supervisorId: idSchema, date: dateSchema, category: nameSchema,
+  subType: z.string().trim().min(1).max(160).nullable().optional(), patientAge: nameSchema,
+  patientSex: z.enum(["male", "female", "other"]), caseNumber: nameSchema }).strict();
+
+router.post("/:studentId/clinical-works", validate(clinicalWorkBody), async (req, res) => {
+  try {
+    const studentId = parseInt(String(req.params.studentId), 10);
+    const caller = req.user!;
+    const [ownProfile] = await db.select({ id: studentsTable.id }).from(studentsTable).where(eq(studentsTable.userId, caller.id));
+    if (caller.role !== "student" || !ownProfile || ownProfile.id !== studentId) {
+      res.status(403).json({ message: "Forbidden: you can only add your own logs" }); return;
+    }
+    const { configSourceId, features } = await getDepartmentFeatures(caller.departmentId!);
+    if (!features.clinicalWorks) { res.status(403).json({ message: "Clinical works are not enabled for your department" }); return; }
+    const { supervisorId, date, category, subType, patientAge, patientSex, caseNumber } = req.body;
+    if (!(await validateSupervisor(supervisorId, caller.departmentId!))) {
+      res.status(400).json({ message: "Invalid supervisorId" }); return;
+    }
+    const categoryError = await checkClinicalWorkCategory(configSourceId, category, subType);
+    if (categoryError) { res.status(400).json({ message: categoryError }); return; }
+    const [inserted] = await db.insert(clinicalWorkLogsTable).values({ studentId, supervisorId, date, category,
+      subType: subType || null, patientAge, patientSex, caseNumber, status: "pending" }).returning();
+    res.status(201).json(inserted);
+  } catch (error) {
+    req.log.error({ studentId: req.params.studentId, status: 500 }, "Error creating clinical work log");
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+router.patch("/:studentId/clinical-works/:logId", requireAuth, validate(clinicalWorkBody.partial()), async (req, res) => {
+  try {
+    const studentId = parseInt(String(req.params.studentId), 10);
+    const logId = parseInt(String(req.params.logId), 10);
+    const caller = req.user!;
+    if (caller.role !== "student") { res.status(403).json({ message: "Only students can edit logs" }); return; }
+    const [ownProfile] = await db.select({ id: studentsTable.id }).from(studentsTable).where(eq(studentsTable.userId, caller.id));
+    if (!ownProfile || ownProfile.id !== studentId) { res.status(403).json({ message: "Forbidden: you can only edit your own logs" }); return; }
+    if (!Number.isSafeInteger(logId) || logId <= 0) { res.status(404).json({ message: "Log not found" }); return; }
+    const [log] = await db.select().from(clinicalWorkLogsTable).where(and(eq(clinicalWorkLogsTable.id, logId),
+      eq(clinicalWorkLogsTable.studentId, studentId), isNull(clinicalWorkLogsTable.deletedAt))).limit(1);
+    if (!log) { res.status(404).json({ message: "Log not found" }); return; }
+    if (log.status !== "pending" && log.status !== "rejected") {
+      res.status(400).json({ message: "Only pending or rejected logs can be edited" }); return;
+    }
+    const { configSourceId, features } = await getDepartmentFeatures(caller.departmentId!);
+    if (!features.clinicalWorks) { res.status(403).json({ message: "Clinical works are not enabled for your department" }); return; }
+    if (req.body.supervisorId !== undefined && !(await validateSupervisor(req.body.supervisorId, caller.departmentId!))) {
+      res.status(400).json({ message: "Invalid supervisorId" }); return;
+    }
+    if (req.body.category !== undefined || req.body.subType !== undefined) {
+      const category = req.body.category ?? log.category;
+      const subType = req.body.subType !== undefined ? req.body.subType : (req.body.category !== undefined ? null : log.subType);
+      const categoryError = await checkClinicalWorkCategory(configSourceId, category, subType);
+      if (categoryError) { res.status(400).json({ message: categoryError }); return; }
+      req.body.subType = subType || null;
+    }
+    const [updated] = await db.update(clinicalWorkLogsTable)
+      .set({ ...req.body, status: "pending", facultyRemarks: null, reviewedBy: null, reviewedAt: null })
+      .where(and(eq(clinicalWorkLogsTable.id, logId), eq(clinicalWorkLogsTable.studentId, studentId), isNull(clinicalWorkLogsTable.deletedAt)))
+      .returning();
+    if (!updated) { res.status(404).json({ message: "Log not found" }); return; }
+    res.json(updated);
+  } catch (error) {
+    req.log.error({ logId: req.params.logId, status: 500 }, "Error updating clinical work log");
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+router.delete("/:studentId/clinical-works/:logId", requireAuth, async (req, res) => {
+  try {
+    const studentId = parseInt(String(req.params.studentId), 10);
+    const logId = parseInt(String(req.params.logId), 10);
+    const caller = req.user!;
+    if (caller.role !== "student") { res.status(403).json({ message: "Only students can delete their own logs" }); return; }
+    const [ownProfile] = await db.select({ id: studentsTable.id }).from(studentsTable).where(eq(studentsTable.userId, caller.id));
+    if (!ownProfile || ownProfile.id !== studentId) { res.status(403).json({ message: "Forbidden: you can only delete your own logs" }); return; }
+    if (!Number.isSafeInteger(logId) || logId <= 0) { res.status(404).json({ message: "Log not found" }); return; }
+    const [log] = await db.select({ status: clinicalWorkLogsTable.status }).from(clinicalWorkLogsTable).where(and(
+      eq(clinicalWorkLogsTable.id, logId), eq(clinicalWorkLogsTable.studentId, studentId), isNull(clinicalWorkLogsTable.deletedAt))).limit(1);
+    if (!log) { res.status(404).json({ message: "Log not found" }); return; }
+    if (log.status !== "pending") { res.status(400).json({ message: "Only pending logs can be deleted" }); return; }
+    await db.update(clinicalWorkLogsTable).set({ deletedAt: new Date() }).where(eq(clinicalWorkLogsTable.id, logId));
+    res.json({ message: "Log deleted successfully" });
+  } catch (error) {
+    req.log.error({ logId: req.params.logId, status: 500 }, "Error deleting clinical work log");
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
 
 // 1. Case Logs
 router.patch("/:studentId/case-logs/:logId", requireAuth, validate(z.object({ supervisorId: idSchema, date: dateSchema, patientAge: nameSchema,

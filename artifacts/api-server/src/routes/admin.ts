@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, usersTable, studentsTable, departmentsTable, departmentConfigsTable, procedureTypesTable, caseLogsTable, procedureLogsTable, academicLogsTable, departmentCatalogTable, paymentsTable, leaveRecordsTable, leaveApplicationsTable, assessmentsTable, appraisalsTable, assignmentRecipientsTable, attendanceLogsTable, certificationsTable, postingsTable, thesisMilestonesTable, researchTable, auditTable, assignmentsTable, assignmentTypesTable } from "@workspace/db";
+import { db, usersTable, studentsTable, departmentsTable, departmentConfigsTable, procedureTypesTable, caseLogsTable, procedureLogsTable, academicLogsTable, departmentCatalogTable, paymentsTable, leaveRecordsTable, leaveApplicationsTable, assessmentsTable, appraisalsTable, assignmentRecipientsTable, attendanceLogsTable, certificationsTable, postingsTable, thesisMilestonesTable, researchTable, auditTable, assignmentsTable, assignmentTypesTable, clinicalWorkLogsTable } from "@workspace/db";
 import { eq, and, count, inArray, sql, or, like } from "drizzle-orm";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
@@ -613,11 +613,25 @@ router.get("/roster", async (req, res) => {
   }
 });
 
-router.post("/department/catalog", validate(z.object({ kind: z.enum(["posting", "academic", "case_category", "competency_level", "leave_type", "conference_level"]), name: nameSchema,
-  value: nameSchema, required: targetSchema, period: z.enum(["total", "month"]) }).strict()), async (req, res) => {
+router.post("/department/catalog", validate(z.object({ kind: z.enum(["posting", "academic", "case_category", "competency_level", "leave_type", "conference_level",
+  "clinical_work_category", "clinical_work_subtype"]), name: nameSchema,
+  value: nameSchema, required: targetSchema, period: z.enum(["total", "month"]), parentValue: nameSchema.optional() }).strict()), async (req, res) => {
   const [dept] = await db.select({ configSourceDepartmentId: departmentsTable.configSourceDepartmentId }).from(departmentsTable).where(eq(departmentsTable.id, req.user!.departmentId!));
   if (dept?.configSourceDepartmentId !== null) { res.status(403).json({ message: "Test departments cannot modify mirrored settings" }); return; }
-  const [row] = await db.insert(departmentCatalogTable).values({ ...req.body, departmentId: req.user!.departmentId! }).returning();
+  const { parentValue, ...entry } = req.body;
+  let values = { ...entry, departmentId: req.user!.departmentId!, parentValue: null as string | null };
+  if (entry.kind === "clinical_work_subtype") {
+    if (!parentValue) { res.status(400).json({ message: "Choose the category this sub-type belongs to" }); return; }
+    const [parent] = await db.select({ id: departmentCatalogTable.id }).from(departmentCatalogTable).where(and(
+      eq(departmentCatalogTable.departmentId, req.user!.departmentId!), eq(departmentCatalogTable.kind, "clinical_work_category"),
+      eq(departmentCatalogTable.value, parentValue))).limit(1);
+    if (!parent) { res.status(400).json({ message: "Choose a clinical work category from your department" }); return; }
+    // Namespaced so the same sub-type name can exist under more than one category.
+    values = { ...values, value: `${parentValue}::${entry.value}`, parentValue };
+  } else if (parentValue !== undefined) {
+    res.status(400).json({ message: "Only clinical work sub-types have a parent category" }); return;
+  }
+  const [row] = await db.insert(departmentCatalogTable).values(values).returning();
   if (req.body.kind === "case_category" || req.body.kind === "academic") {
     await recomputeCatalogRequirements(req.user!.departmentId!);
   }
@@ -685,6 +699,9 @@ router.delete("/users/:id/hard", async (req, res) => {
           const _procs = await tx.delete(procedureLogsTable).where(eq(procedureLogsTable.studentId, studentId)).returning({ id: procedureLogsTable.id });
           deletedCounts.procedureLogs = _procs.length;
 
+          const _clinical = await tx.delete(clinicalWorkLogsTable).where(eq(clinicalWorkLogsTable.studentId, studentId)).returning({ id: clinicalWorkLogsTable.id });
+          deletedCounts.clinicalWorkLogs = _clinical.length;
+
           const _acad = await tx.delete(academicLogsTable).where(eq(academicLogsTable.studentId, studentId)).returning({ id: academicLogsTable.id });
           deletedCounts.academicLogs = _acad.length;
 
@@ -727,6 +744,9 @@ router.delete("/users/:id/hard", async (req, res) => {
 
         const _procs = await tx.delete(procedureLogsTable).where(or(eq(procedureLogsTable.supervisorId, targetUserId), eq(procedureLogsTable.reviewedBy, targetUserId))).returning({ id: procedureLogsTable.id });
         deletedCounts.procedureLogs = _procs.length;
+
+        const _clinical = await tx.delete(clinicalWorkLogsTable).where(or(eq(clinicalWorkLogsTable.supervisorId, targetUserId), eq(clinicalWorkLogsTable.reviewedBy, targetUserId))).returning({ id: clinicalWorkLogsTable.id });
+        deletedCounts.clinicalWorkLogs = _clinical.length;
 
         const _acad = await tx.delete(academicLogsTable).where(or(eq(academicLogsTable.supervisorId, targetUserId), eq(academicLogsTable.reviewedBy, targetUserId))).returning({ id: academicLogsTable.id });
         deletedCounts.academicLogs = _acad.length;
@@ -840,6 +860,13 @@ router.get("/department/catalog/:id/usage-count", async (req, res) => {
         .innerJoin(studentsTable, eq(academicLogsTable.studentId, studentsTable.id))
         .innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
         .where(and(eq(academicLogsTable.activityType, entry.value), eq(usersTable.departmentId, departmentId!)));
+    } else if (entry.kind === "clinical_work_category" || entry.kind === "clinical_work_subtype") {
+      [countRes] = await db.select({ count: count() })
+        .from(clinicalWorkLogsTable)
+        .innerJoin(studentsTable, eq(clinicalWorkLogsTable.studentId, studentsTable.id))
+        .innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
+        .where(and(entry.kind === "clinical_work_category" ? eq(clinicalWorkLogsTable.category, entry.value) : eq(clinicalWorkLogsTable.subType, entry.value),
+          eq(usersTable.departmentId, departmentId!)));
     } else if (entry.kind === "leave_type") {
       [countRes] = await db.select({ count: count() })
         .from(leaveRecordsTable)
@@ -867,6 +894,13 @@ router.delete("/department/catalog/:id", async (req, res) => {
     if (entry && entry.kind === "leave_type" && (entry.value === "casual" || entry.value === "academic")) {
       res.status(403).json({ message: "This leave type is required for quota tracking and cannot be removed" });
       return;
+    }
+
+    if (entry && entry.kind === "clinical_work_category") {
+      const [child] = await db.select({ id: departmentCatalogTable.id }).from(departmentCatalogTable).where(and(
+        eq(departmentCatalogTable.departmentId, departmentId!), eq(departmentCatalogTable.kind, "clinical_work_subtype"),
+        eq(departmentCatalogTable.parentValue, entry.value))).limit(1);
+      if (child) { res.status(409).json({ message: "Delete this category's sub-types first" }); return; }
     }
 
     const [deleted] = await db.delete(departmentCatalogTable)

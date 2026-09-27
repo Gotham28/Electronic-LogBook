@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, usersTable, departmentsTable, studentsTable, departmentConfigsTable, departmentCatalogTable, procedureTypesTable, assignmentTypesTable, assignmentsTable, assignmentRecipientsTable, caseLogsTable, procedureLogsTable, academicLogsTable, leaveRecordsTable, postingsTable, researchTable, assessmentsTable, attendanceLogsTable, leaveApplicationsTable, thesisMilestonesTable, appraisalsTable, auditTable } from "@workspace/db";
+import { db, usersTable, departmentsTable, studentsTable, departmentConfigsTable, departmentCatalogTable, procedureTypesTable, assignmentTypesTable, assignmentsTable, assignmentRecipientsTable, caseLogsTable, procedureLogsTable, academicLogsTable, leaveRecordsTable, postingsTable, researchTable, assessmentsTable, attendanceLogsTable, leaveApplicationsTable, thesisMilestonesTable, appraisalsTable, auditTable, clinicalWorkLogsTable } from "@workspace/db";
 import { eq, and, sql, inArray, or } from "drizzle-orm";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
@@ -327,6 +327,7 @@ export async function deleteDepartmentCascade(tx: any, targetDepartmentId: numbe
     { name: "case_logs",          table: caseLogsTable,          uFields: [caseLogsTable.supervisorId, caseLogsTable.reviewedBy],                   sFields: [caseLogsTable.studentId] },
     { name: "procedure_logs",     table: procedureLogsTable,     uFields: [procedureLogsTable.supervisorId, procedureLogsTable.reviewedBy],          sFields: [procedureLogsTable.studentId] },
     { name: "academic_logs",      table: academicLogsTable,      uFields: [academicLogsTable.supervisorId, academicLogsTable.reviewedBy],            sFields: [academicLogsTable.studentId] },
+    { name: "clinical_work_logs", table: clinicalWorkLogsTable,  uFields: [clinicalWorkLogsTable.supervisorId, clinicalWorkLogsTable.reviewedBy],    sFields: [clinicalWorkLogsTable.studentId] },
     { name: "leave_records",      table: leaveRecordsTable,      uFields: [leaveRecordsTable.reviewedBy],                                           sFields: [leaveRecordsTable.studentId] },
     { name: "postings",           table: postingsTable,          uFields: [postingsTable.supervisorId],                                              sFields: [postingsTable.studentId] },
     { name: "research",           table: researchTable,          uFields: [researchTable.guideId, researchTable.coGuideId],                          sFields: [researchTable.studentId] },

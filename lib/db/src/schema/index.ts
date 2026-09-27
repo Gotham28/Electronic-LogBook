@@ -21,3 +21,4 @@ export * from "./subscription_plans.js";
 export * from "./payments.js";
 export * from "./conferences.js";
 export * from "./awards.js";
+export * from "./clinical_works.js";
