@@ -175,7 +175,7 @@ export function AcademicLogsPage() {
               ) : (
                 <Field label="Presentation format (optional)"><Input value={form.presentationType} onChange={(e) => setForm({ ...form, presentationType: e.target.value })} maxLength={160} /></Field>
               )}
-              <Field label="Topic / title / impression">
+              <Field label="Topic / Title / Impression">
                 <Input value={form.topic} onChange={(e) => setForm({ ...form, topic: e.target.value })} required />
               </Field>
               {config?.enabledFeatures?.academicActivityExtras && (
