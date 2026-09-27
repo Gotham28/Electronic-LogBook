@@ -2,6 +2,7 @@ import * as React from "react";
 import { getCurrentUser, isDemoMode } from "@/lib/session";
 import { apiGet } from "@/lib/apiClient";
 import { formatLogbookDate } from "@/lib/logbook-config";
+import { useDepartment } from "@/lib/department-context";
 import { Printer, X, BookOpen } from "lucide-react";
 
 class PrintErrorBoundary extends React.Component<{children: React.ReactNode}, {error: Error | null}> {
@@ -177,6 +178,8 @@ function AggregateSummary({ rows, label }: { rows: any[]; label: string }) {
 export function PrintableLogbook() {
   const user = React.useMemo(() => getCurrentUser(), []);
   const hideUhid = isDemoMode();
+  const { config, clinicalWorkCategories, clinicalWorkSubtypes } = useDepartment();
+  const features = config?.enabledFeatures ?? {};
   const [data, setData] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -212,6 +215,7 @@ export function PrintableLogbook() {
         profile: logsBundle.profile || null,
         cases: logsBundle.caseLogs || [],
         procs: logsBundle.procedureLogs || [],
+        clinicalWorks: logsBundle.clinicalWorkLogs || [],
         academics: logsBundle.academicLogs || [],
         postings: Array.isArray(postings) ? postings : postings?.data || [],
         leaves: Array.isArray(leaves) ? leaves : leaves?.data || [],
@@ -258,6 +262,10 @@ export function PrintableLogbook() {
 
   if (!data) return null;
 
+  let sectionCount = 0;
+  const nextSection = () => String(++sectionCount).padStart(2, "0");
+  const clinicalNames = new Map([...clinicalWorkCategories, ...clinicalWorkSubtypes].map((item) => [item.value, item.name]));
+
   const regNumber = data?.profile?.registrationNumber ?? "—";
   const department = data?.profile?.department ?? "—";
   const joiningYear = data?.profile?.joiningYear ?? "—";
@@ -302,7 +310,7 @@ export function PrintableLogbook() {
 
         {/* ── 1. Postings ───────────────────────────────── */}
         <div className="mb-12 no-break">
-          <SectionHeader number="01" title="Postings & Rotations" />
+          <SectionHeader number={nextSection()} title="Postings & Rotations" />
           {(() => { const rows = data.postings.filter((p: any) => p.status !== "rejected"); return rows.length === 0 ? <EmptySection /> : (
             <>
               <table className="w-full border-collapse">
@@ -326,9 +334,9 @@ export function PrintableLogbook() {
           ); })()}
         </div>
 
-        {/* ── 2. Case Logs ──────────────────────────────── */}
-        <div className="mb-12 break-before-page">
-          <SectionHeader number="02" title="Clinical Case Logs" />
+        {/* ── Case Logs ─────────────────────────────────── */}
+        {!features.hideCaseLogs && <div className="mb-12 break-before-page">
+          <SectionHeader number={nextSection()} title="Clinical Case Logs" />
           {(() => { const rows = data.cases.filter((c: any) => c.status !== "rejected"); return rows.length === 0 ? <EmptySection /> : (
             <>
               <table className="w-full border-collapse">
@@ -354,11 +362,11 @@ export function PrintableLogbook() {
               <AggregateSummary rows={data.cases} label="Cases" />
             </>
           ); })()}
-        </div>
+        </div>}
 
-        {/* ── 3. Procedure Logs ─────────────────────────── */}
-        <div className="mb-12 break-before-page">
-          <SectionHeader number="03" title="Procedure Logs" />
+        {/* ── Procedure Logs ────────────────────────────── */}
+        {!features.hideProcedureLogs && <div className="mb-12 break-before-page">
+          <SectionHeader number={nextSection()} title="Procedure Logs" />
           {(() => { const rows = data.procs.filter((p: any) => p.status !== "rejected"); return rows.length === 0 ? <EmptySection /> : (
             <>
               <table className="w-full border-collapse">
@@ -385,11 +393,41 @@ export function PrintableLogbook() {
               <AggregateSummary rows={data.procs} label="Procedures" />
             </>
           ); })()}
-        </div>
+        </div>}
+
+        {/* ── Clinical Works ────────────────────────────── */}
+        {features.clinicalWorks && <div className="mb-12 break-before-page">
+          <SectionHeader number={nextSection()} title="Clinical Works" />
+          {(() => { const rows = data.clinicalWorks.filter((c: any) => c.status !== "rejected"); return rows.length === 0 ? <EmptySection /> : (
+            <>
+              <table className="w-full border-collapse">
+                <thead><tr>
+                  <Th>#</Th><Th>Date</Th><Th>Category</Th><Th>Sub-type</Th>
+                  {!hideUhid && <Th>Case No.</Th>}
+                  <Th>Age / Sex</Th><Th>Status</Th>
+                </tr></thead>
+                <tbody>
+                  {rows.map((c: any, i: number) => (
+                    <tr key={c.id} className={i % 2 === 0 ? "" : "bg-slate-50/50"}>
+                      <Td muted>{rows.length - i}</Td>
+                      <Td>{formatLogbookDate(c.date)}</Td>
+                      <Td><span className="font-medium">{clinicalNames.get(c.category) ?? c.category}</span></Td>
+                      <Td muted={!c.subType}>{c.subType ? clinicalNames.get(c.subType) ?? c.subType : "—"}</Td>
+                      {!hideUhid && <Td>{c.caseNumber}</Td>}
+                      <Td>{[c.patientAge, c.patientSex].filter(Boolean).join(" / ")}</Td>
+                      <Td><StatusPill status={c.status ?? "pending"} /></Td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <AggregateSummary rows={data.clinicalWorks} label="Clinical works" />
+            </>
+          ); })()}
+        </div>}
 
         {/* ── 4. Academic Activities ────────────────────── */}
         <div className="mb-12 break-before-page">
-          <SectionHeader number="04" title="Academic Activities" />
+          <SectionHeader number={nextSection()} title="Academic Activities" />
           {(() => { const rows = data.academics.filter((a: any) => a.status !== "rejected"); return rows.length === 0 ? <EmptySection /> : (
             <>
               <table className="w-full border-collapse">
@@ -417,7 +455,7 @@ export function PrintableLogbook() {
 
         {/* ── 5. Assessments ───────────────────────────── */}
         <div className="mb-12 no-break">
-          <SectionHeader number="05" title="Assessments" />
+          <SectionHeader number={nextSection()} title="Assessments" />
           {data.assessments.length === 0 ? <EmptySection /> : (
             <table className="w-full border-collapse">
               <thead><tr>
@@ -440,7 +478,7 @@ export function PrintableLogbook() {
 
         {/* ── 6. Certifications ────────────────────────── */}
         <div className="mb-12 no-break">
-          <SectionHeader number="06" title="Certifications" />
+          <SectionHeader number={nextSection()} title="Certifications" />
           {(() => { const rows = data.certifications.filter((c: any) => c.status !== "rejected"); return rows.length === 0 ? <EmptySection /> : (
             <table className="w-full border-collapse">
               <thead><tr>
@@ -463,7 +501,7 @@ export function PrintableLogbook() {
 
         {/* ── 7. Leave Records ─────────────────────────── */}
         <div className="mb-12 no-break">
-          <SectionHeader number="07" title="Leave Records" />
+          <SectionHeader number={nextSection()} title="Leave Records" />
           {(() => { const rows = data.leaves.filter((l: any) => l.status !== "rejected"); return rows.length === 0 ? <EmptySection /> : (
             <table className="w-full border-collapse">
               <thead><tr>
@@ -491,7 +529,7 @@ export function PrintableLogbook() {
 
         {/* ── 8. Thesis ────────────────────────────────── */}
         <div className="mb-16 no-break">
-          <SectionHeader number="08" title="Thesis" />
+          <SectionHeader number={nextSection()} title="Thesis" />
           {!data.thesis ? <EmptySection /> : (
             <div className="rounded-xl border border-slate-200 overflow-hidden">
               {[
@@ -516,7 +554,7 @@ export function PrintableLogbook() {
 
         {/* ── 9. Quarterly Appraisals ────────────────────── */}
         <div className="mb-16 no-break">
-          <SectionHeader number="09" title="Quarterly Appraisals" />
+          <SectionHeader number={nextSection()} title="Quarterly Appraisals" />
           {(() => { const rows = data.appraisals; return !rows || rows.length === 0 ? <EmptySection /> : (
             <div className="grid grid-cols-2 gap-4">
               {rows.map((appr: any, i: number) => (

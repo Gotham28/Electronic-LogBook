@@ -159,13 +159,21 @@ function navigationForRole(role: RoleType, dashboardData?: any, loadingBadges?: 
     return dermItems;
   }
 
+  const features = config?.enabledFeatures ?? {};
   const items: NavigationItem[] = [
     { title: "Dashboard", icon: LayoutDashboard, href: "/" },
     { title: "Postings & Rotations", icon: CalendarDays, href: "/postings" },
-    { title: "Case Logs", icon: FileText, href: "/cases", badge: getCount("cases"), badgeLoading: loadingBadges },
-    { title: "Procedure Logs", icon: Stethoscope, href: "/procedures", badge: getCount("procedures"), badgeLoading: loadingBadges },
-    { title: "Academic Activities", icon: GraduationCap, href: "/academics" },
   ];
+  if (!features.hideCaseLogs) {
+    items.push({ title: "Case Logs", icon: FileText, href: "/cases", badge: getCount("cases"), badgeLoading: loadingBadges });
+  }
+  if (!features.hideProcedureLogs) {
+    items.push({ title: "Procedure Logs", icon: Stethoscope, href: "/procedures", badge: getCount("procedures"), badgeLoading: loadingBadges });
+  }
+  if (features.clinicalWorks) {
+    items.push({ title: "Clinical Works", icon: Stethoscope, href: "/clinical-works", badge: getCount("clinicalWorks"), badgeLoading: loadingBadges });
+  }
+  items.push({ title: "Academic Activities", icon: GraduationCap, href: "/academics" });
 
   if (config?.enabledFeatures?.attendedConferences) {
     items.push({ title: "Conferences", icon: Presentation, href: "/conferences" });
@@ -263,11 +271,17 @@ export function AppLayout({
         }
 
         if (logsRes.status === "fulfilled" && logsRes.value) {
-          const { caseLogs = [], procedureLogs = [], academicLogs = [] } = logsRes.value;
+          const { caseLogs = [], procedureLogs = [], academicLogs = [], clinicalWorkLogs = [] } = logsRes.value;
           const rejectedCases = caseLogs.filter((l: any) => l.status === "rejected").length;
           const rejectedProcs = procedureLogs.filter((l: any) => l.status === "rejected").length;
           const rejectedAcads = academicLogs.filter((l: any) => l.status === "rejected").length;
-          const rejectedTotal = rejectedCases + rejectedProcs + rejectedAcads;
+          const rejectedClinical = clinicalWorkLogs.filter((l: any) => l.status === "rejected").length;
+          const rejectedTotal = rejectedCases + rejectedProcs + rejectedAcads + rejectedClinical;
+          const features = config?.enabledFeatures ?? {};
+          const rejectedHref = rejectedCases > 0 && !features.hideCaseLogs ? "/cases"
+            : rejectedClinical > 0 && features.clinicalWorks ? "/clinical-works"
+            : rejectedProcs > 0 && !features.hideProcedureLogs ? "/procedures"
+            : rejectedAcads > 0 ? "/academics" : "/";
 
           const rejKey = `dismissed_rejected_${currentUser.studentProfileId}`;
           const dismissedStr = sessionStorage.getItem(rejKey);
@@ -275,7 +289,7 @@ export function AppLayout({
             items.push({
               id: "rejected_logs",
               text: `${rejectedTotal} log ${rejectedTotal === 1 ? "entry" : "entries"} returned for revision`,
-              href: "/cases",
+              href: rejectedHref,
               onDismiss: () => sessionStorage.setItem(rejKey, String(rejectedTotal)),
             });
           }

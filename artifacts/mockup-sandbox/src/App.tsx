@@ -1,5 +1,5 @@
-import { useEffect, useState, type ComponentType } from "react";
-import { Route, Switch, useLocation } from "wouter";
+import { useEffect, useState, type ComponentType, type ReactNode } from "react";
+import { Redirect, Route, Switch, useLocation } from "wouter";
 import { AppLayout, type RoleType } from "@/components/layout/AppLayout";
 import { Dashboard } from "@/components/Dashboard";
 import { ProfessorPortal } from "@/components/ProfessorPortal";
@@ -17,6 +17,7 @@ import { MilestonesPage } from "@/components/pages/MilestonesPage";
 import { ThesisPage } from "@/components/pages/ThesisPage";
 import { CertificationsPage } from "@/components/pages/CertificationsPage";
 import { AwardsPage } from "@/components/pages/AwardsPage";
+import { ClinicalWorksPage } from "@/components/pages/ClinicalWorksPage";
 import { AssessmentsPage } from "@/components/pages/AssessmentsPage";
 import { PrintableLogbook } from "@/components/pages/PrintableLogbook";
 import { PrivacyPolicyPage } from "@/components/pages/PrivacyPolicyPage";
@@ -24,7 +25,7 @@ import { GrievanceOfficerPage } from "@/components/pages/GrievanceOfficerPage";
 import { DataRightsPage } from "@/components/pages/DataRightsPage";
 import { getCurrentUser, clearSession, getToken, saveToken, SESSION_EXPIRED_EVENT } from "@/lib/session";
 import { apiGet, apiPost } from "@/lib/apiClient";
-import { DepartmentProvider } from "@/lib/department-context";
+import { DepartmentProvider, useDepartment } from "@/lib/department-context";
 import { startSessionKeepalive } from "@/lib/session-keepalive";
 
 import { Toaster } from "@/components/ui/sonner";
@@ -242,7 +243,9 @@ function App() {
     );
   }
 
-  if (window.location.pathname === "/print" && activeRole === "Student") return <PrintableLogbook />;
+  if (window.location.pathname === "/print" && activeRole === "Student") {
+    return <DepartmentProvider departmentId={currentUser?.departmentId ?? null}><PrintableLogbook /></DepartmentProvider>;
+  }
 
   return (
     <DepartmentProvider departmentId={currentUser?.departmentId ?? null}>
@@ -267,8 +270,9 @@ function App() {
         <Switch>
           <Route path="/" component={Dashboard} />
           <Route path="/dashboard" component={Dashboard} />
-          <Route path="/cases" component={CaseLogsPage} />
-          <Route path="/procedures" component={ProcedureLogsPage} />
+          <Route path="/cases">{() => <FeatureGate hiddenBy="hideCaseLogs"><CaseLogsPage /></FeatureGate>}</Route>
+          <Route path="/procedures">{() => <FeatureGate hiddenBy="hideProcedureLogs"><ProcedureLogsPage /></FeatureGate>}</Route>
+          <Route path="/clinical-works">{() => <FeatureGate requires="clinicalWorks"><ClinicalWorksPage /></FeatureGate>}</Route>
           <Route path="/academics" component={AcademicLogsPage} />
           <Route path="/conferences" component={ConferencesPage} />
           <Route path="/postings" component={PostingsPage} />
@@ -286,6 +290,12 @@ function App() {
     </AppLayout>
     </DepartmentProvider>
   );
+}
+
+function FeatureGate({ hiddenBy, requires, children }: { hiddenBy?: string; requires?: string; children: ReactNode }) {
+  const features = useDepartment().config?.enabledFeatures ?? {};
+  if ((hiddenBy && features[hiddenBy]) || (requires && !features[requires])) return <Redirect to="/" />;
+  return <>{children}</>;
 }
 
 export default App;
