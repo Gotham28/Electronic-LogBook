@@ -21,6 +21,8 @@ import {
   backfillTestDepartments,
   resetTestCredentials,
   deactivateAdminUser,
+  reactivateAdminUser,
+  hardDeleteAdminUser,
   type AdminDepartment,
   type AdminUserRow
 } from "@/lib/apiClient";
@@ -467,6 +469,10 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
+  const [userToDelete, setUserToDelete] = useState<{ id: number; name: string; role: string } | null>(null);
+  const [deletingUser, setDeletingUser] = useState(false);
+  const [deleteUserError, setDeleteUserError] = useState<string | null>(null);
+
   useEffect(() => {
     fetchRoster();
     fetchMirrorRoster();
@@ -475,6 +481,8 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
     setShowAddForm(false);
     setShowDeleteConfirm(false);
     setDeleteError(null);
+    setUserToDelete(null);
+    setDeleteUserError(null);
   }, [department.id, department.mirrorDepartmentId]);
 
   const fetchRoster = async () => {
@@ -587,6 +595,37 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
       fetchRoster();
     } catch (err: any) {
       toast.error(err.message || "Failed to deactivate user");
+    }
+  };
+
+  const handleReactivate = async (userId: number, name: string) => {
+    if (!window.confirm(`Reactivate ${name}? They will be able to sign in again.`)) return;
+    try {
+      await reactivateAdminUser(userId);
+      toast.success(`${name} reactivated`);
+      onRefresh();
+      fetchRoster();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to reactivate user");
+    }
+  };
+
+  const handleHardDeleteUser = async () => {
+    if (!userToDelete) return;
+    setDeletingUser(true);
+    setDeleteUserError(null);
+    try {
+      const res = await hardDeleteAdminUser(userToDelete.id);
+      const deletedCount = Object.values(res?.deletedRecords ?? {}).reduce((acc, val) => acc + (typeof val === "number" ? val : 0), 0);
+      const summary = deletedCount > 0 ? ` (${deletedCount} related records removed)` : "";
+      toast.success(`${userToDelete.name} permanently deleted${summary}`);
+      setUserToDelete(null);
+      onRefresh();
+      fetchRoster();
+    } catch (err: any) {
+      setDeleteUserError(err.message || "Failed to permanently delete user");
+    } finally {
+      setDeletingUser(false);
     }
   };
 
@@ -743,6 +782,65 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
         </Card>
       )}
 
+      {/* Permanently delete a faculty member or resident: confirmation panel */}
+      {userToDelete && (
+        <Card className="border-rose-200 bg-rose-50/30 shadow-sm">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-rose-100">
+                <AlertTriangle className="h-4 w-4 text-rose-700" />
+              </div>
+              <div className="flex-1 space-y-3">
+                <div>
+                  <h4 className="font-semibold text-rose-900">Permanently delete {userToDelete.name}?</h4>
+                  <p className="text-sm text-rose-800 mt-1 leading-relaxed">
+                    This will <strong>permanently delete</strong> the {userToDelete.role === "student" ? "resident" : "faculty member"} and <strong>all</strong> of their associated data. This action is <strong>irreversible</strong>.
+                  </p>
+                  {userToDelete.role === "student" ? (
+                    <ul className="text-sm text-rose-800 mt-1 ml-4 list-disc space-y-0.5">
+                      <li>Their account and profile</li>
+                      <li>All of their clinical logs, case logs, and procedures</li>
+                      <li>Their assessments, appraisals, and attendance records</li>
+                      <li>Their leave records and applications</li>
+                      <li>Their thesis milestones and research records</li>
+                    </ul>
+                  ) : (
+                    <ul className="text-sm text-rose-800 mt-1 ml-4 list-disc space-y-0.5">
+                      <li>Their account and profile</li>
+                      <li>Any assignments they created (assignment types they created pass to the {department.name} HOD)</li>
+                      <li><strong>Every clinical and academic record belonging to residents</strong> where this faculty member appears as reviewer, verifier, or supervisor</li>
+                      <li>Their assessments and appraisals of residents</li>
+                    </ul>
+                  )}
+                  <p className="text-sm text-rose-800 mt-2 leading-relaxed">
+                    To remove access but keep all records, use <strong>Deactivate</strong> instead.
+                  </p>
+                </div>
+
+                {deleteUserError && (
+                  <div className="p-3 bg-rose-100 border border-rose-300 rounded-md text-sm text-rose-900 font-medium">
+                    {deleteUserError}
+                  </div>
+                )}
+
+                <div className="flex gap-2 justify-end">
+                  <Button type="button" variant="outline" onClick={() => { setUserToDelete(null); setDeleteUserError(null); }}>
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleHardDeleteUser}
+                    disabled={deletingUser}
+                    className="bg-rose-600 hover:bg-rose-700 text-white"
+                  >
+                    {deletingUser ? "Deleting..." : `Yes, permanently delete ${userToDelete.name}`}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {error ? (
         <div className="flex h-40 flex-col items-center justify-center space-y-4 text-center rounded-xl border border-rose-100 bg-rose-50" role="alert">
           <p className="text-sm font-medium text-rose-700">{error}</p>
@@ -850,12 +948,21 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
                           <div className="flex justify-end gap-2">
                             {u.role === "hod" ? (
                               <span className="text-xs text-slate-400 font-medium self-center">Use 'Replace HOD' above</span>
-                            ) : u.status === "rejected" ? (
-                              <span className="text-xs text-slate-400 font-medium self-center">Deactivated</span>
                             ) : (
-                              <Button size="sm" variant="outline" onClick={() => handleDeactivate(u.id, u.role)} className="text-rose-700 border-rose-200 hover:bg-rose-50 h-8 px-3">
-                                Deactivate
-                              </Button>
+                              <>
+                                {u.status === "rejected" ? (
+                                  <Button size="sm" variant="outline" onClick={() => handleReactivate(u.id, u.fullName)} className="h-8 px-3">
+                                    Reactivate
+                                  </Button>
+                                ) : (
+                                  <Button size="sm" variant="outline" onClick={() => handleDeactivate(u.id, u.role)} className="text-rose-700 border-rose-200 hover:bg-rose-50 h-8 px-3">
+                                    Deactivate
+                                  </Button>
+                                )}
+                                <Button size="sm" variant="outline" onClick={() => { setUserToDelete({ id: u.id, name: u.fullName, role: u.role }); setDeleteUserError(null); }} className="text-rose-700 border-rose-200 hover:bg-rose-50 h-8 px-3">
+                                  <Trash2 className="h-4 w-4 mr-1" /> Delete
+                                </Button>
+                              </>
                             )}
                           </div>
                         </TableCell>
@@ -904,12 +1011,17 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
                             {u.status === "rejected" ? (
-                              <span className="text-xs text-slate-400 font-medium self-center">Deactivated</span>
+                              <Button size="sm" variant="outline" onClick={() => handleReactivate(u.id, u.fullName)} className="h-8 px-3">
+                                Reactivate
+                              </Button>
                             ) : (
                               <Button size="sm" variant="outline" onClick={() => handleDeactivate(u.id, u.role)} className="text-rose-700 border-rose-200 hover:bg-rose-50 h-8 px-3">
                                 Deactivate
                               </Button>
                             )}
+                            <Button size="sm" variant="outline" onClick={() => { setUserToDelete({ id: u.id, name: u.fullName, role: u.role }); setDeleteUserError(null); }} className="text-rose-700 border-rose-200 hover:bg-rose-50 h-8 px-3">
+                              <Trash2 className="h-4 w-4 mr-1" /> Delete
+                            </Button>
                           </div>
                         </TableCell>
                       </TableRow>
