@@ -1,69 +1,43 @@
-# Current Task — Admin can permanently delete and reactivate residents and faculty
+# Current Task — Say what failed in the department catalog error log
 
 ## Feature
-Let the platform admin permanently delete (and reactivate) residents and faculty, the
-same way the HOD already can. Branch: `claude/sharp-goldberg-6d110o`, started from `main`
-at `10bb16f`.
-
-What existed before this task:
-- HOD: Deactivate, Reactivate and Permanently delete for residents and faculty in their own
-  department (`HODPortal.tsx`, `DELETE /api/admin/users/:id/hard`).
-- Admin: Deactivate only (`POST /api/superadmin/users/:id/deactivate`).
+`GET /api/departments/:id/catalog` logs "Error resolving config department" for any
+failure, with no detail. The log line now also records which step failed and the Postgres
+error code. Branch: `claude/sharp-goldberg-6d110o`, fast-forwarded to `main` at `1eb7559`
+after PR #82 merged (no force-push).
 
 ## Plan reference
-No MASTER_PLAN.md exists for this project (AGENTS.md §14.7). Unplanned: direct developer
-request ("add the option to delete faculty and residents, by the admin and the HOD").
+No MASTER_PLAN.md exists for this project (AGENTS.md §14.7). Unplanned: the live site's
+admin "Log in as" test accounts showed "Internal server error", and the Render log line
+could not say why.
 
-## Developer decisions (asked at the start of the session, recorded, not assumed)
-- Scope: the HOD side already works; add delete (and reactivate) for the admin only.
-- Faculty delete keeps today's behaviour: residents' records the faculty member supervised,
-  reviewed or verified are deleted with them. This re-confirms the open item from the
-  previous task ("Professor hard delete removes residents' records … Worth re-confirming").
-- Admin may delete residents and faculty in any department, never an HOD or an admin.
+## Developer decisions (recorded, not assumed)
+- Separate PR for this change (§9), as the developer chose.
 - §14.1 overridden again: code written directly in this Claude Code cloud session.
-- §14.2 is not overridden: no pull request until the developer decides.
-- §6 is not overridden: no schema change; the agent never connected to a database (tests
-  use in-process PGlite only; `DATABASE_URL` was unset for the whole session).
+- §6 not overridden: the agent never connected to a database (tests use in-process PGlite).
 
 ## Review tier
-Opus (§15.2): the change deletes rows in the clinical tables and resolves a
-`studentsTable.id` from a `usersTable.id` (§3, §4).
+Sonnet (§15.2): a log field on a non-clinical route. §8 applies (what may be logged): only
+a fixed step name and a 5-character Postgres code are added, never error text.
 
 ## Changes
-- `artifacts/api-server/src/lib/hard-delete-user.ts` (new): the delete cascade, moved
-  unchanged out of the HOD route so both routes run the same steps. One parameter added:
-  who takes over assignment types the deleted user created.
-- `artifacts/api-server/src/routes/admin.ts`: HOD route calls the shared cascade.
-  Behaviour unchanged (existing `tests/hard-delete.test.ts` still passes).
-- `artifacts/api-server/src/routes/superadmin.ts`: new
-  `DELETE /api/superadmin/users/:id/hard` and `POST /api/superadmin/users/:id/reactivate`.
-  Both refuse HOD and admin accounts (403). Nonexistent id is 404 (the admin sees every
-  department, so there is nothing to hide, matching the existing admin deactivate route).
-- `artifacts/mockup-sandbox/src/lib/apiClient.ts`, `components/AdminPortal.tsx`: Delete
-  button with a confirmation panel (copied from the HOD screen), and Reactivate in place of
-  the plain "Deactivated" label.
-- `artifacts/api-server/tests/superadmin-user-delete.test.ts` (new): the four §11 cases for
-  both new routes.
+- `artifacts/api-server/src/routes/department.ts`: the catalog route's failure log adds
+  `step` (`resolve-config-source` or `load-catalog`) and `code` (Postgres code such as
+  `42P01`, else `UNEXPECTED`), using the same code check as `app.ts`.
+- `artifacts/api-server/tests/catalog-error-log.test.ts` (new): a normal load (200); a
+  missing table logs `load-catalog` / `42P01` with no error object or SQL text; a test
+  department whose source is itself a test department logs `resolve-config-source`.
 
-## Decided
-- Assignment types created by a deleted faculty member pass to that department's approved
-  HOD (to the acting admin if there is none). The agent proposed it; the developer said
-  "proceed".
-- PR: open one PR for this branch; not merged by the agent.
-
-## Separate issue found this session (not fixed in this branch)
-The admin console's "Log in as" button on a test account shows "Internal server error"
-on the live site. It could not be reproduced: on a database with every migration applied,
-all three test accounts open their dashboards with no failed request (checked end to end
-in a browser). Migrations 0017–0020 were all added on 2026-09-27, and the developer is not
-sure they have been run on the live database. If 0018 or 0020 is missing,
-`GET /api/departments/:id/catalog` (the first call every dashboard makes) fails with 500
-for every account, not only test accounts.
+## Live issue this helps with (not fixed by code)
+Render log: `GET /api/departments/19/catalog` → 500 "Error resolving config department".
+The developer ran `db:migrate` from a local checkout on branch
+`feat/procedure-experience-all-departments`, whose migration list ends at `0011`, so
+`0012`–`0020` were not applied by that run even though it printed "completed". The
+catalog route reads `department_posting_schedule` (added by `0020`, commit `d2a4ab7`).
 
 ## Manual (developer does)
-- [ ] Review the diff.
-- [ ] Check the live API log for the failed request: "Error resolving config department"
-      or "Request failed" with code 42703 / 42P01 confirms a missing migration.
-- [ ] Back up the live database, then run
-      `pnpm --filter @workspace/api-server db:migrate` (one transaction; rolls back on
-      failure). The agent may not run this (§6).
+- [ ] Back up the live database.
+- [ ] Run `pnpm --filter @workspace/api-server db:migrate` from code at `main` (Render
+      shell, or a local checkout on `main` whose `.env` points at the live database).
+- [ ] Retry "Log in as" on a test account.
+- [ ] Review and merge this PR by hand.
