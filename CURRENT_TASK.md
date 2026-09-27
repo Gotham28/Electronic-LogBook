@@ -51,19 +51,23 @@ FLAGGED = touches a §14.5 area (clinical tables / what a user may edit or delet
 - [ ] Check production for an account `aravind@elogbook.com` (created by the deleted
       phase0 scripts with password `password123`, if they were ever run there). If it
       exists, deactivate or delete it. The agent may not connect to check (§6).
-- [ ] Decide whether to open a PR — never automated.
+- [ ] Review and merge the PR by hand — never automated. (Developer asked for the PR to
+      be opened after the review.)
+
+## Developer decisions after the review
+- PR: open one PR for the branch (not merged by the agent).
+- §5 Dermatology ids: switch to feature flags, as a separate task, once the developer has
+  confirmed the live Dermatology config has `freeTextProcedures` and `freeTextPostingUnit`
+  set. Not done in this branch.
+- Test-department logins (`test.hod@<department>.test`, password `TEST-<id>`): kept as is,
+  by the developer's choice.
+- No separate review-report page.
 
 ## Blocked on developer input
 - §5: Dermatology behaviour is keyed on department ids 15 and 25 in
   `artifacts/api-server/src/routes/student.ts` (5 places), `routes/professor.ts:178`,
   `mockup-sandbox/src/components/ProfessorPortal.tsx` (2 places) and
-  `components/layout/AppLayout.tsx:136`. Flags already exist (`freeTextProcedures`,
-  `freeTextPostingUnit`, set by `scripts/seed-derm-config.ts`). Switching needs the
-  developer to confirm those flags are set on the live Dermatology config, and to say
-  which flag should drive optional supervisors, auto-verify and dept-wide posting view.
-- Test departments: every mirror's accounts sign in with a predictable email
-  (`test.hod@<department>.test`) and the password `TEST-<id>`. Anyone can sign in as a
-  test HOD, and from there create accounts that send welcome emails from the
-  application's address. Product decision whether to keep this.
+  `components/layout/AppLayout.tsx:136`. Waiting on the developer to confirm the flags on
+  the live Dermatology config (read-only check, run by the developer, never the agent).
 - Professor hard delete removes residents' records the professor supervised (logs,
   postings, conferences…), as the original hard-delete spec asked. Worth re-confirming.
