@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, caseLogsTable, procedureLogsTable, academicLogsTable, studentsTable, usersTable, departmentsTable, departmentConfigsTable, conferencesTable } from "@workspace/db";
+import { db, caseLogsTable, procedureLogsTable, academicLogsTable, studentsTable, usersTable, departmentsTable, departmentConfigsTable, conferencesTable, clinicalWorkLogsTable, departmentCatalogTable } from "@workspace/db";
 import { eq, and, inArray, count, or, isNull } from "drizzle-orm";
 import { requireAuth, requireRole, requireDepartment } from "../middlewares/auth.js";
 import { completionPercent } from "../lib/validation.js";
@@ -125,6 +125,24 @@ router.get("/:professorId/review-queue", async (req, res) => {
 
     const conferences = await confQuery.where(and(confWhere, eq(usersTable.departmentId, deptId), eq(usersTable.status, "approved")));
 
+    const clinicalWhere = isHod && deptId != null
+      ? eq(clinicalWorkLogsTable.status, "pending")
+      : and(eq(clinicalWorkLogsTable.supervisorId, professorId), eq(clinicalWorkLogsTable.status, "pending"));
+    const clinicalWorks = await db.select({ log: clinicalWorkLogsTable, student: studentsTable, user: usersTable, department: departmentsTable })
+      .from(clinicalWorkLogsTable)
+      .innerJoin(studentsTable, eq(clinicalWorkLogsTable.studentId, studentsTable.id))
+      .innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
+      .leftJoin(departmentsTable, eq(usersTable.departmentId, departmentsTable.id))
+      .where(and(clinicalWhere, eq(usersTable.departmentId, deptId), eq(usersTable.status, "approved"), isNull(clinicalWorkLogsTable.deletedAt)));
+    const clinicalNames = new Map<string, string>();
+    if (clinicalWorks.length > 0) {
+      const configSourceId = await resolveConfigDepartmentId(deptId);
+      const rows = await db.select({ value: departmentCatalogTable.value, name: departmentCatalogTable.name }).from(departmentCatalogTable)
+        .where(and(eq(departmentCatalogTable.departmentId, configSourceId),
+          inArray(departmentCatalogTable.kind, ["clinical_work_category", "clinical_work_subtype"])));
+      rows.forEach((row) => clinicalNames.set(row.value, row.name));
+    }
+
     const pendingReviews = [
       ...cases.map(c => ({
         id: `case-${c.log.id}`,
@@ -198,7 +216,27 @@ router.get("/:professorId/review-queue", async (req, res) => {
         certificateUrl: c.log.certificateUrl,
         detail: c.log.role === "presented" ? "Presented" : "Attended",
         status: c.log.status
-      }))
+      })),
+      ...clinicalWorks.map(c => {
+        const category = clinicalNames.get(c.log.category) || c.log.category;
+        const subType = c.log.subType ? (clinicalNames.get(c.log.subType) || c.log.subType) : null;
+        return {
+          id: `clinical_work-${c.log.id}`,
+          dbId: c.log.id,
+          logType: "clinical_work",
+          studentId: c.student.id,
+          studentName: c.user.fullName,
+          registrationNumber: c.student.registrationNumber,
+          department: c.department?.name || "Unknown",
+          type: "Clinical Work",
+          title: subType ? `${category} — ${subType}` : category,
+          date: c.log.date,
+          caseNumber: c.log.caseNumber,
+          patientInfo: `${c.log.patientAge} / ${c.log.patientSex}`,
+          detail: subType ? `${category} — ${subType}` : category,
+          status: c.log.status
+        };
+      })
     ];
 
     // ── Mentees (all students in the professor's / HOD's department) ──────────

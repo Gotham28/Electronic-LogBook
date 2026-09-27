@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, caseLogsTable, procedureLogsTable, academicLogsTable, studentsTable, usersTable, conferencesTable, departmentConfigsTable } from "@workspace/db";
+import { db, caseLogsTable, procedureLogsTable, academicLogsTable, studentsTable, usersTable, conferencesTable, departmentConfigsTable, clinicalWorkLogsTable } from "@workspace/db";
 import { eq, and, inArray, isNull } from "drizzle-orm";
 import { requireAuth, requireRole, requireDepartment } from "../middlewares/auth.js";
 import { z } from "zod";
@@ -46,6 +46,9 @@ router.patch("/:logType/:logId/review", requireAuth, requireRole(["professor", "
     } else if (logType === "conference") {
       [target] = await db.select({ supervisorId: conferencesTable.supervisorId, studentId: conferencesTable.studentId })
         .from(conferencesTable).where(eq(conferencesTable.id, id)).limit(1);
+    } else if (logType === "clinical_work") {
+      [target] = await db.select({ supervisorId: clinicalWorkLogsTable.supervisorId, studentId: clinicalWorkLogsTable.studentId })
+        .from(clinicalWorkLogsTable).where(and(eq(clinicalWorkLogsTable.id, id), isNull(clinicalWorkLogsTable.deletedAt))).limit(1);
     } else {
       res.status(400).json({ message: "Invalid logType" });
       return;
@@ -119,6 +122,9 @@ router.patch("/:logType/:logId/review", requireAuth, requireRole(["professor", "
     } else if (logType === "conference") {
       updatedRows = await db.update(conferencesTable).set(updateData).where(and(eq(conferencesTable.id, id), eq(conferencesTable.status, "pending"),
         inArray(conferencesTable.studentId, departmentStudents), reviewer.role === "professor" ? eq(conferencesTable.supervisorId, reviewer.id) : undefined)).returning();
+    } else if (logType === "clinical_work") {
+      updatedRows = await db.update(clinicalWorkLogsTable).set(updateData).where(and(eq(clinicalWorkLogsTable.id, id), eq(clinicalWorkLogsTable.status, "pending"), isNull(clinicalWorkLogsTable.deletedAt),
+        inArray(clinicalWorkLogsTable.studentId, departmentStudents), reviewer.role === "professor" ? eq(clinicalWorkLogsTable.supervisorId, reviewer.id) : undefined)).returning();
     }
 
     if (updatedRows.length === 0) {

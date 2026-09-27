@@ -1,5 +1,8 @@
-import { getToken } from './session';
+import { clearSession, getToken, SESSION_EXPIRED_EVENT } from './session';
 import { handleDemoRequest } from './demoData';
+
+// A 401 from these means wrong credentials, not an expired session.
+const SESSION_CHECK_EXEMPT = ["/api/auth/login", "/api/auth/change-password", "/api/auth/logout", "/api/payments"];
 
 export class ApiError extends Error {
   public status: number;
@@ -80,6 +83,10 @@ async function fetchWithAuth(
       // Not JSON, ignore
     }
     const errorMessage = errorData?.message || response.statusText || "An API error occurred";
+    if (response.status === 401 && token && !SESSION_CHECK_EXEMPT.some((path) => endpoint.startsWith(path))) {
+      clearSession();
+      window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT));
+    }
     throw new ApiError(response.status, errorMessage, errorData);
   }
 

@@ -19,7 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { formatLogbookDate, todayForInput } from "@/lib/logbook-config";
-import { useDepartment } from "@/lib/department-context";
+import { useDepartment, type CatalogItem, type PostingScheduleRow } from "@/lib/department-context";
 
 type PostingName = string;
 
@@ -38,7 +38,7 @@ import { apiGet, apiPost, apiPatch } from "@/lib/apiClient";
 import { getCurrentUser } from "@/lib/session";
 
 export function PostingsPage() {
-  const { postings: postingOptions, config } = useDepartment();
+  const { postings: postingOptions, config, postingSchedule } = useDepartment();
   const [open, setOpen] = React.useState(false);
   const [postings, setPostings] = React.useState<Posting[]>([]);
   const user = React.useMemo(() => getCurrentUser(), []);
@@ -180,6 +180,8 @@ export function PostingsPage() {
         </Dialog>
       </div>
 
+      {postingSchedule.length > 0 && <PostingScheduleCard schedule={postingSchedule} postingOptions={postingOptions} />}
+
       <Card className="border-white/70 bg-white/76">
         <CardHeader className="border-b border-white/70">
           <CardTitle className="text-lg">Posting Records</CardTitle>
@@ -271,4 +273,39 @@ export function PostingsPage() {
   );
 }
 
+const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
 
+function PostingScheduleCard({ schedule, postingOptions }: { schedule: PostingScheduleRow[]; postingOptions: CatalogItem[] }) {
+  const names = new Map(postingOptions.map((option) => [option.value, option.name]));
+  const years = Array.from(new Set(schedule.map((row) => row.trainingYear))).sort((a, b) => a - b);
+  return (
+    <Card className="border-white/70 bg-white/76">
+      <CardHeader className="border-b border-white/70">
+        <CardTitle className="text-lg">Posting schedule</CardTitle>
+        <p className="text-sm text-slate-500">The planned rotation for each year of training, set by your department.</p>
+      </CardHeader>
+      <CardContent className="grid gap-4 p-4 md:grid-cols-3">
+        {years.map((year) => {
+          const rows = schedule.filter((row) => row.trainingYear === year);
+          const total = rows.reduce((sum, row) => sum + row.months, 0);
+          return (
+            <section key={year} className="rounded-xl border border-slate-200 bg-white" aria-label={`Year ${year} postings`}>
+              <header className="flex items-baseline justify-between border-b border-slate-100 px-4 py-3">
+                <h3 className="text-sm font-semibold text-slate-900">Year {ROMAN[year - 1] ?? year}</h3>
+                <span className="text-xs text-slate-500">{total} {total === 1 ? "month" : "months"}</span>
+              </header>
+              <ul className="divide-y divide-slate-100">
+                {rows.map((row) => (
+                  <li key={row.postingValue} className="flex items-start justify-between gap-3 px-4 py-2.5 text-sm">
+                    <span className="text-slate-700">{names.get(row.postingValue) ?? row.postingValue}</span>
+                    <Badge variant="secondary" className="shrink-0">{row.months} {row.months === 1 ? "month" : "months"}</Badge>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          );
+        })}
+      </CardContent>
+    </Card>
+  );
+}

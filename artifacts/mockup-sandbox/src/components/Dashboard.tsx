@@ -25,8 +25,9 @@ import { getCurrentUser, isDemoMode } from "@/lib/session";
 import { useDepartment } from "@/lib/department-context";
 
 export function Dashboard() {
-  const { config: departmentConfig } = useDepartment();
+  const { config: departmentConfig, clinicalWorkCategories, clinicalWorkSubtypes } = useDepartment();
   const deptConfig = departmentConfig;
+  const features = deptConfig?.enabledFeatures ?? {};
   const user = React.useMemo(() => getCurrentUser(), []);
   const [logs, setLogs] = React.useState<any>(null);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -76,11 +77,19 @@ export function Dashboard() {
 
   if (!logs) return null;
 
-  const categories = [
+  const allCategories = [
     { label: "Clinical cases", logged: logs.caseLogs?.filter((l: any) => l.status !== "rejected").length || 0, required: deptConfig?.requiredCases ?? 0, verified: logs.caseLogs?.filter((l: any) => l.status === "verified").length || 0, icon: FileText, href: "/cases", tone: "from-teal-500 to-cyan-500", hasTarget: deptConfig?.requiredCases !== null && deptConfig?.requiredCases !== undefined },
     { label: "Procedures", logged: logs.procedureLogs?.filter((l: any) => l.status !== "rejected").length || 0, required: deptConfig?.requiredProcedures ?? 0, verified: logs.procedureLogs?.filter((l: any) => l.status === "verified").length || 0, icon: Stethoscope, href: "/procedures", tone: "from-cyan-500 to-sky-500", hasTarget: deptConfig?.requiredProcedures !== null && deptConfig?.requiredProcedures !== undefined },
+    { label: "Clinical works", logged: logs.clinicalWorkLogs?.filter((l: any) => l.status !== "rejected").length || 0, required: 0, verified: logs.clinicalWorkLogs?.filter((l: any) => l.status === "verified").length || 0, icon: Stethoscope, href: "/clinical-works", tone: "from-cyan-500 to-sky-500", hasTarget: false },
     { label: "Case discussions", logged: logs.academicLogs?.filter((l: any) => l.status !== "rejected").length || 0, required: deptConfig?.requiredAcademic ?? 0, verified: logs.academicLogs?.filter((l: any) => l.status === "verified").length || 0, icon: GraduationCap, href: "/academics", tone: "from-emerald-500 to-teal-500", hasTarget: deptConfig?.requiredAcademic !== null && deptConfig?.requiredAcademic !== undefined },
   ];
+  const categories = allCategories.filter((item) =>
+    item.href === "/cases" ? !features.hideCaseLogs
+      : item.href === "/procedures" ? !features.hideProcedureLogs
+      : item.href === "/clinical-works" ? !!features.clinicalWorks
+      : true);
+  const primaryLogHref = !features.hideCaseLogs ? "/cases" : features.clinicalWorks ? "/clinical-works" : "/academics";
+  const clinicalNames = new Map([...clinicalWorkCategories, ...clinicalWorkSubtypes].map((item) => [item.value, item.name]));
 
   const configured = categories.filter((item) => item.hasTarget && item.required > 0);
   const completion = configured.length ? Math.round(configured.reduce((sum, item) => sum + Math.min(item.verified / item.required, 1), 0) / configured.length * 100) : null;
@@ -96,12 +105,19 @@ export function Dashboard() {
     number: l.id, date: l.date, type: "Academic", title: l.topic || "Academic Log", patientUhid: undefined, status: l.status, timestamp: new Date(l.createdAt).getTime()
   }));
 
-  const recent = [...mappedCaseLogs, ...mappedProcLogs, ...mappedAcadLogs]
+  const mappedClinicalLogs = (features.clinicalWorks ? logs.clinicalWorkLogs || [] : []).map((l: any) => ({
+    number: l.id, date: l.date, type: "Clinical work",
+    title: [clinicalNames.get(l.category) ?? l.category, l.subType ? clinicalNames.get(l.subType) ?? l.subType : null].filter(Boolean).join(" — "),
+    patientUhid: l.caseNumber, status: l.status, timestamp: new Date(l.createdAt).getTime()
+  }));
+
+  const recent = [...(features.hideCaseLogs ? [] : mappedCaseLogs), ...(features.hideProcedureLogs ? [] : mappedProcLogs), ...mappedClinicalLogs, ...mappedAcadLogs]
     .sort((a, b) => b.timestamp - a.timestamp)
     .slice(0, 5);
 
   const overallRemaining = categories.reduce((sum, item) => sum + Math.max(item.required - item.verified, 0), 0);
-  const pendingCount = [...(logs.caseLogs || []), ...(logs.procedureLogs || []), ...(logs.academicLogs || [])]
+  const pendingCount = [...(features.hideCaseLogs ? [] : logs.caseLogs || []), ...(features.hideProcedureLogs ? [] : logs.procedureLogs || []),
+    ...(features.clinicalWorks ? logs.clinicalWorkLogs || [] : []), ...(logs.academicLogs || [])]
     .filter((entry: any) => entry.status === "pending").length;
   const progressLabel = completion !== null ? (completion >= 75 ? "On track" : completion >= 40 ? "Needs attention" : "Getting started") : "Getting started";
 
@@ -231,7 +247,7 @@ export function Dashboard() {
               <p className="page-eyebrow">Student activity</p>
               <CardTitle className="mt-1 text-xl">Recent entries</CardTitle>
             </div>
-            <Button variant="ghost" size="sm" asChild><Link href="/cases">View logs <ArrowRight className="h-4 w-4" /></Link></Button>
+            <Button variant="ghost" size="sm" asChild><Link href={primaryLogHref}>View logs <ArrowRight className="h-4 w-4" /></Link></Button>
           </CardHeader>
           <CardContent className="p-0">
             {recent.length === 0 ? (
@@ -242,8 +258,9 @@ export function Dashboard() {
                 <h3 className="mt-4 text-base font-semibold text-slate-950">No entries yet</h3>
                 <p className="mt-2 max-w-sm text-sm leading-6 text-slate-500">Your logbook is empty. Start with a case, a procedure, or a posting and the dashboard will begin to fill in immediately.</p>
                 <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
-                  <Button asChild><Link href="/cases">Log first case</Link></Button>
-                  <Button asChild variant="outline"><Link href="/procedures">Open procedure list</Link></Button>
+                  {!features.hideCaseLogs && <Button asChild><Link href="/cases">Log first case</Link></Button>}
+                  {features.clinicalWorks && <Button asChild><Link href="/clinical-works">Log clinical work</Link></Button>}
+                  {!features.hideProcedureLogs && <Button asChild variant="outline"><Link href="/procedures">Open procedure list</Link></Button>}
                 </div>
               </div>
             ) : (
@@ -267,7 +284,7 @@ export function Dashboard() {
         </Card>
 
         <div className="space-y-4">
-          <Card className="border-white/70 bg-white/76">
+          {!features.hideProcedureLogs && <Card className="border-white/70 bg-white/76">
             <CardContent className="p-5">
               <div className="flex items-start gap-3">
                 <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-700" />
@@ -278,7 +295,7 @@ export function Dashboard() {
                 </div>
               </div>
             </CardContent>
-          </Card>
+          </Card>}
 
           <Card className="border-white/70 bg-white/76">
             <CardContent className="p-5">

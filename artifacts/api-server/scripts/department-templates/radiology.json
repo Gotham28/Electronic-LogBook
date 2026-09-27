@@ -1,0 +1,57 @@
+{
+  "features": {
+    "hideCaseLogs": true,
+    "hideProcedureLogs": true,
+    "clinicalWorks": true
+  },
+  "catalog": [
+    { "kind": "clinical_work_category", "name": "Conventional X-rays" },
+    { "kind": "clinical_work_category", "name": "Special radiographic procedures" },
+    { "kind": "clinical_work_category", "name": "Ultrasound" },
+    { "kind": "clinical_work_category", "name": "Doppler study" },
+    { "kind": "clinical_work_category", "name": "Mammogram" },
+    { "kind": "clinical_work_category", "name": "CT scan" },
+    { "kind": "clinical_work_category", "name": "MRI scan" },
+    { "kind": "clinical_work_category", "name": "Guided procedures (CT / USG)" },
+    { "kind": "clinical_work_category", "name": "Interventional radiology" },
+    { "kind": "clinical_work_category", "name": "Emergencies" },
+    { "kind": "clinical_work_category", "name": "Nuclear Medicine" },
+    { "kind": "clinical_work_category", "name": "DRP (District Residency Programme)" },
+    { "kind": "clinical_work_category", "name": "BLS and ACLS Training" },
+
+    { "kind": "academic", "name": "Lectures" },
+    { "kind": "academic", "name": "Seminar / Symposium (1/wk)" },
+    { "kind": "academic", "name": "Case presentation" },
+    { "kind": "academic", "name": "Group discussion (2/wk)" },
+    { "kind": "academic", "name": "Journal club (1-2/wk)" },
+    { "kind": "academic", "name": "CPC — Clinico-Pathological Conference" },
+    { "kind": "academic", "name": "Teaching session (to UG / PG / DRT)" },
+    { "kind": "academic", "name": "CME / Conference" },
+    { "kind": "academic", "name": "Research work (Publication / Paper presentation / Poster presentation)" },
+    { "kind": "academic", "name": "Thesis work" },
+
+    { "kind": "posting", "name": "Ultrasonography" },
+    { "kind": "posting", "name": "Conventional X-ray, Special Radiographic Procedures, Mammogram" },
+    { "kind": "posting", "name": "CT Scan" },
+    { "kind": "posting", "name": "DRP (District Residency Programme)" },
+    { "kind": "posting", "name": "Interventional Radiology" },
+    { "kind": "posting", "name": "MRI" },
+    { "kind": "posting", "name": "Nuclear Medicine and Electives" }
+  ],
+  "postingSchedule": [
+    { "trainingYear": 1, "posting": "Ultrasonography", "months": 6 },
+    { "trainingYear": 1, "posting": "Conventional X-ray, Special Radiographic Procedures, Mammogram", "months": 4 },
+    { "trainingYear": 1, "posting": "CT Scan", "months": 2 },
+
+    { "trainingYear": 2, "posting": "Conventional X-ray, Special Radiographic Procedures, Mammogram", "months": 3 },
+    { "trainingYear": 2, "posting": "Ultrasonography", "months": 3 },
+    { "trainingYear": 2, "posting": "CT Scan", "months": 2 },
+    { "trainingYear": 2, "posting": "DRP (District Residency Programme)", "months": 3 },
+    { "trainingYear": 2, "posting": "Interventional Radiology", "months": 1 },
+
+    { "trainingYear": 3, "posting": "CT Scan", "months": 4 },
+    { "trainingYear": 3, "posting": "Ultrasonography", "months": 2 },
+    { "trainingYear": 3, "posting": "MRI", "months": 4 },
+    { "trainingYear": 3, "posting": "Nuclear Medicine and Electives", "months": 2 }
+  ]
+}

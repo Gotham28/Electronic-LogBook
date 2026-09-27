@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, usersTable, departmentsTable, studentsTable, departmentConfigsTable, departmentCatalogTable, procedureTypesTable, assignmentTypesTable, assignmentsTable, assignmentRecipientsTable, caseLogsTable, procedureLogsTable, academicLogsTable, leaveRecordsTable, postingsTable, researchTable, assessmentsTable, attendanceLogsTable, leaveApplicationsTable, thesisMilestonesTable, appraisalsTable, auditTable } from "@workspace/db";
+import { db, usersTable, departmentsTable, studentsTable, departmentConfigsTable, departmentCatalogTable, procedureTypesTable, assignmentTypesTable, assignmentsTable, assignmentRecipientsTable, caseLogsTable, procedureLogsTable, academicLogsTable, leaveRecordsTable, postingsTable, researchTable, assessmentsTable, attendanceLogsTable, leaveApplicationsTable, thesisMilestonesTable, appraisalsTable, auditTable, clinicalWorkLogsTable, departmentPostingScheduleTable } from "@workspace/db";
 import { eq, and, sql, inArray, or } from "drizzle-orm";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
@@ -9,6 +9,7 @@ import { sendAccountCreatedEmail } from "../lib/mailer.js";
 import { provisionDepartment, provisionMirrorForRealDepartment } from "../lib/department-provisioning.js";
 import jwt from "jsonwebtoken";
 import { JWT_SECRET } from "../lib/env.js";
+import { IMPERSONATION_TOKEN_LIFETIME } from "../lib/session-tokens.js";
 import { sessionProfile } from "./auth.js";
 
 const router = Router();
@@ -326,6 +327,7 @@ export async function deleteDepartmentCascade(tx: any, targetDepartmentId: numbe
     { name: "case_logs",          table: caseLogsTable,          uFields: [caseLogsTable.supervisorId, caseLogsTable.reviewedBy],                   sFields: [caseLogsTable.studentId] },
     { name: "procedure_logs",     table: procedureLogsTable,     uFields: [procedureLogsTable.supervisorId, procedureLogsTable.reviewedBy],          sFields: [procedureLogsTable.studentId] },
     { name: "academic_logs",      table: academicLogsTable,      uFields: [academicLogsTable.supervisorId, academicLogsTable.reviewedBy],            sFields: [academicLogsTable.studentId] },
+    { name: "clinical_work_logs", table: clinicalWorkLogsTable,  uFields: [clinicalWorkLogsTable.supervisorId, clinicalWorkLogsTable.reviewedBy],    sFields: [clinicalWorkLogsTable.studentId] },
     { name: "leave_records",      table: leaveRecordsTable,      uFields: [leaveRecordsTable.reviewedBy],                                           sFields: [leaveRecordsTable.studentId] },
     { name: "postings",           table: postingsTable,          uFields: [postingsTable.supervisorId],                                              sFields: [postingsTable.studentId] },
     { name: "research",           table: researchTable,          uFields: [researchTable.guideId, researchTable.coGuideId],                          sFields: [researchTable.studentId] },
@@ -403,6 +405,7 @@ export async function deleteDepartmentCascade(tx: any, targetDepartmentId: numbe
 
   await tx.delete(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, targetDepartmentId));
   await tx.delete(departmentCatalogTable).where(eq(departmentCatalogTable.departmentId, targetDepartmentId));
+  await tx.delete(departmentPostingScheduleTable).where(eq(departmentPostingScheduleTable.departmentId, targetDepartmentId));
   await tx.delete(procedureTypesTable).where(eq(procedureTypesTable.departmentId, targetDepartmentId));
 
   // 4. Delete the department row itself
@@ -676,9 +679,11 @@ router.post("/users/:id/impersonate", validate(z.object({}).strict()), async (re
 
     const token = jwt.sign({ 
       id: target.id, 
-      sessionVersion: target.sessionVersion, 
-      impersonatedBy: adminId 
-    }, JWT_SECRET, { algorithm: "HS256", expiresIn: "20m" });
+      sessionVersion: target.sessionVersion,
+      impersonatedBy: adminId,
+      impersonatorSessionVersion: req.user!.sessionVersion,
+      origIat: Math.floor(Date.now() / 1000),
+    }, JWT_SECRET, { algorithm: "HS256", expiresIn: IMPERSONATION_TOKEN_LIFETIME });
 
     req.log.info({ adminId, targetId: target.id, role: target.role, departmentId: target.departmentId, status: target.status }, "Admin impersonated user");
 

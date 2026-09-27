@@ -120,7 +120,10 @@ type LogFilter =
 
 export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; embedded?: boolean }) {
   const hideUhid = isDemoMode();
-  const { config, competencyLevels, caseCategories: deptCaseCategories, procedures: deptProcedures, academics: deptAcademics } = useDepartment();
+  const { config, competencyLevels, caseCategories: deptCaseCategories, procedures: deptProcedures, academics: deptAcademics,
+    clinicalWorkCategories, clinicalWorkSubtypes } = useDepartment();
+  const clinicalNames = React.useMemo(() => new Map([...clinicalWorkCategories, ...clinicalWorkSubtypes].map((item) => [item.value, item.name])),
+    [clinicalWorkCategories, clinicalWorkSubtypes]);
   const [location, setLocation] = useLocation();
   const [data, setData] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
@@ -486,6 +489,9 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                       {!hideUhid && currentItem.patientUhid && (
                         <p className="text-xs font-semibold text-teal-800">Case ID: {currentItem.patientUhid}</p>
                       )}
+                      {!hideUhid && currentItem.caseNumber && (
+                        <p className="text-xs font-semibold text-teal-800">Case number: {currentItem.caseNumber}</p>
+                      )}
                       {currentItem.declaredCompetency && (
                         <p className="text-xs text-teal-800 font-semibold bg-teal-50 inline-block px-2.5 py-1 rounded border border-teal-200 mt-1">
                           Self-Declared Level: {currentItem.declaredCompetency}
@@ -839,8 +845,9 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
               <Tabs value={dialogTab} onValueChange={(v) => { setDialogTab(v); setLogFilter(null); }} className="w-full">
                 <TabsList className="bg-slate-100 p-1 rounded-lg w-full h-auto flex flex-nowrap sm:flex-wrap justify-start overflow-x-auto gap-1">
                   <TabsTrigger value="progress" className="text-xs whitespace-nowrap">Training Progress</TabsTrigger>
-                  <TabsTrigger value="case-logs" className="text-xs whitespace-nowrap">Clinical Case Logs</TabsTrigger>
-                  <TabsTrigger value="proc-logs" className="text-xs whitespace-nowrap">Procedure Logs</TabsTrigger>
+                  {!config?.enabledFeatures?.hideCaseLogs && <TabsTrigger value="case-logs" className="text-xs whitespace-nowrap">Clinical Case Logs</TabsTrigger>}
+                  {!config?.enabledFeatures?.hideProcedureLogs && <TabsTrigger value="proc-logs" className="text-xs whitespace-nowrap">Procedure Logs</TabsTrigger>}
+                  {config?.enabledFeatures?.clinicalWorks && <TabsTrigger value="clinical-works" className="text-xs whitespace-nowrap">Clinical Works</TabsTrigger>}
                   <TabsTrigger value="acad-logs" className="text-xs whitespace-nowrap">Academic Activity</TabsTrigger>
                   <TabsTrigger value="postings" className="text-xs whitespace-nowrap">Postings</TabsTrigger>
                   <TabsTrigger value="thesis" className="text-xs whitespace-nowrap">Thesis</TabsTrigger>
@@ -973,6 +980,46 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                               <TableCell className="text-right">
                                 {renderLogStatusBadge(log.status)}
                               </TableCell>
+                            </TableRow>
+                          ));
+                        })()}
+                      </TableBody>
+                    </Table>
+                  )}
+                </TabsContent>
+
+                {/* ── Clinical Works Tab ───────────────────────────────────── */}
+                <TabsContent value="clinical-works" className="pt-3">
+                  {menteeLogsLoading ? (
+                    <div className="flex h-32 items-center justify-center"><div className="animate-spin rounded-full border-4 border-slate-300 border-t-teal-600 h-8 w-8" /></div>
+                  ) : (
+                    <Table>
+                      <TableHeader className="bg-slate-50">
+                        <TableRow>
+                          <TableHead className="text-xs font-semibold">Date</TableHead>
+                          <TableHead className="text-xs font-semibold">Category</TableHead>
+                          <TableHead className="text-xs font-semibold">{hideUhid ? "Patient Info" : "Case No. & Info"}</TableHead>
+                          <TableHead className="text-xs font-semibold text-right">Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {(() => {
+                          const rows = menteeLogs?.clinicalWorkLogs ?? [];
+                          if (!rows.length) {
+                            return <TableRow><TableCell colSpan={4} className="text-center text-sm text-slate-500 py-6">No clinical works found.</TableCell></TableRow>;
+                          }
+                          return rows.map((log: any) => (
+                            <TableRow key={log.id}>
+                              <TableCell className="text-xs font-medium">{formatLogbookDate(log.date)}</TableCell>
+                              <TableCell className="text-xs">
+                                <p className="font-bold text-slate-900">{clinicalNames.get(log.category) ?? log.category}</p>
+                                {log.subType && <p className="text-slate-500">{clinicalNames.get(log.subType) ?? log.subType}</p>}
+                              </TableCell>
+                              <TableCell className="text-xs text-slate-600">
+                                {!hideUhid && <p className="font-semibold text-teal-800">{log.caseNumber}</p>}
+                                <p className="capitalize">{log.patientAge} / {log.patientSex}</p>
+                              </TableCell>
+                              <TableCell className="text-right">{renderLogStatusBadge(log.status)}</TableCell>
                             </TableRow>
                           ));
                         })()}

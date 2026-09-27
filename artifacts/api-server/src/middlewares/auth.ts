@@ -12,10 +12,19 @@ export interface AuthUser {
   sessionVersion: number;
 }
 
+export interface TokenClaims {
+  iat: number;
+  exp: number;
+  origIat?: number;
+  impersonatedBy?: number;
+  impersonatorSessionVersion?: number;
+}
+
 declare global {
   namespace Express {
     interface Request {
       user?: AuthUser;
+      tokenClaims?: TokenClaims;
     }
   }
 }
@@ -33,7 +42,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   }
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ["HS256"] }) as AuthUser & { scope?: string };
+    const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ["HS256"] }) as AuthUser & TokenClaims & { scope?: string };
     // A payment token (scope: "payment") is issued to pending applicants who cannot pass
     // this check. It must never be accepted as a session token.
     if (decoded.scope === "payment") {
@@ -57,6 +66,8 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       return;
     }
     req.user = account;
+    req.tokenClaims = { iat: decoded.iat, exp: decoded.exp, origIat: decoded.origIat,
+      impersonatedBy: decoded.impersonatedBy, impersonatorSessionVersion: decoded.impersonatorSessionVersion };
     next();
   } catch (error: any) {
     if (error.name === "TokenExpiredError") {

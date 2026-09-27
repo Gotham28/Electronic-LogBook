@@ -1,4 +1,5 @@
 const TOKEN_KEY = 'elogbook-token';
+export const SESSION_EXPIRED_EVENT = 'elogbook:session-expired';
 
 export interface UserSession {
   id: number;
@@ -30,6 +31,17 @@ export function saveToken(token: string): void {
 
 export function getToken(): string | null {
   return window.sessionStorage.getItem(TOKEN_KEY);
+}
+
+export function getTokenTimes(token: string | null = getToken()): { iat: number; exp: number } | null {
+  if (!token) return null;
+  try {
+    const payload = token.split('.')[1];
+    const decoded = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
+    return Number.isFinite(decoded.iat) && Number.isFinite(decoded.exp) ? { iat: decoded.iat, exp: decoded.exp } : null;
+  } catch {
+    return null;
+  }
 }
 
 export function clearSession(): void {

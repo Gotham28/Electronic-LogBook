@@ -87,7 +87,8 @@ function SearchableSection<T extends { id: number | string; name: string }>({
 export function DepartmentSettings() {
   const data = useDepartment();
   const [procedure, setProcedure] = React.useState({ name: "", group: "", required: "" });
-  const [entry, setEntry] = React.useState({ kind: "posting", name: "", required: "", period: "total" });
+  const [entry, setEntry] = React.useState({ kind: "posting", name: "", required: "", period: "total", parentValue: "" });
+  const features = data.config?.enabledFeatures ?? {};
   const [busy, setBusy] = React.useState(false);
   const [targets, setTargets] = React.useState<Record<number, string>>({});
   const [academicTargets, setAcademicTargets] = React.useState<Record<number, string>>({});
@@ -104,11 +105,11 @@ export function DepartmentSettings() {
     fetchGroups();
   }, [fetchGroups, data.department.id]);
 
-  const [deleteTarget, setDeleteTarget] = React.useState<{id: number | string, type: "procedure" | "posting" | "academic" | "case_category" | "competency_level" | "leave_type" | "procedure_group" | "conference_level", name: string, count: number | null} | null>(null);
+  const [deleteTarget, setDeleteTarget] = React.useState<{id: number | string, type: "procedure" | "posting" | "academic" | "case_category" | "competency_level" | "leave_type" | "procedure_group" | "conference_level" | "clinical_work_category" | "clinical_work_subtype", name: string, count: number | null} | null>(null);
   const [deleting, setDeleting] = React.useState(false);
   const [deleteError, setDeleteError] = React.useState<string | null>(null);
 
-  const confirmDelete = async (id: number | string, type: "procedure" | "posting" | "academic" | "case_category" | "competency_level" | "leave_type" | "procedure_group" | "conference_level", name: string) => {
+  const confirmDelete = async (id: number | string, type: "procedure" | "posting" | "academic" | "case_category" | "competency_level" | "leave_type" | "procedure_group" | "conference_level" | "clinical_work_category" | "clinical_work_subtype", name: string) => {
     setDeleteTarget({ id, type, name, count: null });
     setDeleteError(null);
     try {
@@ -229,13 +230,13 @@ export function DepartmentSettings() {
         <span className="hidden rounded-full bg-teal-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-teal-700 sm:inline-flex">At a glance</span>
       </div>
       <div className="grid w-full grid-cols-1 gap-3 md:grid-cols-3">
-        {computedRequirementsFields.map(([key, label], index) => <Card key={key} className={`overflow-hidden border-0 shadow-sm ring-1 ring-inset ${index === 0 ? "bg-gradient-to-br from-teal-50 to-white ring-teal-100" : index === 1 ? "bg-gradient-to-br from-sky-50 to-white ring-sky-100" : "bg-gradient-to-br from-violet-50 to-white ring-violet-100"}`}>
+        {computedRequirementsFields.filter(([key]) => !(key === "requiredCases" && features.hideCaseLogs) && !(key === "requiredProcedures" && features.hideProcedureLogs)).map(([key, label], index) => <Card key={key} className={`overflow-hidden border-0 shadow-sm ring-1 ring-inset ${index === 0 ? "bg-gradient-to-br from-teal-50 to-white ring-teal-100" : index === 1 ? "bg-gradient-to-br from-sky-50 to-white ring-sky-100" : "bg-gradient-to-br from-violet-50 to-white ring-violet-100"}`}>
           <CardContent className="relative p-5"><div className={`absolute right-0 top-0 h-20 w-20 -translate-y-1/3 translate-x-1/3 rounded-full blur-2xl ${index === 0 ? "bg-teal-200/50" : index === 1 ? "bg-sky-200/50" : "bg-violet-200/50"}`} /><p className="relative max-w-[13rem] text-xs font-semibold leading-5 text-slate-600">{label}</p><p className="relative mt-3 text-3xl font-semibold tracking-tight text-slate-950">{data.config?.[key] == null ? <span className="text-sm font-medium italic text-slate-400">Not tracked</span> : data.config[key]}</p><p className="relative mt-1 text-[11px] text-slate-500">Target total</p></CardContent>
         </Card>)}
       </div>
     </section>
 
-    {!data.config?.enabledFeatures?.freeTextProcedures && (
+    {!data.config?.enabledFeatures?.freeTextProcedures && !features.hideProcedureLogs && (
       <>
     <div className="grid gap-5">
       <Card className="border-slate-200/80 shadow-sm shadow-slate-200/50"><CardHeader className="border-b border-slate-100 bg-slate-50/70 pb-4"><CardTitle className="text-base">Add procedure type</CardTitle><p className="text-xs text-slate-500">Set the target once, then update it inline below.</p></CardHeader><CardContent className="p-5">
@@ -292,10 +293,14 @@ export function DepartmentSettings() {
     )}
     <Card className="border-slate-200/80 shadow-sm shadow-slate-200/50"><CardHeader className="border-b border-slate-100 bg-slate-50/70 pb-4"><CardTitle className="text-base">Training catalog</CardTitle><p className="text-xs text-slate-500">Manage the options residents select while logging their work.</p></CardHeader><CardContent className="space-y-6 p-5">
       <form className="rounded-2xl border border-dashed border-teal-200 bg-teal-50/40 p-4 grid items-end gap-4 md:grid-cols-4" onSubmit={(e) => { e.preventDefault(); void save(async () => {
-        await apiPost("/api/admin/department/catalog", { ...entry, value: entry.name.trim(), required: entry.kind === "posting" ? 0 : Number(entry.required) });
+        if (entry.kind === "clinical_work_subtype" && !entry.parentValue) throw new Error("Choose the category this sub-type belongs to");
+        const { parentValue, ...fields } = entry;
+        await apiPost("/api/admin/department/catalog", { ...fields, value: entry.name.trim(), required: ["academic", "case_category", "conference_level"].includes(entry.kind) ? Number(entry.required) : 0,
+          ...(entry.kind === "clinical_work_subtype" ? { parentValue } : {}) });
         setEntry({ ...entry, name: "", required: "" });
       }, "Training option added"); }}>
-        <div className="space-y-2"><Label htmlFor="catalog-kind">Category</Label><select id="catalog-kind" className="h-11 w-full rounded-xl border bg-white px-3 text-sm" value={entry.kind} onChange={(e) => setEntry({ ...entry, kind: e.target.value })}><option value="posting">Ward/Posting</option><option value="academic">Academic activity</option><option value="case_category">Case Category</option><option value="competency_level">Experience level</option><option value="leave_type">Leave type</option>{(data.department.id === 15 || data.department.id === 25) && <option value="conference_level">Conference Level</option>}</select></div>
+        <div className="space-y-2"><Label htmlFor="catalog-kind">Category</Label><select id="catalog-kind" className="h-11 w-full rounded-xl border bg-white px-3 text-sm" value={entry.kind} onChange={(e) => setEntry({ ...entry, kind: e.target.value })}><option value="posting">Ward/Posting</option><option value="academic">Academic activity</option>{!features.hideCaseLogs && <option value="case_category">Case Category</option>}{!features.hideProcedureLogs && <option value="competency_level">Experience level</option>}<option value="leave_type">Leave type</option>{(data.department.id === 15 || data.department.id === 25) && <option value="conference_level">Conference Level</option>}{features.clinicalWorks && <><option value="clinical_work_category">Clinical work category</option><option value="clinical_work_subtype">Clinical work sub-type</option></>}</select></div>
+        {entry.kind === "clinical_work_subtype" && <div className="space-y-2"><Label htmlFor="catalog-parent">Belongs to</Label><select id="catalog-parent" required className="h-11 w-full rounded-xl border bg-white px-3 text-sm" value={entry.parentValue} onChange={(e) => setEntry({ ...entry, parentValue: e.target.value })}><option value="">Select a category</option>{data.clinicalWorkCategories.map((item) => <option key={item.value} value={item.value}>{item.name}</option>)}</select></div>}
         <div className="space-y-2"><Label htmlFor="catalog-name">Name</Label><Input id="catalog-name" required maxLength={160} value={entry.name} onChange={(e) => setEntry({ ...entry, name: e.target.value })} /></div>
         {(entry.kind === "academic" || entry.kind === "case_category" || entry.kind === "conference_level") && <><div className="space-y-2"><Label htmlFor="catalog-required">Required count</Label><Input id="catalog-required" type="number" min={0} max={100000} required value={entry.required} onChange={(e) => setEntry({ ...entry, required: e.target.value })} /></div>
           <div className="space-y-2"><Label htmlFor="catalog-period">Period</Label><select id="catalog-period" className="h-11 w-full rounded-xl border bg-white px-3 text-sm" value={entry.period} onChange={(e) => setEntry({ ...entry, period: e.target.value })}><option value="total">Overall</option><option value="month">Per month</option></select></div></>}
@@ -321,8 +326,38 @@ export function DepartmentSettings() {
           </form>}
         />
       </div>
+      {features.clinicalWorks && (
+      <div className="mt-8 space-y-3 border-t pt-8">
+        <div><h4 className="text-sm font-semibold text-slate-900">Clinical works</h4><p className="text-xs text-slate-500">Categories residents log under, and the sub-types offered for each. A category with no sub-types is logged without one.</p></div>
+        {data.clinicalWorkCategories.length === 0 ? <p className="rounded-xl bg-slate-50 p-3 text-sm text-slate-500">No clinical work categories configured.</p> : (
+          <div className="grid gap-3 md:grid-cols-2">
+            {data.clinicalWorkCategories.map((category) => {
+              const subTypes = data.clinicalWorkSubtypes.filter((item) => item.parentValue === category.value);
+              return (
+                <div key={category.id} className="rounded-xl bg-slate-50 p-3">
+                  <div className="flex items-center gap-2">
+                    <span className="flex-1 text-sm font-medium">{category.name}</span>
+                    <Button variant="ghost" size="sm" type="button" aria-label={`Delete ${category.name}`} disabled={busy || deleting} onClick={() => confirmDelete(category.id, "clinical_work_category", category.name)} className="text-rose-700 hover:bg-rose-100 h-8 w-8 p-0"><Trash2 className="h-4 w-4" /></Button>
+                  </div>
+                  {subTypes.length === 0 ? <p className="mt-1 text-xs text-slate-500">No sub-types yet</p> : (
+                    <ul className="mt-2 flex flex-wrap gap-1.5">
+                      {subTypes.map((item) => (
+                        <li key={item.id} className="flex items-center gap-1 rounded-full border border-slate-200 bg-white py-0.5 pl-2.5 pr-1 text-xs text-slate-700">
+                          {item.name}
+                          <button type="button" aria-label={`Delete ${item.name}`} disabled={busy || deleting} onClick={() => confirmDelete(item.id, "clinical_work_subtype", item.name)} className="rounded-full p-0.5 text-rose-600 hover:bg-rose-50"><Trash2 className="h-3 w-3" /></button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+      )}
       <div className="grid gap-6 md:grid-cols-2 mt-8 pt-8 border-t">
-        <SearchableSection
+        {!features.hideCaseLogs && <SearchableSection
           title="Case Categories"
           items={data.caseCategories ?? []}
           emptyText="No case categories configured."
@@ -330,8 +365,8 @@ export function DepartmentSettings() {
             <span className="flex-1 text-sm">{item.name}</span><Input className="w-16" type="number" min={0} max={100000} required aria-label={`Required count for ${item.name}`} value={academicTargets[item.id] ?? item.required} onChange={(e) => setAcademicTargets({ ...academicTargets, [item.id]: e.target.value })} /><Button size="sm" variant="outline" disabled={busy} type="submit">Save</Button>
             <Button variant="outline" size="sm" type="button" disabled={busy || deleting} onClick={() => confirmDelete(item.id, "case_category", item.name)} className="text-rose-700 border-rose-200 hover:bg-rose-50 px-2"><Trash2 className="h-4 w-4" /></Button>
           </form>}
-        />
-        {data.config?.enabledFeatures?.procedureExperience && (
+        />}
+        {data.config?.enabledFeatures?.procedureExperience && !features.hideProcedureLogs && (
           <SearchableSection
             title="Experience levels"
             items={data.competencyLevels ?? []}
