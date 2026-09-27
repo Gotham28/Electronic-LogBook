@@ -495,9 +495,9 @@ export function AppLayout({
                     size="sm"
                     onClick={() => window.open('/print', '_blank')}
                     title="Print the complete consolidated record."
-                    className="hidden border-white/70 bg-white/75 text-teal-800 shadow-[0_12px_24px_rgba(15,23,42,0.05)] sm:inline-flex"
+                    className="border-white/70 bg-white/75 text-teal-800 shadow-[0_12px_24px_rgba(15,23,42,0.05)] h-8 w-8 px-0 sm:w-auto sm:px-3"
                   >
-                    <Printer className="h-4 w-4 mr-2" /> Print PDF
+                    <Printer className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Print</span>
                   </Button>
                 )}
                 <Button
