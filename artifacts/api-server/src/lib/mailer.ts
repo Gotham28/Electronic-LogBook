@@ -10,6 +10,13 @@ function createTransporter() {
   });
 }
 
+// Names, registration numbers and passwords come from user input (self-registration included),
+// so every value placed in an HTML template goes through this first.
+export function escapeHtml(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
 function wrapEmail(title: string, innerHtml: string) {
   return `<!DOCTYPE html>
 <html lang="en">
@@ -124,6 +131,8 @@ export const sendAccountCreatedEmail = async (
   const roleDisplay = role === "hod" ? "HOD" : role === "student" ? "Student" : "Faculty";
   const deptDisplay = departmentName ? `, ${departmentName}` : "";
   const appUrl = process.env.APP_URL || "https://elogbookgothos.in";
+  const html = { fullName: escapeHtml(fullName), email: escapeHtml(email), password: escapeHtml(password),
+    deptDisplay: escapeHtml(deptDisplay), appUrl: escapeHtml(appUrl) };
 
   const textTemplate = `Dear ${fullName},
 
@@ -174,8 +183,8 @@ gothoslabs@gmail.com`;
 
   const htmlTemplate = wrapEmail(
     "E-Logbook — Account Created",
-    `<p style="margin:0; font-size:22px; font-weight:bold; color:#0f172a;">Welcome, ${fullName}</p>
-     <p style="margin:8px 0 0; font-size:12px; letter-spacing:0.4px; text-transform:uppercase; color:#0f766e;">${roleDisplay}${deptDisplay}</p>
+    `<p style="margin:0; font-size:22px; font-weight:bold; color:#0f172a;">Welcome, ${html.fullName}</p>
+     <p style="margin:8px 0 0; font-size:12px; letter-spacing:0.4px; text-transform:uppercase; color:#0f766e;">${roleDisplay}${html.deptDisplay}</p>
      <p style="margin:16px 0 0; font-size:15px; line-height:1.7; color:#475569;">Your E-Logbook account has been created. Use the credentials below to log in and start recording your clinical work.</p>
 
      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:28px 0 8px; background-color:#f0fdfa; border:1px solid #99f6e4;">
@@ -183,10 +192,10 @@ gothoslabs@gmail.com`;
          <td style="padding:22px 24px;">
            <p style="margin:0 0 12px; font-family:Arial, Helvetica, sans-serif; font-size:11px; font-weight:bold; letter-spacing:1px; text-transform:uppercase; color:#0f766e;">Your login credentials</p>
            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-             ${credentialRow("Role", `${roleDisplay}${deptDisplay}`)}
-             ${credentialRow("Username", email)}
-             ${credentialRow("Password", `<span style="font-family:Consolas, Courier, monospace; background-color:#ccfbf1; padding:4px 8px;">${password}</span>`)}
-             ${credentialRow("App URL", `<a href="${appUrl}" style="color:#0f766e; text-decoration:none;">${appUrl}</a>`, true)}
+             ${credentialRow("Role", `${roleDisplay}${html.deptDisplay}`)}
+             ${credentialRow("Username", html.email)}
+             ${credentialRow("Password", `<span style="font-family:Consolas, Courier, monospace; background-color:#ccfbf1; padding:4px 8px;">${html.password}</span>`)}
+             ${credentialRow("App URL", `<a href="${html.appUrl}" style="color:#0f766e; text-decoration:none;">${html.appUrl}</a>`, true)}
            </table>
            <p style="margin:16px 0 0; font-family:Arial, Helvetica, sans-serif; font-size:12px; color:#64748b; line-height:1.6;">Please change your password on first login and do not share these credentials.</p>
          </td>
@@ -200,7 +209,7 @@ gothoslabs@gmail.com`;
      <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:28px 0 12px;">
        <tr>
          <td style="background-color:#0f766e;">
-           <a href="${appUrl}" style="display:inline-block; padding:14px 28px; font-family:Arial, Helvetica, sans-serif; font-size:14px; font-weight:bold; color:#ffffff; text-decoration:none;">Log in to E-LogBook</a>
+           <a href="${html.appUrl}" style="display:inline-block; padding:14px 28px; font-family:Arial, Helvetica, sans-serif; font-size:14px; font-weight:bold; color:#ffffff; text-decoration:none;">Log in to E-LogBook</a>
          </td>
        </tr>
      </table>`
@@ -224,6 +233,8 @@ export const sendHODApprovalRequestEmail = async (
 ) => {
   const transporter = createTransporter();
   const appUrl = process.env.APP_URL || "https://elogbookgothos.in";
+  const html = { hodName: escapeHtml(hodName), studentName: escapeHtml(studentName), studentReg: escapeHtml(studentReg),
+    departmentName: escapeHtml(departmentName), appUrl: escapeHtml(appUrl) };
 
   const textTemplate = `Dear ${hodName},
 
@@ -240,13 +251,13 @@ E-Logbook Support Team`;
   const htmlTemplate = wrapEmail(
     "Pending Student Approval",
     `<p style="margin:0; font-size:22px; font-weight:bold; color:#0f172a;">Action Required: Pending Student Approval</p>
-     <p style="margin:16px 0 0; font-size:15px; line-height:1.7; color:#475569;">Dear ${hodName},</p>
-     <p style="margin:16px 0 0; font-size:15px; line-height:1.7; color:#475569;">A new student, <strong>${studentName}</strong> (Reg No: ${studentReg}), has registered for the ${departmentName} department and is awaiting your approval.</p>
+     <p style="margin:16px 0 0; font-size:15px; line-height:1.7; color:#475569;">Dear ${html.hodName},</p>
+     <p style="margin:16px 0 0; font-size:15px; line-height:1.7; color:#475569;">A new student, <strong>${html.studentName}</strong> (Reg No: ${html.studentReg}), has registered for the ${html.departmentName} department and is awaiting your approval.</p>
 
      <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:28px 0 12px;">
        <tr>
          <td style="background-color:#0f766e;">
-           <a href="${appUrl}/student-access" style="display:inline-block; padding:14px 28px; font-family:Arial, Helvetica, sans-serif; font-size:14px; font-weight:bold; color:#ffffff; text-decoration:none;">Review Registration</a>
+           <a href="${html.appUrl}/student-access" style="display:inline-block; padding:14px 28px; font-family:Arial, Helvetica, sans-serif; font-size:14px; font-weight:bold; color:#ffffff; text-decoration:none;">Review Registration</a>
          </td>
        </tr>
      </table>

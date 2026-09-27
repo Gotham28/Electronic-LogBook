@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, usersTable, departmentsTable, studentsTable, departmentConfigsTable, departmentCatalogTable, procedureTypesTable, assignmentTypesTable, assignmentsTable, assignmentRecipientsTable, caseLogsTable, procedureLogsTable, academicLogsTable, leaveRecordsTable, postingsTable, researchTable, assessmentsTable, attendanceLogsTable, leaveApplicationsTable, thesisMilestonesTable, appraisalsTable, auditTable, clinicalWorkLogsTable, departmentPostingScheduleTable } from "@workspace/db";
+import { db, usersTable, departmentsTable, studentsTable, departmentConfigsTable, departmentCatalogTable, procedureTypesTable, assignmentTypesTable, assignmentsTable, assignmentRecipientsTable, caseLogsTable, procedureLogsTable, academicLogsTable, leaveRecordsTable, postingsTable, researchTable, assessmentsTable, attendanceLogsTable, leaveApplicationsTable, thesisMilestonesTable, appraisalsTable, auditTable, clinicalWorkLogsTable, departmentPostingScheduleTable, conferencesTable, awardsTable, certificationsTable } from "@workspace/db";
 import { eq, and, sql, inArray, or } from "drizzle-orm";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
@@ -336,6 +336,9 @@ export async function deleteDepartmentCascade(tx: any, targetDepartmentId: numbe
     { name: "leave_applications", table: leaveApplicationsTable, uFields: [leaveApplicationsTable.approvedBy],                                      sFields: [leaveApplicationsTable.studentId] },
     { name: "thesis_milestones",  table: thesisMilestonesTable,  uFields: [thesisMilestonesTable.guideId, thesisMilestonesTable.coGuideId],          sFields: [thesisMilestonesTable.studentId] },
     { name: "appraisals",         table: appraisalsTable,        uFields: [appraisalsTable.evaluatorId],                                             sFields: [appraisalsTable.studentId] },
+    { name: "conferences",        table: conferencesTable,       uFields: [conferencesTable.supervisorId, conferencesTable.reviewedBy],              sFields: [conferencesTable.studentId] },
+    { name: "awards",             table: awardsTable,            uFields: [awardsTable.supervisorId],                                                sFields: [awardsTable.studentId] },
+    { name: "certifications",     table: certificationsTable,    uFields: [],                                                                        sFields: [certificationsTable.studentId] },
     { name: "audit",              table: auditTable,             uFields: [auditTable.performedById],                                                sFields: [] },
   ];
 
@@ -365,8 +368,8 @@ export async function deleteDepartmentCascade(tx: any, targetDepartmentId: numbe
     throw err;
   }
 
-  // For mirror (test) departments, delete all rows from the 12 checked
-  // tables before touching students/users. Audit is last in checkedTables
+  // For mirror (test) departments, delete all rows from every checked
+  // table before touching students/users. Audit is last in checkedTables
   // and references usersTable.id (NOT NULL FK), so it is already in the
   // correct position — the loop deletes it before the user-delete at the
   // bottom of this function.

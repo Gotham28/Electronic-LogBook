@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { db, usersTable, studentsTable, departmentsTable, departmentConfigsTable, procedureTypesTable, caseLogsTable, procedureLogsTable, academicLogsTable, departmentCatalogTable, paymentsTable, leaveRecordsTable, leaveApplicationsTable, assessmentsTable, appraisalsTable, assignmentRecipientsTable, attendanceLogsTable, certificationsTable, postingsTable, thesisMilestonesTable, researchTable, auditTable, assignmentsTable, assignmentTypesTable, clinicalWorkLogsTable } from "@workspace/db";
-import { eq, and, count, inArray, sql, or, like } from "drizzle-orm";
+import { db, usersTable, studentsTable, departmentsTable, departmentConfigsTable, procedureTypesTable, caseLogsTable, procedureLogsTable, academicLogsTable, departmentCatalogTable, paymentsTable, leaveRecordsTable, leaveApplicationsTable, assessmentsTable, appraisalsTable, assignmentRecipientsTable, attendanceLogsTable, certificationsTable, postingsTable, thesisMilestonesTable, researchTable, auditTable, assignmentsTable, assignmentTypesTable, clinicalWorkLogsTable, conferencesTable, awardsTable } from "@workspace/db";
+import { eq, and, count, inArray, sql, or } from "drizzle-orm";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { requireAuth, requireRole, requireDepartment } from "../middlewares/auth.js";
@@ -212,8 +212,9 @@ router.post("/professors", validate(z.object({ fullName: nameSchema, email: emai
         .where(eq(departmentsTable.id, req.user!.departmentId!)).limit(1);
         
       await sendAccountCreatedEmail(email, fullName, password, "professor", dept?.name);
-    } catch (error) {
-      req.log.error({ email, error }, "Failed to send welcome email");
+    } catch {
+      // Id only: the welcome email carries the plaintext password, so its error is never logged.
+      req.log.error({ userId: newProf.id, status: 201 }, "Faculty welcome email failed");
       // Continue without returning error to allow account creation to succeed
     }
 
@@ -289,8 +290,9 @@ router.post("/students", validate(z.object({
 
     try {
       await sendAccountCreatedEmail(email, fullName, password, "student", dept?.name);
-    } catch (error) {
-      req.log.error({ email, error }, "Failed to send welcome email");
+    } catch {
+      // Id only: the welcome email carries the plaintext password, so its error is never logged.
+      req.log.error({ userId: newStudent.id, status: 201 }, "Student welcome email failed");
       // Continue without returning error to allow account creation to succeed
     }
 
@@ -343,9 +345,11 @@ router.get("/leaves/pending", async (req, res) => {
     const leaveTypes = await db.select({ value: departmentCatalogTable.value, required: departmentCatalogTable.required }).from(departmentCatalogTable).where(and(eq(departmentCatalogTable.departmentId, configSourceId), eq(departmentCatalogTable.kind, "leave_type")));
     const limits = Object.fromEntries(leaveTypes.map(t => [t.value, t.required]));
 
-    const currentYear = new Date().getFullYear().toString();
+    // Allowances are per calendar year, so each request is measured against the leave taken
+    // in the year it starts in - the same rule POST /students/:id/leave-records enforces.
     const studentIds = [...new Set(pendingLeaves.map(l => l.residentId))];
-    let usedMap: Record<number, Record<string, number>> = {};
+    const usageKey = (studentId: number, year: string, leaveType: string) => `${studentId}|${year}|${leaveType}`;
+    const usedMap: Record<string, number> = {};
     
     if (studentIds.length > 0) {
       const allRelevantLeaves = await db.select({ 
@@ -355,7 +359,7 @@ router.get("/leaves/pending", async (req, res) => {
         endDate: leaveRecordsTable.endDate 
       })
       .from(leaveRecordsTable)
-      .where(and(inArray(leaveRecordsTable.studentId, studentIds), inArray(leaveRecordsTable.status, ['approved', 'pending']), like(leaveRecordsTable.startDate, `${currentYear}-%`)));
+      .where(and(inArray(leaveRecordsTable.studentId, studentIds), inArray(leaveRecordsTable.status, ['approved', 'pending'])));
 
       for (const l of allRelevantLeaves) {
         if (!l.startDate || !l.endDate) continue;
@@ -363,8 +367,8 @@ router.get("/leaves/pending", async (req, res) => {
         const lEnd = new Date(l.endDate);
         const diffDays = Math.ceil((lEnd.getTime() - lStart.getTime()) / (1000 * 3600 * 24)) + 1;
         if (diffDays > 0) {
-          usedMap[l.studentId] = usedMap[l.studentId] || {};
-          usedMap[l.studentId][l.leaveType] = (usedMap[l.studentId][l.leaveType] || 0) + diffDays;
+          const key = usageKey(l.studentId, l.startDate.slice(0, 4), l.leaveType);
+          usedMap[key] = (usedMap[key] || 0) + diffDays;
         }
       }
     }
@@ -377,7 +381,7 @@ router.get("/leaves/pending", async (req, res) => {
       const total = limits[leave.type];
       let remainingBalance: number | null = null;
       if (typeof total === 'number') {
-        const used = usedMap[leave.residentId]?.[leave.type] || 0;
+        const used = usedMap[usageKey(leave.residentId, String(leave.fromDate).slice(0, 4), leave.type)] || 0;
         // Remaining balance shows how many days are left, considering ALL approved/pending leaves
         remainingBalance = total - used;
       }
@@ -705,6 +709,12 @@ router.delete("/users/:id/hard", async (req, res) => {
           const _acad = await tx.delete(academicLogsTable).where(eq(academicLogsTable.studentId, studentId)).returning({ id: academicLogsTable.id });
           deletedCounts.academicLogs = _acad.length;
 
+          const _conf = await tx.delete(conferencesTable).where(eq(conferencesTable.studentId, studentId)).returning({ id: conferencesTable.id });
+          deletedCounts.conferences = _conf.length;
+
+          const _awards = await tx.delete(awardsTable).where(eq(awardsTable.studentId, studentId)).returning({ id: awardsTable.id });
+          deletedCounts.awards = _awards.length;
+
           const _leave = await tx.delete(leaveRecordsTable).where(eq(leaveRecordsTable.studentId, studentId)).returning({ id: leaveRecordsTable.id });
           deletedCounts.leaveRecords = _leave.length;
 
@@ -750,6 +760,13 @@ router.delete("/users/:id/hard", async (req, res) => {
 
         const _acad = await tx.delete(academicLogsTable).where(or(eq(academicLogsTable.supervisorId, targetUserId), eq(academicLogsTable.reviewedBy, targetUserId))).returning({ id: academicLogsTable.id });
         deletedCounts.academicLogs = _acad.length;
+
+        const _conf = await tx.delete(conferencesTable).where(or(eq(conferencesTable.supervisorId, targetUserId), eq(conferencesTable.reviewedBy, targetUserId))).returning({ id: conferencesTable.id });
+        deletedCounts.conferences = _conf.length;
+
+        // A former HOD demoted to professor can still be the supervisor on awards.
+        const _awards = await tx.delete(awardsTable).where(eq(awardsTable.supervisorId, targetUserId)).returning({ id: awardsTable.id });
+        deletedCounts.awards = _awards.length;
 
         const _leave = await tx.delete(leaveRecordsTable).where(eq(leaveRecordsTable.reviewedBy, targetUserId)).returning({ id: leaveRecordsTable.id });
         deletedCounts.leaveRecords = _leave.length;
@@ -1005,10 +1022,12 @@ router.get("/department/procedure-groups", async (req, res) => {
   }
 });
 
-// GET /department/procedure-groups/:id/usage-count
-router.get("/department/procedure-groups/:id/usage-count", async (req, res) => {
+// GET /department/procedure-groups/:group/usage-count
+// The group is a name, not a row id, so it must not be called :id (router.param("id") above
+// rejects anything that is not a positive integer).
+router.get("/department/procedure-groups/:group/usage-count", async (req, res) => {
   try {
-    const groupName = req.params.id;
+    const groupName = req.params.group;
     const departmentId = req.user?.departmentId;
     if (!departmentId) {
       res.status(400).json({ message: "No department assigned" });
@@ -1026,15 +1045,15 @@ router.get("/department/procedure-groups/:id/usage-count", async (req, res) => {
     
     res.json({ count: countRes?.count || 0 });
   } catch (error) {
-    req.log.error({ groupName: req.params.id, status: 500 }, "Error getting procedure group usage count");
+    req.log.error({ groupName: req.params.group, status: 500 }, "Error getting procedure group usage count");
     res.status(500).json({ message: "Internal server error" });
   }
 });
 
-// DELETE /department/procedure-groups/:id
-router.delete("/department/procedure-groups/:id", async (req, res) => {
+// DELETE /department/procedure-groups/:group (a name, not a row id; see above)
+router.delete("/department/procedure-groups/:group", async (req, res) => {
   try {
-    const groupName = req.params.id;
+    const groupName = req.params.group;
     const departmentId = req.user?.departmentId;
     if (!departmentId) {
       res.status(400).json({ message: "No department assigned" });
@@ -1063,7 +1082,7 @@ router.delete("/department/procedure-groups/:id", async (req, res) => {
 
     res.json({ message: "Procedure group deleted successfully" });
   } catch (error) {
-    req.log.error({ groupName: req.params.id, status: 500 }, "Error deleting procedure group");
+    req.log.error({ groupName: req.params.group, status: 500 }, "Error deleting procedure group");
     res.status(500).json({ message: "Internal server error" });
   }
 });

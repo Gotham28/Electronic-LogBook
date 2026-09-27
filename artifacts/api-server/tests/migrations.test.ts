@@ -45,10 +45,15 @@ test("legacy migration preserves users, requirements and logs and backfills cata
     assert.equal((await database.query("SELECT * FROM users")).rows.length, 3);
     assert.equal((await database.query<any>("SELECT * FROM users WHERE id=1")).rows[0].email, "hod@example.test");
     assert.equal((await database.query<any>("SELECT * FROM department_configs")).rows[0].required_cases, 99);
-    assert.equal((await database.query<any>("SELECT * FROM department_configs")).rows[0].program_duration_months, null);
+    // 0008_leave_allowance_restructure.sql drops program_duration_months.
+    assert.ok(!("program_duration_months" in (await database.query<any>("SELECT * FROM department_configs")).rows[0]));
     assert.equal((await database.query<any>("SELECT * FROM academic_logs")).rows[0].topic, "Preserved topic");
     assert.equal((await database.query<any>("SELECT * FROM research")).rows[0].protocol_status, "approved");
-    assert.equal((await database.query<any>("SELECT * FROM department_catalog")).rows.length, 2);
+    // 0002 backfills the posting and academic activity from the legacy records; 0011 then adds
+    // the four default competency levels to every real department.
+    const catalog = (await database.query<any>("SELECT kind FROM department_catalog")).rows;
+    assert.equal(catalog.filter((row) => row.kind !== "competency_level").length, 2);
+    assert.equal(catalog.filter((row) => row.kind === "competency_level").length, 4);
     assert.equal((await database.query<any>("SELECT * FROM procedure_types")).rows[0].name, "Existing procedure");
     await applyMigrations(migrationConnection(database), true);
     assert.equal((await database.query("SELECT * FROM procedure_types")).rows.length, 1);

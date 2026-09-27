@@ -168,6 +168,9 @@ The brief states there is no test suite. There is one, and it works: `artifacts/
 | SEC-06 | **FIXED** | `ede73b0` — *fix(security): fail closed on department scope in three student.ts routes* |
 | SEC-34, SEC-35, SEC-36, SEC-37 | **FIXED** | `6508b19` — *fix(security): collapse existence-vs-ownership status codes on four routes (SEC-34-37)* |
 | SEC-14, SEC-15, SEC-16, SEC-17 | **FIXED** | `622a0e2` — *fix(security): stop four surfaces from rendering fake data on a failed load (SEC-14-17)* |
+| SEC-18 | **FIXED** | `6a8c1ba` — *fix(counts): leave deleted case and procedure logs out of dashboard and analytics* |
+| SEC-22 | **FIXED** | `cea0b51` — *fix(analytics): count approved residents only in HOD department analytics* |
+| SEC-13 | **FIXED** | `d2ba8e2` — *chore(security): delete one-off scripts that create or drop data in any configured database* |
 | All others (SEC-13, SEC-18 … SEC-33, SEC-38 excl. 34-37) | **OPEN** | — |
 
 **Batches B through H are all complete.** Every finding named in `docs/SECURITY_FIXES.md` is fixed and committed. SEC-34 through SEC-37 — found during the §1b preflight, out of scope for the original task — were fixed separately on 2026-09-09: see "SEC-34–37" below.

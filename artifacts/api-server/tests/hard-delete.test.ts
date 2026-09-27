@@ -1,7 +1,7 @@
 import { before, after, test } from "node:test";
 import assert from "node:assert/strict";
 import { setup, request, accounts as a, departmentIds } from "./support.js";
-import { engine, db, usersTable, studentsTable, caseLogsTable, assignmentTypesTable, assignmentsTable, assignmentRecipientsTable } from "./database.js";
+import { engine, db, usersTable, studentsTable, caseLogsTable, assignmentTypesTable, assignmentsTable, assignmentRecipientsTable, conferencesTable, awardsTable } from "./database.js";
 import { eq } from "drizzle-orm";
 
 let runtime: Awaited<ReturnType<typeof setup>>;
@@ -134,4 +134,29 @@ test("HOD can permanently delete a professor and cascade across student records"
   // Verify student2 still exists
   const students = await db.select().from(studentsTable).where(eq(studentsTable.id, a.student2.studentId!));
   assert.equal(students.length, 1, "The student themselves should NOT be deleted");
+});
+
+// conferences and awards reference students (and a supervising user). Both delete paths must
+// clear them, or the database refuses the delete and the HOD sees a 409.
+test("HOD can permanently delete a student who has conference and award records", async () => {
+  await db.insert(conferencesTable).values({ studentId: a.student21.studentId!, conferenceName: "Synthetic conference",
+    role: "attended", date: "2026-03-01", supervisorId: a.faculty1.id });
+  await db.insert(awardsTable).values({ studentId: a.student21.studentId!, date: "2026-03-02",
+    description: "Synthetic award", supervisorId: a.hod1.id });
+
+  const res = await call(`/admin/users/${a.student21.id}/hard`, "hod1", "DELETE");
+  assert.equal(res.status, 200, JSON.stringify(res.body));
+  assert.equal(res.body.deletedRecords.conferences, 1);
+  assert.equal(res.body.deletedRecords.awards, 1);
+  assert.equal((await db.select().from(usersTable).where(eq(usersTable.id, a.student21.id))).length, 0);
+});
+
+test("HOD can permanently delete a professor who supervised or reviewed a conference", async () => {
+  await db.insert(conferencesTable).values({ studentId: a.student1.studentId!, conferenceName: "Supervised conference",
+    role: "presented", date: "2026-03-03", supervisorId: a.faculty21.id, reviewedBy: a.faculty21.id, status: "verified" });
+
+  const res = await call(`/admin/users/${a.faculty21.id}/hard`, "hod1", "DELETE");
+  assert.equal(res.status, 200, JSON.stringify(res.body));
+  assert.equal(res.body.deletedRecords.conferences, 1);
+  assert.equal((await db.select().from(usersTable).where(eq(usersTable.id, a.faculty21.id))).length, 0);
 });

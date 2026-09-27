@@ -169,8 +169,9 @@ router.post("/register", validate(registrationBody), async (req, res) => {
   });
   if (!createdUserId) { res.status(409).json({ message: "Verification has already been used" }); return; }
   
-  sendHODApprovalRequestEmail(department.hodEmail, department.hodName, body.fullName, body.registrationNumber, department.name).catch((err) => {
-    console.error("Failed to send HOD approval request email:", err);
+  sendHODApprovalRequestEmail(department.hodEmail, department.hodName, body.fullName, body.registrationNumber, department.name).catch(() => {
+    // Ids only: the mail error can carry addresses and message details.
+    req.log.error({ userId: createdUserId, departmentId: department.id }, "HOD approval request email failed");
   });
 
   const paymentToken = jwt.sign({ id: createdUserId, scope: "payment" }, JWT_SECRET, { expiresIn: "30m" });

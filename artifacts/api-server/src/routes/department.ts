@@ -121,7 +121,8 @@ router.get("/:departmentId/analytics", requireRole(["hod"]), async (req, res) =>
 
     const configSourceId = await resolveConfigDepartmentId(departmentId);
 
-    // All students in this department (via users.departmentId)
+    // Approved students in this department (via users.departmentId). Pending applicants and
+    // deactivated (rejected) accounts are not residents, matching the review queue's scope.
     const studentsInDept = await db
       .select({
         studentId:          studentsTable.id,
@@ -134,7 +135,7 @@ router.get("/:departmentId/analytics", requireRole(["hod"]), async (req, res) =>
       })
       .from(studentsTable)
       .innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
-      .where(eq(usersTable.departmentId, departmentId));
+      .where(and(eq(usersTable.departmentId, departmentId), eq(usersTable.role, "student"), eq(usersTable.status, "approved")));
 
     const studentIds = studentsInDept.map(s => s.studentId);
 
@@ -142,15 +143,16 @@ router.get("/:departmentId/analytics", requireRole(["hod"]), async (req, res) =>
     let logStats = { pending: 0, verified: 0, rejected: 0 };
 
     if (studentIds.length > 0) {
-      const countByStatus = async (tbl: typeof caseLogsTable | typeof procedureLogsTable | typeof academicLogsTable, idCol: any) =>
+      // Case and procedure logs are soft-deleted (deletedAt); academic logs have no such column.
+      const countByStatus = async (tbl: typeof caseLogsTable | typeof procedureLogsTable | typeof academicLogsTable, idCol: any, deletedAt?: any) =>
         db.select({ status: (tbl as any).status, cnt: count() })
           .from(tbl)
-          .where(inArray(idCol, studentIds))
+          .where(and(inArray(idCol, studentIds), deletedAt ? isNull(deletedAt) : undefined))
           .groupBy((tbl as any).status);
 
       const [caseCounts, procCounts, acadCounts, clinicalCounts] = await Promise.all([
-        countByStatus(caseLogsTable, caseLogsTable.studentId),
-        countByStatus(procedureLogsTable, procedureLogsTable.studentId),
+        countByStatus(caseLogsTable, caseLogsTable.studentId, caseLogsTable.deletedAt),
+        countByStatus(procedureLogsTable, procedureLogsTable.studentId, procedureLogsTable.deletedAt),
         countByStatus(academicLogsTable, academicLogsTable.studentId),
         db.select({ status: clinicalWorkLogsTable.status, cnt: count() }).from(clinicalWorkLogsTable)
           .where(and(inArray(clinicalWorkLogsTable.studentId, studentIds), isNull(clinicalWorkLogsTable.deletedAt)))
@@ -170,7 +172,7 @@ router.get("/:departmentId/analytics", requireRole(["hod"]), async (req, res) =>
       const procRows = await db
         .select({ name: procedureLogsTable.procedureName, cnt: count() })
         .from(procedureLogsTable)
-        .where(inArray(procedureLogsTable.studentId, studentIds))
+        .where(and(inArray(procedureLogsTable.studentId, studentIds), isNull(procedureLogsTable.deletedAt)))
         .groupBy(procedureLogsTable.procedureName)
         .orderBy(sql`count(*) DESC`)
         .limit(5);

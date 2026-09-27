@@ -153,7 +153,8 @@ router.get("/:professorId/review-queue", async (req, res) => {
         registrationNumber: c.student.registrationNumber,
         department: c.department?.name || "Unknown",
         type: "Case Log",
-        title: `${c.log.diagnosisProvisional} — ${c.log.patientAge}, ${c.log.patientGender}`,
+        // The provisional diagnosis is optional; the final diagnosis is always recorded.
+        title: `${c.log.diagnosisProvisional || c.log.diagnosisFinal} — ${c.log.patientAge}, ${c.log.patientGender}`,
         date: c.log.date,
         patientUhid: c.log.patientUhid,
         patientInfo: `${c.log.patientAge} / ${c.log.patientGender}`,

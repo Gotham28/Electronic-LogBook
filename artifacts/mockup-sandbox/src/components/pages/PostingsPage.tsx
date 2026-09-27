@@ -236,7 +236,8 @@ export function PostingsPage() {
                       </TableCell>
                     )}
                     <TableCell className="text-right max-w-[220px]">
-                      {(item.status === "pending" || (isFreeTextWard && item.status === "verified")) ? (
+                      {/* Auto-verified postings (no supervisor) stay editable; faculty-verified ones are locked. */}
+                      {(item.status === "pending" || (isFreeTextWard && item.status === "verified" && !item.supervisorId)) ? (
                         <Button variant="ghost" size="sm" className="text-teal-600 hover:text-teal-800 hover:bg-teal-50" onClick={() => {
                           setEditId(item.id);
                           setWard(item.ward);
