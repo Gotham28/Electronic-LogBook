@@ -503,6 +503,20 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                       {currentItem.type === "Conference" && currentItem.category && (
                         <p className="text-xs text-slate-600 font-medium">Category: {currentItem.category}</p>
                       )}
+                      
+                      {currentItem.type === "Academic" && (currentItem.departmentId === 15 || currentItem.departmentId === 25) && (
+                        <>
+                          {currentItem.presentationType && (
+                            <p className="text-xs text-slate-600 font-medium">Format: {currentItem.presentationType}</p>
+                          )}
+                          {currentItem.description && (
+                            <div className="mt-2 pt-2 border-t border-slate-200/50">
+                              <p className="text-xs font-semibold text-slate-500 uppercase">Description</p>
+                              <p className="text-sm text-slate-800 leading-relaxed whitespace-pre-wrap mt-0.5">{currentItem.description}</p>
+                            </div>
+                          )}
+                        </>
+                      )}
                       {currentItem.type === "Conference" && currentItem.certificateUrl && (
                         <p className="text-xs text-slate-600 font-medium overflow-hidden text-ellipsis whitespace-nowrap">
                           Certificate: <a href={currentItem.certificateUrl} target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline">{currentItem.certificateUrl}</a>

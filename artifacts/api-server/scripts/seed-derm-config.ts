@@ -57,6 +57,7 @@ async function main() {
     enabledFeatures.awards = true;
     enabledFeatures.hideConferenceLocation = true;
     enabledFeatures.conferenceLevels = true;
+    enabledFeatures.academicActivityExtras = true;
     
     await db.update(departmentConfigsTable)
       .set({ enabledFeatures })

@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { Textarea } from "@/components/ui/textarea";
 import { formatLogbookDate, todayForInput } from "@/lib/logbook-config";
 import { useDepartment } from "@/lib/department-context";
 
@@ -20,6 +21,7 @@ type AcademicLog = {
   date: string;
   type: string;
   presentationType: string;
+  description?: string | null;
   topic: string;
   faculty: string;
   facultyRemarks?: string | null;
@@ -30,7 +32,7 @@ type AcademicLog = {
 
 
 export function AcademicLogsPage() {
-  const { academics: academicOptions } = useDepartment();
+  const { academics: academicOptions, config } = useDepartment();
   const [open, setOpen] = React.useState(false);
   const [logs, setLogs] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -40,6 +42,7 @@ export function AcademicLogsPage() {
     type: "",
     presentationType: "",
     topic: "",
+    description: "",
     supervisorId: "",
   });
   const [editLogId, setEditLogId] = React.useState<number | null>(null);
@@ -137,7 +140,7 @@ export function AcademicLogsPage() {
         </div>
         <Dialog open={open} onOpenChange={(val) => { 
           setOpen(val); 
-          if (!val) { setForm({ date: todayForInput(), type: "", presentationType: "", topic: "", supervisorId: "" }); setEditLogId(null); } 
+          if (!val) { setForm({ date: todayForInput(), type: "", presentationType: "", topic: "", description: "", supervisorId: "" }); setEditLogId(null); } 
         }}>
           <DialogTrigger asChild><Button><PlusCircle className="h-4 w-4" /> Log academic activity</Button></DialogTrigger>
           <DialogContent className="rounded-2xl bg-white sm:max-w-lg">
@@ -158,10 +161,28 @@ export function AcademicLogsPage() {
                   </Select>
                 </Field>
               </div>
-              <Field label="Presentation format (optional)"><Input value={form.presentationType} onChange={(e) => setForm({ ...form, presentationType: e.target.value })} maxLength={160} /></Field>
-              <Field label="Topic / title">
+              {config?.enabledFeatures?.academicActivityExtras ? (
+                <Field label="Presentation format (optional)">
+                  <Select value={form.presentationType} onValueChange={(value) => setForm({ ...form, presentationType: value })}>
+                    <SelectTrigger><SelectValue placeholder="Select format" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Presented">Presented</SelectItem>
+                      <SelectItem value="Attended">Attended</SelectItem>
+                      <SelectItem value="Supervised">Supervised</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+              ) : (
+                <Field label="Presentation format (optional)"><Input value={form.presentationType} onChange={(e) => setForm({ ...form, presentationType: e.target.value })} maxLength={160} /></Field>
+              )}
+              <Field label="Topic / title / impression">
                 <Input value={form.topic} onChange={(e) => setForm({ ...form, topic: e.target.value })} required />
               </Field>
+              {config?.enabledFeatures?.academicActivityExtras && (
+                <>
+                  <Field label="Description (optional)"><Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} maxLength={2000} /></Field>
+                </>
+              )}
               <Field label="Reviewing faculty member">
                 <Select value={form.supervisorId} onValueChange={(value) => setForm({ ...form, supervisorId: value })}>
                   <SelectTrigger><SelectValue placeholder="Select a faculty member" /></SelectTrigger>
@@ -264,6 +285,7 @@ export function AcademicLogsPage() {
                           setForm({
                             date: log.date, type: log.activityType || log.type, presentationType: log.presentationType === "—" ? "" : (log.presentationType || ""),
                             topic: log.topic || "", supervisorId: String(log.supervisorId || ""),
+                            description: log.description || ""
                           });
                           setOpen(true);
                         }}>

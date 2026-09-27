@@ -168,10 +168,13 @@ router.get("/:professorId/review-queue", async (req, res) => {
         studentName: a.user.fullName,
         registrationNumber: a.student.registrationNumber,
         department: a.department?.name || "Unknown",
+        departmentId: a.department?.id,
         type: "Academic",
         title: `${a.log.activityType}: ${a.log.topic}`,
         date: a.log.date,
         detail: a.log.presentationType || a.log.activityType,
+        description: a.log.description,
+        presentationType: a.log.presentationType,
         status: a.log.status
       })),
       ...conferences.map(c => ({

@@ -1146,10 +1146,11 @@ router.post("/:studentId/procedure-logs", validate(z.object({ supervisorId: idSc
 
 router.post("/:studentId/academic-logs", validate(z.object({ supervisorId: idSchema, activityType: nameSchema,
   topic: z.string().trim().min(1).max(4000), date: dateSchema, presenter: optionalText,
-  presentationType: z.string().max(160).nullable().optional() }).strict()), async (req, res) => {
+  presentationType: z.string().max(160).nullable().optional(),
+  description: optionalText }).strict()), async (req, res) => {
   try {
     const studentId = parseInt(String(req.params.studentId), 10);
-    const { supervisorId, activityType, topic, date } = req.body;
+    const { supervisorId, activityType, topic, date, presenter, presentationType, description } = req.body;
     const supervisorIdNum = parseInt(supervisorId, 10);
     if (!(await validateSupervisor(supervisorIdNum, req.user!.departmentId!))) {
       res.status(400).json({ message: "Invalid supervisorId" });
@@ -1161,7 +1162,7 @@ router.post("/:studentId/academic-logs", validate(z.object({ supervisorId: idSch
       eq(departmentCatalogTable.departmentId, configSourceId), eq(departmentCatalogTable.kind, "academic"), eq(departmentCatalogTable.value, activityType))).limit(1);
     if (!option) { res.status(400).json({ message: "Select an academic activity from your department" }); return; }
     const [inserted] = await db.insert(academicLogsTable).values({
-      studentId, supervisorId: supervisorIdNum, activityType, presentationType: req.body.presentationType, 
+      studentId, supervisorId: supervisorIdNum, activityType, presentationType, description,
       topic, date, presenter: req.body.presenter, status: "pending"
     }).returning();
     res.status(201).json(inserted);
@@ -1365,7 +1366,8 @@ router.patch("/:studentId/procedure-logs/:logId", requireAuth, validate(z.object
 // 3. Academic Logs
 router.patch("/:studentId/academic-logs/:logId", requireAuth, validate(z.object({ supervisorId: idSchema, activityType: nameSchema,
   topic: z.string().trim().min(1).max(4000), date: dateSchema, presenter: optionalText,
-  presentationType: z.string().max(160).nullable().optional() }).strict().partial()), async (req, res) => {
+  presentationType: z.string().max(160).nullable().optional(),
+  description: optionalText }).strict().partial()), async (req, res) => {
   try {
     const studentId = parseInt(String(req.params.studentId), 10);
     const logId = parseInt(String(req.params.logId), 10);
