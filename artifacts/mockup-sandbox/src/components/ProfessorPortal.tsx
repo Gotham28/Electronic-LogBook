@@ -141,6 +141,8 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
   const [menteeLogs, setMenteeLogs] = React.useState<any>(null);
   const [menteeProgress, setMenteeProgress] = React.useState<MenteeProgress | null>(null);
   const [menteeProgressError, setMenteeProgressError] = React.useState<string | null>(null);
+  // AGENTS.md sec 7: a section whose load failed shows an error, never its "none found" message.
+  const [menteeLoadErrors, setMenteeLoadErrors] = React.useState<Record<string, string>>({});
   const [menteeLogsLoading, setMenteeLogsLoading] = React.useState(false);
   const [menteePostings, setMenteePostings] = React.useState<any[]>([]);
   const [menteeThesis, setMenteeThesis] = React.useState<any | null>(null);
@@ -253,12 +255,17 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
       setMenteeCerts([]);
       setMenteeAwards([]);
       setMenteeAssessments([]);
+      setMenteeLoadErrors({});
       return;
     }
     let mounted = true;
     const fetchBoth = async () => {
       setMenteeLogsLoading(true);
       setMenteeProgressError(null);
+      setMenteeLoadErrors({});
+      const failed = (section: string, message: string) => {
+        if (mounted) setMenteeLoadErrors((current) => ({ ...current, [section]: message }));
+      };
 
       // Fetch /logs independently so a /progress failure doesn't blank the log tables.
       try {
@@ -266,6 +273,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
         if (mounted) setMenteeLogs(logs);
       } catch (err: any) {
         if (mounted) toast.error("Failed to load student logs");
+        failed("logs", "Could not load this student's logs. Close and reopen to try again.");
       }
 
       // Fetch /progress independently so a /logs failure doesn't block the progress tab.
@@ -283,31 +291,34 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
       try {
         const postingResp = await apiGet(`/api/students/${selectedMentee.id}/postings`);
         if (mounted) setMenteePostings(postingResp.data || []);
-      } catch { /* postings tab will show empty */ }
+      } catch { failed("postings", "Could not load this student's postings. Close and reopen to try again."); }
 
       // Fetch thesis — professors are scoped to guide/co-guide
       try {
         const thesisResp = await apiGet(`/api/students/${selectedMentee.id}/thesis`);
         if (mounted) setMenteeThesis(thesisResp.data || null);
-      } catch { /* thesis tab will show empty */ }
+      } catch { failed("thesis", "Could not load this student's thesis. Close and reopen to try again."); }
 
       // Fetch certifications — professors scoped to mentee relationship
       try {
         const certsResp = await apiGet(`/api/students/${selectedMentee.id}/certifications`);
         if (mounted) setMenteeCerts(Array.isArray(certsResp) ? certsResp : []);
-      } catch { /* certs tab will show empty, 403 is expected for non-mentees */ }
+      } catch (err: any) {
+        // 403 is the expected answer for a professor who is not this student's mentor.
+        if (err?.status !== 403) failed("certifications", "Could not load this student's certifications. Close and reopen to try again.");
+      }
 
       // Fetch awards
       try {
         const awardsResp = await apiGet(`/api/students/${selectedMentee.id}/awards`);
         if (mounted) setMenteeAwards(awardsResp.data || []);
-      } catch { /* awards tab will show empty */ }
+      } catch { failed("awards", "Could not load this student's awards. Close and reopen to try again."); }
 
       // Fetch assessments
       try {
         const assessResp = await apiGet(`/api/students/${selectedMentee.id}/assessments`);
         if (mounted) setMenteeAssessments(Array.isArray(assessResp) ? assessResp : (assessResp?.data || []));
-      } catch { /* assessments tab will show empty */ }
+      } catch { failed("assessments", "Could not load this student's assessments. Close and reopen to try again."); }
 
       if (mounted) setMenteeLogsLoading(false);
     };
@@ -886,9 +897,15 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                           (async () => {
                             try {
                               const logs = await apiGet(`/api/students/${menteeIdAtClick}/logs`);
-                              if (selectedMentee?.id === menteeIdAtClick) setMenteeLogs(logs);
+                              if (selectedMentee?.id === menteeIdAtClick) {
+                                setMenteeLogs(logs);
+                                setMenteeLoadErrors(({ logs: _cleared, ...rest }) => rest);
+                              }
                             } catch {
-                              /* toast already shown by original effect; suppress here */
+                              // Toast already shown by the original effect; keep the tables' error visible.
+                              if (selectedMentee?.id === menteeIdAtClick) {
+                                setMenteeLoadErrors((current) => ({ ...current, logs: "Could not load this student's logs. Close and reopen to try again." }));
+                              }
                             }
                             try {
                               const progress = await apiGet(`/api/students/${menteeIdAtClick}/progress`);
@@ -966,6 +983,9 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                           const rows = logFilter?.tab === "case-logs"
                             ? (menteeLogs?.caseLogs ?? []).filter((log: any) => log.category === (logFilter as any).category)
                             : (menteeLogs?.caseLogs ?? []);
+                          if (menteeLoadErrors.logs) {
+                            return <TableRow><TableCell colSpan={4} role="alert" className="text-center text-sm font-medium text-rose-700 py-6">{menteeLoadErrors.logs}</TableCell></TableRow>;
+                          }
                           if (!rows.length) {
                             return <TableRow><TableCell colSpan={4} className="text-center text-sm text-slate-500 py-6">No case logs found.</TableCell></TableRow>;
                           }
@@ -1005,6 +1025,9 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                       <TableBody>
                         {(() => {
                           const rows = menteeLogs?.clinicalWorkLogs ?? [];
+                          if (menteeLoadErrors.logs) {
+                            return <TableRow><TableCell colSpan={4} role="alert" className="text-center text-sm font-medium text-rose-700 py-6">{menteeLoadErrors.logs}</TableCell></TableRow>;
+                          }
                           if (!rows.length) {
                             return <TableRow><TableCell colSpan={4} className="text-center text-sm text-slate-500 py-6">No clinical works found.</TableCell></TableRow>;
                           }
@@ -1068,6 +1091,9 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                               log.procedureGroup === (logFilter as any).group
                             )
                             : (menteeLogs?.procedureLogs ?? []);
+                          if (menteeLoadErrors.logs) {
+                            return <TableRow><TableCell colSpan={4} role="alert" className="text-center text-sm font-medium text-rose-700 py-6">{menteeLoadErrors.logs}</TableCell></TableRow>;
+                          }
                           if (!rows.length) {
                             return <TableRow><TableCell colSpan={4} className="text-center text-sm text-slate-500 py-6">No procedure logs found.</TableCell></TableRow>;
                           }
@@ -1125,6 +1151,9 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                           const rows = logFilter?.tab === "acad-logs"
                             ? (menteeLogs?.academicLogs ?? []).filter((log: any) => log.activityType === (logFilter as any).activityType)
                             : (menteeLogs?.academicLogs ?? []);
+                          if (menteeLoadErrors.logs) {
+                            return <TableRow><TableCell colSpan={3} role="alert" className="text-center text-sm font-medium text-rose-700 py-6">{menteeLoadErrors.logs}</TableCell></TableRow>;
+                          }
                           if (!rows.length) {
                             return <TableRow><TableCell colSpan={3} className="text-center text-sm text-slate-500 py-6">No academic logs found.</TableCell></TableRow>;
                           }
@@ -1145,7 +1174,9 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
 
                 {/* ── Postings Tab ──────────────────────────────────────────── */}
                 <TabsContent value="postings" className="pt-3">
-                  {menteePostings.length === 0 ? (
+                  {menteeLoadErrors.postings ? (
+                    <p role="alert" className="text-sm font-medium text-rose-700 py-6 text-center">{menteeLoadErrors.postings}</p>
+                  ) : menteePostings.length === 0 ? (
                     <p className="text-sm text-slate-500 py-6 text-center">No postings visible to you (either none logged or none assigned to you as supervisor).</p>
                   ) : (
                     <div className="space-y-3">
@@ -1186,7 +1217,9 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                 {/* ── Awards Tab ────────────────────────────────────────────── */}
                 {config?.enabledFeatures?.awards && (
                   <TabsContent value="awards" className="pt-3">
-                    {menteeAwards.length === 0 ? (
+                    {menteeLoadErrors.awards ? (
+                      <p role="alert" className="text-sm font-medium text-rose-700 py-6 text-center">{menteeLoadErrors.awards}</p>
+                    ) : menteeAwards.length === 0 ? (
                       <p className="text-sm text-slate-500 py-6 text-center">No awards visible to you (either none logged or none assigned to you as supervisor).</p>
                     ) : (
                       <div className="space-y-3">
@@ -1227,7 +1260,9 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
 
                 {/* ── Thesis Tab ────────────────────────────────────────────── */}
                 <TabsContent value="thesis" className="pt-3">
-                  {!menteeThesis ? (
+                  {menteeLoadErrors.thesis ? (
+                    <p role="alert" className="text-sm font-medium text-rose-700 py-6 text-center">{menteeLoadErrors.thesis}</p>
+                  ) : !menteeThesis ? (
                     <p className="text-sm text-slate-500 py-6 text-center">No thesis recorded yet, or this student's thesis is not assigned to you as guide.</p>
                   ) : (
                     <div className="space-y-4">
@@ -1271,7 +1306,9 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
 
                 {/* ── Certifications Tab ────────────────────────────────────── */}
                 <TabsContent value="certifications" className="pt-3">
-                  {menteeCerts.length === 0 ? (
+                  {menteeLoadErrors.certifications ? (
+                    <p role="alert" className="text-sm font-medium text-rose-700 py-6 text-center">{menteeLoadErrors.certifications}</p>
+                  ) : menteeCerts.length === 0 ? (
                     <p className="text-sm text-slate-500 py-6 text-center">No certifications visible to you (this student may not be your direct mentee).</p>
                   ) : (
                     <div className="space-y-3">
@@ -1312,7 +1349,9 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
 
                 {/* ── Assessments Tab ─────────────────────────────────────────── */}
                 <TabsContent value="assessments" className="pt-3">
-                  {menteeAssessments.length === 0 ? (
+                  {menteeLoadErrors.assessments ? (
+                    <p role="alert" className="text-sm font-medium text-rose-700 py-6 text-center">{menteeLoadErrors.assessments}</p>
+                  ) : menteeAssessments.length === 0 ? (
                     <p className="text-sm text-slate-500 py-6 text-center">No assessments found for this student.</p>
                   ) : (
                     <div className="space-y-4">
