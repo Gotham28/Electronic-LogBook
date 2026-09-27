@@ -125,7 +125,7 @@ function navigationForRole(role: RoleType, dashboardData?: any, loadingBadges?: 
     const cat = dashboardData.categories?.find((c: any) => c.id === id);
     if (!cat) return undefined;
 
-    const required = id === "cases" ? config?.requiredCases : id === "procedures" ? config?.requiredProcedures : id === "academics" ? config?.requiredAcademic : 0;
+    const required = id === "cases" ? config?.requiredCases : id === "procedures" ? config?.requiredProcedures : id === "academics" ? config?.requiredAcademic : null;
     
     if (required === null || required === undefined) {
       return `${cat.logged}`;

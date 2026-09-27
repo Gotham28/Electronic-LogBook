@@ -148,6 +148,7 @@ function App() {
     () => window.sessionStorage.getItem("elogbook-authenticated") === "true"
   );
   const [authScreen, setAuthScreen] = useState<"login" | "register">("login");
+  const [sessionExpired, setSessionExpired] = useState(false);
   
   const hasTokenInUrl = new URLSearchParams(window.location.search).has("impersonationToken");
   const [checkingSession, setCheckingSession] = useState(!!getToken() || hasTokenInUrl);
@@ -177,12 +178,19 @@ function App() {
     const stopKeepalive = startSessionKeepalive();
     const onExpired = () => {
       setIsAuthenticated(false);
+      setSessionExpired(true);
       setLocation("/");
-      toast.error("Your session expired. Please sign in again.");
     };
     window.addEventListener(SESSION_EXPIRED_EVENT, onExpired);
     return () => { stopKeepalive(); window.removeEventListener(SESSION_EXPIRED_EVENT, onExpired); };
   }, [isAuthenticated, setLocation]);
+
+  // Shown from an effect so the sign-in screen's toaster is mounted before the message is sent.
+  useEffect(() => {
+    if (!sessionExpired || isAuthenticated) return;
+    toast.error("Your session expired. Please sign in again.");
+    setSessionExpired(false);
+  }, [sessionExpired, isAuthenticated]);
 
   if (previewPath) {
     return (
