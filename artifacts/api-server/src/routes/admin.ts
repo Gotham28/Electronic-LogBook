@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, usersTable, studentsTable, departmentsTable, departmentConfigsTable, procedureTypesTable, caseLogsTable, procedureLogsTable, academicLogsTable, departmentCatalogTable, paymentsTable, leaveRecordsTable, leaveApplicationsTable, assessmentsTable, appraisalsTable, assignmentRecipientsTable, attendanceLogsTable, certificationsTable, postingsTable, thesisMilestonesTable, researchTable, auditTable, assignmentsTable, assignmentTypesTable, clinicalWorkLogsTable } from "@workspace/db";
+import { db, usersTable, studentsTable, departmentsTable, departmentConfigsTable, procedureTypesTable, caseLogsTable, procedureLogsTable, academicLogsTable, departmentCatalogTable, paymentsTable, leaveRecordsTable, leaveApplicationsTable, assessmentsTable, appraisalsTable, assignmentRecipientsTable, attendanceLogsTable, certificationsTable, postingsTable, thesisMilestonesTable, researchTable, auditTable, assignmentsTable, assignmentTypesTable, clinicalWorkLogsTable, conferencesTable, awardsTable } from "@workspace/db";
 import { eq, and, count, inArray, sql, or } from "drizzle-orm";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
@@ -709,6 +709,12 @@ router.delete("/users/:id/hard", async (req, res) => {
           const _acad = await tx.delete(academicLogsTable).where(eq(academicLogsTable.studentId, studentId)).returning({ id: academicLogsTable.id });
           deletedCounts.academicLogs = _acad.length;
 
+          const _conf = await tx.delete(conferencesTable).where(eq(conferencesTable.studentId, studentId)).returning({ id: conferencesTable.id });
+          deletedCounts.conferences = _conf.length;
+
+          const _awards = await tx.delete(awardsTable).where(eq(awardsTable.studentId, studentId)).returning({ id: awardsTable.id });
+          deletedCounts.awards = _awards.length;
+
           const _leave = await tx.delete(leaveRecordsTable).where(eq(leaveRecordsTable.studentId, studentId)).returning({ id: leaveRecordsTable.id });
           deletedCounts.leaveRecords = _leave.length;
 
@@ -754,6 +760,13 @@ router.delete("/users/:id/hard", async (req, res) => {
 
         const _acad = await tx.delete(academicLogsTable).where(or(eq(academicLogsTable.supervisorId, targetUserId), eq(academicLogsTable.reviewedBy, targetUserId))).returning({ id: academicLogsTable.id });
         deletedCounts.academicLogs = _acad.length;
+
+        const _conf = await tx.delete(conferencesTable).where(or(eq(conferencesTable.supervisorId, targetUserId), eq(conferencesTable.reviewedBy, targetUserId))).returning({ id: conferencesTable.id });
+        deletedCounts.conferences = _conf.length;
+
+        // A former HOD demoted to professor can still be the supervisor on awards.
+        const _awards = await tx.delete(awardsTable).where(eq(awardsTable.supervisorId, targetUserId)).returning({ id: awardsTable.id });
+        deletedCounts.awards = _awards.length;
 
         const _leave = await tx.delete(leaveRecordsTable).where(eq(leaveRecordsTable.reviewedBy, targetUserId)).returning({ id: leaveRecordsTable.id });
         deletedCounts.leaveRecords = _leave.length;

@@ -7,7 +7,7 @@ import {
   leaveRecordsTable, postingsTable, researchTable,
   assessmentsTable, attendanceLogsTable, leaveApplicationsTable,
   thesisMilestonesTable, appraisalsTable, auditTable,
-  departmentCatalogTable, procedureTypesTable,
+  departmentCatalogTable, procedureTypesTable, conferencesTable, awardsTable, certificationsTable,
 } from "./database.js";
 import { eq, and } from "drizzle-orm";
 import { deleteDepartmentCascade } from "../src/routes/superadmin.js";
@@ -400,4 +400,50 @@ test("department with configSourceDepartmentId set but isTest=false is refused r
   const [guardDeptAfter] = await db.select().from(departmentsTable)
     .where(eq(departmentsTable.id, guardDeptId));
   assert.ok(guardDeptAfter, "Guard target department should still exist after rejected mirror-delete");
+});
+
+// conferences, awards and certifications were added after the cascade was written.
+test("mirror department with conference, award and certification rows deletes cleanly via its real parent", async () => {
+  const createRes = await call("/superadmin/departments", "POST", {
+    setup: { name: "Later Tables Dept", code: "LATER-TBL", hod: { fullName: "Later HOD", email: "later-tbl-hod@example.test" } },
+    hodPassword: password,
+  });
+  assert.equal(createRes.status, 201);
+  const realDeptId = createRes.body.departmentId;
+  const [mirror] = await db.select().from(departmentsTable).where(eq(departmentsTable.configSourceDepartmentId, realDeptId));
+  const [mirrorStudent] = await db.select({ id: studentsTable.id }).from(studentsTable)
+    .innerJoin(usersTable, eq(studentsTable.userId, usersTable.id)).where(eq(usersTable.departmentId, mirror.id));
+  const [mirrorProfessor] = await db.select({ id: usersTable.id }).from(usersTable)
+    .where(and(eq(usersTable.departmentId, mirror.id), eq(usersTable.role, "professor")));
+
+  await db.insert(conferencesTable).values({ studentId: mirrorStudent.id, conferenceName: "[TEST DATA] conference",
+    role: "attended", date: "2026-03-01", supervisorId: mirrorProfessor.id });
+  await db.insert(awardsTable).values({ studentId: mirrorStudent.id, date: "2026-03-01", description: "[TEST DATA] award" });
+  await db.insert(certificationsTable).values({ studentId: mirrorStudent.id, title: "BLS", issueDate: new Date("2026-01-01"),
+    expiryDate: new Date("2028-01-01"), certificateUrl: "https://example.test/cert" });
+
+  const deleteRes = await call(`/superadmin/departments/${realDeptId}`, "DELETE");
+  assert.equal(deleteRes.status, 200, JSON.stringify(deleteRes.body));
+  assert.equal((await db.select().from(departmentsTable).where(eq(departmentsTable.id, mirror.id))).length, 0);
+});
+
+test("non-mirror department whose only records are conferences returns 409 naming them", async () => {
+  const createRes = await call("/superadmin/departments", "POST", {
+    setup: { name: "Conference Only Dept", code: "CONF-ONLY", hod: { fullName: "Conf HOD", email: "conf-only-hod@example.test" } },
+    hodPassword: password,
+  });
+  assert.equal(createRes.status, 201);
+  const deptId = createRes.body.departmentId;
+  const stuRes = await call(`/superadmin/departments/${deptId}/students`, "POST", {
+    fullName: "Conf Student", email: "conf-only-stu@example.test", password,
+    registrationNumber: "CONF-STU-001", batch: "2026", dateOfJoining: "2026-01-01", kuhsId: "CONF-KUHS-001",
+  });
+  const [studentProfile] = await db.select().from(studentsTable).where(eq(studentsTable.userId, stuRes.body.student.id));
+  await db.insert(conferencesTable).values({ studentId: studentProfile.id, conferenceName: "[TEST DATA] conference",
+    role: "attended", date: "2026-03-01" });
+
+  const deleteRes = await call(`/superadmin/departments/${deptId}`, "DELETE");
+  assert.equal(deleteRes.status, 409);
+  assert.match(deleteRes.body.message, /conferences \(1 rows\)/);
+  assert.equal((await db.select().from(conferencesTable).where(eq(conferencesTable.studentId, studentProfile.id))).length, 1);
 });
