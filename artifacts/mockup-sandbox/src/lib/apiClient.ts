@@ -176,6 +176,14 @@ export function deactivateAdminUser(userId: number) {
   return apiPost(`/api/superadmin/users/${userId}/deactivate`);
 }
 
+export function reactivateAdminUser(userId: number) {
+  return apiPost(`/api/superadmin/users/${userId}/reactivate`, {});
+}
+
+export function hardDeleteAdminUser(userId: number): Promise<{ message: string; deletedRecords?: Record<string, number> }> {
+  return apiDelete(`/api/superadmin/users/${userId}/hard`);
+}
+
 export function impersonateAdminUser(userId: number) {
   return apiPost(`/api/superadmin/users/${userId}/impersonate`);
 }

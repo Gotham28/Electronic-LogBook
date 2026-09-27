@@ -11,6 +11,7 @@ import jwt from "jsonwebtoken";
 import { JWT_SECRET } from "../lib/env.js";
 import { IMPERSONATION_TOKEN_LIFETIME } from "../lib/session-tokens.js";
 import { sessionProfile } from "./auth.js";
+import { hardDeleteUserCascade } from "../lib/hard-delete-user.js";
 
 const router = Router();
 
@@ -626,6 +627,81 @@ router.post("/users/:id/deactivate", validate(z.object({}).strict()), async (req
     res.json({ message: "Account deactivated; records retained" });
   } catch (error) {
     req.log.error({ targetId, userId: req.user!.id, status: 500 }, "Error deactivating account");
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/superadmin/users/:id/reactivate — undo a deactivation
+// Same pattern as admin.ts POST /users/:id/reactivate: status "rejected" →
+// "approved", sessionVersion + 1. Refuses admin and HOD accounts (403).
+// ---------------------------------------------------------------------------
+router.post("/users/:id/reactivate", validate(z.object({}).strict()), async (req, res) => {
+  const targetId = Number(req.params.id);
+  try {
+    const [target] = await db.select({ id: usersTable.id, role: usersTable.role, status: usersTable.status })
+      .from(usersTable).where(eq(usersTable.id, targetId)).limit(1);
+
+    if (!target) { res.status(404).json({ message: "User not found" }); return; }
+    if (!["student", "professor"].includes(target.role)) {
+      res.status(403).json({ message: "Only residents and faculty can be reactivated here" });
+      return;
+    }
+    if (target.status !== "rejected") {
+      res.status(409).json({ message: "This account is not deactivated" });
+      return;
+    }
+
+    await db.update(usersTable)
+      .set({ status: "approved", sessionVersion: sql`${usersTable.sessionVersion} + 1` })
+      .where(and(eq(usersTable.id, targetId), eq(usersTable.status, "rejected"), inArray(usersTable.role, ["student", "professor"])));
+
+    req.log.info({ targetId, status: 200 }, "Account reactivated by admin");
+    res.json({ message: "Account reactivated. The user must sign in again." });
+  } catch (error) {
+    req.log.error({ targetId, userId: req.user!.id, status: 500 }, "Error reactivating account");
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// DELETE /api/superadmin/users/:id/hard — permanently delete a resident or faculty
+// member in any department, with the same cascade as the HOD route
+// (admin.ts DELETE /users/:id/hard). Refuses admin and HOD accounts (403).
+// :id is a usersTable.id; the studentsTable.id is resolved inside the cascade (§4).
+// ---------------------------------------------------------------------------
+router.delete("/users/:id/hard", async (req, res) => {
+  const targetId = Number(req.params.id);
+  try {
+    const [target] = await db.select({ id: usersTable.id, role: usersTable.role, departmentId: usersTable.departmentId })
+      .from(usersTable).where(eq(usersTable.id, targetId)).limit(1);
+
+    if (!target) { res.status(404).json({ message: "User not found" }); return; }
+    if (target.role !== "student" && target.role !== "professor") {
+      res.status(403).json({ message: "Only residents and faculty can be permanently deleted here" });
+      return;
+    }
+    const role = target.role;
+
+    let deletedCounts: Record<string, number> = {};
+    await db.transaction(async (tx) => {
+      // Assignment types the target created are department-scoped, so they pass to the
+      // department's HOD. With no approved HOD they pass to the acting admin.
+      const [hod] = await tx.select({ id: usersTable.id }).from(usersTable)
+        .where(and(eq(usersTable.departmentId, target.departmentId!), eq(usersTable.role, "hod"), eq(usersTable.status, "approved"))).limit(1);
+      deletedCounts = await hardDeleteUserCascade(tx, targetId, role, hod?.id ?? req.user!.id);
+    });
+
+    req.log.info({ targetId, departmentId: target.departmentId, status: 200 }, "Account hard-deleted by admin");
+    res.json({ message: "Account and associated records permanently deleted", deletedRecords: deletedCounts });
+  } catch (error: any) {
+    const pgErrorCode = error.code ?? error.cause?.code;
+    if (pgErrorCode === "23503") {
+      req.log.error({ targetId, userId: req.user!.id, status: 409 }, "Hard-delete blocked by FK constraint");
+      res.status(409).json({ message: "Hard-delete failed due to related data conflict" });
+      return;
+    }
+    req.log.error({ targetId, userId: req.user!.id, status: 500 }, "Error hard-deleting account");
     res.status(500).json({ message: "Internal server error" });
   }
 });
