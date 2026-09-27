@@ -23,6 +23,9 @@ export function ConferencesPage() {
   const [form, setForm] = React.useState({
     date: todayForInput(),
     conferenceName: "",
+    conferenceType: "conference",
+    level: "",
+    category: "",
     role: "attended",
     location: "",
     certificateUrl: "",
@@ -31,6 +34,7 @@ export function ConferencesPage() {
   const [editLogId, setEditLogId] = React.useState<number | null>(null);
 
   const user = React.useMemo(() => getCurrentUser(), []);
+  const { config, conferenceLevels } = useDepartment();
   const [professors, setProfessors] = React.useState<any[]>([]);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
@@ -73,6 +77,9 @@ export function ConferencesPage() {
     try {
       const payload = {
         conferenceName: form.conferenceName,
+        conferenceType: form.conferenceType,
+        level: form.level === "none" ? null : form.level || null,
+        category: form.category || null,
         role: form.role,
         date: form.date,
         location: form.location || null,
@@ -89,7 +96,7 @@ export function ConferencesPage() {
       await fetchLogs();
       setOpen(false);
       setEditLogId(null);
-      setForm({ ...form, conferenceName: "", location: "", certificateUrl: "", supervisorId: "" });
+      setForm({ ...form, conferenceName: "", conferenceType: "conference", level: "", category: "", location: "", certificateUrl: "", supervisorId: "" });
       toast.success(editLogId ? `Conference log updated successfully` : `Conference log submitted successfully`);
     } catch (err: any) {
       toast.error(err.message || "Failed to submit conference log");
@@ -114,7 +121,7 @@ export function ConferencesPage() {
         </div>
         <Dialog open={open} onOpenChange={(val) => { 
           setOpen(val); 
-          if (!val) { setForm({ date: todayForInput(), conferenceName: "", role: "attended", location: "", certificateUrl: "", supervisorId: "" }); setEditLogId(null); } 
+          if (!val) { setForm({ date: todayForInput(), conferenceName: "", conferenceType: "conference", level: "", category: "", role: "attended", location: "", certificateUrl: "", supervisorId: "" }); setEditLogId(null); } 
         }}>
           <DialogTrigger asChild><Button><PlusCircle className="h-4 w-4" /> Log conference</Button></DialogTrigger>
           <DialogContent className="rounded-2xl bg-white sm:max-w-lg">
@@ -125,6 +132,36 @@ export function ConferencesPage() {
             <form onSubmit={submit} className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Date"><Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required /></Field>
+                <Field label="Conference/CME">
+                  <Select value={form.conferenceType} onValueChange={(value) => setForm({ ...form, conferenceType: value })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="conference">Conference</SelectItem>
+                      <SelectItem value="cme">CME</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+              </div>
+              <Field label="Conference Name">
+                <Input value={form.conferenceName} onChange={(e) => setForm({ ...form, conferenceName: e.target.value })} required />
+              </Field>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Level (optional)">
+                  <Select value={form.level} onValueChange={(value) => setForm({ ...form, level: value })}>
+                    <SelectTrigger><SelectValue placeholder="Select level" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      {conferenceLevels?.map((level: any) => (
+                        <SelectItem key={level.id} value={level.value}>{level.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+                {!config?.enabledFeatures?.hideConferenceLocation && (
+                  <Field label="Location (optional)"><Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} maxLength={160} /></Field>
+                )}
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Role">
                   <Select value={form.role} onValueChange={(value) => setForm({ ...form, role: value })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
@@ -134,11 +171,8 @@ export function ConferencesPage() {
                     </SelectContent>
                   </Select>
                 </Field>
+                <Field label="Category (optional)"><Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} maxLength={160} /></Field>
               </div>
-              <Field label="Conference Name">
-                <Input value={form.conferenceName} onChange={(e) => setForm({ ...form, conferenceName: e.target.value })} required />
-              </Field>
-              <Field label="Location (optional)"><Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} maxLength={160} /></Field>
               <Field label="Certificate URL (optional)"><Input type="url" placeholder="https://" value={form.certificateUrl} onChange={(e) => setForm({ ...form, certificateUrl: e.target.value })} /></Field>
               <Field label="Reviewing faculty (optional)">
                 <Select value={form.supervisorId} onValueChange={(value) => setForm({ ...form, supervisorId: value })}>
@@ -188,15 +222,17 @@ export function ConferencesPage() {
             </Empty>
           ) : (
             <Table>
-              <TableHeader><TableRow><TableHead>Number</TableHead><TableHead>Date</TableHead><TableHead>Conference</TableHead><TableHead>Role</TableHead><TableHead>Location</TableHead><TableHead>Reviewing faculty</TableHead><TableHead>Remarks</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Number</TableHead><TableHead>Date</TableHead><TableHead>Type</TableHead><TableHead>Conference</TableHead><TableHead>Level</TableHead><TableHead>Role</TableHead>{!config?.enabledFeatures?.hideConferenceLocation && <TableHead>Location</TableHead>}<TableHead>Reviewing faculty</TableHead><TableHead>Remarks</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
               <TableBody>
                 {logs.map((log) => (
                   <TableRow key={log.id}>
                     <TableCell className="font-bold">{log.number}</TableCell>
                     <TableCell>{formatLogbookDate(log.date)}</TableCell>
+                    <TableCell className="uppercase text-xs font-semibold">{log.conferenceType === "cme" ? "CME" : "Conference"}</TableCell>
                     <TableCell className="max-w-sm font-semibold">{log.conferenceName}</TableCell>
+                    <TableCell>{log.level ? <span className="capitalize">{conferenceLevels?.find((l: any) => l.value === log.level)?.name || log.level}</span> : "—"}</TableCell>
                     <TableCell><Badge variant="outline" className="border-teal-100 bg-teal-50 text-teal-800 capitalize">{log.role}</Badge></TableCell>
-                    <TableCell>{log.location ? <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{log.location}</span> : "—"}</TableCell>
+                    {!config?.enabledFeatures?.hideConferenceLocation && <TableCell>{log.location ? <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{log.location}</span> : "—"}</TableCell>}
                     <TableCell>{log.faculty}</TableCell>
                     <TableCell className="text-xs max-w-[160px]">
                       {log.status === "pending"
@@ -211,7 +247,7 @@ export function ConferencesPage() {
                         <Button variant="ghost" size="sm" className="text-teal-600 hover:text-teal-800 hover:bg-teal-50" onClick={() => {
                           setEditLogId(log.id);
                           setForm({
-                            date: log.date, conferenceName: log.conferenceName || "", role: log.role || "attended",
+                            date: log.date, conferenceName: log.conferenceName || "", conferenceType: log.conferenceType || "conference", level: log.level || "", category: log.category || "", role: log.role || "attended",
                             location: log.location || "", certificateUrl: log.certificateUrl || "", supervisorId: log.supervisorId ? String(log.supervisorId) : "none",
                           });
                           setOpen(true);

@@ -3,7 +3,7 @@ import crypto from "crypto";
 import { 
   db, studentsTable, caseLogsTable, procedureLogsTable, 
   academicLogsTable, usersTable, departmentsTable, departmentConfigsTable,
-  postingsTable, leaveRecordsTable, appraisalsTable, researchTable, assessmentsTable, procedureTypesTable, departmentCatalogTable, certificationsTable, conferencesTable
+  postingsTable, leaveRecordsTable, appraisalsTable, researchTable, assessmentsTable, procedureTypesTable, departmentCatalogTable, certificationsTable, conferencesTable, awardsTable
 } from "@workspace/db";
 import { eq, and, or, desc, count, sql, isNull, aliasedTable } from "drizzle-orm";
 import { requireAuth, requireRole, requireDepartment } from "../middlewares/auth.js";
@@ -165,7 +165,19 @@ router.get("/:studentId/logs", requireAuth, async (req, res) => {
     .leftJoin(departmentsTable, eq(usersTable.departmentId, departmentsTable.id))
     .leftJoin(mentorsTable, eq(studentsTable.mentorId, mentorsTable.id))
     .where(eq(studentsTable.id, studentId))
-    .limit(1);
+    .limit(1) as unknown as Array<{
+      id: number;
+      userId: number;
+      name: string;
+      registrationNumber: string | null;
+      dateOfJoining: string | null;
+      batch: number | null;
+      department: string | null;
+      departmentId: number | null;
+      mentorName: string | null;
+      mentorRole: string | null;
+      specialty: string | null;
+    }>;
 
     if (studentMatch.length === 0) {
       res.status(404).json({ message: "Student not found" });
@@ -1016,7 +1028,7 @@ router.patch("/:studentId/certifications/:certId/review", requireAuth, requireRo
   validate(reviewBody), async (req, res) => {
   try {
     const studentId = parseInt(String(req.params.studentId), 10);
-    const certId = req.params.certId; // UUID
+    const certId = String(req.params.certId); // UUID
     if (isNaN(studentId)) { res.status(400).json({ message: "Invalid studentId" }); return; }
     const reviewer = req.user!;
 
@@ -1160,11 +1172,12 @@ router.post("/:studentId/academic-logs", validate(z.object({ supervisorId: idSch
 });
 
 router.post("/:studentId/conference-logs", validate(z.object({ supervisorId: idSchema.optional().nullable(), conferenceName: nameSchema,
+  conferenceType: z.enum(["conference", "cme"]).default("conference"), level: optionalText.nullable(), category: optionalText.nullable(),
   role: z.enum(["attended", "presented"]), date: dateSchema, location: optionalText.nullable(),
   certificateUrl: optionalText.nullable() }).strict()), async (req, res) => {
   try {
     const studentId = parseInt(String(req.params.studentId), 10);
-    const { supervisorId, conferenceName, role, date, location, certificateUrl } = req.body;
+    const { supervisorId, conferenceName, conferenceType, role, date, level, category, location, certificateUrl } = req.body;
     
     let supervisorIdNum = null;
     if (supervisorId) {
@@ -1176,7 +1189,7 @@ router.post("/:studentId/conference-logs", validate(z.object({ supervisorId: idS
     }
 
     const [inserted] = await db.insert(conferencesTable).values({
-      studentId, supervisorId: supervisorIdNum, conferenceName, role, date, location, certificateUrl, status: "pending"
+      studentId, supervisorId: supervisorIdNum, conferenceName, conferenceType, role, date, level, category, location, certificateUrl, status: "pending"
     }).returning();
     res.status(201).json(inserted);
   } catch (error) {
@@ -1383,6 +1396,7 @@ router.patch("/:studentId/academic-logs/:logId", requireAuth, validate(z.object(
 
 // 4. Conference Logs
 router.patch("/:studentId/conference-logs/:logId", requireAuth, validate(z.object({ supervisorId: idSchema.optional().nullable(), conferenceName: nameSchema,
+  conferenceType: z.enum(["conference", "cme"]), level: optionalText.nullable(), category: optionalText.nullable(),
   role: z.enum(["attended", "presented"]), date: dateSchema, location: optionalText.nullable(),
   certificateUrl: optionalText.nullable() }).strict().partial()), async (req, res) => {
   try {
@@ -1467,6 +1481,127 @@ router.patch("/:studentId/certifications/:certId", requireAuth, validate(z.objec
     if (!updated) { res.status(400).json({ message: "Log no longer pending or not found" }); return; }
     res.json(updated);
   } catch (error) { res.status(500).json({ message: "Internal server error" }); }
+});
+
+// 7. Awards
+router.get("/:studentId/awards", async (req, res) => {
+  try {
+    const studentId = parseInt(String(req.params.studentId), 10);
+    const caller = req.user!;
+    const awardsFilter = caller.role === "professor"
+      ? and(eq(awardsTable.studentId, studentId), eq(awardsTable.supervisorId, caller.id))
+      : eq(awardsTable.studentId, studentId);
+    const data = await db
+      .select({
+        id: awardsTable.id,
+        date: awardsTable.date,
+        description: awardsTable.description,
+        supervisorId: awardsTable.supervisorId,
+        supervisorName: usersTable.fullName,
+        status: awardsTable.status,
+        facultyRemarks: awardsTable.facultyRemarks,
+      })
+      .from(awardsTable)
+      .leftJoin(usersTable, eq(awardsTable.supervisorId, usersTable.id))
+      .where(awardsFilter)
+      .orderBy(desc(awardsTable.createdAt));
+      
+    res.json({ data });
+  } catch (error) {
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+router.post("/:studentId/awards", validate(z.object({ 
+  date: dateSchema, 
+  description: z.string().trim().min(1).max(2000)
+}).strict()), async (req, res) => {
+  try {
+    const studentId = parseInt(String(req.params.studentId), 10);
+    const caller = req.user!;
+    
+    const { date, description } = req.body;
+    
+    const [hod] = await db.select({ id: usersTable.id }).from(usersTable)
+      .where(and(eq(usersTable.departmentId, caller.departmentId!), eq(usersTable.role, "hod"), eq(usersTable.status, "approved"))).limit(1);
+
+    if (!hod) {
+      res.status(400).json({ message: "No active Head of Department found for your department to assign as supervisor." }); return;
+    }
+    
+    const supervisorId = hod.id;
+    
+    const [inserted] = await db.insert(awardsTable).values({
+      studentId,
+      date,
+      description,
+      supervisorId: supervisorId,
+    }).returning();
+    res.status(201).json(inserted);
+  } catch (error) {
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+router.patch("/:studentId/awards/:awardId", requireAuth, validate(z.object({ 
+  date: dateSchema, 
+  description: z.string().trim().min(1).max(2000)
+}).strict().partial()), async (req, res) => {
+  try {
+    const studentId = parseInt(String(req.params.studentId), 10);
+    const awardId = parseInt(String(req.params.awardId), 10);
+    const guard = await studentEditGuard(req, res, awardsTable, awardId, studentId);
+    if (guard.error) { res.status(guard.error).json({ message: guard.message }); return; }
+
+    const [updated] = await db.update(awardsTable).set(req.body)
+      .where(and(eq(awardsTable.id, awardId), eq(awardsTable.studentId, studentId), eq((awardsTable as any).status, "pending"))).returning();
+    if (!updated) { res.status(400).json({ message: "Log no longer pending or not found" }); return; }
+    res.json(updated);
+  } catch (error: any) { res.status(500).json({ message: "Internal server error" }); }
+});
+
+router.patch("/:studentId/awards/:awardId/review", requireAuth, requireRole(["professor", "hod"]),
+  validate(reviewBody), async (req, res) => {
+  try {
+    const studentId = parseInt(String(req.params.studentId), 10);
+    const awardId = parseInt(String(req.params.awardId), 10);
+    if (isNaN(studentId) || isNaN(awardId)) { res.status(400).json({ message: "Invalid id" }); return; }
+    const reviewer = req.user!;
+
+    const [award] = await db.select({ supervisorId: awardsTable.supervisorId, studentId: awardsTable.studentId })
+      .from(awardsTable).where(and(eq(awardsTable.id, awardId), eq(awardsTable.studentId, studentId))).limit(1);
+    if (!award) { res.status(404).json({ message: "Award not found" }); return; }
+
+    if (reviewer.role === "professor" && award.supervisorId !== reviewer.id) {
+      res.status(403).json({ message: "Award not assigned to you" }); return;
+    }
+
+    const [studentRow] = await db.select({ departmentId: usersTable.departmentId })
+      .from(studentsTable).innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
+      .where(eq(studentsTable.id, studentId)).limit(1);
+    if (!studentRow || studentRow.departmentId !== reviewer.departmentId) {
+      res.status(403).json({ message: "Award not assigned to you" }); return;
+    }
+
+    const updatePayload = {
+      status: req.body.status,
+      facultyRemarks: req.body.remarks || null,
+    };
+
+    const [updated] = await db.update(awardsTable)
+      .set(updatePayload)
+      .where(and(eq(awardsTable.id, awardId), eq(awardsTable.status, "pending")))
+      .returning();
+
+    if (!updated) {
+      res.status(400).json({ message: "This log has already been reviewed" });
+      return;
+    }
+
+    res.json(updated);
+  } catch (error) {
+    res.status(500).json({ message: "Internal server error" });
+  }
 });
 
 export default router;

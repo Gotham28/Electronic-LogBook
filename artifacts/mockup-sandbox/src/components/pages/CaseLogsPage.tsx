@@ -234,9 +234,9 @@ export function CaseLogsPage() {
                   </Select>
                 </Field>
               </div>
-              <Field label="Case category">
+              <Field label={deptConfig?.enabledFeatures?.useCaseTypeLabel ? "Case type" : "Case category"}>
                 <Select value={form.category} onValueChange={(value) => setField("category", value)}>
-                  <SelectTrigger><SelectValue placeholder="Select a case category" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder={deptConfig?.enabledFeatures?.useCaseTypeLabel ? "Select a case type" : "Select a case category"} /></SelectTrigger>
                   <SelectContent>
                     {caseCategories?.map((cat: any) => (
                       <SelectItem key={cat.value} value={cat.value}>
@@ -358,7 +358,7 @@ export function CaseLogsPage() {
                   <TableHead>Date</TableHead>
                   {!hideUhid && <TableHead>Patient ID</TableHead>}
                   <TableHead>Age</TableHead>
-                  <TableHead>Category</TableHead>
+                  <TableHead>{deptConfig?.enabledFeatures?.useCaseTypeLabel ? "Type" : "Category"}</TableHead>
                   <TableHead>Diagnosis</TableHead>
                   <TableHead>Remarks</TableHead>
                   <TableHead>Status</TableHead>
@@ -439,7 +439,7 @@ export function CaseLogsPage() {
                 <DialogDescription>{[hideUhid ? null : selectedLog.patientUhid, selectedLog.patientAge || selectedLog.age, selectedLog.patientGender || selectedLog.gender].filter(Boolean).join(" • ")}</DialogDescription>
               </DialogHeader>
               <div className="grid gap-4">
-                <Detail label="Category" value={caseCategories?.find((c: any) => c.value === selectedLog.category)?.name || selectedLog.category} />
+                <Detail label={deptConfig?.enabledFeatures?.useCaseTypeLabel ? "Type" : "Category"} value={caseCategories?.find((c: any) => c.value === selectedLog.category)?.name || selectedLog.category} />
                 <Detail label="Chief complaints" value={selectedLog.chiefComplaints} />
                 <Detail label="Relevant history" value={selectedLog.history} />
                 <Detail label="Clinical examination" value={selectedLog.examination} />

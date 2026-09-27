@@ -13,7 +13,7 @@ export type DepartmentData = {
   hod: { id: number; name: string } | null;
   config: DepartmentConfig | null;
   procedures: Array<{ id: number; name: string; group: string; required: number }>;
-  postings: CatalogItem[]; academics: CatalogItem[]; caseCategories: CatalogItem[]; competencyLevels: CatalogItem[]; leaveTypes: CatalogItem[];
+  postings: CatalogItem[]; academics: CatalogItem[]; caseCategories: CatalogItem[]; competencyLevels: CatalogItem[]; leaveTypes: CatalogItem[]; conferenceLevels: CatalogItem[];
 };
 const DepartmentContext = React.createContext<(DepartmentData & { refresh: () => Promise<void> }) | null>(null);
 
@@ -31,6 +31,7 @@ export function DepartmentProvider({ departmentId, children }: { departmentId: n
         caseCategories: result.caseCategories || [],
         competencyLevels: result.competencyLevels || [],
         leaveTypes: result.leaveTypes || [],
+        conferenceLevels: result.conferenceLevels || [],
         procedures: result.procedures || []
       });
       setError("");

@@ -91,6 +91,7 @@ export function DepartmentSettings() {
   const [busy, setBusy] = React.useState(false);
   const [targets, setTargets] = React.useState<Record<number, string>>({});
   const [academicTargets, setAcademicTargets] = React.useState<Record<number, string>>({});
+  const [conferenceTargets, setConferenceTargets] = React.useState<Record<number, string>>({});
   const [leaveTargets, setLeaveTargets] = React.useState<Record<number, string>>({});
   const [procedureGroups, setProcedureGroups] = React.useState<{id: string, name: string, count: number}[]>([]);
   const [isAddingNewGroup, setIsAddingNewGroup] = React.useState(false);
@@ -103,11 +104,11 @@ export function DepartmentSettings() {
     fetchGroups();
   }, [fetchGroups, data.department.id]);
 
-  const [deleteTarget, setDeleteTarget] = React.useState<{id: number | string, type: "procedure" | "posting" | "academic" | "case_category" | "competency_level" | "leave_type" | "procedure_group", name: string, count: number | null} | null>(null);
+  const [deleteTarget, setDeleteTarget] = React.useState<{id: number | string, type: "procedure" | "posting" | "academic" | "case_category" | "competency_level" | "leave_type" | "procedure_group" | "conference_level", name: string, count: number | null} | null>(null);
   const [deleting, setDeleting] = React.useState(false);
   const [deleteError, setDeleteError] = React.useState<string | null>(null);
 
-  const confirmDelete = async (id: number | string, type: "procedure" | "posting" | "academic" | "case_category" | "competency_level" | "leave_type" | "procedure_group", name: string) => {
+  const confirmDelete = async (id: number | string, type: "procedure" | "posting" | "academic" | "case_category" | "competency_level" | "leave_type" | "procedure_group" | "conference_level", name: string) => {
     setDeleteTarget({ id, type, name, count: null });
     setDeleteError(null);
     try {
@@ -290,9 +291,9 @@ export function DepartmentSettings() {
         await apiPost("/api/admin/department/catalog", { ...entry, value: entry.name.trim(), required: entry.kind === "posting" ? 0 : Number(entry.required) });
         setEntry({ ...entry, name: "", required: "" });
       }, "Training option added"); }}>
-        <div className="space-y-2"><Label htmlFor="catalog-kind">Category</Label><select id="catalog-kind" className="h-11 w-full rounded-xl border bg-white px-3 text-sm" value={entry.kind} onChange={(e) => setEntry({ ...entry, kind: e.target.value })}><option value="posting">Ward/Posting</option><option value="academic">Academic activity</option><option value="case_category">Case Category</option><option value="competency_level">Experience level</option><option value="leave_type">Leave type</option></select></div>
+        <div className="space-y-2"><Label htmlFor="catalog-kind">Category</Label><select id="catalog-kind" className="h-11 w-full rounded-xl border bg-white px-3 text-sm" value={entry.kind} onChange={(e) => setEntry({ ...entry, kind: e.target.value })}><option value="posting">Ward/Posting</option><option value="academic">Academic activity</option><option value="case_category">Case Category</option><option value="competency_level">Experience level</option><option value="leave_type">Leave type</option>{(data.department.id === 15 || data.department.id === 25) && <option value="conference_level">Conference Level</option>}</select></div>
         <div className="space-y-2"><Label htmlFor="catalog-name">Name</Label><Input id="catalog-name" required maxLength={160} value={entry.name} onChange={(e) => setEntry({ ...entry, name: e.target.value })} /></div>
-        {(entry.kind === "academic" || entry.kind === "case_category") && <><div className="space-y-2"><Label htmlFor="catalog-required">Required count</Label><Input id="catalog-required" type="number" min={0} max={100000} required value={entry.required} onChange={(e) => setEntry({ ...entry, required: e.target.value })} /></div>
+        {(entry.kind === "academic" || entry.kind === "case_category" || entry.kind === "conference_level") && <><div className="space-y-2"><Label htmlFor="catalog-required">Required count</Label><Input id="catalog-required" type="number" min={0} max={100000} required value={entry.required} onChange={(e) => setEntry({ ...entry, required: e.target.value })} /></div>
           <div className="space-y-2"><Label htmlFor="catalog-period">Period</Label><select id="catalog-period" className="h-11 w-full rounded-xl border bg-white px-3 text-sm" value={entry.period} onChange={(e) => setEntry({ ...entry, period: e.target.value })}><option value="total">Overall</option><option value="month">Per month</option></select></div></>}
         <Button disabled={busy} type="submit">Add training option</Button>
       </form>
@@ -338,6 +339,19 @@ export function DepartmentSettings() {
           />
         )}
       </div>
+      {data.config?.enabledFeatures?.conferenceLevels && (
+      <div className="grid gap-6 md:grid-cols-2 mt-8 pt-8 border-t">
+        <SearchableSection
+          title="Conference Levels"
+          items={data.conferenceLevels ?? []}
+          emptyText="No conference levels configured."
+          renderItem={(item) => <form className="flex flex-wrap items-center gap-2 rounded-xl bg-slate-50 p-3" onSubmit={(e) => { e.preventDefault(); void save(() => apiPatch(`/api/admin/department/catalog/${item.id}`, { required: Number(conferenceTargets[item.id] ?? item.required), period: item.period }), "Conference level target updated"); }}>
+            <span className="flex-1 text-sm">{item.name}</span><Input className="w-16" type="number" min={0} max={100000} required aria-label={`Required count for ${item.name}`} value={conferenceTargets[item.id] ?? item.required} onChange={(e) => setConferenceTargets({ ...conferenceTargets, [item.id]: e.target.value })} /><Button size="sm" variant="outline" disabled={busy} type="submit">Save</Button>
+            <Button variant="outline" size="sm" type="button" disabled={busy || deleting} onClick={() => confirmDelete(item.id, "conference_level", item.name)} className="text-rose-700 border-rose-200 hover:bg-rose-50 px-2"><Trash2 className="h-4 w-4" /></Button>
+          </form>}
+        />
+      </div>
+      )}
       <div className="grid gap-6 md:grid-cols-2 mt-8 pt-8 border-t">
         <SearchableSection
           title="Leave types"

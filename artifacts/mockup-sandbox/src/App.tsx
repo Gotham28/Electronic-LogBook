@@ -16,6 +16,7 @@ import { AttendancePage } from "@/components/pages/AttendancePage";
 import { MilestonesPage } from "@/components/pages/MilestonesPage";
 import { ThesisPage } from "@/components/pages/ThesisPage";
 import { CertificationsPage } from "@/components/pages/CertificationsPage";
+import { AwardsPage } from "@/components/pages/AwardsPage";
 import { AssessmentsPage } from "@/components/pages/AssessmentsPage";
 import { PrintableLogbook } from "@/components/pages/PrintableLogbook";
 import { PrivacyPolicyPage } from "@/components/pages/PrivacyPolicyPage";
@@ -262,6 +263,7 @@ function App() {
           <Route path="/milestones" component={MilestonesPage} />
           <Route path="/thesis" component={ThesisPage} />
           <Route path="/certifications" component={CertificationsPage} />
+          <Route path="/awards" component={AwardsPage} />
           <Route component={Dashboard} />
         </Switch>
       )}
