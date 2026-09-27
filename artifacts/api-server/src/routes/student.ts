@@ -80,8 +80,11 @@ router.get("/:studentId/dashboard", requireAuth, async (req, res) => {
     }
 
     // Counts
-    const caseLogsCounts = await db.select({ status: caseLogsTable.status, count: count() }).from(caseLogsTable).where(eq(caseLogsTable.studentId, studentId)).groupBy(caseLogsTable.status);
-    const procLogsCounts = await db.select({ status: procedureLogsTable.status, count: count() }).from(procedureLogsTable).where(eq(procedureLogsTable.studentId, studentId)).groupBy(procedureLogsTable.status);
+    // Deleted entries are soft-deleted (deletedAt set); they are not "logged" any more.
+    const caseLogsCounts = await db.select({ status: caseLogsTable.status, count: count() }).from(caseLogsTable)
+      .where(and(eq(caseLogsTable.studentId, studentId), isNull(caseLogsTable.deletedAt))).groupBy(caseLogsTable.status);
+    const procLogsCounts = await db.select({ status: procedureLogsTable.status, count: count() }).from(procedureLogsTable)
+      .where(and(eq(procedureLogsTable.studentId, studentId), isNull(procedureLogsTable.deletedAt))).groupBy(procedureLogsTable.status);
     const acadLogsCounts = await db.select({ status: academicLogsTable.status, count: count() }).from(academicLogsTable).where(eq(academicLogsTable.studentId, studentId)).groupBy(academicLogsTable.status);
 
     const calcCounts = (counts: any[]) => ({
