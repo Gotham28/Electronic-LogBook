@@ -9,6 +9,7 @@ import { sendAccountCreatedEmail } from "../lib/mailer.js";
 import { provisionDepartment, provisionMirrorForRealDepartment } from "../lib/department-provisioning.js";
 import jwt from "jsonwebtoken";
 import { JWT_SECRET } from "../lib/env.js";
+import { IMPERSONATION_TOKEN_LIFETIME } from "../lib/session-tokens.js";
 import { sessionProfile } from "./auth.js";
 
 const router = Router();
@@ -676,9 +677,11 @@ router.post("/users/:id/impersonate", validate(z.object({}).strict()), async (re
 
     const token = jwt.sign({ 
       id: target.id, 
-      sessionVersion: target.sessionVersion, 
-      impersonatedBy: adminId 
-    }, JWT_SECRET, { algorithm: "HS256", expiresIn: "20m" });
+      sessionVersion: target.sessionVersion,
+      impersonatedBy: adminId,
+      impersonatorSessionVersion: req.user!.sessionVersion,
+      origIat: Math.floor(Date.now() / 1000),
+    }, JWT_SECRET, { algorithm: "HS256", expiresIn: IMPERSONATION_TOKEN_LIFETIME });
 
     req.log.info({ adminId, targetId: target.id, role: target.role, departmentId: target.departmentId, status: target.status }, "Admin impersonated user");
 

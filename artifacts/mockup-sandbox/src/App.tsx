@@ -22,11 +22,13 @@ import { PrintableLogbook } from "@/components/pages/PrintableLogbook";
 import { PrivacyPolicyPage } from "@/components/pages/PrivacyPolicyPage";
 import { GrievanceOfficerPage } from "@/components/pages/GrievanceOfficerPage";
 import { DataRightsPage } from "@/components/pages/DataRightsPage";
-import { getCurrentUser, clearSession, getToken, saveToken } from "@/lib/session";
+import { getCurrentUser, clearSession, getToken, saveToken, SESSION_EXPIRED_EVENT } from "@/lib/session";
 import { apiGet, apiPost } from "@/lib/apiClient";
 import { DepartmentProvider } from "@/lib/department-context";
+import { startSessionKeepalive } from "@/lib/session-keepalive";
 
 import { Toaster } from "@/components/ui/sonner";
+import { toast } from "sonner";
 
 import { modules as discoveredModules } from "./.generated/mockup-components";
 
@@ -168,6 +170,18 @@ function App() {
       setIsAuthenticated(true);
     }).catch(() => { clearSession(); setIsAuthenticated(false); }).finally(() => setCheckingSession(false));
   }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const stopKeepalive = startSessionKeepalive();
+    const onExpired = () => {
+      setIsAuthenticated(false);
+      setLocation("/");
+      toast.error("Your session expired. Please sign in again.");
+    };
+    window.addEventListener(SESSION_EXPIRED_EVENT, onExpired);
+    return () => { stopKeepalive(); window.removeEventListener(SESSION_EXPIRED_EVENT, onExpired); };
+  }, [isAuthenticated, setLocation]);
 
   if (previewPath) {
     return (

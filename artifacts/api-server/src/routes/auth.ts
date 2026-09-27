@@ -8,10 +8,49 @@ import jwt from "jsonwebtoken";
 import { sendOtpEmail, sendPasswordResetEmail, sendHODApprovalRequestEmail } from "../lib/mailer.js";
 import { requireAuth } from "../middlewares/auth.js";
 import { JWT_SECRET } from "../lib/env.js";
+import { IMPERSONATION_ABSOLUTE_CAP_SECONDS, IMPERSONATION_TOKEN_LIFETIME, SESSION_ABSOLUTE_CAP_SECONDS,
+  SESSION_COOKIE_MAX_AGE_MS, SESSION_TOKEN_LIFETIME } from "../lib/session-tokens.js";
 import { dateSchema, emailSchema, idSchema, nameSchema, passwordSchema, validate } from "../lib/validation.js";
 
 const router = Router();
 const cookieOptions = { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax" as const, path: "/" };
+
+// Registered before the per-IP throttle below: every active tab renews periodically, and on a
+// shared ward IP those renewals must not use up the login attempt budget.
+router.post("/refresh", requireAuth, async (req, res) => {
+  const user = req.user!;
+  const claims = req.tokenClaims;
+  if (!claims) { res.status(401).json({ message: "Invalid session" }); return; }
+  const origIat = Number.isSafeInteger(claims.origIat) ? claims.origIat! : claims.iat;
+  const age = Math.floor(Date.now() / 1000) - origIat;
+
+  if (claims.impersonatedBy !== undefined) {
+    if (age > IMPERSONATION_ABSOLUTE_CAP_SECONDS) {
+      res.status(401).json({ message: "Session limit reached. Please sign in again." }); return;
+    }
+    const [admin] = await db.select({ role: usersTable.role, status: usersTable.status, sessionVersion: usersTable.sessionVersion })
+      .from(usersTable).where(eq(usersTable.id, claims.impersonatedBy)).limit(1);
+    const [dept] = user.departmentId
+      ? await db.select({ isTest: departmentsTable.isTest }).from(departmentsTable).where(eq(departmentsTable.id, user.departmentId)).limit(1)
+      : [];
+    if (!admin || admin.role !== "admin" || admin.status !== "approved" || !dept?.isTest
+      || (claims.impersonatorSessionVersion !== undefined && claims.impersonatorSessionVersion !== admin.sessionVersion)) {
+      res.status(401).json({ message: "Session is no longer active. Please sign in again." }); return;
+    }
+    // Never set the cookie here: it would replace the impersonating admin's own session in this browser.
+    const token = jwt.sign({ id: user.id, sessionVersion: user.sessionVersion, impersonatedBy: claims.impersonatedBy,
+      impersonatorSessionVersion: admin.sessionVersion, origIat }, JWT_SECRET, { algorithm: "HS256", expiresIn: IMPERSONATION_TOKEN_LIFETIME });
+    res.json({ token });
+    return;
+  }
+
+  if (age > SESSION_ABSOLUTE_CAP_SECONDS) {
+    res.status(401).json({ message: "Session limit reached. Please sign in again." }); return;
+  }
+  const token = jwt.sign({ id: user.id, sessionVersion: user.sessionVersion, origIat }, JWT_SECRET, { algorithm: "HS256", expiresIn: SESSION_TOKEN_LIFETIME });
+  res.cookie("token", token, { ...cookieOptions, maxAge: SESSION_COOKIE_MAX_AGE_MS });
+  res.json({ token });
+});
 
 // Bounded per-process throttling supplements single-use, attempt-limited database codes.
 // Multi-instance deployments must also rate-limit at their shared gateway.
@@ -183,8 +222,9 @@ router.post("/login", validate(z.object({ username: z.string().trim().min(1).max
   if (["student", "professor", "hod"].includes(user.role) && !user.departmentId) {
     res.status(403).json({ message: "Your account needs a department assignment" }); return;
   }
-  const token = jwt.sign({ id: user.id, sessionVersion: user.sessionVersion }, JWT_SECRET, { expiresIn: "1d" });
-  res.cookie("token", token, { ...cookieOptions, maxAge: 86400000 });
+  const token = jwt.sign({ id: user.id, sessionVersion: user.sessionVersion, origIat: Math.floor(Date.now() / 1000) },
+    JWT_SECRET, { expiresIn: SESSION_TOKEN_LIFETIME });
+  res.cookie("token", token, { ...cookieOptions, maxAge: SESSION_COOKIE_MAX_AGE_MS });
   res.json({ ...await sessionProfile(user.id), token });
 });
 
