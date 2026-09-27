@@ -48,3 +48,17 @@ test("SEC-08: forced POST /admin/professors failure logs department id and statu
   console.log("SEC-08 forced-failure response ->", response.status, JSON.stringify(response.body));
   assert.equal(response.status, 500);
 });
+
+test("forced PATCH /:studentId/postings/:postingId failure returns a plain 500 with no error text or stack", async () => {
+  const created = await call("/students/" + a.student0.studentId + "/postings", "student0", "POST",
+    { ward: "unit-0", startDate: "2026-02-01", endDate: "2026-02-10", supervisorId: a.faculty0.id });
+  assert.equal(created.status, 201);
+  await db.execute(sql`ALTER TABLE postings ADD CONSTRAINT force_fail_posting_patch CHECK (false) NOT VALID`);
+  const response = await call("/students/" + a.student0.studentId + "/postings/" + created.body.posting.id, "student0", "PATCH",
+    { endDate: "2026-02-12" });
+  await db.execute(sql`ALTER TABLE postings DROP CONSTRAINT force_fail_posting_patch`);
+
+  console.log("posting PATCH forced-failure response ->", response.status, JSON.stringify(response.body));
+  assert.equal(response.status, 500);
+  assert.deepEqual(response.body, { message: "Internal server error" });
+});

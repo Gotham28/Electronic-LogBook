@@ -1607,7 +1607,11 @@ router.patch("/:studentId/postings/:postingId", requireAuth, validate(z.object({
       .where(and(eq(postingsTable.id, postingId), eq(postingsTable.studentId, studentId), statusCond)).returning();
     if (!updated) { res.status(400).json({ message: "Log no longer editable or not found" }); return; }
     res.json(updated);
-  } catch (error: any) { res.status(500).json({ message: "Internal server error", detail: String(error), stack: error?.stack }); }
+  } catch (error) {
+    // Never echo the error: a failed query's message carries the SQL plus every bound parameter.
+    req.log.error({ postingId: req.params.postingId, status: 500 }, "Error updating posting");
+    res.status(500).json({ message: "Internal server error" });
+  }
 });
 
 // 6. Certifications
