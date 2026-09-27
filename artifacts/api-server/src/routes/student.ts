@@ -1317,7 +1317,8 @@ router.delete("/:studentId/procedure-logs/:logId", requireAuth, async (req, res)
 // EDIT (PATCH) ROUTES FOR STUDENT LOGS
 // ==========================================
 
-const studentEditGuard = async (req: any, res: any, table: any, logId: any, studentId: number) => {
+const isPendingOrRejected = (log: any) => log.status === "pending" || log.status === "rejected";
+const studentEditGuard = async (req: any, res: any, table: any, logId: any, studentId: number, editable = isPendingOrRejected) => {
   const caller = req.user!;
   if (caller.role !== "student") return { error: 403, message: "Only students can edit logs" };
   const [ownProfile] = await db.select({ id: studentsTable.id }).from(studentsTable).where(eq(studentsTable.userId, caller.id));
@@ -1325,7 +1326,7 @@ const studentEditGuard = async (req: any, res: any, table: any, logId: any, stud
   
   const [log] = await db.select().from(table).where(and(eq(table.id, logId), eq(table.studentId, studentId)));
   if (!log) return { error: 404, message: "Log not found" };
-  if (log.status !== "pending" && log.status !== "rejected") return { error: 400, message: "Only pending or rejected logs can be edited" };
+  if (!editable(log)) return { error: 400, message: "Only pending or rejected logs can be edited" };
   
   return { error: null, log, caller };
 };
@@ -1582,7 +1583,12 @@ router.patch("/:studentId/postings/:postingId", requireAuth, validate(z.object({
   try {
     const studentId = parseInt(String(req.params.studentId), 10);
     const postingId = parseInt(String(req.params.postingId), 10);
-    const guard = await studentEditGuard(req, res, postingsTable, postingId, studentId);
+    const isDerm = req.user!.departmentId === 15 || req.user!.departmentId === 25;
+    // A verified posting stays editable only when it was verified automatically (no supervisor
+    // named). One a faculty member verified is locked, as it is in every other department.
+    const autoVerified = (log: any) => isDerm && log.status === "verified" && log.supervisorId === null;
+    const guard = await studentEditGuard(req, res, postingsTable, postingId, studentId,
+      (log) => isPendingOrRejected(log) || autoVerified(log));
     if (guard.error) { res.status(guard.error).json({ message: guard.message }); return; }
     
     const effStartDate = req.body.startDate || guard.log!.startDate;
@@ -1591,7 +1597,6 @@ router.patch("/:studentId/postings/:postingId", requireAuth, validate(z.object({
       res.status(400).json({ message: "End date must be on or after start date" }); return;
     }
 
-    const isDerm = guard.caller.departmentId === 15 || guard.caller.departmentId === 25;
     if (req.body.ward) {
       const configSourceId = await resolveConfigDepartmentId(guard.caller.departmentId!);
       const [option] = await db.select({ id: departmentCatalogTable.id }).from(departmentCatalogTable).where(and(
@@ -1606,11 +1611,14 @@ router.patch("/:studentId/postings/:postingId", requireAuth, validate(z.object({
       req.body.supervisorId = parseInt(req.body.supervisorId, 10);
     }
 
+    // Re-checked in the update itself so a review landing in between still locks the row.
     const statusCond = isDerm 
-      ? or(eq((postingsTable as any).status, "pending"), eq((postingsTable as any).status, "verified"))
-      : eq((postingsTable as any).status, "pending");
+      ? or(eq(postingsTable.status, "pending"), and(eq(postingsTable.status, "verified"), isNull(postingsTable.supervisorId)))
+      : eq(postingsTable.status, "pending");
+    // Naming a supervisor sends the posting to them for review, as it does on create.
+    const updateSet = req.body.supervisorId ? { ...req.body, status: "pending" as const } : req.body;
 
-    const [updated] = await db.update(postingsTable).set(req.body)
+    const [updated] = await db.update(postingsTable).set(updateSet)
       .where(and(eq(postingsTable.id, postingId), eq(postingsTable.studentId, studentId), statusCond)).returning();
     if (!updated) { res.status(400).json({ message: "Log no longer editable or not found" }); return; }
     res.json(updated);
