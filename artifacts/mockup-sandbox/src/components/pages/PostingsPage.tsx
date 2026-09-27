@@ -38,7 +38,7 @@ import { apiGet, apiPost, apiPatch } from "@/lib/apiClient";
 import { getCurrentUser } from "@/lib/session";
 
 export function PostingsPage() {
-  const { postings: postingOptions } = useDepartment();
+  const { postings: postingOptions, config } = useDepartment();
   const [open, setOpen] = React.useState(false);
   const [postings, setPostings] = React.useState<Posting[]>([]);
   const user = React.useMemo(() => getCurrentUser(), []);
@@ -52,6 +52,8 @@ export function PostingsPage() {
   const [endDate, setEndDate] = React.useState(todayForInput());
   const [supervisorId, setSupervisorId] = React.useState("");
   const [editId, setEditId] = React.useState<number | null>(null);
+
+  const isFreeTextWard = !!config?.enabledFeatures?.freeTextPostingUnit;
 
   const fetchPostings = React.useCallback(async () => {
     if (!user?.studentProfileId) return;
@@ -81,17 +83,18 @@ export function PostingsPage() {
     e.preventDefault();
     if (!user?.studentProfileId) return;
 
-    if (!ward || !startDate || !endDate || !supervisorId) {
+    if (!ward || !startDate || !endDate || (!isFreeTextWard && !supervisorId)) {
       toast.error("Please fill in all required fields");
       return;
     }
 
     try {
+      const finalSupervisorId = isFreeTextWard ? undefined : supervisorId;
       if (editId) {
-        await apiPatch(`/api/students/${user.studentProfileId}/postings/${editId}`, { ward, startDate, endDate, supervisorId });
+        await apiPatch(`/api/students/${user.studentProfileId}/postings/${editId}`, { ward, startDate, endDate, supervisorId: finalSupervisorId });
         toast.success("Posting updated successfully");
       } else {
-        await apiPost(`/api/students/${user.studentProfileId}/postings`, { ward, startDate, endDate, supervisorId });
+        await apiPost(`/api/students/${user.studentProfileId}/postings`, { ward, startDate, endDate, supervisorId: finalSupervisorId });
         toast.success("Posting added successfully");
       }
       setOpen(false);
@@ -131,15 +134,21 @@ export function PostingsPage() {
             <form onSubmit={handleAddPosting} className="space-y-4">
               <div className="space-y-2">
                 <Label>Ward / Posting Unit</Label>
-                {!postingOptions.length && <p className="text-xs text-slate-500">Your HOD has not configured postings yet.</p>}
-                <Select value={ward} onValueChange={(val: any) => setWard(val)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {postingOptions.map((opt) => (
-                      <SelectItem key={opt.id} value={opt.value}>{opt.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {isFreeTextWard ? (
+                  <Input value={ward} onChange={e => setWard(e.target.value)} required placeholder="Enter posting unit" />
+                ) : (
+                  <>
+                    {!postingOptions.length && <p className="text-xs text-slate-500">Your HOD has not configured postings yet.</p>}
+                    <Select value={ward} onValueChange={(val: any) => setWard(val)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {postingOptions.map((opt) => (
+                          <SelectItem key={opt.id} value={opt.value}>{opt.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -151,15 +160,17 @@ export function PostingsPage() {
                   <Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} required />
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label>Supervisor (Unit Chief)</Label>
-                <Select value={supervisorId} onValueChange={setSupervisorId}>
-                  <SelectTrigger><SelectValue placeholder="Select faculty member" /></SelectTrigger>
-                  <SelectContent>
-                    {professors.map(p => <SelectItem key={p.id} value={String(p.id)}>{p.fullName}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
+              {!isFreeTextWard && (
+                <div className="space-y-2">
+                  <Label>Supervisor (Unit Chief)</Label>
+                  <Select value={supervisorId} onValueChange={setSupervisorId}>
+                    <SelectTrigger><SelectValue placeholder="Select faculty member" /></SelectTrigger>
+                    <SelectContent>
+                      {professors.map(p => <SelectItem key={p.id} value={String(p.id)}>{p.fullName}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
                 <Button type="submit">Save Posting</Button>
@@ -199,9 +210,9 @@ export function PostingsPage() {
                   <TableHead>Ward / Unit</TableHead>
                   <TableHead>Start Date</TableHead>
                   <TableHead>End Date</TableHead>
-                  <TableHead>Supervisor</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Faculty Remarks</TableHead>
+                  {!isFreeTextWard && <TableHead>Supervisor</TableHead>}
+                  {!isFreeTextWard && <TableHead>Status</TableHead>}
+                  <TableHead className="text-right">{isFreeTextWard ? "Action" : "Faculty Remarks"}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -210,18 +221,20 @@ export function PostingsPage() {
                     <TableCell className="font-medium text-slate-900">{item.ward}</TableCell>
                     <TableCell>{formatLogbookDate(item.startDate)}</TableCell>
                     <TableCell>{formatLogbookDate(item.endDate)}</TableCell>
-                    <TableCell>{item.supervisorName}</TableCell>
-                    <TableCell>
-                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                        item.status === "verified" ? "bg-emerald-100 text-emerald-700" :
-                        item.status === "rejected" ? "bg-rose-100 text-rose-700" :
-                        "bg-amber-100 text-amber-700"
-                      }`}>
-                        {item.status === "verified" ? "Verified" : item.status === "rejected" ? "Rejected" : "Pending"}
-                      </span>
-                    </TableCell>
+                    {!isFreeTextWard && <TableCell>{item.supervisorName}</TableCell>}
+                    {!isFreeTextWard && (
+                      <TableCell>
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                          item.status === "verified" ? "bg-emerald-100 text-emerald-700" :
+                          item.status === "rejected" ? "bg-rose-100 text-rose-700" :
+                          "bg-amber-100 text-amber-700"
+                        }`}>
+                          {item.status === "verified" ? "Verified" : item.status === "rejected" ? "Rejected" : "Pending"}
+                        </span>
+                      </TableCell>
+                    )}
                     <TableCell className="text-right max-w-[220px]">
-                      {item.status === "pending" ? (
+                      {(item.status === "pending" || (isFreeTextWard && item.status === "verified")) ? (
                         <Button variant="ghost" size="sm" className="text-teal-600 hover:text-teal-800 hover:bg-teal-50" onClick={() => {
                           setEditId(item.id);
                           setWard(item.ward);
@@ -232,18 +245,20 @@ export function PostingsPage() {
                         }}>
                           <Edit3 className="h-4 w-4" /> Edit
                         </Button>
-                      ) : (item as any).facultyRemarks ? (
-                        <span
-                          title={(item as any).facultyRemarks}
-                          className={`block truncate cursor-help text-sm font-medium ${
-                            item.status === "rejected" ? "text-rose-700" : "text-slate-600"
-                          }`}
-                        >
-                          {(item as any).facultyRemarks}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-slate-400">No remark</span>
-                      )}
+                      ) : !isFreeTextWard ? (
+                        (item as any).facultyRemarks ? (
+                          <span
+                            title={(item as any).facultyRemarks}
+                            className={`block truncate cursor-help text-sm font-medium ${
+                              item.status === "rejected" ? "text-rose-700" : "text-slate-600"
+                            }`}
+                          >
+                            {(item as any).facultyRemarks}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-slate-400">No remark</span>
+                        )
+                      ) : null}
                     </TableCell>
                   </TableRow>
                 ))}
