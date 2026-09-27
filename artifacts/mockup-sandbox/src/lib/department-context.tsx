@@ -7,13 +7,15 @@ export type DepartmentConfig = {
   requiredCases: number; requiredProcedures: number; requiredAcademic: number;
   enabledFeatures: Record<string, boolean>;
 };
-export type CatalogItem = { id: number; name: string; value: string; required: number; period: "total" | "month" };
+export type CatalogItem = { id: number; name: string; value: string; required: number; period: "total" | "month"; parentValue?: string | null };
+export type PostingScheduleRow = { trainingYear: number; postingValue: string; months: number };
 export type DepartmentData = {
   department: { id: number; name: string; code: string };
   hod: { id: number; name: string } | null;
   config: DepartmentConfig | null;
   procedures: Array<{ id: number; name: string; group: string; required: number }>;
   postings: CatalogItem[]; academics: CatalogItem[]; caseCategories: CatalogItem[]; competencyLevels: CatalogItem[]; leaveTypes: CatalogItem[]; conferenceLevels: CatalogItem[];
+  clinicalWorkCategories: CatalogItem[]; clinicalWorkSubtypes: CatalogItem[]; postingSchedule: PostingScheduleRow[];
 };
 const DepartmentContext = React.createContext<(DepartmentData & { refresh: () => Promise<void> }) | null>(null);
 
@@ -32,6 +34,9 @@ export function DepartmentProvider({ departmentId, children }: { departmentId: n
         competencyLevels: result.competencyLevels || [],
         leaveTypes: result.leaveTypes || [],
         conferenceLevels: result.conferenceLevels || [],
+        clinicalWorkCategories: result.clinicalWorkCategories || [],
+        clinicalWorkSubtypes: result.clinicalWorkSubtypes || [],
+        postingSchedule: result.postingSchedule || [],
         procedures: result.procedures || []
       });
       setError("");

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, usersTable, departmentsTable, studentsTable, departmentConfigsTable, departmentCatalogTable, procedureTypesTable, assignmentTypesTable, assignmentsTable, assignmentRecipientsTable, caseLogsTable, procedureLogsTable, academicLogsTable, leaveRecordsTable, postingsTable, researchTable, assessmentsTable, attendanceLogsTable, leaveApplicationsTable, thesisMilestonesTable, appraisalsTable, auditTable, clinicalWorkLogsTable } from "@workspace/db";
+import { db, usersTable, departmentsTable, studentsTable, departmentConfigsTable, departmentCatalogTable, procedureTypesTable, assignmentTypesTable, assignmentsTable, assignmentRecipientsTable, caseLogsTable, procedureLogsTable, academicLogsTable, leaveRecordsTable, postingsTable, researchTable, assessmentsTable, attendanceLogsTable, leaveApplicationsTable, thesisMilestonesTable, appraisalsTable, auditTable, clinicalWorkLogsTable, departmentPostingScheduleTable } from "@workspace/db";
 import { eq, and, sql, inArray, or } from "drizzle-orm";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
@@ -405,6 +405,7 @@ export async function deleteDepartmentCascade(tx: any, targetDepartmentId: numbe
 
   await tx.delete(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, targetDepartmentId));
   await tx.delete(departmentCatalogTable).where(eq(departmentCatalogTable.departmentId, targetDepartmentId));
+  await tx.delete(departmentPostingScheduleTable).where(eq(departmentPostingScheduleTable.departmentId, targetDepartmentId));
   await tx.delete(procedureTypesTable).where(eq(procedureTypesTable.departmentId, targetDepartmentId));
 
   // 4. Delete the department row itself
