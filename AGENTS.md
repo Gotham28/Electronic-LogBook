@@ -245,8 +245,9 @@ They entered history at commit `10bbd69` and were on `origin/main`. The pattern 
 with `DATABASE_URL` unset they silently targeted production. One of them was named `delete_reetha.mjs`.
 
 All eight scripts were deleted in commit `bcbb109` ("fix(security): delete eight scripts carrying
-a hardcoded database credential"). `phase0.js` at the repository root also reads `DATABASE_URL`
-(cleanly with no fallback).
+a hardcoded database credential"). `phase0.js` (repository root), `lib/db/phase0.mjs` and
+`artifacts/api-server/src/phase0.cjs` read `DATABASE_URL` with no fallback, but created an approved
+account with a hardcoded password; they were deleted in commit `d2ba8e2`, with `lib/db/drop.mjs`.
 
 Purging the credential from git history remains an open task.
 
