@@ -45,10 +45,25 @@ Opus (§15.2): the change deletes rows in the clinical tables and resolves a
 - `artifacts/api-server/tests/superadmin-user-delete.test.ts` (new): the four §11 cases for
   both new routes.
 
-## Blocked on developer input
+## Decided
 - Assignment types created by a deleted faculty member pass to that department's approved
-  HOD (to the acting admin if there is none). The agent chose this; confirm or change.
+  HOD (to the acting admin if there is none). The agent proposed it; the developer said
+  "proceed".
+- PR: open one PR for this branch; not merged by the agent.
+
+## Separate issue found this session (not fixed in this branch)
+The admin console's "Log in as" button on a test account shows "Internal server error"
+on the live site. It could not be reproduced: on a database with every migration applied,
+all three test accounts open their dashboards with no failed request (checked end to end
+in a browser). Migrations 0017–0020 were all added on 2026-09-27, and the developer is not
+sure they have been run on the live database. If 0018 or 0020 is missing,
+`GET /api/departments/:id/catalog` (the first call every dashboard makes) fails with 500
+for every account, not only test accounts.
 
 ## Manual (developer does)
 - [ ] Review the diff.
-- [ ] Decide whether to open a PR (§14.2 step 5).
+- [ ] Check the live API log for the failed request: "Error resolving config department"
+      or "Request failed" with code 42703 / 42P01 confirms a missing migration.
+- [ ] Back up the live database, then run
+      `pnpm --filter @workspace/api-server db:migrate` (one transaction; rolls back on
+      failure). The agent may not run this (§6).
