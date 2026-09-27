@@ -1057,6 +1057,9 @@ router.patch("/:studentId/thesis/review", requireAuth, requireRole(["professor",
   }
 });
 
+// Certification ids are UUIDs. Anything else cannot match a row, and would make Postgres throw.
+const isUuid = (value: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+
 // PATCH /:studentId/certifications/:certId/review
 router.patch("/:studentId/certifications/:certId/review", requireAuth, requireRole(["professor", "hod"]),
   validate(reviewBody), async (req, res) => {
@@ -1064,6 +1067,7 @@ router.patch("/:studentId/certifications/:certId/review", requireAuth, requireRo
     const studentId = parseInt(String(req.params.studentId), 10);
     const certId = String(req.params.certId); // UUID
     if (isNaN(studentId)) { res.status(400).json({ message: "Invalid studentId" }); return; }
+    if (!isUuid(certId)) { res.status(404).json({ message: "Certification not found" }); return; }
     const reviewer = req.user!;
 
     // Confirm certification belongs to this student (§3)
@@ -1636,6 +1640,7 @@ router.patch("/:studentId/certifications/:certId", requireAuth, validate(z.objec
   try {
     const studentId = parseInt(String(req.params.studentId), 10);
     const certId = String(req.params.certId);
+    if (!isUuid(certId)) { res.status(404).json({ message: "Log not found" }); return; }
     const guard = await studentEditGuard(req, res, certificationsTable, certId, studentId);
     if (guard.error) { res.status(guard.error).json({ message: guard.message }); return; }
 
