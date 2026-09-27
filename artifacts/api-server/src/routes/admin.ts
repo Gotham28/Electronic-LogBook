@@ -1022,10 +1022,12 @@ router.get("/department/procedure-groups", async (req, res) => {
   }
 });
 
-// GET /department/procedure-groups/:id/usage-count
-router.get("/department/procedure-groups/:id/usage-count", async (req, res) => {
+// GET /department/procedure-groups/:group/usage-count
+// The group is a name, not a row id, so it must not be called :id (router.param("id") above
+// rejects anything that is not a positive integer).
+router.get("/department/procedure-groups/:group/usage-count", async (req, res) => {
   try {
-    const groupName = req.params.id;
+    const groupName = req.params.group;
     const departmentId = req.user?.departmentId;
     if (!departmentId) {
       res.status(400).json({ message: "No department assigned" });
@@ -1043,15 +1045,15 @@ router.get("/department/procedure-groups/:id/usage-count", async (req, res) => {
     
     res.json({ count: countRes?.count || 0 });
   } catch (error) {
-    req.log.error({ groupName: req.params.id, status: 500 }, "Error getting procedure group usage count");
+    req.log.error({ groupName: req.params.group, status: 500 }, "Error getting procedure group usage count");
     res.status(500).json({ message: "Internal server error" });
   }
 });
 
-// DELETE /department/procedure-groups/:id
-router.delete("/department/procedure-groups/:id", async (req, res) => {
+// DELETE /department/procedure-groups/:group (a name, not a row id; see above)
+router.delete("/department/procedure-groups/:group", async (req, res) => {
   try {
-    const groupName = req.params.id;
+    const groupName = req.params.group;
     const departmentId = req.user?.departmentId;
     if (!departmentId) {
       res.status(400).json({ message: "No department assigned" });
@@ -1080,7 +1082,7 @@ router.delete("/department/procedure-groups/:id", async (req, res) => {
 
     res.json({ message: "Procedure group deleted successfully" });
   } catch (error) {
-    req.log.error({ groupName: req.params.id, status: 500 }, "Error deleting procedure group");
+    req.log.error({ groupName: req.params.group, status: 500 }, "Error deleting procedure group");
     res.status(500).json({ message: "Internal server error" });
   }
 });
