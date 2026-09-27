@@ -62,3 +62,29 @@ test("forced PATCH /:studentId/postings/:postingId failure returns a plain 500 w
   assert.equal(response.status, 500);
   assert.deepEqual(response.body, { message: "Internal server error" });
 });
+
+// Records everything written through console.* / process streams while `run` executes, then
+// passes it through unchanged. pino writes to fd 1 directly, so its line still prints below
+// as evidence; this catches the console.error(error) shape that logged the bound parameters.
+async function captureConsole<T>(run: () => Promise<T>): Promise<{ result: T; output: string }> {
+  const chunks: string[] = [];
+  const out = process.stdout.write.bind(process.stdout);
+  const err = process.stderr.write.bind(process.stderr);
+  process.stdout.write = ((chunk: any, ...rest: any[]) => { chunks.push(String(chunk)); return out(chunk, ...rest); }) as any;
+  process.stderr.write = ((chunk: any, ...rest: any[]) => { chunks.push(String(chunk)); return err(chunk, ...rest); }) as any;
+  try { return { result: await run(), output: chunks.join("") }; }
+  finally { process.stdout.write = out; process.stderr.write = err; }
+}
+
+test("forced POST /:studentId/academic-logs failure never writes the topic or description to the console", async () => {
+  const marker = "ACADEMIC-LOG-MARKER-patient-history-do-not-log";
+  await db.execute(sql`ALTER TABLE academic_logs ADD CONSTRAINT force_fail_academic CHECK (false) NOT VALID`);
+  const { result: response, output } = await captureConsole(() =>
+    call("/students/" + a.student0.studentId + "/academic-logs", "student0", "POST",
+      { supervisorId: a.faculty0.id, activityType: "discussion-0", topic: marker, date: "2026-03-01", description: marker }));
+  await db.execute(sql`ALTER TABLE academic_logs DROP CONSTRAINT force_fail_academic`);
+
+  console.log("academic-log forced-failure response ->", response.status, JSON.stringify(response.body));
+  assert.equal(response.status, 500);
+  assert.ok(!output.includes(marker), "the academic log topic reached the console");
+});

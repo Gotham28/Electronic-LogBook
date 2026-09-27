@@ -1201,7 +1201,9 @@ router.post("/:studentId/academic-logs", validate(z.object({ supervisorId: idSch
     }).returning();
     res.status(201).json(inserted);
   } catch (error) {
-    console.error("POST academic-logs error:", error);
+    // Never the error object: a failed insert's message carries every bound parameter,
+    // including the topic and description (AGENTS.md sec 8).
+    req.log.error({ studentId: req.params.studentId, status: 500 }, "Error creating academic log");
     res.status(500).json({ message: "Internal server error" });
   }
 });

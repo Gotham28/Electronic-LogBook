@@ -212,8 +212,9 @@ router.post("/professors", validate(z.object({ fullName: nameSchema, email: emai
         .where(eq(departmentsTable.id, req.user!.departmentId!)).limit(1);
         
       await sendAccountCreatedEmail(email, fullName, password, "professor", dept?.name);
-    } catch (error) {
-      req.log.error({ email, error }, "Failed to send welcome email");
+    } catch {
+      // Id only: the welcome email carries the plaintext password, so its error is never logged.
+      req.log.error({ userId: newProf.id, status: 201 }, "Faculty welcome email failed");
       // Continue without returning error to allow account creation to succeed
     }
 
@@ -289,8 +290,9 @@ router.post("/students", validate(z.object({
 
     try {
       await sendAccountCreatedEmail(email, fullName, password, "student", dept?.name);
-    } catch (error) {
-      req.log.error({ email, error }, "Failed to send welcome email");
+    } catch {
+      // Id only: the welcome email carries the plaintext password, so its error is never logged.
+      req.log.error({ userId: newStudent.id, status: 201 }, "Student welcome email failed");
       // Continue without returning error to allow account creation to succeed
     }
 
