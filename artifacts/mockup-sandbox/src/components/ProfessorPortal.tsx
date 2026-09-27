@@ -517,6 +517,17 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                           )}
                         </>
                       )}
+                      
+                      {currentItem.type === "Procedure" && (currentItem.departmentId === 15 || currentItem.departmentId === 25) && (
+                        <>
+                          {currentItem.diagnosis && (
+                            <p className="text-xs text-slate-600 font-medium">Diagnosis: {currentItem.diagnosis}</p>
+                          )}
+                          {currentItem.sex && (
+                            <p className="text-xs text-slate-600 font-medium">Sex: {currentItem.sex}</p>
+                          )}
+                        </>
+                      )}
                       {currentItem.type === "Conference" && currentItem.certificateUrl && (
                         <p className="text-xs text-slate-600 font-medium overflow-hidden text-ellipsis whitespace-nowrap">
                           Certificate: <a href={currentItem.certificateUrl} target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline">{currentItem.certificateUrl}</a>

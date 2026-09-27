@@ -235,6 +235,8 @@ export function DepartmentSettings() {
       </div>
     </section>
 
+    {!data.config?.enabledFeatures?.freeTextProcedures && (
+      <>
     <div className="grid gap-5">
       <Card className="border-slate-200/80 shadow-sm shadow-slate-200/50"><CardHeader className="border-b border-slate-100 bg-slate-50/70 pb-4"><CardTitle className="text-base">Add procedure type</CardTitle><p className="text-xs text-slate-500">Set the target once, then update it inline below.</p></CardHeader><CardContent className="p-5">
         <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); void save(async () => {
@@ -286,6 +288,8 @@ export function DepartmentSettings() {
         </div>
       </CardContent></Card>
     </div>
+      </>
+    )}
     <Card className="border-slate-200/80 shadow-sm shadow-slate-200/50"><CardHeader className="border-b border-slate-100 bg-slate-50/70 pb-4"><CardTitle className="text-base">Training catalog</CardTitle><p className="text-xs text-slate-500">Manage the options residents select while logging their work.</p></CardHeader><CardContent className="space-y-6 p-5">
       <form className="rounded-2xl border border-dashed border-teal-200 bg-teal-50/40 p-4 grid items-end gap-4 md:grid-cols-4" onSubmit={(e) => { e.preventDefault(); void save(async () => {
         await apiPost("/api/admin/department/catalog", { ...entry, value: entry.name.trim(), required: entry.kind === "posting" ? 0 : Number(entry.required) });

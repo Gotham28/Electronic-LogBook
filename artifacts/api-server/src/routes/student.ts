@@ -1119,22 +1119,27 @@ router.post("/:studentId/case-logs", validate(z.object({ supervisorId: idSchema,
   }
 });
 
-router.post("/:studentId/procedure-logs", validate(z.object({ supervisorId: idSchema, procedureGroup: nameSchema,
+router.post("/:studentId/procedure-logs", validate(z.object({ supervisorId: idSchema, procedureGroup: nameSchema.optional(),
   procedureName: nameSchema, date: dateSchema, patientUhid: nameSchema, patientAge: nameSchema,
-  competencyLevel: nameSchema }).strict()), async (req, res) => {
+  competencyLevel: nameSchema, diagnosis: optionalText, sex: optionalText }).strict()), async (req, res) => {
   try {
     const studentId = parseInt(String(req.params.studentId), 10);
-    const { supervisorId, procedureGroup, procedureName, date, patientUhid, patientAge, competencyLevel } = req.body;
+    const { supervisorId, procedureGroup, procedureName, date, patientUhid, patientAge, competencyLevel, diagnosis, sex } = req.body;
     const supervisorIdNum = parseInt(supervisorId, 10);
     if (!(await validateSupervisor(supervisorIdNum, req.user!.departmentId!))) {
       res.status(400).json({ message: "Invalid supervisorId" });
       return;
     }
 
+    const isDerm = req.user!.departmentId === 15 || req.user!.departmentId === 25;
+    const finalProcedureGroup = isDerm ? "N/A" : procedureGroup;
     const configSourceId = await resolveConfigDepartmentId(req.user!.departmentId!);
-    const [option] = await db.select({ id: procedureTypesTable.id }).from(procedureTypesTable).where(and(
-      eq(procedureTypesTable.departmentId, configSourceId), eq(procedureTypesTable.name, procedureName), eq(procedureTypesTable.group, procedureGroup))).limit(1);
-    if (!option) { res.status(400).json({ message: "Select a procedure from your department" }); return; }
+
+    if (!isDerm) {
+      const [option] = await db.select({ id: procedureTypesTable.id }).from(procedureTypesTable).where(and(
+        eq(procedureTypesTable.departmentId, configSourceId), eq(procedureTypesTable.name, procedureName), eq(procedureTypesTable.group, finalProcedureGroup))).limit(1);
+      if (!option) { res.status(400).json({ message: "Select a procedure from your department" }); return; }
+    }
 
     const [config] = await db.select({ enabledFeatures: departmentConfigsTable.enabledFeatures }).from(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, configSourceId)).limit(1);
     const enabledFeatures = config?.enabledFeatures as Record<string, boolean> | null;
@@ -1150,8 +1155,8 @@ router.post("/:studentId/procedure-logs", validate(z.object({ supervisorId: idSc
       }
     }
     const [inserted] = await db.insert(procedureLogsTable).values({
-      studentId, supervisorId: supervisorIdNum, procedureGroup, procedureName, date, 
-      patientUhid, patientAge, competencyLevel, status: "pending"
+      studentId, supervisorId: supervisorIdNum, procedureGroup: finalProcedureGroup, procedureName, date, 
+      patientUhid, patientAge, competencyLevel, diagnosis, sex, status: "pending"
     }).returning();
     res.status(201).json(inserted);
   } catch (error) {
@@ -1332,9 +1337,9 @@ router.patch("/:studentId/case-logs/:logId", requireAuth, validate(z.object({ su
 });
 
 // 2. Procedure Logs
-router.patch("/:studentId/procedure-logs/:logId", requireAuth, validate(z.object({ supervisorId: idSchema, procedureGroup: nameSchema,
+router.patch("/:studentId/procedure-logs/:logId", requireAuth, validate(z.object({ supervisorId: idSchema, procedureGroup: nameSchema.optional(),
   procedureName: nameSchema, date: dateSchema, patientUhid: nameSchema, patientAge: nameSchema,
-  competencyLevel: nameSchema }).strict().partial()), async (req, res) => {
+  competencyLevel: nameSchema, diagnosis: optionalText, sex: optionalText }).strict().partial()), async (req, res) => {
   try {
     const studentId = parseInt(String(req.params.studentId), 10);
     const logId = parseInt(String(req.params.logId), 10);
@@ -1348,13 +1353,19 @@ router.patch("/:studentId/procedure-logs/:logId", requireAuth, validate(z.object
       req.body.supervisorId = parseInt(req.body.supervisorId, 10);
     }
 
+    const isDerm = guard.caller.departmentId === 15 || guard.caller.departmentId === 25;
+
     if (req.body.procedureName || req.body.procedureGroup) {
       const pName = req.body.procedureName || guard.log!.procedureName;
-      const pGroup = req.body.procedureGroup || guard.log!.procedureGroup;
+      const pGroup = isDerm ? "N/A" : (req.body.procedureGroup || guard.log!.procedureGroup);
       const configSourceId = await resolveConfigDepartmentId(guard.caller.departmentId!);
-      const [option] = await db.select({ id: procedureTypesTable.id }).from(procedureTypesTable).where(and(
-        eq(procedureTypesTable.departmentId, configSourceId), eq(procedureTypesTable.name, pName), eq(procedureTypesTable.group, pGroup))).limit(1);
-      if (!option) { res.status(400).json({ message: "Select a procedure from your department" }); return; }
+      
+      if (!isDerm) {
+        const [option] = await db.select({ id: procedureTypesTable.id }).from(procedureTypesTable).where(and(
+          eq(procedureTypesTable.departmentId, configSourceId), eq(procedureTypesTable.name, pName), eq(procedureTypesTable.group, pGroup))).limit(1);
+        if (!option) { res.status(400).json({ message: "Select a procedure from your department" }); return; }
+      }
+      if (isDerm) req.body.procedureGroup = "N/A";
     }
 
     if (req.body.competencyLevel) {

@@ -151,13 +151,16 @@ router.get("/:professorId/review-queue", async (req, res) => {
         studentName: p.user.fullName,
         registrationNumber: p.student.registrationNumber,
         department: p.department?.name || "Unknown",
+        departmentId: p.department?.id,
         type: "Procedure",
         title: p.log.procedureName,
         date: p.log.date,
         patientUhid: p.log.patientUhid,
         patientInfo: p.log.patientAge,
-        detail: `${p.log.procedureGroup} procedure`,
+        detail: (p.department?.id === 15 || p.department?.id === 25) ? ((p.log as any).diagnosis ? `${p.log.procedureName} - ${(p.log as any).diagnosis}` : p.log.procedureName) : `${p.log.procedureGroup} procedure`,
         declaredCompetency: p.log.competencyLevel,
+        diagnosis: (p.log as any).diagnosis,
+        sex: (p.log as any).sex,
         status: p.log.status
       })),
       ...academics.map(a => ({

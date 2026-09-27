@@ -59,6 +59,7 @@ async function main() {
     enabledFeatures.conferenceLevels = true;
     enabledFeatures.academicActivityExtras = true;
     enabledFeatures.freeTextPostingUnit = true;
+    enabledFeatures.freeTextProcedures = true;
     
     await db.update(departmentConfigsTable)
       .set({ enabledFeatures })
