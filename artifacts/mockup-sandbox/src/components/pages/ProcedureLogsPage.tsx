@@ -30,6 +30,8 @@ type ProcedureLog = {
   status: "pending" | "verified" | "rejected";
   procedureGroup: string;
   patientAge: string;
+  diagnosis?: string;
+  sex?: string;
   competencyLevel: string;
 };
 
@@ -43,6 +45,7 @@ export function ProcedureLogsPage() {
   const groupNames: Record<string, string> = Object.fromEntries(Object.keys(PROCEDURE_GROUPS).map((group) => [group, group]));
   const user = React.useMemo(() => getCurrentUser(), []);
   const hideUhid = isDemoMode();
+  const isFreeTextProcedures = Boolean(config?.enabledFeatures?.freeTextProcedures);
   const initialGroup = hideUhid ? PROCEDURE_REQUIREMENTS[0]?.group ?? "" : "";
   const [open, setOpen] = React.useState(false);
   const [logs, setLogs] = React.useState<any[]>([]);
@@ -53,6 +56,8 @@ export function ProcedureLogsPage() {
     group: initialGroup as ProcedureGroup,
     procedureName: "",
     patientUhid: "",
+    diagnosis: "",
+    sex: "",
     age: "",
     experience: competencyLevels[0]?.value ?? "",
     supervisorId: "",
@@ -128,10 +133,12 @@ export function ProcedureLogsPage() {
     setIsSubmitting(true);
     try {
       const payload = {
-        procedureGroup: form.group,
+        procedureGroup: isFreeTextProcedures ? undefined : form.group,
         procedureName: form.procedureName,
         date: form.date,
         patientUhid: hideUhid ? "N/A" : form.patientUhid,
+        diagnosis: form.diagnosis,
+        sex: form.sex,
         patientAge: form.age,
         competencyLevel: config?.enabledFeatures?.procedureExperience ? form.experience : "N/A",
         supervisorId: form.supervisorId,
@@ -151,6 +158,8 @@ export function ProcedureLogsPage() {
         group: initialGroup,
         procedureName: "",
         patientUhid: "",
+        diagnosis: "",
+        sex: "",
         age: "",
         experience: competencyLevels[0]?.value ?? "",
         supervisorId: "",
@@ -179,7 +188,7 @@ export function ProcedureLogsPage() {
         </div>
         <Dialog open={open} onOpenChange={(val) => { 
           setOpen(val); 
-          if (!val) { setForm({ date: todayForInput(), group: initialGroup, procedureName: "", patientUhid: "", age: "", experience: competencyLevels[0]?.value ?? "", supervisorId: "" }); setEditLogId(null); } 
+          if (!val) { setForm({ date: todayForInput(), group: initialGroup, procedureName: "", patientUhid: "", diagnosis: "", sex: "", age: "", experience: competencyLevels[0]?.value ?? "", supervisorId: "" }); setEditLogId(null); } 
         }}>
           <DialogTrigger asChild><Button><PlusCircle className="h-4 w-4" /> Log procedure</Button></DialogTrigger>
           <DialogContent className="rounded-2xl bg-white sm:max-w-xl">
@@ -190,21 +199,33 @@ export function ProcedureLogsPage() {
             <form onSubmit={submit} className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Date"><Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required /></Field>
+                {!isFreeTextProcedures && (
                 <Field label="Procedure group">
                   <Select value={form.group} onValueChange={(value: ProcedureGroup) => setGroup(value)}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>{Object.keys(PROCEDURE_GROUPS).map((group) => <SelectItem key={group} value={group}>{group}</SelectItem>)}</SelectContent>
                   </Select>
                 </Field>
+                )}
               </div>
               <Field label="Procedure">
+                {isFreeTextProcedures ? (
+                  <Input value={form.procedureName} onChange={(e) => setForm({ ...form, procedureName: e.target.value })} placeholder="Enter procedure name" required />
+                ) : (
                 <Select value={form.procedureName} onValueChange={(value) => setForm({ ...form, procedureName: value })}>
                   <SelectTrigger><SelectValue placeholder="Select a required procedure" /></SelectTrigger>
                   <SelectContent>{(PROCEDURE_GROUPS[form.group] || []).map((procedure) => <SelectItem key={procedure} value={procedure}>{procedure}</SelectItem>)}</SelectContent>
                 </Select>
+                )}
               </Field>
               <div className={`grid gap-4 ${hideUhid ? "sm:grid-cols-1" : "sm:grid-cols-2"}`}>
-                {!hideUhid && <Field label="Patient ID"><Input value={form.patientUhid} onChange={(e) => setForm({ ...form, patientUhid: e.target.value })} required /></Field>}
+                {!hideUhid && <Field label="Case ID"><Input value={form.patientUhid} onChange={(e) => setForm({ ...form, patientUhid: e.target.value })} required /></Field>}
+                {isFreeTextProcedures && (
+                  <>
+                    <Field label="Diagnosis (optional)"><Input value={form.diagnosis} onChange={(e) => setForm({ ...form, diagnosis: e.target.value })} placeholder="e.g. Tinea Corporis" /></Field>
+                    <Field label="Sex (optional)"><Input value={form.sex} onChange={(e) => setForm({ ...form, sex: e.target.value })} placeholder="e.g. Male" /></Field>
+                  </>
+                )}
                 <Field label="Age"><Input value={form.age} onChange={(e) => setForm({ ...form, age: e.target.value })} placeholder="e.g. 4 months" required /></Field>
               </div>
               {config?.enabledFeatures?.procedureExperience && (
@@ -280,7 +301,7 @@ export function ProcedureLogsPage() {
         <CardContent className="p-0">
           <Table>
             <TableHeader>
-              <TableRow><TableHead>Procedure</TableHead><TableHead>Group</TableHead><TableHead>Logged</TableHead><TableHead>Required</TableHead><TableHead>Remaining</TableHead></TableRow>
+              <TableRow><TableHead>Procedure</TableHead>{!isFreeTextProcedures && <TableHead>Group</TableHead>}<TableHead>Logged</TableHead><TableHead>Required</TableHead><TableHead>Remaining</TableHead></TableRow>
             </TableHeader>
             <TableBody>
               {PROCEDURE_REQUIREMENTS.map((requirement) => {
@@ -288,7 +309,7 @@ export function ProcedureLogsPage() {
                 return (
                   <TableRow key={requirement.name}>
                     <TableCell className="font-semibold">{requirement.name}</TableCell>
-                    <TableCell><Badge variant="outline" className="border-teal-100 bg-teal-50 text-teal-800">{groupNames[requirement.group]}</Badge></TableCell>
+                    {!isFreeTextProcedures && <TableCell><Badge variant="outline" className="border-teal-100 bg-teal-50 text-teal-800">{groupNames[requirement.group]}</Badge></TableCell>}
                     <TableCell>{logged}</TableCell>
                     <TableCell className="font-bold text-teal-800">{requirement.required}</TableCell>
                     <TableCell>{Math.max(requirement.required - logged, 0)}</TableCell>
@@ -326,13 +347,13 @@ export function ProcedureLogsPage() {
             </Empty>
           ) : (
             <Table>
-              <TableHeader><TableRow><TableHead>Number</TableHead><TableHead>Date</TableHead><TableHead>Group</TableHead><TableHead>Procedure</TableHead>{!hideUhid && <TableHead>Patient ID</TableHead>}<TableHead>Age</TableHead>{config?.enabledFeatures?.procedureExperience && <TableHead>Experience</TableHead>}{config?.enabledFeatures?.procedureExperience && <TableHead>Verified competency</TableHead>}<TableHead>Remarks</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Number</TableHead><TableHead>Date</TableHead>{!isFreeTextProcedures && <TableHead>Group</TableHead>}<TableHead>Procedure</TableHead>{!hideUhid && <TableHead>Case ID</TableHead>}<TableHead>Age</TableHead>{config?.enabledFeatures?.procedureExperience && <TableHead>Experience</TableHead>}{config?.enabledFeatures?.procedureExperience && <TableHead>Verified competency</TableHead>}<TableHead>Remarks</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
               <TableBody>
                 {logs.map((log) => (
                   <TableRow key={log.id}>
                     <TableCell className="font-bold">{log.number}</TableCell>
                     <TableCell>{formatLogbookDate(log.date)}</TableCell>
-                    <TableCell><Badge variant="outline" className="border-teal-100 bg-teal-50 text-teal-800">{groupNames[log.procedureGroup as ProcedureGroup]}</Badge></TableCell>
+                    {!isFreeTextProcedures && <TableCell><Badge variant="outline" className="border-teal-100 bg-teal-50 text-teal-800">{groupNames[log.procedureGroup as ProcedureGroup] || log.procedureGroup}</Badge></TableCell>}
                     <TableCell className="font-semibold">{log.procedureName}</TableCell>
                     {!hideUhid && <TableCell className="font-semibold text-teal-800">{log.patientUhid}</TableCell>}
                     <TableCell>{log.patientAge || log.age}</TableCell>
@@ -358,6 +379,8 @@ export function ProcedureLogsPage() {
                             setForm({
                               date: log.date, group: log.procedureGroup, procedureName: log.procedureName,
                               patientUhid: log.patientUhid === "N/A" ? "" : log.patientUhid, age: log.patientAge || log.age,
+                              diagnosis: (log as any).diagnosis || "",
+                              sex: (log as any).sex || "",
                               experience: log.competencyLevel || "", supervisorId: String(log.supervisorId || ""),
                             });
                             setOpen(true);

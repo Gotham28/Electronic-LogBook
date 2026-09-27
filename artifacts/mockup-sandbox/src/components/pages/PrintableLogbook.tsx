@@ -334,7 +334,7 @@ export function PrintableLogbook() {
               <table className="w-full border-collapse">
                 <thead><tr>
                   <Th>#</Th><Th>Date</Th>
-                  {!hideUhid && <Th>Patient ID</Th>}
+                  {!hideUhid && <Th>Case ID</Th>}
                   <Th>Age / Gender</Th><Th>Category</Th><Th>Diagnosis</Th><Th>Status</Th>
                 </tr></thead>
                 <tbody>
@@ -364,7 +364,7 @@ export function PrintableLogbook() {
               <table className="w-full border-collapse">
                 <thead><tr>
                   <Th>#</Th><Th>Date</Th><Th>Procedure</Th><Th>Group</Th>
-                  {!hideUhid && <Th>Patient ID</Th>}
+                  {!hideUhid && <Th>Case ID</Th>}
                   <Th>Competency</Th><Th>Verified Level</Th><Th>Status</Th>
                 </tr></thead>
                 <tbody>

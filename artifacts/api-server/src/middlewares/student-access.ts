@@ -22,7 +22,7 @@ export const studentAccess: RequestHandler = async (req, res, next) => {
   }
 
   const facultyAssessment = ["POST", "PATCH", "DELETE"].includes(req.method) && isAssessmentPath && ["professor", "hod"].includes(caller.role);
-  const isReviewPath = /^\/(postings\/[^/]+\/review|thesis\/review|certifications\/[^/]+\/review)$/.test(req.path);
+  const isReviewPath = /^\/(postings\/[^/]+\/review|thesis\/review|certifications\/[^/]+\/review|awards\/[^/]+\/review)$/.test(req.path);
   const facultyReview = req.method === "PATCH" && isReviewPath && ["professor", "hod"].includes(caller.role);
 
   if (!isRead && caller.role !== "student" && !facultyAssessment && !facultyReview) {

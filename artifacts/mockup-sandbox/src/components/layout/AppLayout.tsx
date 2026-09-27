@@ -52,6 +52,7 @@ import {
   Presentation,
   Printer,
   Stethoscope,
+  Trophy,
   UserCheck,
   UserPlus,
 } from "lucide-react";
@@ -132,6 +133,32 @@ function navigationForRole(role: RoleType, dashboardData?: any, loadingBadges?: 
     return `${cat.logged}/${required}`;
   };
 
+  if (config?.departmentId === 15) {
+    const dermItems: NavigationItem[] = [];
+    dermItems.push({ title: "Dashboard", icon: LayoutDashboard, href: "/" });
+    dermItems.push({ title: "Academic Activities", icon: GraduationCap, href: "/academics" });
+    dermItems.push({ title: "Case Logs", icon: FileText, href: "/cases", badge: getCount("cases"), badgeLoading: loadingBadges });
+    dermItems.push({ title: "Procedure Logs", icon: Stethoscope, href: "/procedures", badge: getCount("procedures"), badgeLoading: loadingBadges });
+    if (config?.enabledFeatures?.attendedConferences) {
+      dermItems.push({ title: "Conferences and CME", icon: Presentation, href: "/conferences" });
+    }
+    if (config?.enabledFeatures?.splitThesisAndCertifications) {
+      dermItems.push({ title: config?.enabledFeatures?.useThesisAndPublicationsLabel ? "Thesis and Publications" : "Thesis", icon: FileText, href: "/thesis" });
+    } else {
+      dermItems.push({ title: "Thesis & Certifications", icon: Award, href: "/milestones" });
+    }
+    dermItems.push({ title: "Assessments", icon: ClipboardCheck, href: "/assessments" });
+    dermItems.push({ title: "Postings & Rotations", icon: CalendarDays, href: "/postings" });
+    if (config?.enabledFeatures?.splitThesisAndCertifications) {
+      dermItems.push({ title: "Certifications", icon: Award, href: "/certifications" });
+    }
+    if (config?.enabledFeatures?.awards) {
+      dermItems.push({ title: "Awards and Achievements", icon: Trophy, href: "/awards" });
+    }
+    dermItems.push({ title: "Leave Records", icon: CalendarDays, href: "/attendance" });
+    return dermItems;
+  }
+
   const items: NavigationItem[] = [
     { title: "Dashboard", icon: LayoutDashboard, href: "/" },
     { title: "Postings & Rotations", icon: CalendarDays, href: "/postings" },
@@ -147,7 +174,7 @@ function navigationForRole(role: RoleType, dashboardData?: any, loadingBadges?: 
   items.push({ title: "Assessments", icon: ClipboardCheck, href: "/assessments" });
 
   if (config?.enabledFeatures?.splitThesisAndCertifications) {
-    items.push({ title: "Thesis", icon: FileText, href: "/thesis" });
+    items.push({ title: config?.enabledFeatures?.useThesisAndPublicationsLabel ? "Thesis and Publications" : "Thesis", icon: FileText, href: "/thesis" });
     items.push({ title: "Certifications", icon: Award, href: "/certifications" });
   } else {
     items.push({ title: "Thesis & Certifications", icon: Award, href: "/milestones" });

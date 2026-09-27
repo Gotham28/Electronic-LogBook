@@ -225,7 +225,7 @@ export function CaseLogsPage() {
             <form onSubmit={handleAddCase} className="space-y-5">
               <div className={`grid gap-4 ${hideUhid ? "sm:grid-cols-3" : "sm:grid-cols-4"}`}>
                 <Field label="Date"><Input type="date" value={form.date} onChange={(e) => setField("date", e.target.value)} required /></Field>
-                {!hideUhid && <Field label="Patient ID"><Input value={form.patientUhid} onChange={(e) => setField("patientUhid", e.target.value)} placeholder="ID-2026-…" /></Field>}
+                {!hideUhid && <Field label="Case ID"><Input value={form.patientUhid} onChange={(e) => setField("patientUhid", e.target.value)} placeholder="ID-2026-…" /></Field>}
                 <Field label="Age"><Input value={form.age} onChange={(e) => setField("age", e.target.value)} placeholder="e.g. 7 years" required /></Field>
                 <Field label="Gender">
                   <Select value={form.gender} onValueChange={(value) => setField("gender", value)}>
@@ -234,9 +234,9 @@ export function CaseLogsPage() {
                   </Select>
                 </Field>
               </div>
-              <Field label="Case category">
+              <Field label={deptConfig?.enabledFeatures?.useCaseTypeLabel ? "Case type" : "Case category"}>
                 <Select value={form.category} onValueChange={(value) => setField("category", value)}>
-                  <SelectTrigger><SelectValue placeholder="Select a case category" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder={deptConfig?.enabledFeatures?.useCaseTypeLabel ? "Select a case type" : "Select a case category"} /></SelectTrigger>
                   <SelectContent>
                     {caseCategories?.map((cat: any) => (
                       <SelectItem key={cat.value} value={cat.value}>
@@ -323,7 +323,7 @@ export function CaseLogsPage() {
         <CardHeader className="flex flex-col justify-between gap-4 border-b border-teal-100 md:flex-row md:items-center">
           <div className="relative w-full max-w-md">
             <Search className="absolute left-3 top-3 h-4 w-4 text-teal-600" />
-            <Input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="h-11 pl-9 pr-24" placeholder={hideUhid ? "Search category or diagnosis..." : "Search patient, ID, category or diagnosis..."} />
+            <Input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="h-11 pl-9 pr-24" placeholder={hideUhid ? "Search category or diagnosis..." : "Search patient, case ID, category or diagnosis..."} />
             <div className="pointer-events-none absolute right-3 top-2.5 flex items-center gap-1">
               <Kbd>Ctrl</Kbd>
               <span className="text-[10px] text-slate-400">+</span>
@@ -347,7 +347,7 @@ export function CaseLogsPage() {
               </div>
               <div className="space-y-1 text-center">
                 <p className="text-base font-semibold text-slate-950">No cases found</p>
-                <p className="max-w-sm text-sm leading-6 text-slate-500">{hideUhid ? "Try a different diagnosis or case number, or clear the search to see all records." : "Try a different ID, diagnosis, or case number, or clear the search to see all records."}</p>
+                <p className="max-w-sm text-sm leading-6 text-slate-500">{hideUhid ? "Try a different diagnosis or case number, or clear the search to see all records." : "Try a different case ID, diagnosis, or clear the search to see all records."}</p>
               </div>
             </div>
           ) : (
@@ -356,9 +356,9 @@ export function CaseLogsPage() {
                 <TableRow>
                   <TableHead>Number</TableHead>
                   <TableHead>Date</TableHead>
-                  {!hideUhid && <TableHead>Patient ID</TableHead>}
+                  {!hideUhid && <TableHead>Case ID</TableHead>}
                   <TableHead>Age</TableHead>
-                  <TableHead>Category</TableHead>
+                  <TableHead>{deptConfig?.enabledFeatures?.useCaseTypeLabel ? "Type" : "Category"}</TableHead>
                   <TableHead>Diagnosis</TableHead>
                   <TableHead>Remarks</TableHead>
                   <TableHead>Status</TableHead>
@@ -439,7 +439,7 @@ export function CaseLogsPage() {
                 <DialogDescription>{[hideUhid ? null : selectedLog.patientUhid, selectedLog.patientAge || selectedLog.age, selectedLog.patientGender || selectedLog.gender].filter(Boolean).join(" • ")}</DialogDescription>
               </DialogHeader>
               <div className="grid gap-4">
-                <Detail label="Category" value={caseCategories?.find((c: any) => c.value === selectedLog.category)?.name || selectedLog.category} />
+                <Detail label={deptConfig?.enabledFeatures?.useCaseTypeLabel ? "Type" : "Category"} value={caseCategories?.find((c: any) => c.value === selectedLog.category)?.name || selectedLog.category} />
                 <Detail label="Chief complaints" value={selectedLog.chiefComplaints} />
                 <Detail label="Relevant history" value={selectedLog.history} />
                 <Detail label="Clinical examination" value={selectedLog.examination} />

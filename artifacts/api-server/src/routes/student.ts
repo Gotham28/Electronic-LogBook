@@ -3,7 +3,7 @@ import crypto from "crypto";
 import { 
   db, studentsTable, caseLogsTable, procedureLogsTable, 
   academicLogsTable, usersTable, departmentsTable, departmentConfigsTable,
-  postingsTable, leaveRecordsTable, appraisalsTable, researchTable, assessmentsTable, procedureTypesTable, departmentCatalogTable, certificationsTable, conferencesTable
+  postingsTable, leaveRecordsTable, appraisalsTable, researchTable, assessmentsTable, procedureTypesTable, departmentCatalogTable, certificationsTable, conferencesTable, awardsTable
 } from "@workspace/db";
 import { eq, and, or, desc, count, sql, isNull, aliasedTable } from "drizzle-orm";
 import { requireAuth, requireRole, requireDepartment } from "../middlewares/auth.js";
@@ -165,7 +165,19 @@ router.get("/:studentId/logs", requireAuth, async (req, res) => {
     .leftJoin(departmentsTable, eq(usersTable.departmentId, departmentsTable.id))
     .leftJoin(mentorsTable, eq(studentsTable.mentorId, mentorsTable.id))
     .where(eq(studentsTable.id, studentId))
-    .limit(1);
+    .limit(1) as unknown as Array<{
+      id: number;
+      userId: number;
+      name: string;
+      registrationNumber: string | null;
+      dateOfJoining: string | null;
+      batch: number | null;
+      department: string | null;
+      departmentId: number | null;
+      mentorName: string | null;
+      mentorRole: string | null;
+      specialty: string | null;
+    }>;
 
     if (studentMatch.length === 0) {
       res.status(404).json({ message: "Student not found" });
@@ -411,10 +423,15 @@ router.get("/:studentId/postings", async (req, res) => {
   try {
     const studentId = parseInt(String(req.params.studentId), 10);
     const caller = req.user!;
+    const [studentRow] = await db.select({ departmentId: usersTable.departmentId })
+      .from(studentsTable).innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
+      .where(eq(studentsTable.id, studentId)).limit(1);
+    const isDerm = studentRow && (studentRow.departmentId === 15 || studentRow.departmentId === 25);
+
     // Same supervisor scoping as /logs (student.ts:165-173): professors see only the
-    // postings they supervise; students (own) and HODs (dept-wide, already enforced by
+    // postings they supervise (unless Derm, where they see all); students (own) and HODs (dept-wide, already enforced by
     // studentAccess) see the rest.
-    const postingsFilter = caller.role === "professor"
+    const postingsFilter = (caller.role === "professor" && !isDerm)
       ? and(eq(postingsTable.studentId, studentId), eq(postingsTable.supervisorId, caller.id))
       : eq(postingsTable.studentId, studentId);
     const data = await db
@@ -444,15 +461,24 @@ router.get("/:studentId/postings", async (req, res) => {
 });
 
 router.post("/:studentId/postings", validate(z.object({ ward: nameSchema, startDate: dateSchema, endDate: dateSchema,
-  supervisorId: idSchema }).strict().refine((v) => v.endDate >= v.startDate, "End date must be on or after start date")), async (req, res) => {
+  supervisorId: idSchema.optional().nullable() }).strict().refine((v) => v.endDate >= v.startDate, "End date must be on or after start date")), async (req, res) => {
   try {
     const studentId = parseInt(String(req.params.studentId), 10);
     const { ward, postingName, startDate, endDate, supervisorId } = req.body;
+    const isDerm = req.user!.departmentId === 15 || req.user!.departmentId === 25;
+    
+    if (!isDerm && !supervisorId) {
+      res.status(400).json({ message: "Supervisor is required" }); return;
+    }
+
     const configSourceId = await resolveConfigDepartmentId(req.user!.departmentId!);
     const [option] = await db.select({ id: departmentCatalogTable.id }).from(departmentCatalogTable).where(and(
       eq(departmentCatalogTable.departmentId, configSourceId), eq(departmentCatalogTable.kind, "posting"), eq(departmentCatalogTable.value, ward))).limit(1);
-    if (!option || !(await validateSupervisor(Number(supervisorId), req.user!.departmentId!))) {
-      res.status(400).json({ message: "Select a posting and supervisor from your department" }); return;
+    if (!isDerm && !option) {
+      res.status(400).json({ message: "Select a posting from your department" }); return;
+    }
+    if (supervisorId && !(await validateSupervisor(Number(supervisorId), req.user!.departmentId!))) {
+      res.status(400).json({ message: "Select a valid supervisor from your department" }); return;
     }
     
     const [inserted] = await db.insert(postingsTable).values({
@@ -460,7 +486,8 @@ router.post("/:studentId/postings", validate(z.object({ ward: nameSchema, startD
       ward,
       startDate,
       endDate,
-      supervisorId: parseInt(supervisorId, 10) || null,
+      supervisorId: supervisorId ? parseInt(supervisorId, 10) : null,
+      status: (isDerm && !supervisorId) ? "verified" : "pending"
     }).returning();
     res.status(201).json({ success: true, posting: inserted });
   } catch (error) {
@@ -1016,7 +1043,7 @@ router.patch("/:studentId/certifications/:certId/review", requireAuth, requireRo
   validate(reviewBody), async (req, res) => {
   try {
     const studentId = parseInt(String(req.params.studentId), 10);
-    const certId = req.params.certId; // UUID
+    const certId = String(req.params.certId); // UUID
     if (isNaN(studentId)) { res.status(400).json({ message: "Invalid studentId" }); return; }
     const reviewer = req.user!;
 
@@ -1092,22 +1119,27 @@ router.post("/:studentId/case-logs", validate(z.object({ supervisorId: idSchema,
   }
 });
 
-router.post("/:studentId/procedure-logs", validate(z.object({ supervisorId: idSchema, procedureGroup: nameSchema,
+router.post("/:studentId/procedure-logs", validate(z.object({ supervisorId: idSchema, procedureGroup: nameSchema.optional(),
   procedureName: nameSchema, date: dateSchema, patientUhid: nameSchema, patientAge: nameSchema,
-  competencyLevel: nameSchema }).strict()), async (req, res) => {
+  competencyLevel: nameSchema, diagnosis: optionalText, sex: optionalText }).strict()), async (req, res) => {
   try {
     const studentId = parseInt(String(req.params.studentId), 10);
-    const { supervisorId, procedureGroup, procedureName, date, patientUhid, patientAge, competencyLevel } = req.body;
+    const { supervisorId, procedureGroup, procedureName, date, patientUhid, patientAge, competencyLevel, diagnosis, sex } = req.body;
     const supervisorIdNum = parseInt(supervisorId, 10);
     if (!(await validateSupervisor(supervisorIdNum, req.user!.departmentId!))) {
       res.status(400).json({ message: "Invalid supervisorId" });
       return;
     }
 
+    const isDerm = req.user!.departmentId === 15 || req.user!.departmentId === 25;
+    const finalProcedureGroup = isDerm ? "N/A" : procedureGroup;
     const configSourceId = await resolveConfigDepartmentId(req.user!.departmentId!);
-    const [option] = await db.select({ id: procedureTypesTable.id }).from(procedureTypesTable).where(and(
-      eq(procedureTypesTable.departmentId, configSourceId), eq(procedureTypesTable.name, procedureName), eq(procedureTypesTable.group, procedureGroup))).limit(1);
-    if (!option) { res.status(400).json({ message: "Select a procedure from your department" }); return; }
+
+    if (!isDerm) {
+      const [option] = await db.select({ id: procedureTypesTable.id }).from(procedureTypesTable).where(and(
+        eq(procedureTypesTable.departmentId, configSourceId), eq(procedureTypesTable.name, procedureName), eq(procedureTypesTable.group, finalProcedureGroup))).limit(1);
+      if (!option) { res.status(400).json({ message: "Select a procedure from your department" }); return; }
+    }
 
     const [config] = await db.select({ enabledFeatures: departmentConfigsTable.enabledFeatures }).from(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, configSourceId)).limit(1);
     const enabledFeatures = config?.enabledFeatures as Record<string, boolean> | null;
@@ -1123,8 +1155,8 @@ router.post("/:studentId/procedure-logs", validate(z.object({ supervisorId: idSc
       }
     }
     const [inserted] = await db.insert(procedureLogsTable).values({
-      studentId, supervisorId: supervisorIdNum, procedureGroup, procedureName, date, 
-      patientUhid, patientAge, competencyLevel, status: "pending"
+      studentId, supervisorId: supervisorIdNum, procedureGroup: finalProcedureGroup, procedureName, date, 
+      patientUhid, patientAge, competencyLevel, diagnosis, sex, status: "pending"
     }).returning();
     res.status(201).json(inserted);
   } catch (error) {
@@ -1134,10 +1166,11 @@ router.post("/:studentId/procedure-logs", validate(z.object({ supervisorId: idSc
 
 router.post("/:studentId/academic-logs", validate(z.object({ supervisorId: idSchema, activityType: nameSchema,
   topic: z.string().trim().min(1).max(4000), date: dateSchema, presenter: optionalText,
-  presentationType: z.string().max(160).nullable().optional() }).strict()), async (req, res) => {
+  presentationType: z.string().max(160).nullable().optional(),
+  description: optionalText }).strict()), async (req, res) => {
   try {
     const studentId = parseInt(String(req.params.studentId), 10);
-    const { supervisorId, activityType, topic, date } = req.body;
+    const { supervisorId, activityType, topic, date, presenter, presentationType, description } = req.body;
     const supervisorIdNum = parseInt(supervisorId, 10);
     if (!(await validateSupervisor(supervisorIdNum, req.user!.departmentId!))) {
       res.status(400).json({ message: "Invalid supervisorId" });
@@ -1149,7 +1182,7 @@ router.post("/:studentId/academic-logs", validate(z.object({ supervisorId: idSch
       eq(departmentCatalogTable.departmentId, configSourceId), eq(departmentCatalogTable.kind, "academic"), eq(departmentCatalogTable.value, activityType))).limit(1);
     if (!option) { res.status(400).json({ message: "Select an academic activity from your department" }); return; }
     const [inserted] = await db.insert(academicLogsTable).values({
-      studentId, supervisorId: supervisorIdNum, activityType, presentationType: req.body.presentationType, 
+      studentId, supervisorId: supervisorIdNum, activityType, presentationType, description,
       topic, date, presenter: req.body.presenter, status: "pending"
     }).returning();
     res.status(201).json(inserted);
@@ -1160,11 +1193,12 @@ router.post("/:studentId/academic-logs", validate(z.object({ supervisorId: idSch
 });
 
 router.post("/:studentId/conference-logs", validate(z.object({ supervisorId: idSchema.optional().nullable(), conferenceName: nameSchema,
+  conferenceType: z.enum(["conference", "cme"]).default("conference"), level: optionalText.nullable(), category: optionalText.nullable(),
   role: z.enum(["attended", "presented"]), date: dateSchema, location: optionalText.nullable(),
   certificateUrl: optionalText.nullable() }).strict()), async (req, res) => {
   try {
     const studentId = parseInt(String(req.params.studentId), 10);
-    const { supervisorId, conferenceName, role, date, location, certificateUrl } = req.body;
+    const { supervisorId, conferenceName, conferenceType, role, date, level, category, location, certificateUrl } = req.body;
     
     let supervisorIdNum = null;
     if (supervisorId) {
@@ -1176,7 +1210,7 @@ router.post("/:studentId/conference-logs", validate(z.object({ supervisorId: idS
     }
 
     const [inserted] = await db.insert(conferencesTable).values({
-      studentId, supervisorId: supervisorIdNum, conferenceName, role, date, location, certificateUrl, status: "pending"
+      studentId, supervisorId: supervisorIdNum, conferenceName, conferenceType, role, date, level, category, location, certificateUrl, status: "pending"
     }).returning();
     res.status(201).json(inserted);
   } catch (error) {
@@ -1303,9 +1337,9 @@ router.patch("/:studentId/case-logs/:logId", requireAuth, validate(z.object({ su
 });
 
 // 2. Procedure Logs
-router.patch("/:studentId/procedure-logs/:logId", requireAuth, validate(z.object({ supervisorId: idSchema, procedureGroup: nameSchema,
+router.patch("/:studentId/procedure-logs/:logId", requireAuth, validate(z.object({ supervisorId: idSchema, procedureGroup: nameSchema.optional(),
   procedureName: nameSchema, date: dateSchema, patientUhid: nameSchema, patientAge: nameSchema,
-  competencyLevel: nameSchema }).strict().partial()), async (req, res) => {
+  competencyLevel: nameSchema, diagnosis: optionalText, sex: optionalText }).strict().partial()), async (req, res) => {
   try {
     const studentId = parseInt(String(req.params.studentId), 10);
     const logId = parseInt(String(req.params.logId), 10);
@@ -1319,13 +1353,19 @@ router.patch("/:studentId/procedure-logs/:logId", requireAuth, validate(z.object
       req.body.supervisorId = parseInt(req.body.supervisorId, 10);
     }
 
+    const isDerm = guard.caller.departmentId === 15 || guard.caller.departmentId === 25;
+
     if (req.body.procedureName || req.body.procedureGroup) {
       const pName = req.body.procedureName || guard.log!.procedureName;
-      const pGroup = req.body.procedureGroup || guard.log!.procedureGroup;
+      const pGroup = isDerm ? "N/A" : (req.body.procedureGroup || guard.log!.procedureGroup);
       const configSourceId = await resolveConfigDepartmentId(guard.caller.departmentId!);
-      const [option] = await db.select({ id: procedureTypesTable.id }).from(procedureTypesTable).where(and(
-        eq(procedureTypesTable.departmentId, configSourceId), eq(procedureTypesTable.name, pName), eq(procedureTypesTable.group, pGroup))).limit(1);
-      if (!option) { res.status(400).json({ message: "Select a procedure from your department" }); return; }
+      
+      if (!isDerm) {
+        const [option] = await db.select({ id: procedureTypesTable.id }).from(procedureTypesTable).where(and(
+          eq(procedureTypesTable.departmentId, configSourceId), eq(procedureTypesTable.name, pName), eq(procedureTypesTable.group, pGroup))).limit(1);
+        if (!option) { res.status(400).json({ message: "Select a procedure from your department" }); return; }
+      }
+      if (isDerm) req.body.procedureGroup = "N/A";
     }
 
     if (req.body.competencyLevel) {
@@ -1352,7 +1392,8 @@ router.patch("/:studentId/procedure-logs/:logId", requireAuth, validate(z.object
 // 3. Academic Logs
 router.patch("/:studentId/academic-logs/:logId", requireAuth, validate(z.object({ supervisorId: idSchema, activityType: nameSchema,
   topic: z.string().trim().min(1).max(4000), date: dateSchema, presenter: optionalText,
-  presentationType: z.string().max(160).nullable().optional() }).strict().partial()), async (req, res) => {
+  presentationType: z.string().max(160).nullable().optional(),
+  description: optionalText }).strict().partial()), async (req, res) => {
   try {
     const studentId = parseInt(String(req.params.studentId), 10);
     const logId = parseInt(String(req.params.logId), 10);
@@ -1383,6 +1424,7 @@ router.patch("/:studentId/academic-logs/:logId", requireAuth, validate(z.object(
 
 // 4. Conference Logs
 router.patch("/:studentId/conference-logs/:logId", requireAuth, validate(z.object({ supervisorId: idSchema.optional().nullable(), conferenceName: nameSchema,
+  conferenceType: z.enum(["conference", "cme"]), level: optionalText.nullable(), category: optionalText.nullable(),
   role: z.enum(["attended", "presented"]), date: dateSchema, location: optionalText.nullable(),
   certificateUrl: optionalText.nullable() }).strict().partial()), async (req, res) => {
   try {
@@ -1420,11 +1462,12 @@ router.patch("/:studentId/postings/:postingId", requireAuth, validate(z.object({
       res.status(400).json({ message: "End date must be on or after start date" }); return;
     }
 
+    const isDerm = guard.caller.departmentId === 15 || guard.caller.departmentId === 25;
     if (req.body.ward) {
       const configSourceId = await resolveConfigDepartmentId(guard.caller.departmentId!);
       const [option] = await db.select({ id: departmentCatalogTable.id }).from(departmentCatalogTable).where(and(
         eq(departmentCatalogTable.departmentId, configSourceId), eq(departmentCatalogTable.kind, "posting"), eq(departmentCatalogTable.value, req.body.ward))).limit(1);
-      if (!option) { res.status(400).json({ message: "Select a posting from your department" }); return; }
+      if (!isDerm && !option) { res.status(400).json({ message: "Select a posting from your department" }); return; }
     }
 
     if (req.body.supervisorId) {
@@ -1434,9 +1477,13 @@ router.patch("/:studentId/postings/:postingId", requireAuth, validate(z.object({
       req.body.supervisorId = parseInt(req.body.supervisorId, 10);
     }
 
+    const statusCond = isDerm 
+      ? or(eq((postingsTable as any).status, "pending"), eq((postingsTable as any).status, "verified"))
+      : eq((postingsTable as any).status, "pending");
+
     const [updated] = await db.update(postingsTable).set(req.body)
-      .where(and(eq(postingsTable.id, postingId), eq(postingsTable.studentId, studentId), eq((postingsTable as any).status, "pending"))).returning();
-    if (!updated) { res.status(400).json({ message: "Log no longer pending or not found" }); return; }
+      .where(and(eq(postingsTable.id, postingId), eq(postingsTable.studentId, studentId), statusCond)).returning();
+    if (!updated) { res.status(400).json({ message: "Log no longer editable or not found" }); return; }
     res.json(updated);
   } catch (error: any) { res.status(500).json({ message: "Internal server error", detail: String(error), stack: error?.stack }); }
 });
@@ -1467,6 +1514,127 @@ router.patch("/:studentId/certifications/:certId", requireAuth, validate(z.objec
     if (!updated) { res.status(400).json({ message: "Log no longer pending or not found" }); return; }
     res.json(updated);
   } catch (error) { res.status(500).json({ message: "Internal server error" }); }
+});
+
+// 7. Awards
+router.get("/:studentId/awards", async (req, res) => {
+  try {
+    const studentId = parseInt(String(req.params.studentId), 10);
+    const caller = req.user!;
+    const awardsFilter = caller.role === "professor"
+      ? and(eq(awardsTable.studentId, studentId), eq(awardsTable.supervisorId, caller.id))
+      : eq(awardsTable.studentId, studentId);
+    const data = await db
+      .select({
+        id: awardsTable.id,
+        date: awardsTable.date,
+        description: awardsTable.description,
+        supervisorId: awardsTable.supervisorId,
+        supervisorName: usersTable.fullName,
+        status: awardsTable.status,
+        facultyRemarks: awardsTable.facultyRemarks,
+      })
+      .from(awardsTable)
+      .leftJoin(usersTable, eq(awardsTable.supervisorId, usersTable.id))
+      .where(awardsFilter)
+      .orderBy(desc(awardsTable.createdAt));
+      
+    res.json({ data });
+  } catch (error) {
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+router.post("/:studentId/awards", validate(z.object({ 
+  date: dateSchema, 
+  description: z.string().trim().min(1).max(2000)
+}).strict()), async (req, res) => {
+  try {
+    const studentId = parseInt(String(req.params.studentId), 10);
+    const caller = req.user!;
+    
+    const { date, description } = req.body;
+    
+    const [hod] = await db.select({ id: usersTable.id }).from(usersTable)
+      .where(and(eq(usersTable.departmentId, caller.departmentId!), eq(usersTable.role, "hod"), eq(usersTable.status, "approved"))).limit(1);
+
+    if (!hod) {
+      res.status(400).json({ message: "No active Head of Department found for your department to assign as supervisor." }); return;
+    }
+    
+    const supervisorId = hod.id;
+    
+    const [inserted] = await db.insert(awardsTable).values({
+      studentId,
+      date,
+      description,
+      supervisorId: supervisorId,
+    }).returning();
+    res.status(201).json(inserted);
+  } catch (error) {
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+router.patch("/:studentId/awards/:awardId", requireAuth, validate(z.object({ 
+  date: dateSchema, 
+  description: z.string().trim().min(1).max(2000)
+}).strict().partial()), async (req, res) => {
+  try {
+    const studentId = parseInt(String(req.params.studentId), 10);
+    const awardId = parseInt(String(req.params.awardId), 10);
+    const guard = await studentEditGuard(req, res, awardsTable, awardId, studentId);
+    if (guard.error) { res.status(guard.error).json({ message: guard.message }); return; }
+
+    const [updated] = await db.update(awardsTable).set(req.body)
+      .where(and(eq(awardsTable.id, awardId), eq(awardsTable.studentId, studentId), eq((awardsTable as any).status, "pending"))).returning();
+    if (!updated) { res.status(400).json({ message: "Log no longer pending or not found" }); return; }
+    res.json(updated);
+  } catch (error: any) { res.status(500).json({ message: "Internal server error" }); }
+});
+
+router.patch("/:studentId/awards/:awardId/review", requireAuth, requireRole(["professor", "hod"]),
+  validate(reviewBody), async (req, res) => {
+  try {
+    const studentId = parseInt(String(req.params.studentId), 10);
+    const awardId = parseInt(String(req.params.awardId), 10);
+    if (isNaN(studentId) || isNaN(awardId)) { res.status(400).json({ message: "Invalid id" }); return; }
+    const reviewer = req.user!;
+
+    const [award] = await db.select({ supervisorId: awardsTable.supervisorId, studentId: awardsTable.studentId })
+      .from(awardsTable).where(and(eq(awardsTable.id, awardId), eq(awardsTable.studentId, studentId))).limit(1);
+    if (!award) { res.status(404).json({ message: "Award not found" }); return; }
+
+    if (reviewer.role === "professor" && award.supervisorId !== reviewer.id) {
+      res.status(403).json({ message: "Award not assigned to you" }); return;
+    }
+
+    const [studentRow] = await db.select({ departmentId: usersTable.departmentId })
+      .from(studentsTable).innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
+      .where(eq(studentsTable.id, studentId)).limit(1);
+    if (!studentRow || studentRow.departmentId !== reviewer.departmentId) {
+      res.status(403).json({ message: "Award not assigned to you" }); return;
+    }
+
+    const updatePayload = {
+      status: req.body.status,
+      facultyRemarks: req.body.remarks || null,
+    };
+
+    const [updated] = await db.update(awardsTable)
+      .set(updatePayload)
+      .where(and(eq(awardsTable.id, awardId), eq(awardsTable.status, "pending")))
+      .returning();
+
+    if (!updated) {
+      res.status(400).json({ message: "This log has already been reviewed" });
+      return;
+    }
+
+    res.json(updated);
+  } catch (error) {
+    res.status(500).json({ message: "Internal server error" });
+  }
 });
 
 export default router;
