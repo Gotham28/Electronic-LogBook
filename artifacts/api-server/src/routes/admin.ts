@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, usersTable, studentsTable, departmentsTable, departmentConfigsTable, procedureTypesTable, caseLogsTable, procedureLogsTable, academicLogsTable, departmentCatalogTable, paymentsTable, leaveRecordsTable, leaveApplicationsTable, assessmentsTable, appraisalsTable, assignmentRecipientsTable, attendanceLogsTable, certificationsTable, postingsTable, thesisMilestonesTable, researchTable, auditTable, assignmentsTable, assignmentTypesTable, clinicalWorkLogsTable } from "@workspace/db";
-import { eq, and, count, inArray, sql, or, like } from "drizzle-orm";
+import { eq, and, count, inArray, sql, or } from "drizzle-orm";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { requireAuth, requireRole, requireDepartment } from "../middlewares/auth.js";
@@ -345,9 +345,11 @@ router.get("/leaves/pending", async (req, res) => {
     const leaveTypes = await db.select({ value: departmentCatalogTable.value, required: departmentCatalogTable.required }).from(departmentCatalogTable).where(and(eq(departmentCatalogTable.departmentId, configSourceId), eq(departmentCatalogTable.kind, "leave_type")));
     const limits = Object.fromEntries(leaveTypes.map(t => [t.value, t.required]));
 
-    const currentYear = new Date().getFullYear().toString();
+    // Allowances are per calendar year, so each request is measured against the leave taken
+    // in the year it starts in - the same rule POST /students/:id/leave-records enforces.
     const studentIds = [...new Set(pendingLeaves.map(l => l.residentId))];
-    let usedMap: Record<number, Record<string, number>> = {};
+    const usageKey = (studentId: number, year: string, leaveType: string) => `${studentId}|${year}|${leaveType}`;
+    const usedMap: Record<string, number> = {};
     
     if (studentIds.length > 0) {
       const allRelevantLeaves = await db.select({ 
@@ -357,7 +359,7 @@ router.get("/leaves/pending", async (req, res) => {
         endDate: leaveRecordsTable.endDate 
       })
       .from(leaveRecordsTable)
-      .where(and(inArray(leaveRecordsTable.studentId, studentIds), inArray(leaveRecordsTable.status, ['approved', 'pending']), like(leaveRecordsTable.startDate, `${currentYear}-%`)));
+      .where(and(inArray(leaveRecordsTable.studentId, studentIds), inArray(leaveRecordsTable.status, ['approved', 'pending'])));
 
       for (const l of allRelevantLeaves) {
         if (!l.startDate || !l.endDate) continue;
@@ -365,8 +367,8 @@ router.get("/leaves/pending", async (req, res) => {
         const lEnd = new Date(l.endDate);
         const diffDays = Math.ceil((lEnd.getTime() - lStart.getTime()) / (1000 * 3600 * 24)) + 1;
         if (diffDays > 0) {
-          usedMap[l.studentId] = usedMap[l.studentId] || {};
-          usedMap[l.studentId][l.leaveType] = (usedMap[l.studentId][l.leaveType] || 0) + diffDays;
+          const key = usageKey(l.studentId, l.startDate.slice(0, 4), l.leaveType);
+          usedMap[key] = (usedMap[key] || 0) + diffDays;
         }
       }
     }
@@ -379,7 +381,7 @@ router.get("/leaves/pending", async (req, res) => {
       const total = limits[leave.type];
       let remainingBalance: number | null = null;
       if (typeof total === 'number') {
-        const used = usedMap[leave.residentId]?.[leave.type] || 0;
+        const used = usedMap[usageKey(leave.residentId, String(leave.fromDate).slice(0, 4), leave.type)] || 0;
         // Remaining balance shows how many days are left, considering ALL approved/pending leaves
         remainingBalance = total - used;
       }

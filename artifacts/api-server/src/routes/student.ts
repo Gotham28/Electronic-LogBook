@@ -621,7 +621,9 @@ router.post("/:studentId/leave-records", validate(z.object({ startDate: dateSche
       return;
     }
 
-    const currentYear = new Date().getFullYear().toString();
+    // Allowances are per calendar year: count leave in the year this request starts in,
+    // not the year it is submitted in (a December request for January uses next year's).
+    const leaveYear = String(startDate).slice(0, 4);
     const configSourceId = await resolveConfigDepartmentId(studentUser.departmentId!);
     const result = await db.transaction(async (tx) => {
       const hashBuffer = crypto.createHash("md5").update(`leave_lock_${studentId}`).digest();
@@ -646,7 +648,7 @@ router.post("/:studentId/leave-records", validate(z.object({ startDate: dateSche
 
       const relevantLeaves = await tx.select({ startDate: leaveRecordsTable.startDate, endDate: leaveRecordsTable.endDate })
         .from(leaveRecordsTable)
-        .where(sql`${leaveRecordsTable.studentId} = ${studentId} AND ${leaveRecordsTable.leaveType} = ${leaveType} AND ${leaveRecordsTable.status} IN ('approved', 'pending') AND ${leaveRecordsTable.startDate} LIKE ${currentYear + '-%'}`);
+        .where(sql`${leaveRecordsTable.studentId} = ${studentId} AND ${leaveRecordsTable.leaveType} = ${leaveType} AND ${leaveRecordsTable.status} IN ('approved', 'pending') AND ${leaveRecordsTable.startDate} LIKE ${leaveYear + '-%'}`);
       
       let used = 0;
       for (const l of relevantLeaves) {

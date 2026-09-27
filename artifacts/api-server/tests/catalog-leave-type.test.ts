@@ -108,3 +108,33 @@ describe("Student leave records validation against dynamic leave types", () => {
     assert.deepEqual(statusCodes, [201, 400], "One request should succeed and one should fail due to lock");
   });
 });
+
+describe("Leave allowances are counted per calendar year of the leave", () => {
+  const thisYear = new Date().getFullYear();
+  const nextYear = thisYear + 1;
+
+  test("a leave for next year is checked against next year's usage, not this year's", async () => {
+    await db.insert(departmentCatalogTable).values({ departmentId: 1, kind: "leave_type", name: "Yearly Test Leave", value: "yearly_test_leave", required: 5 });
+    const fillThisYear = await call(`/students/${a.student0.studentId}/leave-records`, "student0", "POST",
+      { startDate: `${thisYear}-01-05`, endDate: `${thisYear}-01-09`, leaveType: "yearly_test_leave", reason: "Uses this year's 5 days" });
+    assert.equal(fillThisYear.status, 201);
+
+    const nextYearLeave = await call(`/students/${a.student0.studentId}/leave-records`, "student0", "POST",
+      { startDate: `${nextYear}-01-05`, endDate: `${nextYear}-01-07`, leaveType: "yearly_test_leave", reason: "Next year" });
+    assert.equal(nextYearLeave.status, 201, JSON.stringify(nextYearLeave.body));
+
+    const overNextYear = await call(`/students/${a.student0.studentId}/leave-records`, "student0", "POST",
+      { startDate: `${nextYear}-02-01`, endDate: `${nextYear}-02-03`, leaveType: "yearly_test_leave", reason: "Over next year's allowance" });
+    assert.equal(overNextYear.status, 400);
+    assert.match(overNextYear.body.message, /Remaining: 2 days/);
+  });
+
+  test("the HOD's pending-leave list shows the balance for the year each leave starts in", async () => {
+    const res = await call("/admin/leaves/pending", "hod0", "GET");
+    assert.equal(res.status, 200);
+    const nextYearLeave = res.body.find((leave: any) => leave.type === "yearly_test_leave" && leave.fromDate === `${nextYear}-01-05`);
+    const thisYearLeave = res.body.find((leave: any) => leave.type === "yearly_test_leave" && leave.fromDate === `${thisYear}-01-05`);
+    assert.equal(nextYearLeave.remainingBalance, 2);
+    assert.equal(thisYearLeave.remainingBalance, 0);
+  });
+});
