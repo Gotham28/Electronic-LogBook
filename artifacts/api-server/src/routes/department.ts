@@ -121,7 +121,8 @@ router.get("/:departmentId/analytics", requireRole(["hod"]), async (req, res) =>
 
     const configSourceId = await resolveConfigDepartmentId(departmentId);
 
-    // All students in this department (via users.departmentId)
+    // Approved students in this department (via users.departmentId). Pending applicants and
+    // deactivated (rejected) accounts are not residents, matching the review queue's scope.
     const studentsInDept = await db
       .select({
         studentId:          studentsTable.id,
@@ -134,7 +135,7 @@ router.get("/:departmentId/analytics", requireRole(["hod"]), async (req, res) =>
       })
       .from(studentsTable)
       .innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
-      .where(eq(usersTable.departmentId, departmentId));
+      .where(and(eq(usersTable.departmentId, departmentId), eq(usersTable.role, "student"), eq(usersTable.status, "approved")));
 
     const studentIds = studentsInDept.map(s => s.studentId);
 
