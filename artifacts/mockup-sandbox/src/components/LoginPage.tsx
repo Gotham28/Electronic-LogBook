@@ -118,6 +118,7 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
       
       saveToken(user.token);
       window.sessionStorage.setItem("elogbook-user", JSON.stringify(user));
+      window.sessionStorage.setItem("elogbook-login-summary-pending", "true");
       onSignIn();
     } catch (err: any) {
       toast.error(err.message || "Demo login failed. Please try again.");
@@ -140,6 +141,7 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
 
       if (user.token) saveToken(user.token);
       window.sessionStorage.setItem("elogbook-user", JSON.stringify(user));
+      window.sessionStorage.setItem("elogbook-login-summary-pending", "true");
       onSignIn();
     } catch (err: any) {
       if (err instanceof ApiError && err.status === 402 && typeof err.data?.paymentToken === "string") {

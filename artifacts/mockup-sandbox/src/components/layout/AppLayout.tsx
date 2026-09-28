@@ -210,6 +210,7 @@ export function AppLayout({
   const [changingPassword, setChangingPassword] = React.useState(false);
   const [isTourOpen, setIsTourOpen] = React.useState(false);
   const tourButtonRef = React.useRef<HTMLButtonElement>(null);
+  const loginSummaryShownRef = React.useRef(false);
 
   // Notification item type
   type NotifItem = {
@@ -285,19 +286,24 @@ export function AppLayout({
             : rejectedProcs > 0 && !features.hideProcedureLogs ? "/procedures"
             : rejectedAcads > 0 ? "/academics" : "/";
 
-          const rejKey = `dismissed_rejected_${currentUser.studentProfileId}`;
-          const dismissedStr = sessionStorage.getItem(rejKey);
-          if (rejectedTotal > 0 && dismissedStr !== String(rejectedTotal)) {
+          if (rejectedTotal > 0) {
             items.push({
               id: "rejected_logs",
               text: `${rejectedTotal} log ${rejectedTotal === 1 ? "entry" : "entries"} returned for revision`,
               href: rejectedHref,
-              onDismiss: () => sessionStorage.setItem(rejKey, String(rejectedTotal)),
             });
           }
         }
 
         setNotifItems(items);
+
+        if (sessionStorage.getItem("elogbook-login-summary-pending") === "true" && !loginSummaryShownRef.current) {
+          loginSummaryShownRef.current = true;
+          sessionStorage.removeItem("elogbook-login-summary-pending");
+          if (items.length > 0) {
+            toast.info(items.map(i => i.text).join(" · "), { duration: 6000 });
+          }
+        }
       } catch {
         /* fail silently - no fabricated numbers (§7) */
       }
@@ -327,12 +333,14 @@ export function AppLayout({
         } catch { /* fail silently — no fabricated data (§7) */ }
       }
       if (activeRole === "HOD") {
-        const [ps, pl] = await Promise.allSettled([
+        const [ps, pl, queue] = await Promise.allSettled([
           apiGet<any[]>("/api/admin/students/pending"),
           apiGet<any[]>("/api/admin/leaves/pending"),
+          apiGet<{ pendingReviews?: unknown[] }>(`/api/professors/${currentUser.id}/review-queue`),
         ]);
         const sc = ps.status === "fulfilled" && Array.isArray(ps.value) ? ps.value.length : 0;
         const lc = pl.status === "fulfilled" && Array.isArray(pl.value) ? pl.value.length : 0;
+        const n = queue.status === "fulfilled" && Array.isArray(queue.value?.pendingReviews) ? queue.value.pendingReviews.length : 0;
         if (sc > 0) {
           items.push({
             id: "hod_pending_students",
@@ -347,8 +355,24 @@ export function AppLayout({
             href: "/leave-approvals",
           });
         }
+        if (n > 0) {
+          items.push({
+            id: "faculty_queue",
+            text: `${n} log${n === 1 ? "" : "s"} pending your review`,
+            href: "/review-queue",
+          });
+        }
       }
-      if (!cancelled) setNotifItems(items);
+      if (!cancelled) {
+        setNotifItems(items);
+        if (sessionStorage.getItem("elogbook-login-summary-pending") === "true" && !loginSummaryShownRef.current) {
+          loginSummaryShownRef.current = true;
+          sessionStorage.removeItem("elogbook-login-summary-pending");
+          if (items.length > 0) {
+            toast.info(items.map(i => i.text).join(" · "), { duration: 6000 });
+          }
+        }
+      }
     })();
     return () => { cancelled = true; };
   }, [activeRole, currentUser?.id]);

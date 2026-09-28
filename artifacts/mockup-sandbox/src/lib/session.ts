@@ -48,4 +48,14 @@ export function clearSession(): void {
   window.sessionStorage.removeItem('elogbook-user');
   window.sessionStorage.removeItem('elogbook-authenticated');
   window.sessionStorage.removeItem(TOKEN_KEY);
+  window.sessionStorage.removeItem('elogbook-login-summary-pending');
+  
+  const keysToRemove: string[] = [];
+  for (let i = 0; i < window.sessionStorage.length; i++) {
+    const key = window.sessionStorage.key(i);
+    if (key && (key.startsWith('seen_assessments_') || key.startsWith('dismissed_rejected_'))) {
+      keysToRemove.push(key);
+    }
+  }
+  keysToRemove.forEach(k => window.sessionStorage.removeItem(k));
 }
