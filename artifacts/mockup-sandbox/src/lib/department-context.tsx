@@ -15,7 +15,7 @@ export type DepartmentData = {
   config: DepartmentConfig | null;
   procedures: Array<{ id: number; name: string; group: string; required: number }>;
   postings: CatalogItem[]; academics: CatalogItem[]; caseCategories: CatalogItem[]; competencyLevels: CatalogItem[]; leaveTypes: CatalogItem[]; conferenceLevels: CatalogItem[];
-  clinicalWorkCategories: CatalogItem[]; clinicalWorkSubtypes: CatalogItem[]; postingSchedule: PostingScheduleRow[];
+  clinicalWorkCategories: CatalogItem[]; clinicalWorkSubtypes: CatalogItem[]; organSystemOptions: CatalogItem[]; postingSchedule: PostingScheduleRow[];
 };
 const DepartmentContext = React.createContext<(DepartmentData & { refresh: () => Promise<void> }) | null>(null);
 
@@ -36,6 +36,7 @@ export function DepartmentProvider({ departmentId, children }: { departmentId: n
         conferenceLevels: result.conferenceLevels || [],
         clinicalWorkCategories: result.clinicalWorkCategories || [],
         clinicalWorkSubtypes: result.clinicalWorkSubtypes || [],
+        organSystemOptions: result.organSystemOptions || [],
         postingSchedule: result.postingSchedule || [],
         procedures: result.procedures || []
       });

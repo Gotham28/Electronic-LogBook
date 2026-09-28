@@ -221,7 +221,7 @@ router.get("/:professorId/review-queue", async (req, res) => {
         detail: c.log.role === "presented" ? "Presented" : "Attended",
         status: c.log.status
       })),
-      ...clinicalWorks.map(c => {
+      ...clinicalWorks.map((c: any) => {
         const category = clinicalNames.get(c.log.category) || c.log.category;
         const subType = c.log.subType ? (clinicalNames.get(c.log.subType) || c.log.subType) : null;
         return {
@@ -238,6 +238,9 @@ router.get("/:professorId/review-queue", async (req, res) => {
           caseNumber: c.log.caseNumber,
           patientInfo: `${c.log.patientAge} / ${c.log.patientSex}`,
           detail: subType ? `${category} — ${subType}` : category,
+          organSystem: c.log.organSystem,
+          clinicalFindings: c.log.clinicalFindings,
+          declaredCompetency: c.log.competency,
           status: c.log.status
         };
       })

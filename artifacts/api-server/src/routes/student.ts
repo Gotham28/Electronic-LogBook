@@ -1384,9 +1384,42 @@ async function checkClinicalWorkCategory(configSourceId: number, category: strin
   return subTypes.some((row) => row.value === subType) ? null : "Select a sub-type that belongs to this category";
 }
 
-const clinicalWorkBody = z.object({ supervisorId: idSchema, date: dateSchema, category: nameSchema,
-  subType: z.string().trim().min(1).max(160).nullable().optional(), patientAge: nameSchema,
-  patientSex: z.enum(["male", "female", "other"]), caseNumber: nameSchema }).strict();
+const clinicalWorkBody = z.object({
+  supervisorId: idSchema,
+  date: dateSchema,
+  category: nameSchema,
+  subType: z.string().trim().min(1).max(160).nullable().optional(),
+  patientAge: nameSchema,
+  patientSex: z.enum(["male", "female", "other"]),
+  caseNumber: nameSchema,
+  // Radiology-specific optional fields (other departments send null/undefined)
+  organSystem: z.string().trim().min(1).max(160).nullable().optional(),
+  clinicalFindings: z.string().trim().min(1).max(5000).nullable().optional(),
+  competency: z.string().trim().min(1).max(160).nullable().optional(),
+}).strict();
+
+// Validates that organSystem and competency are in the department's catalog when present.
+async function checkRadiologyFields(
+  configSourceId: number,
+  organSystem: string | null | undefined,
+  competency: string | null | undefined
+): Promise<string | null> {
+  if (organSystem) {
+    const options = await db.select({ value: departmentCatalogTable.value }).from(departmentCatalogTable)
+      .where(and(eq(departmentCatalogTable.departmentId, configSourceId), eq(departmentCatalogTable.kind, "organ_system_option")));
+    if (options.length > 0 && !options.some((r) => r.value === organSystem)) {
+      return "Select a valid organ system from the list";
+    }
+  }
+  if (competency) {
+    const options = await db.select({ value: departmentCatalogTable.value }).from(departmentCatalogTable)
+      .where(and(eq(departmentCatalogTable.departmentId, configSourceId), eq(departmentCatalogTable.kind, "competency_level")));
+    if (options.length > 0 && !options.some((r) => r.value === competency)) {
+      return "Select a valid competency level from the list";
+    }
+  }
+  return null;
+}
 
 router.post("/:studentId/clinical-works", validate(clinicalWorkBody), async (req, res) => {
   try {
@@ -1398,14 +1431,30 @@ router.post("/:studentId/clinical-works", validate(clinicalWorkBody), async (req
     }
     const { configSourceId, features } = await getDepartmentFeatures(caller.departmentId!);
     if (!features.clinicalWorks) { res.status(403).json({ message: "Clinical work is not enabled for your department" }); return; }
-    const { supervisorId, date, category, subType, patientAge, patientSex, caseNumber } = req.body;
+    const { supervisorId, date, category, subType, patientAge, patientSex, caseNumber, organSystem, clinicalFindings, competency } = req.body;
     if (!(await validateSupervisor(supervisorId, caller.departmentId!))) {
       res.status(400).json({ message: "Invalid supervisorId" }); return;
     }
     const categoryError = await checkClinicalWorkCategory(configSourceId, category, subType);
     if (categoryError) { res.status(400).json({ message: categoryError }); return; }
-    const [inserted] = await db.insert(clinicalWorkLogsTable).values({ studentId, supervisorId, date, category,
-      subType: subType || null, patientAge, patientSex, caseNumber, status: "pending" }).returning();
+    // For departments with organ_system_option entries, organSystem and competency are required on new entries
+    const [organSystemCount] = await db.select({ cnt: count() }).from(departmentCatalogTable)
+      .where(and(eq(departmentCatalogTable.departmentId, configSourceId), eq(departmentCatalogTable.kind, "organ_system_option")));
+    if (Number(organSystemCount?.cnt ?? 0) > 0) {
+      if (!organSystem) { res.status(400).json({ message: "Organ system is required for this department" }); return; }
+      const [competencyCount] = await db.select({ cnt: count() }).from(departmentCatalogTable)
+        .where(and(eq(departmentCatalogTable.departmentId, configSourceId), eq(departmentCatalogTable.kind, "competency_level")));
+      if (Number(competencyCount?.cnt ?? 0) > 0 && !competency) {
+        res.status(400).json({ message: "Competency level is required for this department" }); return;
+      }
+    }
+    const radiologyError = await checkRadiologyFields(configSourceId, organSystem, competency);
+    if (radiologyError) { res.status(400).json({ message: radiologyError }); return; }
+    const [inserted] = await db.insert(clinicalWorkLogsTable).values({
+      studentId, supervisorId, date, category, subType: subType || null, patientAge, patientSex, caseNumber,
+      organSystem: organSystem || null, clinicalFindings: clinicalFindings ? clinicalFindings.trim() : null,
+      competency: competency || null, status: "pending",
+    }).returning();
     res.status(201).json(inserted);
   } catch (error) {
     req.log.error({ studentId: req.params.studentId, status: 500 }, "Error creating clinical work log");
@@ -1439,6 +1488,13 @@ router.patch("/:studentId/clinical-works/:logId", requireAuth, validate(clinical
       const categoryError = await checkClinicalWorkCategory(configSourceId, category, subType);
       if (categoryError) { res.status(400).json({ message: categoryError }); return; }
       req.body.subType = subType || null;
+    }
+    if (req.body.organSystem !== undefined || req.body.competency !== undefined) {
+      const radiologyError = await checkRadiologyFields(configSourceId, req.body.organSystem, req.body.competency);
+      if (radiologyError) { res.status(400).json({ message: radiologyError }); return; }
+    }
+    if (req.body.clinicalFindings !== undefined && req.body.clinicalFindings !== null) {
+      req.body.clinicalFindings = req.body.clinicalFindings.trim();
     }
     const [updated] = await db.update(clinicalWorkLogsTable)
       .set({ ...req.body, status: "pending", facultyRemarks: null, reviewedBy: null, reviewedAt: null })

@@ -513,10 +513,19 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                       {!hideUhid && currentItem.caseNumber && (
                         <p className="text-xs font-semibold text-teal-800">Case number: {currentItem.caseNumber}</p>
                       )}
+                      {currentItem.organSystem && (
+                        <p className="text-xs text-slate-600 font-medium">Organ System: {currentItem.organSystem}</p>
+                      )}
                       {currentItem.declaredCompetency && (
                         <p className="text-xs text-teal-800 font-semibold bg-teal-50 inline-block px-2.5 py-1 rounded border border-teal-200 mt-1">
                           Self-Declared Level: {currentItem.declaredCompetency}
                         </p>
+                      )}
+                      {currentItem.clinicalFindings && (
+                        <div className="mt-2 pt-2 border-t border-slate-200/50">
+                          <p className="text-xs font-semibold text-slate-500 uppercase">Clinical Findings</p>
+                          <p className="text-sm text-slate-800 leading-relaxed whitespace-pre-wrap mt-0.5">{currentItem.clinicalFindings}</p>
+                        </div>
                       )}
                       {currentItem.type === "Conference" && currentItem.location && (
                         <p className="text-xs text-slate-600 font-medium">Location: {currentItem.location}</p>
