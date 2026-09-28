@@ -175,6 +175,7 @@
   body {
     @apply font-sans antialiased bg-background text-foreground;
     min-width: 320px;
+    overflow-x: hidden;
     background:
       radial-gradient(circle at 8% 0%, rgba(94, 234, 212, .12), transparent 28rem),
       linear-gradient(145deg, #f2f7f6 0%, #fbfdfd 52%, #eef7f6 100%);
@@ -329,6 +330,84 @@
 
 /* ── Phones (under 640px). Laptop and print layouts are unchanged. ─────────────── */
 @media screen and (max-width: 639px) {
+  :root {
+    --mobile-gutter: 1rem;
+  }
+
+  body {
+    font-size: 1rem;
+  }
+
+  [data-slot="sidebar-inset"] {
+    min-width: 0;
+  }
+
+  [data-slot="sidebar-inset"] > header {
+    min-height: 4rem;
+    height: auto;
+    padding: 0.75rem var(--mobile-gutter);
+  }
+
+  [data-slot="sidebar-inset"] > main {
+    padding: 1rem var(--mobile-gutter) calc(5.5rem + env(safe-area-inset-bottom));
+  }
+
+  [data-slot="sidebar-inset"] > main > * {
+    min-width: 0;
+  }
+
+  [data-slot="sidebar-inset"] header button,
+  [data-slot="sidebar-inset"] header [role="button"] {
+    min-height: 2.75rem;
+    min-width: 2.75rem;
+  }
+
+  [data-slot="card"] {
+    min-width: 0;
+  }
+
+  [data-slot="sidebar-inset"] .page-title {
+    font-size: 1.75rem;
+  }
+
+  [data-slot="sidebar-inset"] .content-spacing {
+    gap: 1.5rem;
+  }
+
+  [data-slot="sidebar-inset"] .section-spacing {
+    gap: 1.25rem;
+  }
+
+  input,
+  select,
+  textarea,
+  button {
+    font-size: 1rem;
+  }
+
+  .overflow-x-auto {
+    max-width: 100%;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+  }
+
+  [data-slot="dialog-content"] {
+    width: calc(100% - 2rem);
+    max-height: calc(100dvh - 2rem);
+    padding: 1rem;
+    border-radius: 1rem;
+  }
+
+  [data-slot="dialog-footer"] {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  [data-slot="dialog-footer"] button {
+    min-height: 2.75rem;
+    width: 100%;
+  }
+
   /* Tables become one card per row: the header is hidden and each value sits next to
      its column name, copied onto the cell as data-label by components/ui/table.tsx. */
   table[data-mobile="cards"],
@@ -341,7 +420,7 @@
   }
   table[data-mobile="cards"] > tbody > tr {
     display: block;
-    margin: 0.75rem;
+    margin: 0.75rem 0;
     padding: 0.375rem 0;
     border: 1px solid rgba(13, 148, 136, .14);
     border-radius: 1rem;
