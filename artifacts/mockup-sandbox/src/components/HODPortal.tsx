@@ -61,7 +61,8 @@ type LeaveRequest = {
   toDate: string;
   reason: string;
   status: string;
-  remainingBalance: number | null;
+  totalDays: number;
+  availableByYear?: { year: string; available: number | null }[];
 };
 
 const paths: Record<string, string> = {
@@ -647,15 +648,34 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
                 <p className="p-6 text-center text-sm text-slate-500">No pending leave requests.</p>
               ) : (
                 <Table>
-                  <TableHeader><TableRow><TableHead>Number</TableHead><TableHead>Resident</TableHead><TableHead>Type</TableHead><TableHead>Reason</TableHead><TableHead className="text-right">Decision</TableHead></TableRow></TableHeader>
+                  <TableHeader><TableRow><TableHead>Number</TableHead><TableHead>Resident</TableHead><TableHead>Type</TableHead><TableHead>Leave Period</TableHead><TableHead>Reason</TableHead><TableHead className="text-right">Decision</TableHead></TableRow></TableHeader>
                   <TableBody>
                     {leaves.map((leave, idx) => (
                       <TableRow key={leave.id}>
                         <TableCell className="font-bold">{idx + 1}</TableCell>
                         <TableCell className="font-semibold">{leave.residentName}</TableCell>
+                        <TableCell className="font-medium">{leave.type}</TableCell>
                         <TableCell>
-                          <div className="font-medium">{leave.type}</div>
-                          <div className="text-[10px] text-slate-500">{leave.remainingBalance !== null ? `${leave.remainingBalance} days remaining` : 'No limit'}</div>
+                          <div className="font-medium text-slate-700 mb-1">
+                            {formatLogbookDate(leave.fromDate)} -&gt; {formatLogbookDate(leave.toDate)} &middot; {leave.totalDays} day(s)
+                          </div>
+                          {!leave.availableByYear ? (
+                            <div className="text-[10px] text-slate-500">Availability unavailable</div>
+                          ) : (
+                            leave.availableByYear.map((entry, i) => {
+                              if (entry.available === null) {
+                                return <div key={i} className="text-[10px] text-slate-500">No limit</div>;
+                              }
+                              const isMultiYear = leave.availableByYear!.length > 1;
+                              const isNegative = entry.available < 0;
+                              const label = isMultiYear ? `Available (${entry.year})` : "Available";
+                              return (
+                                <div key={i} className={`text-[10px] ${isNegative ? 'text-red-600 font-semibold' : 'text-slate-500'}`}>
+                                  {label}: {entry.available} days
+                                </div>
+                              );
+                            })
+                          )}
                         </TableCell>
                         <TableCell>{leave.reason}</TableCell>
                         <TableCell className="text-right">

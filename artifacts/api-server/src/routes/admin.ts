@@ -3,6 +3,7 @@ import { db, usersTable, studentsTable, departmentsTable, departmentConfigsTable
 import { eq, and, count, inArray, sql, or, isNull } from "drizzle-orm";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
+import { splitLeaveDaysByYear } from "../lib/leave.js";
 import { requireAuth, requireRole, requireDepartment } from "../middlewares/auth.js";
 import { completionPercent, configSchema, dateSchema, emailSchema, nameSchema, passwordSchema, targetSchema, validate } from "../lib/validation.js";
 import { resolveConfigDepartmentId } from "../lib/department-config-source.js";
@@ -351,7 +352,7 @@ router.get("/leaves/pending", async (req, res) => {
     // in the year it starts in - the same rule POST /students/:id/leave-records enforces.
     const studentIds = [...new Set(pendingLeaves.map(l => l.residentId))];
     const usageKey = (studentId: number, year: string, leaveType: string) => `${studentId}|${year}|${leaveType}`;
-    const usedMap: Record<string, number> = {};
+    const approvedUsedMap: Record<string, number> = {};
     
     if (studentIds.length > 0) {
       const allRelevantLeaves = await db.select({ 
@@ -361,34 +362,34 @@ router.get("/leaves/pending", async (req, res) => {
         endDate: leaveRecordsTable.endDate 
       })
       .from(leaveRecordsTable)
-      .where(and(inArray(leaveRecordsTable.studentId, studentIds), inArray(leaveRecordsTable.status, ['approved', 'pending'])));
+      .where(and(inArray(leaveRecordsTable.studentId, studentIds), eq(leaveRecordsTable.status, 'approved')));
 
       for (const l of allRelevantLeaves) {
         if (!l.startDate || !l.endDate) continue;
-        const lStart = new Date(l.startDate);
-        const lEnd = new Date(l.endDate);
-        const diffDays = Math.ceil((lEnd.getTime() - lStart.getTime()) / (1000 * 3600 * 24)) + 1;
-        if (diffDays > 0) {
-          const key = usageKey(l.studentId, l.startDate.slice(0, 4), l.leaveType);
-          usedMap[key] = (usedMap[key] || 0) + diffDays;
+        const splits = splitLeaveDaysByYear(String(l.startDate), String(l.endDate));
+        for (const split of splits) {
+          const key = usageKey(l.studentId, split.year, l.leaveType);
+          approvedUsedMap[key] = (approvedUsedMap[key] || 0) + split.days;
         }
       }
     }
 
     const mappedLeaves = pendingLeaves.map(leave => {
-      const start = new Date(leave.fromDate).getTime();
-      const end = new Date(leave.toDate).getTime();
-      const diff = Math.ceil((end - start) / (1000 * 3600 * 24)) + 1;
+      const splits = splitLeaveDaysByYear(String(leave.fromDate), String(leave.toDate));
+      const totalDays = splits.reduce((sum, s) => sum + s.days, 0);
       
       const total = limits[leave.type];
-      let remainingBalance: number | null = null;
-      if (typeof total === 'number') {
-        const used = usedMap[usageKey(leave.residentId, String(leave.fromDate).slice(0, 4), leave.type)] || 0;
-        // Remaining balance shows how many days are left, considering ALL approved/pending leaves
-        remainingBalance = total - used;
-      }
+      const availableByYear = splits.map(split => {
+        if (typeof total !== 'number') return { year: split.year, available: null };
+        const used = approvedUsedMap[usageKey(leave.residentId, split.year, leave.type)] || 0;
+        return { year: split.year, available: total - used };
+      });
 
-      return { ...leave, totalDays: isNaN(diff) ? 1 : diff, remainingBalance };
+      return { 
+        ...leave, 
+        totalDays: totalDays > 0 ? totalDays : 1, 
+        availableByYear 
+      };
     });
 
     res.json(mappedLeaves);
