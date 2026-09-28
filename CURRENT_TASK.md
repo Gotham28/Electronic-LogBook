@@ -1,113 +1,74 @@
-# Current Task — Developer feedback round: wording, HOD setup, mobile (10 items)
+# Current Task — Follow-ups: department settings, counts, a log line, admin margin; phone bottom bar
 
 ## Feature
-Ten items of developer feedback from using the live site, split into three stacked
-branches so each diff holds one theme (§9):
+Two follow-up tasks from the developer feedback round (PRs #84–#86), done in one session:
 
-| Part | Branch | Items |
+| Part | Branch | What |
 |---|---|---|
-| 1. Wording and targets | `claude/tender-noether-cd7xh9` (base `main` at `c526992`) | 1, 2, 7 (+ hardcoded "101") |
-| 2. HOD setup and progress | `claude/tender-noether-cd7xh9-hod-setup` (base: part 1) | 6, 8, 9 (+ conference-level IDs) |
-| 3. Mobile layout | `claude/tender-noether-cd7xh9-mobile` (base: part 2) | 3, 4, 5, 10 |
+| A. Four fixes (one task, developer's choice) | `claude/tender-noether-cd7xh9-followups` (base `b7d345e`) | Dermatology's hardcoded department ids → settings; deleted entries in completion counts; HOD email in a log line; admin portal laptop margin |
+| B. Phone bottom navigation bar | `claude/tender-noether-cd7xh9-bottom-nav` (base: part A) | A bottom bar on phones for the main pages |
 
-The items, as given:
-1. "Clinical works" → "Clinical work".
-2. Student dashboard says "Case discussions"; it should say academic activities.
-3. Recent entries on the student dashboard cannot be swiped on a phone.
-4. A long posting name ("Conventional X-ray…") runs out of its box; fix everywhere.
-5. The whole system is not tuned for phones (font size, spacing).
-6. Student progress shows case categories and procedures for Radiology; it should show
-   clinical work and academic activities, and a new department must not hit this again.
-7. HOD requirements says "Not tracked" for academic activities; explain and change it.
-8. Clinical work needs HOD-set minimums (0 = optional), like case and procedure targets.
-9. HOD requirements: "Add new log option" first, existing ones under "Existing log options".
-10. "View logbook" is cramped on a phone.
+Both PRs target `main`. Merge #87 first (it carries parts 2 and 3 of the feedback round, which
+never reached `main`: #85 and #86 merged into their stacked base branches), then A, then B.
 
 ## Plan reference
-No MASTER_PLAN.md exists for this project (AGENTS.md §14.7). Unplanned: feedback from the
-developer's own use of the Radiology pilot on a phone.
+No MASTER_PLAN.md exists for this project (AGENTS.md §14.7). Unplanned: issues found while
+working on #84–#86, and a mobile pattern the developer asked for.
 
 ## Developer decisions (recorded, not assumed)
 - §14.1 overridden for this task: code written directly in this Claude Code cloud session.
-- §9: three branches by theme, as above (developer chose "3 PRs by theme").
-- Item 8: per-category minimums only, using the existing `department_catalog.required`
-  column. No schema change, no migration (§6 not triggered).
-- Items 3, 5, 10: wide tables become stacked cards on phones; laptop layout unchanged.
-- §14.5 halt, answered: the server may add read-only clinical work counts to
-  `/progress`, the HOD roster and completion % ("Counts + completion %"). Ownership checks
-  on those routes are not changed.
-- Item 10 covers both the faculty/HOD "View Logbook" pop-up and the student print page.
-- The dashboard's hardcoded "combined target is 101" (§5, §7) is replaced by the
-  department's real procedure total, in part 1.
-- The HOD form's hardcoded department IDs 15/25 for "Conference Level" (§5) are replaced
-  by the department's `conferenceLevels` setting, in part 2.
+- New branch names instead of reusing `claude/tender-noether-cd7xh9`: its PR merged, and
+  restarting it from `main` would need a force-push, which §2 forbids.
+- Dermatology's ids 15/25 are replaced by settings Dermatology already has on
+  (`freeTextProcedures`, `freeTextPostingUnit`, `academicActivityExtras`) plus one new
+  setting, `academicsFirstInNav`, for its sidebar order.
+- §3 / §14.5, answered: whether faculty see every posting of a student (not only ones they
+  supervise) now follows `freeTextPostingUnit`, the same rule Dermatology has today.
+- §14.5, answered: completion counts leave out deleted case and procedure entries and count
+  only the department's own students.
 - §6 not overridden: the agent never connects to a database (tests use in-process PGlite).
 
 ## Review tier
-Part 1: Sonnet (§15.2). Part 2: Opus (§15.2): new queries read `clinical_work_logs`, a
-clinical table (§3). Part 3: Sonnet.
+Opus (§15.2): posting visibility is an ownership rule (§3), and the count queries read
+clinical tables.
 
-## Changes — part 1
-- Item 1: user-facing "Clinical works" → "Clinical work" (sidebar, tabs, page title, empty
-  states, print section, HOD page, two API error messages, `/dashboard` category name).
-- Item 2: dashboard card "Case discussions" → "Academic activities" (also the `/dashboard`
-  API category name and the login page preview). "Keep logging your cases and procedures"
-  and the empty-state text no longer name cases and procedures.
-- Item 7: "Not tracked" meant the department total was empty. `applyDepartmentTemplate`
-  (used to set up Radiology) and `provisionDepartment` inserted targets without summing
-  them, so the total stayed empty. Both now recompute the totals. The HOD page shows
-  "No minimum set yet" with a one-line explanation when a total is empty or 0; the
-  faculty badge "Not tracked" reads "No targets set".
-- Dashboard "Procedure shortfall" card: shows the department's real total, hidden when none.
-- Tests: `department-template.test.ts` (totals set on apply, untouched on dry run),
-  `auto-provision.test.ts` (procedure total set on provisioning).
+## Changes — part A
+- Department settings (§5). Every `departmentId === 15 || 25` check is gone:
+  - `student.ts` postings list, create and edit → `freeTextPostingUnit`: faculty see every
+    posting; a posting needs no catalog ward or supervisor; without a supervisor it is
+    verified and stays editable.
+  - `student.ts` procedure create and edit → `freeTextProcedures`: typed-in procedure names.
+  - `professor.ts` review queue detail line, and the faculty review card's procedure
+    diagnosis/sex → `freeTextProcedures`. The review card's academic extras →
+    `academicActivityExtras`.
+  - `AppLayout.tsx` Dermatology sidebar order → new `academicsFirstInNav` setting.
+    `scripts/seed-derm-config.ts` now sets it.
+- Completion counts: the HOD roster (`admin.ts`), review queue (`professor.ts`) and analytics
+  (`department.ts`) leave out deleted case and procedure entries. The roster and review
+  queue now count only the department's students instead of every student.
+- `department-provisioning.ts`: a failed HOD welcome email is logged with the department id,
+  not the HOD's email address.
+- `AdminPortal.tsx`: a laptop margin and max width, as in the other portals.
+- Tests: `derm-posting-edit.test.ts` now uses the setting on an ordinary department and
+  shows department id 15 without the setting follows the normal rules; new posting
+  visibility and free-text procedure tests; new `completion-counts.test.ts`; a log line
+  test in `auto-provision.test.ts`.
 
-## Changes — part 2 (Opus review tier)
-- Server, read-only counts on `clinical_work_logs` (new `src/lib/clinical-work-progress.ts`):
-  - `GET /api/students/:id/progress` adds `clinicalWorks: [{ value, verified, pending }]`,
-    counted per category, leaving out rejected and deleted entries. Counts only (§8).
-  - Completion % in the HOD roster (`admin.ts`), review queue (`professor.ts`), analytics
-    (`department.ts`) and student `/dashboard` now includes clinical work: verified entries
-    against the sum of the HOD's per-category overall minimums (0 when Clinical Work is off).
-  - No ownership check was changed. `/progress` evidence (§11), from
-    `tests/clinical-work-progress.test.ts`: no token → 401; faculty of another department
-    → 403; another student of the same department → 403; the student, their faculty and
-    their HOD → 200; nonexistent student id → 403 (studentAccess answers 403 for any id
-    outside the caller's scope, by design, so ids cannot be probed; same as
-    `clinical-works.test.ts`).
-- Item 6: the faculty/HOD "View Logbook" progress tab shows case, procedure and clinical
-  work sections from the department's own settings (`hideCaseLogs`, `hideProcedureLogs`,
-  `clinicalWorks`), never a fixed list, so a new department gets the right sections. The
-  HOD roster lines follow the same settings. Clinical work bars click through to a
-  filtered Clinical Work tab.
-- Item 8: the HOD sets a minimum per clinical work category (0 = optional, overall or per
-  month), when adding one and inline afterwards. The student's Clinical Work page shows
-  "N of M verified" per category; the dashboard card shows the total target.
-- Item 9: HOD page order is now "Add a new log option" (one form for every type, including
-  procedure types) then "Existing log options" (totals, procedures, clinical work,
-  catalog lists). "Conference level" is offered when the department's `conferenceLevels`
-  setting is on, replacing the hardcoded department IDs 15 and 25 (§5).
-- Tests: `tests/clinical-work-progress.test.ts` (new, 6 tests).
-
-## Changes — part 3 (front end only)
-Everything below applies under 640px on screens. Laptop and print output were checked
-unchanged by pixel comparison (26 laptop screens, and the print page in print mode); the
-only intended laptop difference is item 4, which also spilled out of the dialog on laptop.
-- Items 3, 5: `ui/table.tsx` labels every body cell with its column name; `index.css`
-  shows each row as a card on phones (all tables, no per-page code). A grid item may now
-  shrink below its content (`.grid > * { min-width: 0 }`), which was what stopped
-  "Recent entries" from scrolling and cut it off. Small print has an 11–12px floor on phones.
-- Item 4: `ui/select.tsx` keeps long names inside the box, ending in "…"; the option list
-  fits the screen. `ui/dialog.tsx` fits dialogs to the phone with a scroll inside.
-- Item 10: the "View Logbook" dialog's progress charts become a tappable list on phones;
-  the student print page's tables become cards on a phone screen.
-- Also on phones: dashboard padding and progress header, stat tiles three across,
-  HOD target rows (name on its own line), review queue navigation row, admin header and
-  tabs (these two overflowed the screen).
-- Verified with a local browser at 390px width against faked API responses (no server,
-  no database): 26 screens, no content past the screen edge.
+### Evidence (§11): GET /api/students/:id/postings, from `derm-posting-edit.test.ts`
+- unauthenticated → 401
+- faculty of another department → 403
+- faculty, setting on → 200, including postings with no supervisor
+- nonexistent student id → 403 (studentAccess answers 403 for any id outside the caller's
+  scope, by design, so ids cannot be probed)
+- without the setting, a professor sees only postings they supervise (asserted).
 
 ## Manual (developer does)
-- [ ] Review and merge each branch in order (1, then 2, then 3), by hand.
-- [ ] Radiology's saved academic total stays empty until the HOD saves any target (or the
-      template is re-applied with the new code). No command is needed otherwise.
+- [ ] Before merging part A, confirm Dermatology's live config has `freeTextPostingUnit`,
+      `freeTextProcedures` and `academicActivityExtras` on. `scripts/seed-derm-config.ts`
+      sets them, so they are on if that script ran. Otherwise its residents lose free-text
+      postings and procedures.
+- [ ] Set `academicsFirstInNav` on for Dermatology, or its sidebar uses the standard order.
+      Re-running `scripts/seed-derm-config.ts` sets it (it only adds rows and switches settings on). Or, by hand, against
+      the live database:
+      `UPDATE department_configs SET enabled_features = enabled_features || '{"academicsFirstInNav": true}'::jsonb WHERE department_id = 15;`
+- [ ] Merge #87, then part A, then part B, by hand.

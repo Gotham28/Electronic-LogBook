@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, usersTable, studentsTable, departmentsTable, departmentConfigsTable, procedureTypesTable, caseLogsTable, procedureLogsTable, academicLogsTable, departmentCatalogTable, paymentsTable, leaveRecordsTable, leaveApplicationsTable, assessmentsTable, appraisalsTable, assignmentRecipientsTable, attendanceLogsTable, certificationsTable, postingsTable, thesisMilestonesTable, researchTable, auditTable, assignmentsTable, assignmentTypesTable, clinicalWorkLogsTable, conferencesTable, awardsTable } from "@workspace/db";
-import { eq, and, count, inArray, sql, or } from "drizzle-orm";
+import { eq, and, count, inArray, sql, or, isNull } from "drizzle-orm";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { requireAuth, requireRole, requireDepartment } from "../middlewares/auth.js";
@@ -570,16 +570,22 @@ router.get("/roster", async (req, res) => {
       .orderBy(usersTable.fullName);
 
     const configSourceId = await resolveConfigDepartmentId(departmentId);
+    // Verified, not-deleted entries of this department's students only.
+    const studentIds = students.map((student) => student.studentProfileId);
     const [caseCountRows, procedureCountRows, academicCountRows, configs, clinicalWorkTotal, clinicalWorkCounts] = await Promise.all([
       db.select({ studentId: caseLogsTable.studentId, value: count() }).from(caseLogsTable)
-        .where(eq(caseLogsTable.status, "verified")).groupBy(caseLogsTable.studentId),
+        .where(and(inArray(caseLogsTable.studentId, studentIds), eq(caseLogsTable.status, "verified"), isNull(caseLogsTable.deletedAt)))
+        .groupBy(caseLogsTable.studentId),
       db.select({ studentId: procedureLogsTable.studentId, value: count() }).from(procedureLogsTable)
-        .where(eq(procedureLogsTable.status, "verified")).groupBy(procedureLogsTable.studentId),
+        .where(and(inArray(procedureLogsTable.studentId, studentIds), eq(procedureLogsTable.status, "verified"), isNull(procedureLogsTable.deletedAt)))
+        .groupBy(procedureLogsTable.studentId),
+      // academic_logs has no deletedAt column.
       db.select({ studentId: academicLogsTable.studentId, value: count() }).from(academicLogsTable)
-        .where(eq(academicLogsTable.status, "verified")).groupBy(academicLogsTable.studentId),
+        .where(and(inArray(academicLogsTable.studentId, studentIds), eq(academicLogsTable.status, "verified")))
+        .groupBy(academicLogsTable.studentId),
       db.select().from(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, configSourceId)),
       clinicalWorkTarget(configSourceId),
-      verifiedClinicalWorkCounts(students.map((student) => student.studentProfileId)),
+      verifiedClinicalWorkCounts(studentIds),
     ]);
     const toMap = (rows: Array<{ studentId: number; value: number }>) =>
       new Map(rows.map((row) => [row.studentId, Number(row.value)]));

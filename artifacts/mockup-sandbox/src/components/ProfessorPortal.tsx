@@ -531,7 +531,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                         <p className="text-xs text-slate-600 font-medium">Category: {currentItem.category}</p>
                       )}
                       
-                      {currentItem.type === "Academic" && (currentItem.departmentId === 15 || currentItem.departmentId === 25) && (
+                      {currentItem.type === "Academic" && config?.enabledFeatures?.academicActivityExtras && (
                         <>
                           {currentItem.presentationType && (
                             <p className="text-xs text-slate-600 font-medium">Format: {currentItem.presentationType}</p>
@@ -545,7 +545,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                         </>
                       )}
                       
-                      {currentItem.type === "Procedure" && (currentItem.departmentId === 15 || currentItem.departmentId === 25) && (
+                      {currentItem.type === "Procedure" && config?.enabledFeatures?.freeTextProcedures && (
                         <>
                           {currentItem.diagnosis && (
                             <p className="text-xs text-slate-600 font-medium">Diagnosis: {currentItem.diagnosis}</p>

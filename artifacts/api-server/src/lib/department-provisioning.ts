@@ -73,7 +73,8 @@ export async function provisionDepartment(input: unknown, initialPassword: unkno
   try {
     await sendAccountCreatedEmail(setup.hod.email, setup.hod.fullName, password as string, "hod", setup.name);
   } catch (error) {
-    console.warn(`HOD account created but welcome email failed to send to ${setup.hod.email}`);
+    // The department id only; never the HOD's email address or name in a log.
+    console.warn(`HOD account created but the welcome email failed to send (department ${result.departmentId})`);
   }
 
   return result;

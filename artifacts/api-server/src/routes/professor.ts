@@ -5,6 +5,7 @@ import { requireAuth, requireRole, requireDepartment } from "../middlewares/auth
 import { completionPercent } from "../lib/validation.js";
 import { resolveConfigDepartmentId } from "../lib/department-config-source.js";
 import { clinicalWorkTarget, verifiedClinicalWorkCounts } from "../lib/clinical-work-progress.js";
+import { getDepartmentFeatures } from "../lib/department-features.js";
 
 const router: IRouter = Router();
 
@@ -52,6 +53,7 @@ router.get("/:professorId/review-queue", async (req, res) => {
 
     const deptId = caller.departmentId!;
     const isHod = profMatch[0].role === "hod";
+    const { features } = await getDepartmentFeatures(deptId);
 
     // For HOD: show all pending logs in their department.
     // For professor: show only logs where they are the named supervisor.
@@ -177,7 +179,7 @@ router.get("/:professorId/review-queue", async (req, res) => {
         date: p.log.date,
         patientUhid: p.log.patientUhid,
         patientInfo: p.log.patientAge,
-        detail: (p.department?.id === 15 || p.department?.id === 25) ? ((p.log as any).diagnosis ? `${p.log.procedureName} - ${(p.log as any).diagnosis}` : p.log.procedureName) : `${p.log.procedureGroup} procedure`,
+        detail: features.freeTextProcedures ? ((p.log as any).diagnosis ? `${p.log.procedureName} - ${(p.log as any).diagnosis}` : p.log.procedureName) : `${p.log.procedureGroup} procedure`,
         declaredCompetency: p.log.competencyLevel,
         diagnosis: (p.log as any).diagnosis,
         sex: (p.log as any).sex,
@@ -257,22 +259,25 @@ router.get("/:professorId/review-queue", async (req, res) => {
         .leftJoin(departmentsTable, eq(usersTable.departmentId,   departmentsTable.id))
         .where(and(eq(usersTable.departmentId, deptId), eq(usersTable.status, "approved")));
 
+      // Verified, not-deleted entries of this department's students only.
+      const studentIds = studentsInDept.map((s) => s.studentId);
       const caseCountRows = await db
         .select({ studentId: caseLogsTable.studentId, cnt: count() })
         .from(caseLogsTable)
-        .where(eq(caseLogsTable.status, "verified"))
+        .where(and(inArray(caseLogsTable.studentId, studentIds), eq(caseLogsTable.status, "verified"), isNull(caseLogsTable.deletedAt)))
         .groupBy(caseLogsTable.studentId);
 
       const procCountRows = await db
         .select({ studentId: procedureLogsTable.studentId, cnt: count() })
         .from(procedureLogsTable)
-        .where(eq(procedureLogsTable.status, "verified"))
+        .where(and(inArray(procedureLogsTable.studentId, studentIds), eq(procedureLogsTable.status, "verified"), isNull(procedureLogsTable.deletedAt)))
         .groupBy(procedureLogsTable.studentId);
 
+      // academic_logs has no deletedAt column.
       const acadCountRows = await db
         .select({ studentId: academicLogsTable.studentId, cnt: count() })
         .from(academicLogsTable)
-        .where(eq(academicLogsTable.status, "verified"))
+        .where(and(inArray(academicLogsTable.studentId, studentIds), eq(academicLogsTable.status, "verified")))
         .groupBy(academicLogsTable.studentId);
 
       const toMap = (rows: { studentId: number; cnt: number }[]) =>
@@ -288,7 +293,7 @@ router.get("/:professorId/review-queue", async (req, res) => {
       const reqProcs = config?.requiredProcedures ?? 0;
       const reqAcad = config?.requiredAcademic ?? 0;
       const [reqClinical, clinicalMap] = await Promise.all([
-        clinicalWorkTarget(configSourceId), verifiedClinicalWorkCounts(studentsInDept.map((s) => s.studentId))]);
+        clinicalWorkTarget(configSourceId), verifiedClinicalWorkCounts(studentIds)]);
 
       menteesData = studentsInDept.map(s => {
         const cases = caseMap[s.studentId] ?? 0;
