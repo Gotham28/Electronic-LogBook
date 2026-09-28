@@ -179,7 +179,7 @@ function AggregateSummary({ rows, label }: { rows: any[]; label: string }) {
 export function PrintableLogbook() {
   const user = React.useMemo(() => getCurrentUser(), []);
   const hideUhid = isDemoMode();
-  const { config, clinicalWorkCategories, clinicalWorkSubtypes, organSystemOptions, competencyLevels } = useDepartment();
+  const { config, clinicalWorkCategories, clinicalWorkSubtypes, competencyLevels } = useDepartment();
   const features = config?.enabledFeatures ?? {};
   const [data, setData] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
@@ -409,9 +409,9 @@ export function PrintableLogbook() {
                   <Th>#</Th><Th>Date</Th><Th>Category</Th><Th>Sub-type</Th>
                   {!hideUhid && <Th>Case No.</Th>}
                   <Th>Age / Sex</Th>
-                  {organSystemOptions.length > 0 && <Th>Organ System</Th>}
-                  {organSystemOptions.length > 0 && <Th>Findings</Th>}
-                  {organSystemOptions.length > 0 && competencyLevels.length > 0 && <Th>Competency</Th>}
+                  
+                  {<Th>Findings</Th>}
+                  {competencyLevels.length > 0 && <Th>Competency</Th>}
                   <Th>Status</Th>
                 </tr></thead>
                 <tbody>
@@ -423,9 +423,9 @@ export function PrintableLogbook() {
                       <Td muted={!c.subType}>{c.subType ? clinicalNames.get(c.subType) ?? c.subType : "—"}</Td>
                       {!hideUhid && <Td>{c.caseNumber}</Td>}
                       <Td>{[c.patientAge, c.patientSex].filter(Boolean).join(" / ")}</Td>
-                      {organSystemOptions.length > 0 && <Td muted={!c.organSystem}>{c.organSystem || "—"}</Td>}
-                      {organSystemOptions.length > 0 && <Td muted={!c.clinicalFindings}><div className="whitespace-pre-wrap max-w-xs">{c.clinicalFindings || "—"}</div></Td>}
-                      {organSystemOptions.length > 0 && competencyLevels.length > 0 && <Td muted={!c.competency}>{c.competency || "—"}</Td>}
+                      
+                      {<Td muted={!c.clinicalFindings}><div className="whitespace-pre-wrap max-w-xs">{c.clinicalFindings || "—"}</div></Td>}
+                      {competencyLevels.length > 0 && <Td muted={!c.competency}>{c.competency || "—"}</Td>}
                       <Td><StatusPill status={c.status ?? "pending"} /></Td>
                     </tr>
                   ))}

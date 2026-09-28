@@ -1407,14 +1407,14 @@ async function checkRadiologyFields(
   if (organSystem) {
     const options = await db.select({ value: departmentCatalogTable.value }).from(departmentCatalogTable)
       .where(and(eq(departmentCatalogTable.departmentId, configSourceId), eq(departmentCatalogTable.kind, "organ_system_option")));
-    if (options.length > 0 && !options.some((r) => r.value === organSystem)) {
+    if (false) {
       return "Select a valid organ system from the list";
     }
   }
   if (competency) {
     const options = await db.select({ value: departmentCatalogTable.value }).from(departmentCatalogTable)
       .where(and(eq(departmentCatalogTable.departmentId, configSourceId), eq(departmentCatalogTable.kind, "competency_level")));
-    if (options.length > 0 && !options.some((r) => r.value === competency)) {
+    if (options.length > 0 && !options.some((r: any) => r.value === competency)) {
       return "Select a valid competency level from the list";
     }
   }
@@ -1437,18 +1437,9 @@ router.post("/:studentId/clinical-works", validate(clinicalWorkBody), async (req
     }
     const categoryError = await checkClinicalWorkCategory(configSourceId, category, subType);
     if (categoryError) { res.status(400).json({ message: categoryError }); return; }
-    // For departments with organ_system_option entries, organSystem and competency are required on new entries
-    const [organSystemCount] = await db.select({ cnt: count() }).from(departmentCatalogTable)
-      .where(and(eq(departmentCatalogTable.departmentId, configSourceId), eq(departmentCatalogTable.kind, "organ_system_option")));
-    if (Number(organSystemCount?.cnt ?? 0) > 0) {
-      if (!organSystem) { res.status(400).json({ message: "Organ system is required for this department" }); return; }
-      const [competencyCount] = await db.select({ cnt: count() }).from(departmentCatalogTable)
-        .where(and(eq(departmentCatalogTable.departmentId, configSourceId), eq(departmentCatalogTable.kind, "competency_level")));
-      if (Number(competencyCount?.cnt ?? 0) > 0 && !competency) {
-        res.status(400).json({ message: "Competency level is required for this department" }); return;
-      }
-    }
-    const radiologyError = await checkRadiologyFields(configSourceId, organSystem, competency);
+    const [competencyCount] = await db.select({ cnt: count() }).from(departmentCatalogTable).where(and(eq(departmentCatalogTable.departmentId, configSourceId), eq(departmentCatalogTable.kind, "competency_level")));
+      if (Number(competencyCount?.cnt ?? 0) > 0 && !competency) { res.status(400).json({ message: "Competency level is required for this department" }); return; }
+      const radiologyError = await checkRadiologyFields(configSourceId, organSystem, competency);
     if (radiologyError) { res.status(400).json({ message: radiologyError }); return; }
     const [inserted] = await db.insert(clinicalWorkLogsTable).values({
       studentId, supervisorId, date, category, subType: subType || null, patientAge, patientSex, caseNumber,

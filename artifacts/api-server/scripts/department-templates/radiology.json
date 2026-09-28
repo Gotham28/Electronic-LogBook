@@ -2,137 +2,491 @@
   "features": {
     "hideCaseLogs": true,
     "hideProcedureLogs": true,
-    "clinicalWorks": true
+    "clinicalWorks": true,
+    "radiologyFields": true
   },
   "catalog": [
-    { "kind": "clinical_work_category", "name": "Conventional X-rays" },
-    { "kind": "clinical_work_category", "name": "Mammogram" },
-    { "kind": "clinical_work_category", "name": "Interventional radiology" },
-    { "kind": "clinical_work_category", "name": "Nuclear Medicine" },
-    { "kind": "clinical_work_category", "name": "DRP (District Residency Programme)" },
-    { "kind": "clinical_work_category", "name": "BLS and ACLS Training" },
-
-    { "kind": "clinical_work_category", "name": "USG (Ultrasound)" },
-    { "kind": "clinical_work_subtype", "name": "Abdomen", "parentValue": "USG (Ultrasound)" },
-    { "kind": "clinical_work_subtype", "name": "KUB (Kidney, Ureter, Bladder)", "parentValue": "USG (Ultrasound)" },
-    { "kind": "clinical_work_subtype", "name": "Obstetrics", "parentValue": "USG (Ultrasound)" },
-    { "kind": "clinical_work_subtype", "name": "Musculoskeletal", "parentValue": "USG (Ultrasound)" },
-    { "kind": "clinical_work_subtype", "name": "Neurosonogram", "parentValue": "USG (Ultrasound)" },
-    { "kind": "clinical_work_subtype", "name": "Cardiovascular", "parentValue": "USG (Ultrasound)" },
-    { "kind": "clinical_work_subtype", "name": "Small Parts", "parentValue": "USG (Ultrasound)" },
-
-    { "kind": "clinical_work_category", "name": "Doppler Studies" },
-    { "kind": "clinical_work_subtype", "name": "Peripheral Arterial Doppler", "parentValue": "Doppler Studies" },
-    { "kind": "clinical_work_subtype", "name": "Peripheral Venous Doppler", "parentValue": "Doppler Studies" },
-    { "kind": "clinical_work_subtype", "name": "Renal Doppler", "parentValue": "Doppler Studies" },
-    { "kind": "clinical_work_subtype", "name": "Other Abdominal Doppler", "parentValue": "Doppler Studies" },
-    { "kind": "clinical_work_subtype", "name": "Neck Vessel Carotid Doppler", "parentValue": "Doppler Studies" },
-    { "kind": "clinical_work_subtype", "name": "Testicular Doppler", "parentValue": "Doppler Studies" },
-    { "kind": "clinical_work_subtype", "name": "AV Fistula Mapping", "parentValue": "Doppler Studies" },
-
-    { "kind": "clinical_work_category", "name": "CT Scan" },
-    { "kind": "clinical_work_subtype", "name": "Brain", "parentValue": "CT Scan" },
-    { "kind": "clinical_work_subtype", "name": "Head Neck and PNS", "parentValue": "CT Scan" },
-    { "kind": "clinical_work_subtype", "name": "Heart", "parentValue": "CT Scan" },
-    { "kind": "clinical_work_subtype", "name": "Spine", "parentValue": "CT Scan" },
-    { "kind": "clinical_work_subtype", "name": "Musculoskeletal", "parentValue": "CT Scan" },
-    { "kind": "clinical_work_subtype", "name": "Abdomen", "parentValue": "CT Scan" },
-    { "kind": "clinical_work_subtype", "name": "Thorax", "parentValue": "CT Scan" },
-    { "kind": "clinical_work_subtype", "name": "CT Angiogram", "parentValue": "CT Scan" },
-    { "kind": "clinical_work_subtype", "name": "CT Cisternography", "parentValue": "CT Scan" },
-    { "kind": "clinical_work_subtype", "name": "Trauma Protocol", "parentValue": "CT Scan" },
-
-    { "kind": "clinical_work_category", "name": "MRI" },
-    { "kind": "clinical_work_subtype", "name": "Brain", "parentValue": "MRI" },
-    { "kind": "clinical_work_subtype", "name": "Spine", "parentValue": "MRI" },
-    { "kind": "clinical_work_subtype", "name": "Abdomen", "parentValue": "MRI" },
-    { "kind": "clinical_work_subtype", "name": "MRCP", "parentValue": "MRI" },
-    { "kind": "clinical_work_subtype", "name": "MR Urogram", "parentValue": "MRI" },
-    { "kind": "clinical_work_subtype", "name": "MSK", "parentValue": "MRI" },
-    { "kind": "clinical_work_subtype", "name": "Thorax", "parentValue": "MRI" },
-    { "kind": "clinical_work_subtype", "name": "Heart", "parentValue": "MRI" },
-    { "kind": "clinical_work_subtype", "name": "MR Angio", "parentValue": "MRI" },
-    { "kind": "clinical_work_subtype", "name": "MR Fistulogram", "parentValue": "MRI" },
-    { "kind": "clinical_work_subtype", "name": "MR Fetal and Placenta", "parentValue": "MRI" },
-
-    { "kind": "clinical_work_category", "name": "Special Radiographic Procedures" },
-    { "kind": "clinical_work_subtype", "name": "Intravenous Urography (IVU)", "parentValue": "Special Radiographic Procedures" },
-    { "kind": "clinical_work_subtype", "name": "Micturating Cystourethrography (MCU)", "parentValue": "Special Radiographic Procedures" },
-    { "kind": "clinical_work_subtype", "name": "Retrograde Urethrography (RGU)", "parentValue": "Special Radiographic Procedures" },
-    { "kind": "clinical_work_subtype", "name": "Hysterosalpingography (HSG)", "parentValue": "Special Radiographic Procedures" },
-    { "kind": "clinical_work_subtype", "name": "Gastrointestinal Tract (GIT) Barium Studies", "parentValue": "Special Radiographic Procedures" },
-    { "kind": "clinical_work_subtype", "name": "Dacryocystography (DCG)", "parentValue": "Special Radiographic Procedures" },
-    { "kind": "clinical_work_subtype", "name": "Sinogram & Fistulogram", "parentValue": "Special Radiographic Procedures" },
-
-    { "kind": "clinical_work_category", "name": "Image Guided Procedures" },
-    { "kind": "clinical_work_subtype", "name": "CT Guided Biopsy", "parentValue": "Image Guided Procedures" },
-    { "kind": "clinical_work_subtype", "name": "USG Guided Biopsy", "parentValue": "Image Guided Procedures" },
-    { "kind": "clinical_work_subtype", "name": "USG Guided FNAC", "parentValue": "Image Guided Procedures" },
-    { "kind": "clinical_work_subtype", "name": "USG Guided Ascitic Fluid and Pleural Tap", "parentValue": "Image Guided Procedures" },
-    { "kind": "clinical_work_subtype", "name": "USG Guided Drainage Tube Placement", "parentValue": "Image Guided Procedures" },
-    { "kind": "clinical_work_subtype", "name": "Guided Abscess Drainage", "parentValue": "Image Guided Procedures" },
-
-    { "kind": "clinical_work_category", "name": "Emergencies" },
-    { "kind": "clinical_work_subtype", "name": "Abdominal", "parentValue": "Emergencies" },
-    { "kind": "clinical_work_subtype", "name": "Obstetric", "parentValue": "Emergencies" },
-    { "kind": "clinical_work_subtype", "name": "Cardiovascular", "parentValue": "Emergencies" },
-    { "kind": "clinical_work_subtype", "name": "Thoracic", "parentValue": "Emergencies" },
-    { "kind": "clinical_work_subtype", "name": "Head and Neck", "parentValue": "Emergencies" },
-    { "kind": "clinical_work_subtype", "name": "MSK", "parentValue": "Emergencies" },
-    { "kind": "clinical_work_subtype", "name": "Trauma", "parentValue": "Emergencies" },
-    { "kind": "clinical_work_subtype", "name": "Others", "parentValue": "Emergencies" },
-
-    { "kind": "organ_system_option", "name": "Brain / Neuro" },
-    { "kind": "organ_system_option", "name": "Head & Neck" },
-    { "kind": "organ_system_option", "name": "Spine" },
-    { "kind": "organ_system_option", "name": "Thorax" },
-    { "kind": "organ_system_option", "name": "Cardiovascular" },
-    { "kind": "organ_system_option", "name": "Abdomen & GI / Hepatobiliary" },
-    { "kind": "organ_system_option", "name": "Genitourinary" },
-    { "kind": "organ_system_option", "name": "Obstetric & Gynaecology" },
-    { "kind": "organ_system_option", "name": "Musculoskeletal" },
-    { "kind": "organ_system_option", "name": "Vascular" },
-    { "kind": "organ_system_option", "name": "Small Parts" },
-    { "kind": "organ_system_option", "name": "Other" },
-
-    { "kind": "competency_level", "name": "Observed" },
-    { "kind": "competency_level", "name": "Assisted" },
-    { "kind": "competency_level", "name": "Performed under supervision" },
-    { "kind": "competency_level", "name": "Performed independently" },
-
-    { "kind": "academic", "name": "Lectures" },
-    { "kind": "academic", "name": "Seminar / Symposium (1/wk)" },
-    { "kind": "academic", "name": "Case presentation" },
-    { "kind": "academic", "name": "Group discussion (2/wk)" },
-    { "kind": "academic", "name": "Journal club (1-2/wk)" },
-    { "kind": "academic", "name": "CPC – Clinico-Pathological Conference" },
-    { "kind": "academic", "name": "Teaching session (to UG / PG / DRT)" },
-    { "kind": "academic", "name": "CME / Conference" },
-    { "kind": "academic", "name": "Research work (Publication / Paper presentation / Poster presentation)" },
-    { "kind": "academic", "name": "Thesis work" },
-
-    { "kind": "posting", "name": "Ultrasonography" },
-    { "kind": "posting", "name": "Conventional X-ray, Special Radiographic Procedures, Mammogram" },
-    { "kind": "posting", "name": "CT Scan" },
-    { "kind": "posting", "name": "DRP (District Residency Programme)" },
-    { "kind": "posting", "name": "Interventional Radiology" },
-    { "kind": "posting", "name": "MRI" },
-    { "kind": "posting", "name": "Nuclear Medicine and Electives" }
+    {
+      "kind": "clinical_work_category",
+      "name": "Conventional X-rays"
+    },
+    {
+      "kind": "clinical_work_category",
+      "name": "Special radiographic procedures"
+    },
+    {
+      "kind": "clinical_work_category",
+      "name": "Ultrasound"
+    },
+    {
+      "kind": "clinical_work_category",
+      "name": "Doppler study"
+    },
+    {
+      "kind": "clinical_work_category",
+      "name": "Mammogram"
+    },
+    {
+      "kind": "clinical_work_category",
+      "name": "CT scan"
+    },
+    {
+      "kind": "clinical_work_category",
+      "name": "MRI scan"
+    },
+    {
+      "kind": "clinical_work_category",
+      "name": "Guided procedures (CT / USG)"
+    },
+    {
+      "kind": "clinical_work_category",
+      "name": "Interventional radiology"
+    },
+    {
+      "kind": "clinical_work_category",
+      "name": "Emergencies"
+    },
+    {
+      "kind": "clinical_work_category",
+      "name": "Nuclear Medicine"
+    },
+    {
+      "kind": "clinical_work_category",
+      "name": "DRP (District Residency Programme)"
+    },
+    {
+      "kind": "clinical_work_category",
+      "name": "BLS and ACLS Training"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "Abdomen",
+      "parentValue": "Ultrasound"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "KUB (Kidney, Ureter, Bladder)",
+      "parentValue": "Ultrasound"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "Obstetrics",
+      "parentValue": "Ultrasound"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "Musculoskeletal",
+      "parentValue": "Ultrasound"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "Neurosonogram",
+      "parentValue": "Ultrasound"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "Cardiovascular",
+      "parentValue": "Ultrasound"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "Small Parts",
+      "parentValue": "Ultrasound"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "Peripheral Arterial Doppler",
+      "parentValue": "Doppler study"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "Peripheral Venous Doppler",
+      "parentValue": "Doppler study"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "Renal Doppler",
+      "parentValue": "Doppler study"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "Other Abdominal Doppler",
+      "parentValue": "Doppler study"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "Neck Vessel Carotid Doppler",
+      "parentValue": "Doppler study"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "Testicular Doppler",
+      "parentValue": "Doppler study"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "AV Fistula Mapping",
+      "parentValue": "Doppler study"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "Brain",
+      "parentValue": "CT scan"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "Head Neck and PNS",
+      "parentValue": "CT scan"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "Heart",
+      "parentValue": "CT scan"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "Spine",
+      "parentValue": "CT scan"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "Musculoskeletal",
+      "parentValue": "CT scan"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "Abdomen",
+      "parentValue": "CT scan"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "Thorax",
+      "parentValue": "CT scan"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "CT Angiogram",
+      "parentValue": "CT scan"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "CT Cisternography",
+      "parentValue": "CT scan"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "Trauma Protocol",
+      "parentValue": "CT scan"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "Brain",
+      "parentValue": "MRI scan"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "Spine",
+      "parentValue": "MRI scan"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "Abdomen",
+      "parentValue": "MRI scan"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "MRCP",
+      "parentValue": "MRI scan"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "MR Urogram",
+      "parentValue": "MRI scan"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "MSK",
+      "parentValue": "MRI scan"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "Thorax",
+      "parentValue": "MRI scan"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "Heart",
+      "parentValue": "MRI scan"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "MR Angio",
+      "parentValue": "MRI scan"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "MR Fistulogram",
+      "parentValue": "MRI scan"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "MR Fetal and Placenta",
+      "parentValue": "MRI scan"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "Intravenous Urography (IVU)",
+      "parentValue": "Special radiographic procedures"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "Micturating Cystourethrography (MCU)",
+      "parentValue": "Special radiographic procedures"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "Retrograde Urethrography (RGU)",
+      "parentValue": "Special radiographic procedures"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "Hysterosalpingography (HSG)",
+      "parentValue": "Special radiographic procedures"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "Gastrointestinal Tract (GIT) Barium Studies",
+      "parentValue": "Special radiographic procedures"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "Dacryocystography (DCG)",
+      "parentValue": "Special radiographic procedures"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "Sinogram & Fistulogram",
+      "parentValue": "Special radiographic procedures"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "CT Guided Biopsy",
+      "parentValue": "Guided procedures (CT / USG)"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "USG Guided Biopsy",
+      "parentValue": "Guided procedures (CT / USG)"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "USG Guided FNAC",
+      "parentValue": "Guided procedures (CT / USG)"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "USG Guided Ascitic Fluid and Pleural Tap",
+      "parentValue": "Guided procedures (CT / USG)"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "USG Guided Drainage Tube Placement",
+      "parentValue": "Guided procedures (CT / USG)"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "Guided Abscess Drainage",
+      "parentValue": "Guided procedures (CT / USG)"
+    },
+    {
+      "kind": "clinical_work_category",
+      "name": "Emergencies"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "Abdominal",
+      "parentValue": "Emergencies"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "Obstetric",
+      "parentValue": "Emergencies"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "Cardiovascular",
+      "parentValue": "Emergencies"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "Thoracic",
+      "parentValue": "Emergencies"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "Head and Neck",
+      "parentValue": "Emergencies"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "MSK",
+      "parentValue": "Emergencies"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "Trauma",
+      "parentValue": "Emergencies"
+    },
+    {
+      "kind": "clinical_work_subtype",
+      "name": "Others",
+      "parentValue": "Emergencies"
+    },
+    {
+      "kind": "competency_level",
+      "name": "Observed"
+    },
+    {
+      "kind": "competency_level",
+      "name": "Assisted"
+    },
+    {
+      "kind": "competency_level",
+      "name": "Performed under supervision"
+    },
+    {
+      "kind": "competency_level",
+      "name": "Performed independently"
+    },
+    {
+      "kind": "academic",
+      "name": "Lectures"
+    },
+    {
+      "kind": "academic",
+      "name": "Seminar / Symposium (1/wk)"
+    },
+    {
+      "kind": "academic",
+      "name": "Case presentation"
+    },
+    {
+      "kind": "academic",
+      "name": "Group discussion (2/wk)"
+    },
+    {
+      "kind": "academic",
+      "name": "Journal club (1-2/wk)"
+    },
+    {
+      "kind": "academic",
+      "name": "CPC – Clinico-Pathological Conference"
+    },
+    {
+      "kind": "academic",
+      "name": "Teaching session (to UG / PG / DRT)"
+    },
+    {
+      "kind": "academic",
+      "name": "CME / Conference"
+    },
+    {
+      "kind": "academic",
+      "name": "Research work (Publication / Paper presentation / Poster presentation)"
+    },
+    {
+      "kind": "academic",
+      "name": "Thesis work"
+    },
+    {
+      "kind": "posting",
+      "name": "Ultrasonography"
+    },
+    {
+      "kind": "posting",
+      "name": "Conventional X-ray, Special Radiographic Procedures, Mammogram"
+    },
+    {
+      "kind": "posting",
+      "name": "CT Scan"
+    },
+    {
+      "kind": "posting",
+      "name": "DRP (District Residency Programme)"
+    },
+    {
+      "kind": "posting",
+      "name": "Interventional Radiology"
+    },
+    {
+      "kind": "posting",
+      "name": "MRI"
+    },
+    {
+      "kind": "posting",
+      "name": "Nuclear Medicine and Electives"
+    }
   ],
   "postingSchedule": [
-    { "trainingYear": 1, "posting": "Ultrasonography", "months": 6 },
-    { "trainingYear": 1, "posting": "Conventional X-ray, Special Radiographic Procedures, Mammogram", "months": 4 },
-    { "trainingYear": 1, "posting": "CT Scan", "months": 2 },
-
-    { "trainingYear": 2, "posting": "Conventional X-ray, Special Radiographic Procedures, Mammogram", "months": 3 },
-    { "trainingYear": 2, "posting": "Ultrasonography", "months": 3 },
-    { "trainingYear": 2, "posting": "CT Scan", "months": 2 },
-    { "trainingYear": 2, "posting": "DRP (District Residency Programme)", "months": 3 },
-    { "trainingYear": 2, "posting": "Interventional Radiology", "months": 1 },
-
-    { "trainingYear": 3, "posting": "CT Scan", "months": 4 },
-    { "trainingYear": 3, "posting": "Ultrasonography", "months": 2 },
-    { "trainingYear": 3, "posting": "MRI", "months": 4 },
-    { "trainingYear": 3, "posting": "Nuclear Medicine and Electives", "months": 2 }
+    {
+      "trainingYear": 1,
+      "posting": "Ultrasonography",
+      "months": 6
+    },
+    {
+      "trainingYear": 1,
+      "posting": "Conventional X-ray, Special Radiographic Procedures, Mammogram",
+      "months": 4
+    },
+    {
+      "trainingYear": 1,
+      "posting": "CT Scan",
+      "months": 2
+    },
+    {
+      "trainingYear": 2,
+      "posting": "Conventional X-ray, Special Radiographic Procedures, Mammogram",
+      "months": 3
+    },
+    {
+      "trainingYear": 2,
+      "posting": "Ultrasonography",
+      "months": 3
+    },
+    {
+      "trainingYear": 2,
+      "posting": "CT Scan",
+      "months": 2
+    },
+    {
+      "trainingYear": 2,
+      "posting": "DRP (District Residency Programme)",
+      "months": 3
+    },
+    {
+      "trainingYear": 2,
+      "posting": "Interventional Radiology",
+      "months": 1
+    },
+    {
+      "trainingYear": 3,
+      "posting": "CT Scan",
+      "months": 4
+    },
+    {
+      "trainingYear": 3,
+      "posting": "Ultrasonography",
+      "months": 2
+    },
+    {
+      "trainingYear": 3,
+      "posting": "MRI",
+      "months": 4
+    },
+    {
+      "trainingYear": 3,
+      "posting": "Nuclear Medicine and Electives",
+      "months": 2
+    }
   ]
 }

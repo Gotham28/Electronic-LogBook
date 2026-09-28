@@ -46,7 +46,7 @@ const emptyForm = () => ({ date: todayForInput(), category: "", subType: "", pat
   organSystem: "", clinicalFindings: "", competency: "" });
 
 export function ClinicalWorksPage() {
-  const { clinicalWorkCategories, clinicalWorkSubtypes, organSystemOptions, competencyLevels } = useDepartment();
+  const { clinicalWorkCategories, clinicalWorkSubtypes, competencyLevels } = useDepartment();
   const user = React.useMemo(() => getCurrentUser(), []);
   const hideCaseNumber = isDemoMode();
   const [logs, setLogs] = React.useState<ClinicalWorkLog[]>([]);
@@ -103,8 +103,8 @@ export function ClinicalWorksPage() {
     if (!form.patientSex) { toast.error("Select the patient's sex"); return; }
     if (!form.supervisorId) { toast.error("Select a reviewing faculty member"); return; }
     // Radiology-specific required fields
-    if (organSystemOptions.length > 0 && !form.organSystem) { toast.error("Select an organ system"); return; }
-    if (organSystemOptions.length > 0 && competencyLevels.length > 0 && !form.competency) { toast.error("Select a competency level"); return; }
+    
+    if (competencyLevels.length > 0 && !form.competency) { toast.error("Select a competency level"); return; }
     const payload: Record<string, unknown> = {
       date: form.date, category: form.category, subType: form.subType || null,
       patientAge: form.patientAge.trim(), patientSex: form.patientSex,
@@ -228,17 +228,10 @@ export function ClinicalWorksPage() {
                 )}
               </Field>
               {/* Radiology-specific fields — only shown when the department has organ system options */}
-              {organSystemOptions.length > 0 && (
+              {competencyLevels.length > 0 && (
                 <>
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <Field label="Organ System *" htmlFor="cw-organ">
-                      <Select value={form.organSystem} onValueChange={(value) => setField("organSystem", value)}>
-                        <SelectTrigger id="cw-organ"><SelectValue placeholder="Select organ system" /></SelectTrigger>
-                        <SelectContent>
-                          {organSystemOptions.map((item) => <SelectItem key={item.value} value={item.value}>{item.name}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </Field>
+                    
                     {competencyLevels.length > 0 && (
                       <Field label="Competency Level *" htmlFor="cw-competency">
                         <Select value={form.competency} onValueChange={(value) => setField("competency", value)}>
@@ -338,8 +331,8 @@ export function ClinicalWorksPage() {
                   <TableHead>Category</TableHead>
                   {!hideCaseNumber && <TableHead>Case number</TableHead>}
                   <TableHead>Age / Sex</TableHead>
-                  {organSystemOptions.length > 0 && <TableHead>Organ System</TableHead>}
-                  {organSystemOptions.length > 0 && competencyLevels.length > 0 && <TableHead>Competency</TableHead>}
+                  
+                  {competencyLevels.length > 0 && <TableHead>Competency</TableHead>}
                   <TableHead>Faculty</TableHead>
                   <TableHead>Remarks</TableHead>
                   <TableHead>Status</TableHead>
@@ -359,8 +352,8 @@ export function ClinicalWorksPage() {
                       </TableCell>
                       {!hideCaseNumber && <TableCell className="font-semibold text-teal-800">{log.caseNumber}</TableCell>}
                       <TableCell className="capitalize">{log.patientAge} / {log.patientSex}</TableCell>
-                      {organSystemOptions.length > 0 && <TableCell className="text-xs text-slate-600">{log.organSystem ?? <span className="text-slate-300">—</span>}</TableCell>}
-                      {organSystemOptions.length > 0 && competencyLevels.length > 0 && <TableCell className="text-xs text-slate-600">{log.competency ?? <span className="text-slate-300">—</span>}</TableCell>}
+                      
+                      {competencyLevels.length > 0 && <TableCell className="text-xs text-slate-600">{log.competency ?? <span className="text-slate-300">—</span>}</TableCell>}
                       <TableCell>{log.supervisorName ?? "—"}</TableCell>
                       <TableCell className="max-w-[180px] text-xs">
                         {log.status === "pending" ? <span className="text-slate-400">—</span>

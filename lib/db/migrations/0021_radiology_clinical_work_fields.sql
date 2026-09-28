@@ -18,7 +18,8 @@ BEGIN
   FROM pg_constraint
   WHERE conrelid = 'department_catalog'::regclass
     AND contype = 'c'
-    AND pg_get_constraintdef(oid) LIKE '%kind%';
+    AND pg_get_constraintdef(oid) LIKE '%case_category%'
+    AND conname != 'department_catalog_parent_check';
   IF cname IS NOT NULL THEN
     EXECUTE format('ALTER TABLE department_catalog DROP CONSTRAINT %I', cname);
   END IF;

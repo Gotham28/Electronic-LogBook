@@ -50,7 +50,6 @@ router.get("/:departmentId/catalog", async (req, res) => {
       conferenceLevels: catalog.filter((item) => item.kind === "conference_level"),
       clinicalWorkCategories: catalog.filter((item) => item.kind === "clinical_work_category"),
       clinicalWorkSubtypes: catalog.filter((item) => item.kind === "clinical_work_subtype"),
-      organSystemOptions: catalog.filter((item) => item.kind === "organ_system_option"),
       postingSchedule });
   } catch (error: any) {
     // The Postgres error code only (e.g. 42P01 missing table, 42703 missing column), never
