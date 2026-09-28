@@ -397,7 +397,7 @@ export function PrintableLogbook() {
 
         {/* ── Clinical Works ────────────────────────────── */}
         {features.clinicalWorks && <div className="mb-12 break-before-page">
-          <SectionHeader number={nextSection()} title="Clinical Works" />
+          <SectionHeader number={nextSection()} title="Clinical Work" />
           {(() => { const rows = data.clinicalWorks.filter((c: any) => c.status !== "rejected"); return rows.length === 0 ? <EmptySection /> : (
             <>
               <table className="w-full border-collapse">
@@ -420,7 +420,7 @@ export function PrintableLogbook() {
                   ))}
                 </tbody>
               </table>
-              <AggregateSummary rows={data.clinicalWorks} label="Clinical works" />
+              <AggregateSummary rows={data.clinicalWorks} label="Clinical work" />
             </>
           ); })()}
         </div>}

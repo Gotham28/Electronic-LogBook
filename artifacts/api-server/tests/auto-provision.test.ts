@@ -32,6 +32,10 @@ describe("Auto-provision Mirror Department", () => {
     const result = await provisionDepartment(input, "SecurePass123!");
     const realDeptId = result.departmentId;
 
+    // 0. Totals are summed from the targets given, not left empty
+    const [config] = await db.select().from(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, realDeptId));
+    assert.equal(config.requiredProcedures, 10);
+
     // 1. Verify real department created
     const [realDept] = await db.select().from(departmentsTable).where(eq(departmentsTable.id, realDeptId));
     assert.ok(realDept);

@@ -171,7 +171,7 @@ function navigationForRole(role: RoleType, dashboardData?: any, loadingBadges?: 
     items.push({ title: "Procedure Logs", icon: Stethoscope, href: "/procedures", badge: getCount("procedures"), badgeLoading: loadingBadges });
   }
   if (features.clinicalWorks) {
-    items.push({ title: "Clinical Works", icon: Stethoscope, href: "/clinical-works", badge: getCount("clinicalWorks"), badgeLoading: loadingBadges });
+    items.push({ title: "Clinical Work", icon: Stethoscope, href: "/clinical-works", badge: getCount("clinicalWorks"), badgeLoading: loadingBadges });
   }
   items.push({ title: "Academic Activities", icon: GraduationCap, href: "/academics" });
 

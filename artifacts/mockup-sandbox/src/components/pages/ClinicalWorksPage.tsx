@@ -67,7 +67,7 @@ export function ClinicalWorksPage() {
       const sorted = [...(data.clinicalWorkLogs || [])].sort((a: any, b: any) => b.id - a.id);
       setLogs(sorted.map((log: any, index: number) => ({ ...log, number: sorted.length - index })));
     } catch (err: any) {
-      setError(err?.message || "Could not load your clinical works");
+      setError(err?.message || "Could not load your clinical work");
     } finally {
       setLoading(false);
     }
@@ -146,7 +146,7 @@ export function ClinicalWorksPage() {
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
         <div>
           <p className="page-eyebrow">Imaging and procedures</p>
-          <h2 className="page-title mt-1">Clinical works</h2>
+          <h2 className="page-title mt-1">Clinical work</h2>
           <p className="mt-2 max-w-2xl text-sm text-slate-500">Log each study or procedure you performed and send it to a faculty member for verification.</p>
         </div>
         <Dialog open={open} onOpenChange={closeDialog}>
@@ -232,7 +232,7 @@ export function ClinicalWorksPage() {
         <CardHeader className="flex flex-col justify-between gap-4 border-b border-teal-100 md:flex-row md:items-center">
           <div className="relative w-full max-w-md">
             <Search className="absolute left-3 top-3 h-4 w-4 text-teal-600" aria-hidden />
-            <Input value={search} onChange={(e) => setSearch(e.target.value)} className="h-11 pl-9" aria-label="Search clinical works"
+            <Input value={search} onChange={(e) => setSearch(e.target.value)} className="h-11 pl-9" aria-label="Search clinical work"
               placeholder={hideCaseNumber ? "Search category or sub-type..." : "Search category, sub-type or case number..."} />
           </div>
           {!loading && !error && <Badge variant="outline" className="w-fit border-teal-100 bg-teal-50 px-3 py-1 text-teal-800">{logs.length} logged</Badge>}
@@ -241,7 +241,7 @@ export function ClinicalWorksPage() {
           {loading ? (
             <div className="flex h-48 flex-col items-center justify-center gap-3" role="status">
               <Loader2 className="h-8 w-8 animate-spin text-teal-600" />
-              <p className="text-sm text-slate-500">Loading clinical works...</p>
+              <p className="text-sm text-slate-500">Loading clinical work...</p>
             </div>
           ) : error ? (
             <div className="flex flex-col items-center justify-center gap-4 p-8 text-center" role="alert">
@@ -250,7 +250,7 @@ export function ClinicalWorksPage() {
             </div>
           ) : filtered.length === 0 ? (
             <div className="flex h-48 flex-col items-center justify-center gap-2 text-center">
-              <p className="text-base font-semibold text-slate-950">{logs.length === 0 ? "No clinical works logged yet" : "No entries match your search"}</p>
+              <p className="text-base font-semibold text-slate-950">{logs.length === 0 ? "No clinical work logged yet" : "No entries match your search"}</p>
               <p className="max-w-sm text-sm text-slate-500">{logs.length === 0 ? "Use “Log clinical work” to add your first entry." : "Clear the search to see every entry."}</p>
             </div>
           ) : (
