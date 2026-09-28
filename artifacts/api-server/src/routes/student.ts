@@ -5,7 +5,8 @@ import {
   academicLogsTable, usersTable, departmentsTable, departmentConfigsTable,
   postingsTable, leaveRecordsTable, appraisalsTable, researchTable, assessmentsTable, procedureTypesTable, departmentCatalogTable, certificationsTable, conferencesTable, awardsTable, clinicalWorkLogsTable
 } from "@workspace/db";
-import { eq, and, or, desc, count, sql, isNull, aliasedTable } from "drizzle-orm";
+import { eq, and, or, desc, count, sql, isNull, aliasedTable, inArray } from "drizzle-orm";
+import { splitLeaveDaysByYear } from "../lib/leave.js";
 import { requireAuth, requireRole, requireDepartment } from "../middlewares/auth.js";
 import { studentAccess } from "../middlewares/student-access.js";
 import { z } from "zod";
@@ -653,9 +654,6 @@ router.post("/:studentId/leave-records", validate(z.object({ startDate: dateSche
       return;
     }
 
-    // Allowances are per calendar year: count leave in the year this request starts in,
-    // not the year it is submitted in (a December request for January uses next year's).
-    const leaveYear = String(startDate).slice(0, 4);
     const configSourceId = await resolveConfigDepartmentId(studentUser.departmentId!);
     const result = await db.transaction(async (tx) => {
       const hashBuffer = crypto.createHash("md5").update(`leave_lock_${studentId}`).digest();
@@ -669,30 +667,35 @@ router.post("/:studentId/leave-records", validate(z.object({ startDate: dateSche
         return { status: 400, body: { message: "Invalid leave type for this department" } };
       }
 
-      const start = new Date(startDate || fromDate);
-      const end = new Date(endDate || toDate);
-      const diffTime = end.getTime() - start.getTime();
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-      
-      if (diffDays <= 0) {
+      const splits = splitLeaveDaysByYear(String(startDate || fromDate), String(endDate || toDate));
+      if (splits.length === 0) {
         return { status: 400, body: { message: "End date must be after start date" } };
       }
 
       const relevantLeaves = await tx.select({ startDate: leaveRecordsTable.startDate, endDate: leaveRecordsTable.endDate })
         .from(leaveRecordsTable)
-        .where(sql`${leaveRecordsTable.studentId} = ${studentId} AND ${leaveRecordsTable.leaveType} = ${leaveType} AND ${leaveRecordsTable.status} IN ('approved', 'pending') AND ${leaveRecordsTable.startDate} LIKE ${leaveYear + '-%'}`);
+        .where(and(
+           eq(leaveRecordsTable.studentId, studentId),
+           eq(leaveRecordsTable.leaveType, leaveType),
+           inArray(leaveRecordsTable.status, ['approved', 'pending'])
+        ));
       
-      let used = 0;
+      const usedByYear: Record<string, number> = {};
       for (const l of relevantLeaves) {
         if (!l.startDate || !l.endDate) continue;
-        const lStart = new Date(l.startDate);
-        const lEnd = new Date(l.endDate);
-        const lDiffTime = lEnd.getTime() - lStart.getTime();
-        used += Math.ceil(lDiffTime / (1000 * 60 * 60 * 24)) + 1;
+        const lSplits = splitLeaveDaysByYear(String(l.startDate), String(l.endDate));
+        for (const s of lSplits) {
+          usedByYear[s.year] = (usedByYear[s.year] || 0) + s.days;
+        }
       }
 
-      if (catalogEntry.required > 0 && used + diffDays > catalogEntry.required) {
-        return { status: 400, body: { message: `Requested leave exceeds remaining balance (Remaining: ${catalogEntry.required - used} days)` } };
+      if (catalogEntry.required > 0) {
+        for (const split of splits) {
+          const used = usedByYear[split.year] || 0;
+          if (used + split.days > catalogEntry.required) {
+             return { status: 400, body: { message: `Requested leave exceeds remaining balance for ${split.year} (Available: ${catalogEntry.required - used} days)` } };
+          }
+        }
       }
 
       const [inserted] = await tx.insert(leaveRecordsTable).values({
