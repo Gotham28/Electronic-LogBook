@@ -4,6 +4,7 @@ import { apiGet } from "@/lib/apiClient";
 import { formatLogbookDate } from "@/lib/logbook-config";
 import { useDepartment } from "@/lib/department-context";
 import { Printer, X, BookOpen } from "lucide-react";
+import { useMobileCellLabels } from "@/components/ui/table";
 
 class PrintErrorBoundary extends React.Component<{children: React.ReactNode}, {error: Error | null}> {
   constructor(props: {children: React.ReactNode}) {
@@ -69,7 +70,7 @@ function CoverPage({ profile, name }: { profile: any; name: string }) {
   }, [course]);
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[98vh] break-after-page px-12 py-20 text-slate-800" style={{ fontFamily: "system-ui, sans-serif", background: "linear-gradient(160deg, #f0fdf9 0%, #ffffff 60%)" }}>
+    <div className="flex flex-col items-center justify-center min-h-[98vh] break-after-page px-6 py-12 sm:px-12 sm:py-20 text-slate-800" style={{ fontFamily: "system-ui, sans-serif", background: "linear-gradient(160deg, #f0fdf9 0%, #ffffff 60%)" }}>
       {/* Header band */}
       <div className="flex flex-col items-center gap-4 mb-20 text-center w-full">
         <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-teal-700 text-white shadow-lg mb-2">
@@ -183,6 +184,9 @@ export function PrintableLogbook() {
   const [data, setData] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  // On a phone screen the record's tables read as cards; printing is unchanged.
+  const documentRef = React.useRef<HTMLDivElement>(null);
+  useMobileCellLabels(documentRef, true, data);
   const printStarted = React.useRef(false);
 
   const closePrintView = React.useCallback(() => {
@@ -286,7 +290,7 @@ export function PrintableLogbook() {
       <CoverPage profile={data.profile} name={user?.name ?? "—"} />
 
       {/* Main document */}
-      <div className="bg-white px-10 py-10 max-w-[900px] mx-auto text-slate-800" style={{ fontFamily: "system-ui, sans-serif" }}>
+      <div ref={documentRef} className="bg-white px-4 py-8 sm:px-10 sm:py-10 max-w-[900px] mx-auto text-slate-800" style={{ fontFamily: "system-ui, sans-serif" }}>
 
         {/* Running header on every printed page */}
         <div className="hidden print:flex items-center justify-between border-b border-slate-200 pb-2 mb-6 text-[9px] text-slate-400 font-medium uppercase tracking-wide">
@@ -313,7 +317,7 @@ export function PrintableLogbook() {
           <SectionHeader number={nextSection()} title="Postings & Rotations" />
           {(() => { const rows = data.postings.filter((p: any) => p.status !== "rejected"); return rows.length === 0 ? <EmptySection /> : (
             <>
-              <table className="w-full border-collapse">
+              <table data-mobile="cards" className="w-full border-collapse">
                 <thead><tr>
                   <Th>Ward / Unit</Th><Th>Start</Th><Th>End</Th><Th>Supervisor</Th><Th>Status</Th>
                 </tr></thead>
@@ -339,7 +343,7 @@ export function PrintableLogbook() {
           <SectionHeader number={nextSection()} title="Clinical Case Logs" />
           {(() => { const rows = data.cases.filter((c: any) => c.status !== "rejected"); return rows.length === 0 ? <EmptySection /> : (
             <>
-              <table className="w-full border-collapse">
+              <table data-mobile="cards" className="w-full border-collapse">
                 <thead><tr>
                   <Th>#</Th><Th>Date</Th>
                   {!hideUhid && <Th>Case ID</Th>}
@@ -369,7 +373,7 @@ export function PrintableLogbook() {
           <SectionHeader number={nextSection()} title="Procedure Logs" />
           {(() => { const rows = data.procs.filter((p: any) => p.status !== "rejected"); return rows.length === 0 ? <EmptySection /> : (
             <>
-              <table className="w-full border-collapse">
+              <table data-mobile="cards" className="w-full border-collapse">
                 <thead><tr>
                   <Th>#</Th><Th>Date</Th><Th>Procedure</Th><Th>Group</Th>
                   {!hideUhid && <Th>Case ID</Th>}
@@ -400,7 +404,7 @@ export function PrintableLogbook() {
           <SectionHeader number={nextSection()} title="Clinical Work" />
           {(() => { const rows = data.clinicalWorks.filter((c: any) => c.status !== "rejected"); return rows.length === 0 ? <EmptySection /> : (
             <>
-              <table className="w-full border-collapse">
+              <table data-mobile="cards" className="w-full border-collapse">
                 <thead><tr>
                   <Th>#</Th><Th>Date</Th><Th>Category</Th><Th>Sub-type</Th>
                   {!hideUhid && <Th>Case No.</Th>}
@@ -430,7 +434,7 @@ export function PrintableLogbook() {
           <SectionHeader number={nextSection()} title="Academic Activities" />
           {(() => { const rows = data.academics.filter((a: any) => a.status !== "rejected"); return rows.length === 0 ? <EmptySection /> : (
             <>
-              <table className="w-full border-collapse">
+              <table data-mobile="cards" className="w-full border-collapse">
                 <thead><tr>
                   <Th>#</Th><Th>Date</Th><Th>Activity</Th><Th>Topic / Title</Th><Th>Supervisor</Th><Th>Grade</Th><Th>Status</Th>
                 </tr></thead>
@@ -457,7 +461,7 @@ export function PrintableLogbook() {
         <div className="mb-12 no-break">
           <SectionHeader number={nextSection()} title="Assessments" />
           {data.assessments.length === 0 ? <EmptySection /> : (
-            <table className="w-full border-collapse">
+            <table data-mobile="cards" className="w-full border-collapse">
               <thead><tr>
                 <Th>Date</Th><Th>Exam Name</Th><Th>Type</Th><Th right>Marks</Th><Th>Assessed By</Th>
               </tr></thead>
@@ -480,7 +484,7 @@ export function PrintableLogbook() {
         <div className="mb-12 no-break">
           <SectionHeader number={nextSection()} title="Certifications" />
           {(() => { const rows = data.certifications.filter((c: any) => c.status !== "rejected"); return rows.length === 0 ? <EmptySection /> : (
-            <table className="w-full border-collapse">
+            <table data-mobile="cards" className="w-full border-collapse">
               <thead><tr>
                 <Th>Certificate</Th><Th>Issuing Body</Th><Th>Date Issued</Th><Th>Expiry</Th><Th>Status</Th>
               </tr></thead>
@@ -503,7 +507,7 @@ export function PrintableLogbook() {
         <div className="mb-12 no-break">
           <SectionHeader number={nextSection()} title="Leave Records" />
           {(() => { const rows = data.leaves.filter((l: any) => l.status !== "rejected"); return rows.length === 0 ? <EmptySection /> : (
-            <table className="w-full border-collapse">
+            <table data-mobile="cards" className="w-full border-collapse">
               <thead><tr>
                 <Th>Type</Th><Th>From</Th><Th>To</Th><Th right>Days</Th><Th>Status</Th>
               </tr></thead>

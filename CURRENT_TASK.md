@@ -89,6 +89,24 @@ clinical table (§3). Part 3: Sonnet.
   setting is on, replacing the hardcoded department IDs 15 and 25 (§5).
 - Tests: `tests/clinical-work-progress.test.ts` (new, 6 tests).
 
+## Changes — part 3 (front end only)
+Everything below applies under 640px on screens. Laptop and print output were checked
+unchanged by pixel comparison (26 laptop screens, and the print page in print mode); the
+only intended laptop difference is item 4, which also spilled out of the dialog on laptop.
+- Items 3, 5: `ui/table.tsx` labels every body cell with its column name; `index.css`
+  shows each row as a card on phones (all tables, no per-page code). A grid item may now
+  shrink below its content (`.grid > * { min-width: 0 }`), which was what stopped
+  "Recent entries" from scrolling and cut it off. Small print has an 11–12px floor on phones.
+- Item 4: `ui/select.tsx` keeps long names inside the box, ending in "…"; the option list
+  fits the screen. `ui/dialog.tsx` fits dialogs to the phone with a scroll inside.
+- Item 10: the "View Logbook" dialog's progress charts become a tappable list on phones;
+  the student print page's tables become cards on a phone screen.
+- Also on phones: dashboard padding and progress header, stat tiles three across,
+  HOD target rows (name on its own line), review queue navigation row, admin header and
+  tabs (these two overflowed the screen).
+- Verified with a local browser at 390px width against faked API responses (no server,
+  no database): 26 screens, no content past the screen edge.
+
 ## Manual (developer does)
 - [ ] Review and merge each branch in order (1, then 2, then 3), by hand.
 - [ ] Radiology's saved academic total stays empty until the HOD saves any target (or the

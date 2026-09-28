@@ -62,6 +62,7 @@ import {
 } from "lucide-react";
 import { formatLogbookDate } from "@/lib/logbook-config";
 import { apiGet, apiPatch, apiPost, apiDelete } from "@/lib/apiClient";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { getCurrentUser, isDemoMode } from "@/lib/session";
 import { QuarterlyAppraisalSection } from "@/components/QuarterlyAppraisalSection";
 import { useDepartment } from "@/lib/department-context";
@@ -456,7 +457,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
               <div className="lg:col-span-2 space-y-4">
                 <Card className="border border-slate-200 shadow-xs bg-white">
                   <CardHeader className="border-b border-slate-100 pb-3">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <Badge variant="outline" className="bg-teal-50 text-teal-800 border-teal-300 text-xs">
                           Item {currentIndex + 1} of {reviews.length}
@@ -1734,9 +1735,9 @@ function ProgressTabContent({
   return (
     <div className="space-y-6">
       {/* Summary tiles */}
-      <div className={`grid gap-4 ${tiles.length >= 3 ? "grid-cols-3" : "grid-cols-2"}`}>
+      <div className={`grid grid-cols-2 gap-2 sm:gap-4 ${tiles.length >= 3 ? "sm:grid-cols-3" : ""}`}>
         {tiles.map((tile) => (
-          <div key={tile.label} className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-center">
+          <div key={tile.label} className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-center sm:p-4">
             <p className="metric-value">{tile.verified + tile.pending}</p>
             <p className="metric-label mt-1">{tile.label}</p>
             <p className="mt-1 text-[11px] text-slate-500">{tile.verified} verified · {tile.pending} pending</p>
@@ -1916,6 +1917,9 @@ function ProgressSection({
   items: ProgressSectionItem[];
   onItemClick: (item: any) => void;
 }) {
+  // A 600px-wide chart cannot fit a phone; show the same numbers as a tappable list.
+  const isMobile = useIsMobile();
+  if (isMobile) return <ProgressList items={items} onItemClick={onItemClick} />;
   const chartData = items.map((item) => {
     const total = item.verified + item.pending;
     const remaining = item.required !== null ? Math.max(item.required - total, 0) : 0;
@@ -2060,6 +2064,46 @@ function ProgressSection({
         </ChartContainer>
       </div>
     </div>
+  );
+}
+
+function ProgressList({
+  items,
+  onItemClick,
+}: {
+  items: ProgressSectionItem[];
+  onItemClick: (item: any) => void;
+}) {
+  return (
+    <ul className="space-y-2">
+      {items.map((item) => {
+        const scale = item.required ?? Math.max(item.verified + item.pending, 1);
+        const verifiedPct = Math.min((item.verified / scale) * 100, 100);
+        const pendingPct = Math.min((item.pending / scale) * 100, 100 - verifiedPct);
+        const isDone = item.done && item.required !== null;
+        return (
+          <li key={item.key}>
+            <button type="button" onClick={() => onItemClick(item)} className="w-full rounded-xl border border-slate-100 bg-white p-3 text-left transition-colors active:bg-slate-50">
+              <div className="flex items-start justify-between gap-3">
+                <span className="min-w-0 text-sm font-medium leading-snug text-slate-800">{item.label}</span>
+                <span className="shrink-0 text-xs font-semibold text-slate-700">
+                  {item.required !== null ? `${item.verified} / ${item.required}` : `${item.verified} verified`}
+                </span>
+              </div>
+              <div className="mt-2 flex h-2 overflow-hidden rounded-full bg-slate-100" aria-hidden>
+                <div className={isDone ? "bg-emerald-500" : "bg-teal-600"} style={{ width: `${verifiedPct}%` }} />
+                <div className={isDone ? "bg-emerald-300" : "bg-teal-200"} style={{ width: `${pendingPct}%` }} />
+              </div>
+              <p className="mt-1.5 text-[11px] text-slate-500">
+                {item.pending} pending
+                {item.required === null && ` · ${item.inCatalog ? "No minimum set" : "Not in current catalog"}`}
+                {item.byCompetency && item.byCompetency.length > 0 && ` · ${item.byCompetency.map((c) => `${c.level}: ${c.verified}V ${c.pending}P`).join(", ")}`}
+              </p>
+            </button>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 

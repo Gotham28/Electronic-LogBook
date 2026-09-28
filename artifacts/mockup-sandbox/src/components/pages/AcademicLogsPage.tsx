@@ -203,7 +203,7 @@ export function AcademicLogsPage() {
         </Dialog>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
         <Summary label="Awaiting review" value={logs.filter((log) => log.status === "pending").length} />
         <Summary label="Verified activities" value={logs.filter((log) => log.status === "verified").length} />
         <Summary label="Valid academic activities" value={logs.filter((log) => log.status !== "rejected").length} />
@@ -309,5 +309,5 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 function Summary({ label, value }: { label: string; value: number }) {
-  return <Card><CardContent className="p-5"><p className="text-3xl font-bold text-teal-700">{value}</p><p className="mt-1 text-[11px] font-bold uppercase tracking-wider text-slate-500">{label}</p></CardContent></Card>;
+  return <Card><CardContent className="p-3 sm:p-5"><p className="text-2xl font-bold text-teal-700 sm:text-3xl">{value}</p><p className="mt-1 text-[11px] font-bold uppercase leading-tight tracking-wide text-slate-500 sm:leading-[inherit] sm:tracking-wider">{label}</p></CardContent></Card>;
 }

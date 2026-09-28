@@ -2,18 +2,59 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
+// Copies each column's header text onto its body cells as data-label. On phones, index.css
+// hides the header and shows every row as a card, each value next to its column name.
+// The ref is a table, or a container whose table[data-mobile="cards"] elements are labelled;
+// pass `rerunWhen` when the container itself renders later (e.g. after data loads).
+function labelTable(table: HTMLTableElement) {
+  const heads = Array.from(table.querySelectorAll(":scope > thead > tr:last-child > th")).map((th) => th.textContent?.trim() ?? "")
+  for (const row of Array.from(table.querySelectorAll(":scope > tbody > tr"))) {
+    let column = 0
+    for (const cell of Array.from(row.children) as HTMLTableCellElement[]) {
+      const text = cell.colSpan > 1 ? "" : heads[column] ?? ""
+      if (text) {
+        if (cell.getAttribute("data-label") !== text) cell.setAttribute("data-label", text)
+      } else if (cell.hasAttribute("data-label")) {
+        cell.removeAttribute("data-label")
+      }
+      column += cell.colSpan || 1
+    }
+  }
+}
+
+export function useMobileCellLabels(ref: React.RefObject<HTMLElement | null>, enabled = true, rerunWhen?: unknown) {
+  React.useLayoutEffect(() => {
+    const root = ref.current
+    if (!root || !enabled) return
+    const label = () => {
+      if (root instanceof HTMLTableElement) labelTable(root)
+      else root.querySelectorAll<HTMLTableElement>('table[data-mobile="cards"]').forEach(labelTable)
+    }
+    label()
+    const observer = new MutationObserver(label)
+    observer.observe(root, { childList: true, subtree: true, characterData: true })
+    return () => observer.disconnect()
+  }, [ref, enabled, rerunWhen])
+}
+
 const Table = React.forwardRef<
   HTMLTableElement,
-  React.HTMLAttributes<HTMLTableElement>
->(({ className, ...props }, ref) => (
-  <div className="relative w-full overflow-auto">
-    <table
-      ref={ref}
-      className={cn("w-full caption-bottom text-sm [border-spacing:0_0.75rem]", className)}
-      {...props}
-    />
-  </div>
-))
+  React.HTMLAttributes<HTMLTableElement> & { mobileLayout?: "cards" | "scroll" }
+>(({ className, mobileLayout = "cards", ...props }, ref) => {
+  const tableRef = React.useRef<HTMLTableElement | null>(null)
+  React.useImperativeHandle(ref, () => tableRef.current as HTMLTableElement)
+  useMobileCellLabels(tableRef, mobileLayout === "cards")
+  return (
+    <div className="relative w-full overflow-auto">
+      <table
+        ref={tableRef}
+        data-mobile={mobileLayout}
+        className={cn("w-full caption-bottom text-sm [border-spacing:0_0.75rem]", className)}
+        {...props}
+      />
+    </div>
+  )
+})
 Table.displayName = "Table"
 
 const TableHeader = React.forwardRef<

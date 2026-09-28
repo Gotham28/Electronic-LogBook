@@ -219,9 +219,9 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
   }
 
   return (
-    <div className="space-y-4 pb-8 font-sans">
+    <div className="space-y-4 px-4 pb-8 pt-3 font-sans sm:px-0 sm:pt-0">
       {/* Topbar */}
-      <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-600 text-white font-bold font-display shadow-sm">
             EL
@@ -231,7 +231,7 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
             <p className="text-sm font-medium text-slate-500">Admin console</p>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {onSignOut && (
             <Button variant="outline" onClick={onSignOut} className="border-slate-200 text-slate-700">
               Sign out
@@ -851,8 +851,8 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
       ) : (
         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <div className="border-b border-slate-100 px-3 pt-3 flex justify-between items-center bg-slate-50/50">
-              <TabsList className="bg-slate-200/50">
+            <div className="border-b border-slate-100 px-3 pt-3 flex flex-wrap justify-between items-center gap-2 bg-slate-50/50">
+              <TabsList className="h-auto flex-wrap bg-slate-200/50">
                 <TabsTrigger value="faculty" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
                   Faculty ({faculty.length})
                 </TabsTrigger>

@@ -315,7 +315,7 @@ export function DepartmentSettings() {
             items={data.procedures}
             emptyText="No procedure types configured."
             renderItem={(p) => <form className="flex flex-wrap items-end gap-2 rounded-xl bg-slate-50 p-3" onSubmit={(e) => { e.preventDefault(); void save(() => apiPatch(`/api/admin/department/procedures/${p.id}`, { required: Number(targets[p.id] ?? p.required) }), "Procedure target updated"); }}>
-              <div className="min-w-0 flex-1"><p className="text-sm font-medium">{p.name}</p><p className="text-xs text-slate-500">{p.group}</p></div>
+              <div className="min-w-0 grow basis-full sm:basis-0"><p className="text-sm font-medium">{p.name}</p><p className="text-xs text-slate-500">{p.group}</p></div>
               <Input aria-label={`Required count for ${p.name}`} className="w-24" type="number" min={0} max={100000} required value={targets[p.id] ?? p.required} onChange={(e) => setTargets({ ...targets, [p.id]: e.target.value })} />
               <Button variant="outline" size="sm" disabled={busy} type="submit">Save</Button>
               <Button variant="outline" size="sm" type="button" disabled={busy || deleting} onClick={() => confirmDelete(p.id, "procedure", p.name)} className="text-rose-700 border-rose-200 hover:bg-rose-50 px-2"><Trash2 className="h-4 w-4" /></Button>
@@ -333,7 +333,7 @@ export function DepartmentSettings() {
                 return (
                   <div key={category.id} className="rounded-xl bg-slate-50 p-3">
                     <form className="flex flex-wrap items-center gap-2" onSubmit={(e) => { e.preventDefault(); void save(() => apiPatch(`/api/admin/department/catalog/${category.id}`, { required: Number(clinicalTargets[category.id] ?? category.required), period: category.period }), "Clinical work minimum updated"); }}>
-                      <span className="min-w-0 flex-1 text-sm font-medium">{category.name}{category.period === "month" && <span className="font-normal text-slate-500"> (per month)</span>}</span>
+                      <span className="min-w-0 grow basis-full text-sm font-medium sm:basis-0">{category.name}{category.period === "month" && <span className="font-normal text-slate-500"> (per month)</span>}</span>
                       <Input className="w-20" type="number" min={0} max={100000} required aria-label={`Minimum for ${category.name}`} value={clinicalTargets[category.id] ?? category.required} onChange={(e) => setClinicalTargets({ ...clinicalTargets, [category.id]: e.target.value })} />
                       <Button size="sm" variant="outline" disabled={busy} type="submit">Save</Button>
                       <Button variant="outline" size="sm" type="button" aria-label={`Delete ${category.name}`} disabled={busy || deleting} onClick={() => confirmDelete(category.id, "clinical_work_category", category.name)} className="text-rose-700 border-rose-200 hover:bg-rose-50 px-2"><Trash2 className="h-4 w-4" /></Button>
@@ -372,7 +372,7 @@ export function DepartmentSettings() {
           items={data.academics}
           emptyText="No academic activities configured."
           renderItem={(item) => <form className="flex flex-wrap items-center gap-2 rounded-xl bg-slate-50 p-3" onSubmit={(e) => { e.preventDefault(); void save(() => apiPatch(`/api/admin/department/catalog/${item.id}`, { required: Number(academicTargets[item.id] ?? item.required), period: item.period }), "Academic target updated"); }}>
-            <span className="flex-1 text-sm">{item.name} ({item.period === "month" ? "per month" : "overall"})</span><Input className="w-24" type="number" min={0} max={100000} required aria-label={`Required count for ${item.name}`} value={academicTargets[item.id] ?? item.required} onChange={(e) => setAcademicTargets({ ...academicTargets, [item.id]: e.target.value })} /><Button size="sm" variant="outline" disabled={busy} type="submit">Save</Button>
+            <span className="min-w-0 grow basis-full text-sm sm:basis-0">{item.name} ({item.period === "month" ? "per month" : "overall"})</span><Input className="w-24" type="number" min={0} max={100000} required aria-label={`Required count for ${item.name}`} value={academicTargets[item.id] ?? item.required} onChange={(e) => setAcademicTargets({ ...academicTargets, [item.id]: e.target.value })} /><Button size="sm" variant="outline" disabled={busy} type="submit">Save</Button>
             <Button variant="outline" size="sm" type="button" disabled={busy || deleting} onClick={() => confirmDelete(item.id, "academic", item.name)} className="text-rose-700 border-rose-200 hover:bg-rose-50 px-2"><Trash2 className="h-4 w-4" /></Button>
           </form>}
         />
@@ -383,7 +383,7 @@ export function DepartmentSettings() {
           items={data.caseCategories ?? []}
           emptyText="No case categories configured."
           renderItem={(item) => <form className="flex flex-wrap items-center gap-2 rounded-xl bg-slate-50 p-3" onSubmit={(e) => { e.preventDefault(); void save(() => apiPatch(`/api/admin/department/catalog/${item.id}`, { required: Number(academicTargets[item.id] ?? item.required), period: item.period }), "Case target updated"); }}>
-            <span className="flex-1 text-sm">{item.name}</span><Input className="w-16" type="number" min={0} max={100000} required aria-label={`Required count for ${item.name}`} value={academicTargets[item.id] ?? item.required} onChange={(e) => setAcademicTargets({ ...academicTargets, [item.id]: e.target.value })} /><Button size="sm" variant="outline" disabled={busy} type="submit">Save</Button>
+            <span className="min-w-0 grow basis-full text-sm sm:basis-0">{item.name}</span><Input className="w-16" type="number" min={0} max={100000} required aria-label={`Required count for ${item.name}`} value={academicTargets[item.id] ?? item.required} onChange={(e) => setAcademicTargets({ ...academicTargets, [item.id]: e.target.value })} /><Button size="sm" variant="outline" disabled={busy} type="submit">Save</Button>
             <Button variant="outline" size="sm" type="button" disabled={busy || deleting} onClick={() => confirmDelete(item.id, "case_category", item.name)} className="text-rose-700 border-rose-200 hover:bg-rose-50 px-2"><Trash2 className="h-4 w-4" /></Button>
           </form>}
         />}
@@ -406,7 +406,7 @@ export function DepartmentSettings() {
           items={data.conferenceLevels ?? []}
           emptyText="No conference levels configured."
           renderItem={(item) => <form className="flex flex-wrap items-center gap-2 rounded-xl bg-slate-50 p-3" onSubmit={(e) => { e.preventDefault(); void save(() => apiPatch(`/api/admin/department/catalog/${item.id}`, { required: Number(conferenceTargets[item.id] ?? item.required), period: item.period }), "Conference level target updated"); }}>
-            <span className="flex-1 text-sm">{item.name}</span><Input className="w-16" type="number" min={0} max={100000} required aria-label={`Required count for ${item.name}`} value={conferenceTargets[item.id] ?? item.required} onChange={(e) => setConferenceTargets({ ...conferenceTargets, [item.id]: e.target.value })} /><Button size="sm" variant="outline" disabled={busy} type="submit">Save</Button>
+            <span className="min-w-0 grow basis-full text-sm sm:basis-0">{item.name}</span><Input className="w-16" type="number" min={0} max={100000} required aria-label={`Required count for ${item.name}`} value={conferenceTargets[item.id] ?? item.required} onChange={(e) => setConferenceTargets({ ...conferenceTargets, [item.id]: e.target.value })} /><Button size="sm" variant="outline" disabled={busy} type="submit">Save</Button>
             <Button variant="outline" size="sm" type="button" disabled={busy || deleting} onClick={() => confirmDelete(item.id, "conference_level", item.name)} className="text-rose-700 border-rose-200 hover:bg-rose-50 px-2"><Trash2 className="h-4 w-4" /></Button>
           </form>}
         />
@@ -418,7 +418,7 @@ export function DepartmentSettings() {
           items={data.leaveTypes ?? []}
           emptyText="No leave types configured."
           renderItem={(item) => <form className="flex flex-wrap items-center gap-2 rounded-xl bg-slate-50 p-3" onSubmit={(e) => { e.preventDefault(); void save(() => apiPatch(`/api/admin/department/catalog/${item.id}`, { required: Number(leaveTargets[item.id] ?? item.required), period: item.period }), "Leave allowance updated"); }}>
-            <span className="flex-1 text-sm">{item.name}</span><Input className="w-16" type="number" min={0} max={365} required aria-label={`Allowance for ${item.name}`} value={leaveTargets[item.id] ?? item.required} onChange={(e) => setLeaveTargets({ ...leaveTargets, [item.id]: e.target.value })} /><Button size="sm" variant="outline" disabled={busy} type="submit">Save</Button>
+            <span className="min-w-0 grow basis-full text-sm sm:basis-0">{item.name}</span><Input className="w-16" type="number" min={0} max={365} required aria-label={`Allowance for ${item.name}`} value={leaveTargets[item.id] ?? item.required} onChange={(e) => setLeaveTargets({ ...leaveTargets, [item.id]: e.target.value })} /><Button size="sm" variant="outline" disabled={busy} type="submit">Save</Button>
             <Button variant="outline" size="sm" type="button" disabled={busy || deleting} onClick={() => confirmDelete(item.id, "leave_type", item.name)} className="text-rose-700 border-rose-200 hover:bg-rose-50 px-2"><Trash2 className="h-4 w-4" /></Button>
           </form>}
         />
