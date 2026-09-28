@@ -179,7 +179,7 @@ function AggregateSummary({ rows, label }: { rows: any[]; label: string }) {
 export function PrintableLogbook() {
   const user = React.useMemo(() => getCurrentUser(), []);
   const hideUhid = isDemoMode();
-  const { config, clinicalWorkCategories, clinicalWorkSubtypes } = useDepartment();
+  const { config, clinicalWorkCategories, clinicalWorkSubtypes, competencyLevels } = useDepartment();
   const features = config?.enabledFeatures ?? {};
   const [data, setData] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
@@ -408,7 +408,11 @@ export function PrintableLogbook() {
                 <thead><tr>
                   <Th>#</Th><Th>Date</Th><Th>Category</Th><Th>Sub-type</Th>
                   {!hideUhid && <Th>Case No.</Th>}
-                  <Th>Age / Sex</Th><Th>Status</Th>
+                  <Th>Age / Sex</Th>
+                  
+                  {<Th>Findings</Th>}
+                  {competencyLevels.length > 0 && <Th>Competency</Th>}
+                  <Th>Status</Th>
                 </tr></thead>
                 <tbody>
                   {rows.map((c: any, i: number) => (
@@ -419,6 +423,9 @@ export function PrintableLogbook() {
                       <Td muted={!c.subType}>{c.subType ? clinicalNames.get(c.subType) ?? c.subType : "—"}</Td>
                       {!hideUhid && <Td>{c.caseNumber}</Td>}
                       <Td>{[c.patientAge, c.patientSex].filter(Boolean).join(" / ")}</Td>
+                      
+                      {<Td muted={!c.clinicalFindings}><div className="whitespace-pre-wrap max-w-xs">{c.clinicalFindings || "—"}</div></Td>}
+                      {competencyLevels.length > 0 && <Td muted={!c.competency}>{c.competency || "—"}</Td>}
                       <Td><StatusPill status={c.status ?? "pending"} /></Td>
                     </tr>
                   ))}

@@ -3,12 +3,14 @@ import { and, eq, sql } from "drizzle-orm";
 import { db, departmentsTable, departmentConfigsTable, departmentCatalogTable, departmentPostingScheduleTable } from "@workspace/db";
 import { recomputeCatalogRequirements } from "./department-requirements.js";
 
-const templateKinds = ["posting", "academic", "case_category", "clinical_work_category"] as const;
+const templateKinds = ["posting", "academic", "case_category", "clinical_work_category", "clinical_work_subtype", "competency_level", "organ_system_option"] as const;
 
 export const departmentTemplateSchema = z.object({
   features: z.record(z.string(), z.boolean()).default({}),
   catalog: z.array(z.object({ kind: z.enum(templateKinds), name: z.string().trim().min(1).max(160),
-    required: z.number().int().min(0).max(100000).default(0) }).strict()).default([]),
+    required: z.number().int().min(0).max(100000).default(0),
+    // For clinical_work_subtype: the value of the parent clinical_work_category
+    parentValue: z.string().trim().min(1).max(160).optional() }).strict()).default([]),
   postingSchedule: z.array(z.object({ trainingYear: z.number().int().positive(), posting: z.string().trim().min(1).max(160),
     months: z.number().int().positive() }).strict()).default([]),
 }).strict().superRefine((template, ctx) => {
@@ -16,6 +18,12 @@ export const departmentTemplateSchema = z.object({
   template.postingSchedule.forEach((row, index) => {
     if (!postings.has(row.posting)) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["postingSchedule", index, "posting"], message: `"${row.posting}" is not a posting in this template` });
+    }
+  });
+  // Validate that subtypes have a parentValue
+  template.catalog.forEach((item, index) => {
+    if (item.kind === "clinical_work_subtype" && !item.parentValue) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["catalog", index, "parentValue"], message: "clinical_work_subtype must have a parentValue" });
     }
   });
 });
@@ -74,7 +82,9 @@ export async function applyDepartmentTemplate(options: ApplyTemplateOptions): Pr
       let catalogAdded = 0;
       for (const item of template?.catalog ?? []) {
         const inserted = await tx.insert(departmentCatalogTable)
-          .values({ departmentId, kind: item.kind, name: item.name, value: item.name, required: item.required, period: "total" })
+          .values({ departmentId, kind: item.kind, name: item.name, value: item.name,
+            required: item.required, period: "total",
+            ...(item.parentValue ? { parentValue: item.parentValue } : {}) })
           .onConflictDoNothing({ target: [departmentCatalogTable.departmentId, departmentCatalogTable.kind, departmentCatalogTable.value] })
           .returning({ id: departmentCatalogTable.id });
         catalogAdded += inserted.length;

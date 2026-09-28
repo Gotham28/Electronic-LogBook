@@ -12,6 +12,10 @@ export const clinicalWorkLogsTable = pgTable("clinical_work_logs", {
   patientAge: text("patient_age").notNull(),
   patientSex: text("patient_sex", { enum: ["male", "female", "other"] }).notNull(),
   caseNumber: text("case_number").notNull(),
+  // Radiology-specific fields (nullable; other departments leave these null)
+  organSystem: text("organ_system"),
+  clinicalFindings: text("clinical_findings"),
+  competency: text("competency"),
   status: text("status", { enum: ["pending", "verified", "rejected"] }).notNull().default("pending"),
   facultyRemarks: text("faculty_remarks"),
   reviewedBy: integer("reviewed_by").references(() => usersTable.id),

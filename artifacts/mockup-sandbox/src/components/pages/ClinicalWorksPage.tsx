@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
 import { formatLogbookDate, todayForInput } from "@/lib/logbook-config";
 import { useDepartment } from "@/lib/department-context";
 
@@ -35,12 +36,17 @@ type ClinicalWorkLog = {
   supervisorName: string | null;
   status: "pending" | "verified" | "rejected";
   facultyRemarks: string | null;
+  // Radiology-specific (null for other departments)
+  organSystem: string | null;
+  clinicalFindings: string | null;
+  competency: string | null;
 };
 
-const emptyForm = () => ({ date: todayForInput(), category: "", subType: "", patientAge: "", patientSex: "", caseNumber: "", supervisorId: "" });
+const emptyForm = () => ({ date: todayForInput(), category: "", subType: "", patientAge: "", patientSex: "", caseNumber: "", supervisorId: "",
+  organSystem: "", clinicalFindings: "", competency: "" });
 
 export function ClinicalWorksPage() {
-  const { clinicalWorkCategories, clinicalWorkSubtypes } = useDepartment();
+  const { clinicalWorkCategories, clinicalWorkSubtypes, competencyLevels } = useDepartment();
   const user = React.useMemo(() => getCurrentUser(), []);
   const hideCaseNumber = isDemoMode();
   const [logs, setLogs] = React.useState<ClinicalWorkLog[]>([]);
@@ -96,8 +102,17 @@ export function ClinicalWorksPage() {
     if (formSubTypes.length > 0 && !form.subType) { toast.error("Select a sub-type"); return; }
     if (!form.patientSex) { toast.error("Select the patient's sex"); return; }
     if (!form.supervisorId) { toast.error("Select a reviewing faculty member"); return; }
-    const payload = { date: form.date, category: form.category, subType: form.subType || null, patientAge: form.patientAge.trim(),
-      patientSex: form.patientSex, caseNumber: form.caseNumber.trim(), supervisorId: Number(form.supervisorId) };
+    // Radiology-specific required fields
+    
+    if (competencyLevels.length > 0 && !form.competency) { toast.error("Select a competency level"); return; }
+    const payload: Record<string, unknown> = {
+      date: form.date, category: form.category, subType: form.subType || null,
+      patientAge: form.patientAge.trim(), patientSex: form.patientSex,
+      caseNumber: form.caseNumber.trim(), supervisorId: Number(form.supervisorId),
+      organSystem: form.organSystem || null,
+      clinicalFindings: form.clinicalFindings.trim() || null,
+      competency: form.competency || null,
+    };
     setSubmitting(true);
     try {
       if (editId) await apiPatch(`/api/students/${user.studentProfileId}/clinical-works/${editId}`, payload);
@@ -126,7 +141,8 @@ export function ClinicalWorksPage() {
   const startEdit = (log: ClinicalWorkLog) => {
     setEditId(log.id);
     setForm({ date: log.date, category: log.category, subType: log.subType || "", patientAge: log.patientAge, patientSex: log.patientSex,
-      caseNumber: log.caseNumber, supervisorId: log.supervisorId ? String(log.supervisorId) : "" });
+      caseNumber: log.caseNumber, supervisorId: log.supervisorId ? String(log.supervisorId) : "",
+      organSystem: log.organSystem || "", clinicalFindings: log.clinicalFindings || "", competency: log.competency || "" });
     setOpen(true);
   };
 
@@ -211,6 +227,30 @@ export function ClinicalWorksPage() {
                   </Select>
                 )}
               </Field>
+              {/* Radiology-specific fields — only shown when the department has organ system options */}
+              {competencyLevels.length > 0 && (
+                <>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    
+                    {competencyLevels.length > 0 && (
+                      <Field label="Competency Level *" htmlFor="cw-competency">
+                        <Select value={form.competency} onValueChange={(value) => setField("competency", value)}>
+                          <SelectTrigger id="cw-competency"><SelectValue placeholder="Select competency" /></SelectTrigger>
+                          <SelectContent>
+                            {competencyLevels.map((item) => <SelectItem key={item.value} value={item.value}>{item.name}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </Field>
+                    )}
+                  </div>
+                  <Field label="Clinical Findings" htmlFor="cw-findings">
+                    <Textarea id="cw-findings" value={form.clinicalFindings}
+                      onChange={(e) => setField("clinicalFindings", e.target.value)}
+                      placeholder="Record what was found on the imaging study or procedure…"
+                      maxLength={5000} className="min-h-[80px] resize-y" />
+                  </Field>
+                </>
+              )}
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => closeDialog(false)} disabled={submitting}>Cancel</Button>
                 <Button type="submit" disabled={submitting}>{submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{editId ? "Save changes" : "Send to faculty"}</Button>
@@ -283,7 +323,7 @@ export function ClinicalWorksPage() {
               <p className="max-w-sm text-sm text-slate-500">{logs.length === 0 ? "Use “Log clinical work” to add your first entry." : "Clear the search to see every entry."}</p>
             </div>
           ) : (
-            <Table>
+              <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Number</TableHead>
@@ -291,6 +331,8 @@ export function ClinicalWorksPage() {
                   <TableHead>Category</TableHead>
                   {!hideCaseNumber && <TableHead>Case number</TableHead>}
                   <TableHead>Age / Sex</TableHead>
+                  
+                  {competencyLevels.length > 0 && <TableHead>Competency</TableHead>}
                   <TableHead>Faculty</TableHead>
                   <TableHead>Remarks</TableHead>
                   <TableHead>Status</TableHead>
@@ -310,6 +352,8 @@ export function ClinicalWorksPage() {
                       </TableCell>
                       {!hideCaseNumber && <TableCell className="font-semibold text-teal-800">{log.caseNumber}</TableCell>}
                       <TableCell className="capitalize">{log.patientAge} / {log.patientSex}</TableCell>
+                      
+                      {competencyLevels.length > 0 && <TableCell className="text-xs text-slate-600">{log.competency ?? <span className="text-slate-300">—</span>}</TableCell>}
                       <TableCell>{log.supervisorName ?? "—"}</TableCell>
                       <TableCell className="max-w-[180px] text-xs">
                         {log.status === "pending" ? <span className="text-slate-400">—</span>
