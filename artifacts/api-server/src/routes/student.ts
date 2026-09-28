@@ -1456,7 +1456,8 @@ router.post("/:studentId/clinical-works", validate(clinicalWorkBody), async (req
       competency: competency || null, status: "pending",
     }).returning();
     res.status(201).json(inserted);
-  } catch (error) {
+  } catch (error: any) {
+    console.error("POST ERROR", error, error?.cause);
     req.log.error({ studentId: req.params.studentId, status: 500 }, "Error creating clinical work log");
     res.status(500).json({ message: "Internal server error" });
   }
@@ -1503,6 +1504,7 @@ router.patch("/:studentId/clinical-works/:logId", requireAuth, validate(clinical
     if (!updated) { res.status(404).json({ message: "Log not found" }); return; }
     res.json(updated);
   } catch (error) {
+    console.error("PATCH ERROR", error);
     req.log.error({ logId: req.params.logId, status: 500 }, "Error updating clinical work log");
     res.status(500).json({ message: "Internal server error" });
   }
