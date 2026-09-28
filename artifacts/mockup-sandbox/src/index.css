@@ -175,7 +175,6 @@
   body {
     @apply font-sans antialiased bg-background text-foreground;
     min-width: 320px;
-    overflow-x: hidden;
     background:
       radial-gradient(circle at 8% 0%, rgba(94, 234, 212, .12), transparent 28rem),
       linear-gradient(145deg, #f2f7f6 0%, #fbfdfd 52%, #eef7f6 100%);
@@ -332,6 +331,12 @@
 @media screen and (max-width: 639px) {
   :root {
     --mobile-gutter: 1rem;
+    --mobile-type-caption: 0.75rem;
+    --mobile-type-label: 0.875rem;
+    --mobile-type-body: 1rem;
+    --mobile-type-emphasis: 1.125rem;
+    --mobile-type-title: 1.75rem;
+    --mobile-control-height: 2.75rem;
   }
 
   body {
@@ -358,8 +363,8 @@
 
   [data-slot="sidebar-inset"] header button,
   [data-slot="sidebar-inset"] header [role="button"] {
-    min-height: 2.75rem;
-    min-width: 2.75rem;
+    min-height: var(--mobile-control-height);
+    min-width: var(--mobile-control-height);
   }
 
   [data-slot="card"] {
@@ -367,22 +372,130 @@
   }
 
   [data-slot="sidebar-inset"] .page-title {
+    font-size: var(--mobile-type-title);
+  }
+
+  [data-slot="sidebar-inset"] .content-spacing > :not([hidden]) ~ :not([hidden]) {
+    margin-block-start: 1.25rem;
+  }
+
+  [data-slot="sidebar-inset"] .section-spacing > :not([hidden]) ~ :not([hidden]) {
+    margin-block-start: 1rem;
+  }
+
+  /* Normalize common Tailwind and legacy pixel text sizes on phones. The miniature
+     labels inside the login product preview keep their intentionally small sizes. */
+  :is(.text-\[8px\], .text-\[9px\], .text-\[10px\], .text-\[11px\], .text-xs) {
+    font-size: var(--mobile-type-caption);
+  }
+
+  :is(.text-\[13px\], .text-sm) {
+    font-size: var(--mobile-type-label);
+  }
+
+  .text-base {
+    font-size: var(--mobile-type-body);
+  }
+
+  .text-lg {
+    font-size: var(--mobile-type-emphasis);
+  }
+
+  .text-xl {
+    font-size: 1.25rem;
+  }
+
+  .text-2xl {
+    font-size: 1.5rem;
+  }
+
+  .text-3xl {
     font-size: 1.75rem;
   }
 
-  [data-slot="sidebar-inset"] .content-spacing {
-    gap: 1.5rem;
-  }
-
-  [data-slot="sidebar-inset"] .section-spacing {
-    gap: 1.25rem;
+  .text-4xl {
+    font-size: 2rem;
   }
 
   input,
   select,
-  textarea,
-  button {
-    font-size: 1rem;
+  textarea {
+    font-size: var(--mobile-type-body);
+  }
+
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  button:not([data-slot="checkbox"]):not([data-slot="radio"]):not([data-slot="switch"]) {
+    min-height: var(--mobile-control-height);
+  }
+
+  [data-slot="button"] {
+    min-height: var(--mobile-control-height);
+    font-size: var(--mobile-type-label);
+  }
+
+  [data-slot="button"][data-size="icon"] {
+    min-width: var(--mobile-control-height);
+  }
+
+  [aria-label="Main pages"] > ul > li > :is(a, button) {
+    min-height: 3.75rem;
+  }
+
+  select,
+  [data-slot="select-trigger"],
+  [data-slot="tabs-trigger"] {
+    min-height: var(--mobile-control-height);
+  }
+
+  [data-slot="tabs-list"] {
+    height: auto;
+    min-height: 3rem;
+  }
+
+  [data-slot="textarea"] {
+    min-height: 5.5rem;
+  }
+
+  [role="menuitem"],
+  [role="option"] {
+    min-height: var(--mobile-control-height);
+  }
+
+  [data-slot="checkbox"],
+  [data-slot="radio"],
+  [data-slot="switch"] {
+    position: relative;
+  }
+
+  [data-slot="checkbox"]::before,
+  [data-slot="radio"]::before,
+  [data-slot="switch"]::before {
+    position: absolute;
+    inset: -0.875rem;
+    content: "";
+  }
+
+  [data-slot="switch"]::before {
+    inset-inline: 0;
+  }
+
+  [data-slot="switch"] {
+    width: var(--mobile-control-height);
+    height: 1.625rem;
+  }
+
+  [data-slot="switch-thumb"] {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+
+  [data-slot="switch"][data-state="checked"] [data-slot="switch-thumb"] {
+    transform: translateX(1.25rem);
+  }
+
+  [data-slot="switch"][data-state="unchecked"] [data-slot="switch-thumb"] {
+    transform: translateX(0);
   }
 
   .overflow-x-auto {
@@ -404,8 +517,19 @@
   }
 
   [data-slot="dialog-footer"] button {
-    min-height: 2.75rem;
+    min-height: var(--mobile-control-height);
     width: 100%;
+  }
+
+  [data-slot="dialog-close"] {
+    min-height: var(--mobile-control-height);
+    min-width: var(--mobile-control-height);
+    display: grid;
+    place-items: center;
+  }
+
+  [data-mobile-nav-icon] svg {
+    stroke-width: 1.75;
   }
 
   /* Tables become one card per row: the header is hidden and each value sits next to
@@ -465,13 +589,6 @@
   }
   table[data-mobile="cards"] > tbody > tr > td:not([data-label]) {
     text-align: center;
-  }
-  /* Readable small print: nothing under 11px, captions at 12px. */
-  .text-\[10px\] {
-    font-size: 11px;
-  }
-  .text-\[11px\] {
-    font-size: 12px;
   }
 }
 

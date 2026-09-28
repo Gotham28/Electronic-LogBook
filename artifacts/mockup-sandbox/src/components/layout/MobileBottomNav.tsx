@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Link } from "wouter";
-import { Menu } from "lucide-react";
+import { MoreHorizontal } from "lucide-react";
 import { useSidebar } from "@/components/ui/sidebar";
 
 type BottomNavItem = { title: string; icon: React.ComponentType<{ className?: string }>; href: string };
@@ -34,27 +34,31 @@ export function MobileBottomNav({ role, items, location }: { role: "Student" | "
   React.useEffect(() => { setOpenMobile(false); }, [location, setOpenMobile]);
   const byHref = new Map(items.map((item) => [item.href, item]));
   const slots = PRIORITY[role].map((href) => byHref.get(href)).filter((item): item is BottomNavItem => !!item).slice(0, 4);
-  const cell = "flex min-h-14 min-w-0 flex-1 flex-col items-center justify-center gap-1 px-0.5 text-[11px] font-semibold leading-none";
+  const cell = "flex min-h-[60px] min-w-0 flex-1 flex-col items-center justify-center gap-1 px-0.5 pt-1 text-xs font-semibold leading-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-600";
 
   return (
-    <nav aria-label="Main pages" className="print-hidden fixed inset-x-0 bottom-0 z-40 border-t border-teal-100 bg-white/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-10px_30px_rgba(15,23,42,0.06)] backdrop-blur-md sm:hidden">
-      <ul className="flex">
+    <nav aria-label="Main pages" className="print-hidden fixed inset-x-0 bottom-0 z-40 border-t border-teal-100/80 bg-white/96 pb-[env(safe-area-inset-bottom)] shadow-[0_-6px_24px_rgba(15,23,42,0.07)] backdrop-blur-xl sm:hidden">
+      <ul className="flex min-h-[60px]">
         {slots.map((item) => {
           const isActive = location === item.href || (item.href !== "/" && location.startsWith(item.href));
           const Icon = item.icon;
           return (
             <li key={item.href} className="flex min-w-0 flex-1">
               <Link href={item.href} aria-current={isActive ? "page" : undefined}
-                className={`${cell} ${isActive ? "text-teal-700" : "text-slate-500"}`}>
-                <span className={`grid h-7 w-12 place-items-center rounded-full ${isActive ? "bg-teal-100" : ""}`}><Icon className="h-5 w-5" /></span>
+                className={`${cell} ${isActive ? "text-teal-800" : "text-slate-500 hover:text-slate-800"}`}>
+                <span data-mobile-nav-icon className={`grid h-8 w-9 place-items-center rounded-full transition-colors ${isActive ? "bg-teal-50 text-teal-700" : "text-slate-500"}`}>
+                  <Icon className="h-5 w-5" aria-hidden="true" />
+                </span>
                 <span className="w-full truncate text-center tracking-tight">{SHORT_LABELS[item.title] ?? item.title}</span>
               </Link>
             </li>
           );
         })}
         <li className="flex min-w-0 flex-1">
-          <button type="button" onClick={() => setOpenMobile(true)} className={`${cell} text-slate-500`}>
-            <span className="grid h-7 w-12 place-items-center rounded-full"><Menu className="h-5 w-5" /></span>
+          <button type="button" onClick={() => setOpenMobile(true)} aria-label="More pages" className={`${cell} text-slate-500 hover:text-slate-800`}>
+            <span data-mobile-nav-icon className="grid h-8 w-9 place-items-center rounded-full text-slate-500 transition-colors">
+              <MoreHorizontal className="h-5 w-5" aria-hidden="true" />
+            </span>
             <span>More</span>
           </button>
         </li>
