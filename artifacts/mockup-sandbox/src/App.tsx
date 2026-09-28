@@ -159,6 +159,7 @@ function App() {
     
     if (impersonationToken) {
       saveToken(impersonationToken);
+      sessionStorage.setItem("elogbook-login-summary-pending", "true");
       urlParams.delete("impersonationToken");
       const newUrl = window.location.pathname + (urlParams.toString() ? `?${urlParams.toString()}` : "") + window.location.hash;
       window.history.replaceState(null, "", newUrl);
