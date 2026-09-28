@@ -5,6 +5,7 @@ import { eq, and } from "drizzle-orm";
 import { db, departmentsTable, usersTable, departmentConfigsTable, procedureTypesTable, departmentCatalogTable, studentsTable, caseLogsTable, procedureLogsTable } from "@workspace/db";
 import { configSchema, emailSchema, nameSchema, passwordSchema, targetSchema } from "./validation.js";
 import { sendAccountCreatedEmail } from "./mailer.js";
+import { recomputeCatalogRequirements, recomputeProcedureRequirement } from "./department-requirements.js";
 
 export const setupSchema = z.object({
   name: nameSchema, code: z.string().trim().min(1).max(32).regex(/^[a-zA-Z0-9_-]+$/), description: z.string().max(1000).optional(),
@@ -58,6 +59,10 @@ export async function provisionDepartment(input: unknown, initialPassword: unkno
 
     return { departmentId: department.id, hodId: created.id };
   });
+
+  // Totals are sums of the targets just inserted; left unset, the HOD page shows them as missing.
+  await recomputeProcedureRequirement(result.departmentId);
+  await recomputeCatalogRequirements(result.departmentId);
 
   try {
     await provisionMirrorForRealDepartment(result.departmentId, setup.name, setup.description);

@@ -858,7 +858,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                   <TabsTrigger value="progress" className="text-xs whitespace-nowrap">Training Progress</TabsTrigger>
                   {!config?.enabledFeatures?.hideCaseLogs && <TabsTrigger value="case-logs" className="text-xs whitespace-nowrap">Clinical Case Logs</TabsTrigger>}
                   {!config?.enabledFeatures?.hideProcedureLogs && <TabsTrigger value="proc-logs" className="text-xs whitespace-nowrap">Procedure Logs</TabsTrigger>}
-                  {config?.enabledFeatures?.clinicalWorks && <TabsTrigger value="clinical-works" className="text-xs whitespace-nowrap">Clinical Works</TabsTrigger>}
+                  {config?.enabledFeatures?.clinicalWorks && <TabsTrigger value="clinical-works" className="text-xs whitespace-nowrap">Clinical Work</TabsTrigger>}
                   <TabsTrigger value="acad-logs" className="text-xs whitespace-nowrap">Academic Activity</TabsTrigger>
                   <TabsTrigger value="postings" className="text-xs whitespace-nowrap">Postings</TabsTrigger>
                   <TabsTrigger value="thesis" className="text-xs whitespace-nowrap">Thesis</TabsTrigger>
@@ -1029,7 +1029,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                             return <TableRow><TableCell colSpan={4} role="alert" className="text-center text-sm font-medium text-rose-700 py-6">{menteeLoadErrors.logs}</TableCell></TableRow>;
                           }
                           if (!rows.length) {
-                            return <TableRow><TableCell colSpan={4} className="text-center text-sm text-slate-500 py-6">No clinical works found.</TableCell></TableRow>;
+                            return <TableRow><TableCell colSpan={4} className="text-center text-sm text-slate-500 py-6">No clinical work found.</TableCell></TableRow>;
                           }
                           return rows.map((log: any) => (
                             <TableRow key={log.id}>
@@ -1990,7 +1990,7 @@ function renderShortfallBadge(status: string) {
     case "behind":
       return <Badge className="bg-rose-50 text-rose-700 border-rose-200 text-[10px]">Behind</Badge>;
     case "not_tracked":
-      return <Badge variant="outline" className="text-slate-500 text-[10px]">Not tracked</Badge>;
+      return <Badge variant="outline" className="text-slate-500 text-[10px]">No targets set</Badge>;
     default:
       return <Badge className="bg-amber-50 text-amber-700 border-amber-200 text-[10px]">At Risk</Badge>;
   }

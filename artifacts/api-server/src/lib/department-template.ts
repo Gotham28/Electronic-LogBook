@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { and, eq, sql } from "drizzle-orm";
 import { db, departmentsTable, departmentConfigsTable, departmentCatalogTable, departmentPostingScheduleTable } from "@workspace/db";
+import { recomputeCatalogRequirements } from "./department-requirements.js";
 
 const templateKinds = ["posting", "academic", "case_category", "clinical_work_category"] as const;
 
@@ -104,5 +105,8 @@ export async function applyDepartmentTemplate(options: ApplyTemplateOptions): Pr
   } catch (error) {
     if (!(error instanceof DryRun)) throw error;
   }
+  // The department totals are sums of catalog targets. Without this, a department set up from a
+  // template keeps an empty total, which the HOD page showed as "Not tracked".
+  if (apply) await recomputeCatalogRequirements(departmentId);
   return result!;
 }

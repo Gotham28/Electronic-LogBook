@@ -231,7 +231,8 @@ export function DepartmentSettings() {
       </div>
       <div className="grid w-full grid-cols-1 gap-3 md:grid-cols-3">
         {computedRequirementsFields.filter(([key]) => !(key === "requiredCases" && features.hideCaseLogs) && !(key === "requiredProcedures" && features.hideProcedureLogs)).map(([key, label], index) => <Card key={key} className={`overflow-hidden border-0 shadow-sm ring-1 ring-inset ${index === 0 ? "bg-gradient-to-br from-teal-50 to-white ring-teal-100" : index === 1 ? "bg-gradient-to-br from-sky-50 to-white ring-sky-100" : "bg-gradient-to-br from-violet-50 to-white ring-violet-100"}`}>
-          <CardContent className="relative p-5"><div className={`absolute right-0 top-0 h-20 w-20 -translate-y-1/3 translate-x-1/3 rounded-full blur-2xl ${index === 0 ? "bg-teal-200/50" : index === 1 ? "bg-sky-200/50" : "bg-violet-200/50"}`} /><p className="relative max-w-[13rem] text-xs font-semibold leading-5 text-slate-600">{label}</p><p className="relative mt-3 text-3xl font-semibold tracking-tight text-slate-950">{data.config?.[key] == null ? <span className="text-sm font-medium italic text-slate-400">Not tracked</span> : data.config[key]}</p><p className="relative mt-1 text-[11px] text-slate-500">Target total</p></CardContent>
+          <CardContent className="relative p-5"><div className={`absolute right-0 top-0 h-20 w-20 -translate-y-1/3 translate-x-1/3 rounded-full blur-2xl ${index === 0 ? "bg-teal-200/50" : index === 1 ? "bg-sky-200/50" : "bg-violet-200/50"}`} /><p className="relative max-w-[13rem] text-xs font-semibold leading-5 text-slate-600">{label}</p>{data.config?.[key] ? <><p className="relative mt-3 text-3xl font-semibold tracking-tight text-slate-950">{data.config[key]}</p><p className="relative mt-1 text-[11px] text-slate-500">Target total</p></>
+            : <><p className="relative mt-3 text-base font-semibold text-slate-700">No minimum set yet</p><p className="relative mt-1 text-[11px] leading-4 text-slate-500">Residents can still log these. Set a required count on any item below and this total will add them up.</p></>}</CardContent>
         </Card>)}
       </div>
     </section>
@@ -328,7 +329,7 @@ export function DepartmentSettings() {
       </div>
       {features.clinicalWorks && (
       <div className="mt-8 space-y-3 border-t pt-8">
-        <div><h4 className="text-sm font-semibold text-slate-900">Clinical works</h4><p className="text-xs text-slate-500">Categories residents log under, and the sub-types offered for each. A category with no sub-types is logged without one.</p></div>
+        <div><h4 className="text-sm font-semibold text-slate-900">Clinical work</h4><p className="text-xs text-slate-500">Categories residents log under, and the sub-types offered for each. A category with no sub-types is logged without one.</p></div>
         {data.clinicalWorkCategories.length === 0 ? <p className="rounded-xl bg-slate-50 p-3 text-sm text-slate-500">No clinical work categories configured.</p> : (
           <div className="grid gap-3 md:grid-cols-2">
             {data.clinicalWorkCategories.map((category) => {

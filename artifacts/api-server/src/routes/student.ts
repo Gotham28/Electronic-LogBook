@@ -134,8 +134,8 @@ router.get("/:studentId/dashboard", requireAuth, async (req, res) => {
       categories: [
         ...(features.hideCaseLogs ? [] : [{ id: "cases", name: "Clinical Cases Presented", logged: cases.total, required: reqCases, verified: cases.verified, percentage: Math.min(100, Math.round((cases.verified / (reqCases || 1)) * 100)) }]),
         ...(features.hideProcedureLogs ? [] : [{ id: "procedures", name: "Required Procedures", logged: procs.total, required: reqProcs, verified: procs.verified, percentage: Math.min(100, Math.round((procs.verified / (reqProcs || 1)) * 100)) }]),
-        ...(clinicalWorks ? [{ id: "clinicalWorks", name: "Clinical Works", logged: clinicalWorks.total, required: 0, verified: clinicalWorks.verified, percentage: 0 }] : []),
-        { id: "academics", name: "Case Discussions", logged: acads.total, required: reqAcad, verified: acads.verified, percentage: Math.min(100, Math.round((acads.verified / (reqAcad || 1)) * 100)) },
+        ...(clinicalWorks ? [{ id: "clinicalWorks", name: "Clinical Work", logged: clinicalWorks.total, required: 0, verified: clinicalWorks.verified, percentage: 0 }] : []),
+        { id: "academics", name: "Academic Activities", logged: acads.total, required: reqAcad, verified: acads.verified, percentage: Math.min(100, Math.round((acads.verified / (reqAcad || 1)) * 100)) },
       ],
       recentLogs: [...(features.hideCaseLogs ? [] : recentCases), ...(features.hideProcedureLogs ? [] : recentProcs)]
     });
@@ -1367,7 +1367,7 @@ router.post("/:studentId/clinical-works", validate(clinicalWorkBody), async (req
       res.status(403).json({ message: "Forbidden: you can only add your own logs" }); return;
     }
     const { configSourceId, features } = await getDepartmentFeatures(caller.departmentId!);
-    if (!features.clinicalWorks) { res.status(403).json({ message: "Clinical works are not enabled for your department" }); return; }
+    if (!features.clinicalWorks) { res.status(403).json({ message: "Clinical work is not enabled for your department" }); return; }
     const { supervisorId, date, category, subType, patientAge, patientSex, caseNumber } = req.body;
     if (!(await validateSupervisor(supervisorId, caller.departmentId!))) {
       res.status(400).json({ message: "Invalid supervisorId" }); return;
@@ -1399,7 +1399,7 @@ router.patch("/:studentId/clinical-works/:logId", requireAuth, validate(clinical
       res.status(400).json({ message: "Only pending or rejected logs can be edited" }); return;
     }
     const { configSourceId, features } = await getDepartmentFeatures(caller.departmentId!);
-    if (!features.clinicalWorks) { res.status(403).json({ message: "Clinical works are not enabled for your department" }); return; }
+    if (!features.clinicalWorks) { res.status(403).json({ message: "Clinical work is not enabled for your department" }); return; }
     if (req.body.supervisorId !== undefined && !(await validateSupervisor(req.body.supervisorId, caller.departmentId!))) {
       res.status(400).json({ message: "Invalid supervisorId" }); return;
     }

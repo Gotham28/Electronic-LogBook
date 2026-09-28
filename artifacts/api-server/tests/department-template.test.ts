@@ -46,6 +46,7 @@ test("a dry run reports the changes and saves nothing", async () => {
   assert.equal(await catalogCount("posting"), 0);
   const [config] = await db.select().from(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, radiologyId));
   assert.deepEqual(config.enabledFeatures, { procedureExperience: true, keepMe: true });
+  assert.equal(config.requiredAcademic, null, "a dry run leaves the department totals alone");
 });
 
 test("applying merges flags without dropping existing ones and loads the catalog and schedule", async () => {
@@ -57,6 +58,20 @@ test("applying merges flags without dropping existing ones and loads the catalog
   assert.equal(await catalogCount("posting"), 7);
   const schedule = await db.select().from(departmentPostingScheduleTable).where(eq(departmentPostingScheduleTable.departmentId, radiologyId));
   assert.equal(schedule.length, 12);
+});
+
+test("applying a template sets the department totals from its targets", async () => {
+  const [department] = await db.insert(departmentsTable).values({ name: "Targets", code: "TEST-TARGETS" }).returning();
+  const template = departmentTemplateSchema.parse({ catalog: [
+    { kind: "academic", name: "Seminar", required: 4 }, { kind: "academic", name: "Journal club", required: 6 },
+    { kind: "clinical_work_category", name: "CT scan", required: 9 }] });
+  await applyDepartmentTemplate({ departmentId: department.id, expectName: "Targets", template, apply: true });
+  const [config] = await db.select().from(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, department.id));
+  assert.equal(config.requiredAcademic, 10);
+  assert.equal(config.requiredCases, null, "no case categories, so no case total");
+  // The radiology template sets no targets: its academic total is 0, not missing.
+  const [radiologyConfig] = await db.select().from(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, radiologyId));
+  assert.equal(radiologyConfig.requiredAcademic, 0);
 });
 
 test("applying twice changes nothing more", async () => {
