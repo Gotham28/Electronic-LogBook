@@ -126,15 +126,71 @@ describe("Leave allowances are counted per calendar year of the leave", () => {
     const overNextYear = await call(`/students/${a.student0.studentId}/leave-records`, "student0", "POST",
       { startDate: `${nextYear}-02-01`, endDate: `${nextYear}-02-03`, leaveType: "yearly_test_leave", reason: "Over next year's allowance" });
     assert.equal(overNextYear.status, 400);
-    assert.match(overNextYear.body.message, /Remaining: 2 days/);
+    assert.match(overNextYear.body.message, /Available: 2 days/);
   });
 
-  test("the HOD's pending-leave list shows the balance for the year each leave starts in", async () => {
+  test("the HOD's pending-leave list explicitly excludes pending leaves from the available balance", async () => {
+    await db.insert(departmentCatalogTable).values({ departmentId: 1, kind: "leave_type", name: "Distinguish Test Leave", value: "distinguish_test", required: 5 });
+
+    const approvedThis = await call(`/students/${a.student0.studentId}/leave-records`, "student0", "POST",
+      { startDate: `${thisYear}-01-01`, endDate: `${thisYear}-01-04`, leaveType: "distinguish_test", reason: "Approved this year" });
+    const appThisRes = await call(`/admin/leaves/${approvedThis.body.leave.id}/action`, "hod0", "POST", { action: "approve" });
+    assert.equal(appThisRes.status, 200);
+
+    const pendingThis = await call(`/students/${a.student0.studentId}/leave-records`, "student0", "POST",
+      { startDate: `${thisYear}-02-01`, endDate: `${thisYear}-02-01`, leaveType: "distinguish_test", reason: "Pending this year" });
+
+    const approvedNext = await call(`/students/${a.student0.studentId}/leave-records`, "student0", "POST",
+      { startDate: `${nextYear}-01-05`, endDate: `${nextYear}-01-06`, leaveType: "distinguish_test", reason: "Approved next year" });
+    const appNextRes = await call(`/admin/leaves/${approvedNext.body.leave.id}/action`, "hod0", "POST", { action: "approve" });
+    assert.equal(appNextRes.status, 200);
+
+    const pendingNext = await call(`/students/${a.student0.studentId}/leave-records`, "student0", "POST",
+      { startDate: `${nextYear}-02-01`, endDate: `${nextYear}-02-02`, leaveType: "distinguish_test", reason: "Pending next year" });
+
     const res = await call("/admin/leaves/pending", "hod0", "GET");
     assert.equal(res.status, 200);
-    const nextYearLeave = res.body.find((leave: any) => leave.type === "yearly_test_leave" && leave.fromDate === `${nextYear}-01-05`);
-    const thisYearLeave = res.body.find((leave: any) => leave.type === "yearly_test_leave" && leave.fromDate === `${thisYear}-01-05`);
-    assert.equal(nextYearLeave.remainingBalance, 2);
-    assert.equal(thisYearLeave.remainingBalance, 0);
+    const nextYearLeave = res.body.find((leave: any) => leave.reason === "Pending next year");
+    const thisYearLeave = res.body.find((leave: any) => leave.reason === "Pending this year");
+
+    assert.equal(nextYearLeave.availableByYear.find((y: any) => y.year === nextYear.toString()).available, 3);
+    assert.equal(thisYearLeave.availableByYear.find((y: any) => y.year === thisYear.toString()).available, 1);
+  });
+
+  test("cross-year leaves return availability splits for both years in the HOD list", async () => {
+    await db.insert(departmentCatalogTable).values({ departmentId: 1, kind: "leave_type", name: "Cross Year Pending", value: "cross_year_pending", required: 5 });
+
+    const crossYearRes = await call(`/students/${a.student0.studentId}/leave-records`, "student0", "POST",
+      { startDate: `${thisYear}-12-30`, endDate: `${nextYear}-01-02`, leaveType: "cross_year_pending", reason: "Cross year pending" });
+    assert.equal(crossYearRes.status, 201);
+
+    const res = await call("/admin/leaves/pending", "hod0", "GET");
+    assert.equal(res.status, 200);
+    const leave = res.body.find((l: any) => l.reason === "Cross year pending");
+    assert.equal(leave.availableByYear.length, 2);
+
+    const thisYearSplit = leave.availableByYear.find((y: any) => y.year === thisYear.toString());
+    const nextYearSplit = leave.availableByYear.find((y: any) => y.year === nextYear.toString());
+    assert.equal(thisYearSplit.available, 5);
+    assert.equal(nextYearSplit.available, 5);
+  });
+
+  test("cross-year leave validates against both years' limits individually", async () => {
+    await db.insert(departmentCatalogTable).values({ departmentId: 1, kind: "leave_type", name: "Cross Year Block", value: "cross_year_block", required: 2 });
+
+    const fillThis = await call(`/students/${a.student0.studentId}/leave-records`, "student0", "POST",
+      { startDate: `${thisYear}-05-01`, endDate: `${thisYear}-05-02`, leaveType: "cross_year_block", reason: "Fill this year" });
+    const appCrossRes = await call(`/admin/leaves/${fillThis.body.leave.id}/action`, "hod0", "POST", { action: "approve" });
+    assert.equal(appCrossRes.status, 200);
+
+    const blockRes = await call(`/students/${a.student0.studentId}/leave-records`, "student0", "POST",
+      { startDate: `${thisYear}-12-31`, endDate: `${nextYear}-01-01`, leaveType: "cross_year_block", reason: "Blocked cross year" });
+    assert.equal(blockRes.status, 400);
+    assert.equal(blockRes.body.message, `Requested leave exceeds remaining balance for ${thisYear} (Available: 0 days)`);
+
+    await db.insert(departmentCatalogTable).values({ departmentId: 1, kind: "leave_type", name: "Cross Year Allow", value: "cross_year_allow", required: 5 });
+    const allowRes = await call(`/students/${a.student0.studentId}/leave-records`, "student0", "POST",
+      { startDate: `${thisYear}-12-31`, endDate: `${nextYear}-01-01`, leaveType: "cross_year_allow", reason: "Allowed cross year" });
+    assert.equal(allowRes.status, 201);
   });
 });
