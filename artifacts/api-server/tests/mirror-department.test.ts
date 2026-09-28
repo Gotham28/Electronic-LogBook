@@ -216,32 +216,48 @@ describe("Mirror Test Department (AGENTS.md §3, §6, §11)", () => {
   });
 
   it("Test student case-log submission is visible to test prof and HOD", async () => {
-    // Post a case log
-    const postRes = await request(base, `/students/${testStudent.studentId}/case-logs`, testStudent, "POST", {
+    // Post a case log assigned to the Prof
+    const profLog = await request(base, `/students/${testStudent.studentId}/case-logs`, testStudent, "POST", {
       supervisorId: String(mirrorProf.id),
       date: "2026-09-21",
       patientAge: "5",
       patientGender: "male",
       diagnosisFinal: "Test Diagnosis"
     });
-    assert.equal(postRes.status, 201);
+    assert.equal(profLog.status, 201);
+
+    // Post a case log explicitly assigned to the HOD
+    const hodLog = await request(base, `/students/${testStudent.studentId}/case-logs`, testStudent, "POST", {
+      supervisorId: String(mirrorHod.id),
+      date: "2026-09-21",
+      patientAge: "5",
+      patientGender: "male",
+      diagnosisFinal: "Test Diagnosis HOD"
+    });
+    assert.equal(hodLog.status, 201);
 
     // Test prof queue
     const profRes = await request(base, `/professors/${mirrorProf.id}/review-queue`, mirrorProf);
     assert.equal(profRes.status, 200);
-    const foundProf = profRes.body.pendingReviews.some((l: any) => l.logType === "case" && l.dbId === postRes.body.id);
+    const foundProf = profRes.body.pendingReviews.some((l: any) => l.logType === "case" && l.dbId === profLog.body.id);
     assert.equal(foundProf, true, "Prof queue should include the case log");
 
-    // Test HOD logs view
+    // Test HOD queue view
     const hodRes = await request(base, `/professors/${mirrorHod.id}/review-queue`, mirrorHod);
     assert.equal(hodRes.status, 200);
-    const foundHod = hodRes.body.pendingReviews.some((l: any) => l.logType === "case" && l.dbId === postRes.body.id);
-    assert.equal(foundHod, true, "HOD logs should include the case log");
+    
+    const hodSeesProfLog = hodRes.body.pendingReviews.some((l: any) => l.logType === "case" && l.dbId === profLog.body.id);
+    assert.equal(hodSeesProfLog, false, "HOD queue should not include logs assigned to another professor");
+
+    const hodSeesHodLog = hodRes.body.pendingReviews.some((l: any) => l.logType === "case" && l.dbId === hodLog.body.id);
+    assert.equal(hodSeesHodLog, true, "HOD queue should include logs explicitly assigned to them");
 
     // Real HOD logs view shouldn't see it
     const realHodRes = await request(base, `/professors/${realHod.id}/review-queue`, realHod);
-    const foundReal = realHodRes.body.pendingReviews.some((l: any) => l.logType === "case" && l.dbId === postRes.body.id);
+    const foundReal = realHodRes.body.pendingReviews.some((l: any) => l.logType === "case" && l.dbId === hodLog.body.id);
+    const foundRealProf = realHodRes.body.pendingReviews.some((l: any) => l.logType === "case" && l.dbId === profLog.body.id);
     assert.equal(foundReal, false, "Real HOD should not see test case logs");
+    assert.equal(foundRealProf, false, "Real HOD should not see test case logs assigned to prof");
   });
 
   it("Real-department assignmentTypesTable change is visible on mirror", async () => {
