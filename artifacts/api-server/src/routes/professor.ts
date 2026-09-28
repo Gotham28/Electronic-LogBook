@@ -55,18 +55,18 @@ router.get("/:professorId/review-queue", async (req, res) => {
     const isHod = profMatch[0].role === "hod";
     const { features } = await getDepartmentFeatures(deptId);
 
-    // For HOD: show all pending logs in their department.
+    // For HOD: show pending logs assigned to them or unassigned (department-scoped below via join).
     // For professor: show only logs where they are the named supervisor.
     const caseWhere = isHod && deptId != null
-      ? eq(caseLogsTable.status, "pending")   // dept-scoped below via join
+      ? and(or(eq(caseLogsTable.supervisorId, professorId), isNull(caseLogsTable.supervisorId)), eq(caseLogsTable.status, "pending"))
       : and(eq(caseLogsTable.supervisorId, professorId), eq(caseLogsTable.status, "pending"));
 
     const procWhere = isHod && deptId != null
-      ? eq(procedureLogsTable.status, "pending")
+      ? and(or(eq(procedureLogsTable.supervisorId, professorId), isNull(procedureLogsTable.supervisorId)), eq(procedureLogsTable.status, "pending"))
       : and(eq(procedureLogsTable.supervisorId, professorId), eq(procedureLogsTable.status, "pending"));
 
     const acadWhere = isHod && deptId != null
-      ? eq(academicLogsTable.status, "pending")
+      ? and(or(eq(academicLogsTable.supervisorId, professorId), isNull(academicLogsTable.supervisorId)), eq(academicLogsTable.status, "pending"))
       : and(eq(academicLogsTable.supervisorId, professorId), eq(academicLogsTable.status, "pending"));
 
     const caseQuery = db.select({
@@ -112,7 +112,7 @@ router.get("/:professorId/review-queue", async (req, res) => {
     const academics = await acadQuery.where(and(acadWhere, eq(usersTable.departmentId, deptId), eq(usersTable.status, "approved")));
 
     const confWhere = isHod && deptId != null
-      ? eq(conferencesTable.status, "pending")
+      ? and(or(eq(conferencesTable.supervisorId, professorId), isNull(conferencesTable.supervisorId)), eq(conferencesTable.status, "pending"))
       : and(eq(conferencesTable.supervisorId, professorId), eq(conferencesTable.status, "pending"));
 
     const confQuery = db.select({
@@ -129,7 +129,7 @@ router.get("/:professorId/review-queue", async (req, res) => {
     const conferences = await confQuery.where(and(confWhere, eq(usersTable.departmentId, deptId), eq(usersTable.status, "approved")));
 
     const clinicalWhere = isHod && deptId != null
-      ? eq(clinicalWorkLogsTable.status, "pending")
+      ? and(or(eq(clinicalWorkLogsTable.supervisorId, professorId), isNull(clinicalWorkLogsTable.supervisorId)), eq(clinicalWorkLogsTable.status, "pending"))
       : and(eq(clinicalWorkLogsTable.supervisorId, professorId), eq(clinicalWorkLogsTable.status, "pending"));
     const clinicalWorks = await db.select({ log: clinicalWorkLogsTable, student: studentsTable, user: usersTable, department: departmentsTable })
       .from(clinicalWorkLogsTable)
