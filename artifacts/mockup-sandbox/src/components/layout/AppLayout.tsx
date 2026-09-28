@@ -59,6 +59,7 @@ import {
 
 import { LegalDisclaimerModal } from "@/components/LegalDisclaimerModal";
 import { useDepartment } from "@/lib/department-context";
+import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 
 export type RoleType = "Student" | "Faculty" | "HOD";
 
@@ -589,7 +590,7 @@ export function AppLayout({
               </div>
             </header>
 
-            <main className="mx-auto w-full max-w-[1380px] flex-1 p-4 md:p-6 lg:p-8">
+            <main className="mx-auto w-full max-w-[1380px] flex-1 p-4 pb-28 sm:pb-4 md:p-6 lg:p-8">
               <div className="print-only mb-6 border-b border-slate-300 pb-4">
                 <p className="page-eyebrow">Department of {department.name}</p>
                 <h1 className="mt-1 text-2xl font-bold">Resident Training Record</h1>
@@ -597,6 +598,7 @@ export function AppLayout({
               {children}
             </main>
           </SidebarInset>
+          <MobileBottomNav role={activeRole} items={navigationItems} location={location} />
           <Toaster position="top-right" richColors />
 
           <Dialog open={isChangePasswordOpen} onOpenChange={setIsChangePasswordOpen}>

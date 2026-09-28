@@ -62,6 +62,18 @@ clinical tables.
   scope, by design, so ids cannot be probed)
 - without the setting, a professor sees only postings they supervise (asserted).
 
+## Changes — part B (front end only)
+- New `components/layout/MobileBottomNav.tsx`, rendered by `AppLayout.tsx`: under 640px, a
+  bar with up to four of the role's main pages plus "More" (opens the full menu). Slots come
+  from the sidebar's own list, so they follow department settings: Radiology students get
+  Home / Clinical / Academics / Postings; Pediatrics students Home / Cases / Procedures /
+  Academics; faculty Queue / Students / Assessments; HOD Home / Students / Reviews /
+  Requirements. Hidden from 640px up and in print. Pages get bottom room on phones.
+- Picking a page from the phone menu now closes the menu. Before, it stayed open over the
+  page.
+- Checked at 390px on 26 screens (no content past the screen edge), "More" opens the menu and
+  a pick closes it; laptop screenshots are pixel-identical to part A.
+
 ## Manual (developer does)
 - [ ] Before merging part A, confirm Dermatology's live config has `freeTextPostingUnit`,
       `freeTextProcedures` and `academicActivityExtras` on. `scripts/seed-derm-config.ts`
