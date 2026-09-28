@@ -195,11 +195,11 @@ router.get("/:departmentId/analytics", requireRole(["hod"]), async (req, res) =>
       const [caseRows, procRows2, acadRows] = await Promise.all([
         db.select({ studentId: caseLogsTable.studentId, cnt: count() })
           .from(caseLogsTable)
-          .where(and(inArray(caseLogsTable.studentId, studentIds), eq(caseLogsTable.status, "verified")))
+          .where(and(inArray(caseLogsTable.studentId, studentIds), eq(caseLogsTable.status, "verified"), isNull(caseLogsTable.deletedAt)))
           .groupBy(caseLogsTable.studentId),
         db.select({ studentId: procedureLogsTable.studentId, cnt: count() })
           .from(procedureLogsTable)
-          .where(and(inArray(procedureLogsTable.studentId, studentIds), eq(procedureLogsTable.status, "verified")))
+          .where(and(inArray(procedureLogsTable.studentId, studentIds), eq(procedureLogsTable.status, "verified"), isNull(procedureLogsTable.deletedAt)))
           .groupBy(procedureLogsTable.studentId),
         db.select({ studentId: academicLogsTable.studentId, cnt: count() })
           .from(academicLogsTable)

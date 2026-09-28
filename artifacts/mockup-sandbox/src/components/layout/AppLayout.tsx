@@ -133,7 +133,8 @@ function navigationForRole(role: RoleType, dashboardData?: any, loadingBadges?: 
     return `${cat.logged}/${required}`;
   };
 
-  if (config?.departmentId === 15) {
+  // A department that lists academic activities before its logs (the academicsFirstInNav setting).
+  if (config?.enabledFeatures?.academicsFirstInNav) {
     const dermItems: NavigationItem[] = [];
     dermItems.push({ title: "Dashboard", icon: LayoutDashboard, href: "/" });
     dermItems.push({ title: "Academic Activities", icon: GraduationCap, href: "/academics" });

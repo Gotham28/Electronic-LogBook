@@ -467,15 +467,16 @@ router.get("/:studentId/postings", async (req, res) => {
   try {
     const studentId = parseInt(String(req.params.studentId), 10);
     const caller = req.user!;
-    const [studentRow] = await db.select({ departmentId: usersTable.departmentId })
-      .from(studentsTable).innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
-      .where(eq(studentsTable.id, studentId)).limit(1);
-    const isDerm = studentRow && (studentRow.departmentId === 15 || studentRow.departmentId === 25);
+    // studentAccess has already confirmed the student is in the caller's department.
+    const { features } = await getDepartmentFeatures(caller.departmentId!);
+    // A department that logs postings as free text (freeTextPostingUnit) names no supervisor,
+    // so its postings cannot be scoped per faculty member: its faculty see them all.
+    const facultySeesAllPostings = !!features.freeTextPostingUnit;
 
     // Same supervisor scoping as /logs (student.ts:165-173): professors see only the
-    // postings they supervise (unless Derm, where they see all); students (own) and HODs (dept-wide, already enforced by
-    // studentAccess) see the rest.
-    const postingsFilter = (caller.role === "professor" && !isDerm)
+    // postings they supervise (unless facultySeesAllPostings); students (own) and HODs
+    // (dept-wide, already enforced by studentAccess) see the rest.
+    const postingsFilter = (caller.role === "professor" && !facultySeesAllPostings)
       ? and(eq(postingsTable.studentId, studentId), eq(postingsTable.supervisorId, caller.id))
       : eq(postingsTable.studentId, studentId);
     const data = await db
@@ -509,16 +510,17 @@ router.post("/:studentId/postings", validate(z.object({ ward: nameSchema, startD
   try {
     const studentId = parseInt(String(req.params.studentId), 10);
     const { ward, postingName, startDate, endDate, supervisorId } = req.body;
-    const isDerm = req.user!.departmentId === 15 || req.user!.departmentId === 25;
+    // Free-text postings name no catalog ward and need no supervisor; without one, they are verified.
+    const freeTextPostings = !!(await getDepartmentFeatures(req.user!.departmentId!)).features.freeTextPostingUnit;
     
-    if (!isDerm && !supervisorId) {
+    if (!freeTextPostings && !supervisorId) {
       res.status(400).json({ message: "Supervisor is required" }); return;
     }
 
     const configSourceId = await resolveConfigDepartmentId(req.user!.departmentId!);
     const [option] = await db.select({ id: departmentCatalogTable.id }).from(departmentCatalogTable).where(and(
       eq(departmentCatalogTable.departmentId, configSourceId), eq(departmentCatalogTable.kind, "posting"), eq(departmentCatalogTable.value, ward))).limit(1);
-    if (!isDerm && !option) {
+    if (!freeTextPostings && !option) {
       res.status(400).json({ message: "Select a posting from your department" }); return;
     }
     if (supervisorId && !(await validateSupervisor(Number(supervisorId), req.user!.departmentId!))) {
@@ -531,7 +533,7 @@ router.post("/:studentId/postings", validate(z.object({ ward: nameSchema, startD
       startDate,
       endDate,
       supervisorId: supervisorId ? parseInt(supervisorId, 10) : null,
-      status: (isDerm && !supervisorId) ? "verified" : "pending"
+      status: (freeTextPostings && !supervisorId) ? "verified" : "pending"
     }).returning();
     res.status(201).json({ success: true, posting: inserted });
   } catch (error) {
@@ -1181,11 +1183,12 @@ router.post("/:studentId/procedure-logs", validate(z.object({ supervisorId: idSc
       return;
     }
 
-    const isDerm = req.user!.departmentId === 15 || req.user!.departmentId === 25;
-    const finalProcedureGroup = isDerm ? "N/A" : procedureGroup;
+    // Free-text procedures are typed in, not chosen from the department's procedure types.
+    const freeTextProcedures = !!(await getDepartmentFeatures(req.user!.departmentId!)).features.freeTextProcedures;
+    const finalProcedureGroup = freeTextProcedures ? "N/A" : procedureGroup;
     const configSourceId = await resolveConfigDepartmentId(req.user!.departmentId!);
 
-    if (!isDerm) {
+    if (!freeTextProcedures) {
       const [option] = await db.select({ id: procedureTypesTable.id }).from(procedureTypesTable).where(and(
         eq(procedureTypesTable.departmentId, configSourceId), eq(procedureTypesTable.name, procedureName), eq(procedureTypesTable.group, finalProcedureGroup))).limit(1);
       if (!option) { res.status(400).json({ message: "Select a procedure from your department" }); return; }
@@ -1514,19 +1517,19 @@ router.patch("/:studentId/procedure-logs/:logId", requireAuth, validate(z.object
       req.body.supervisorId = parseInt(req.body.supervisorId, 10);
     }
 
-    const isDerm = guard.caller.departmentId === 15 || guard.caller.departmentId === 25;
+    const freeTextProcedures = !!(await getDepartmentFeatures(guard.caller.departmentId!)).features.freeTextProcedures;
 
     if (req.body.procedureName || req.body.procedureGroup) {
       const pName = req.body.procedureName || guard.log!.procedureName;
-      const pGroup = isDerm ? "N/A" : (req.body.procedureGroup || guard.log!.procedureGroup);
+      const pGroup = freeTextProcedures ? "N/A" : (req.body.procedureGroup || guard.log!.procedureGroup);
       const configSourceId = await resolveConfigDepartmentId(guard.caller.departmentId!);
       
-      if (!isDerm) {
+      if (!freeTextProcedures) {
         const [option] = await db.select({ id: procedureTypesTable.id }).from(procedureTypesTable).where(and(
           eq(procedureTypesTable.departmentId, configSourceId), eq(procedureTypesTable.name, pName), eq(procedureTypesTable.group, pGroup))).limit(1);
         if (!option) { res.status(400).json({ message: "Select a procedure from your department" }); return; }
       }
-      if (isDerm) req.body.procedureGroup = "N/A";
+      if (freeTextProcedures) req.body.procedureGroup = "N/A";
     }
 
     if (req.body.competencyLevel) {
@@ -1614,10 +1617,10 @@ router.patch("/:studentId/postings/:postingId", requireAuth, validate(z.object({
   try {
     const studentId = parseInt(String(req.params.studentId), 10);
     const postingId = parseInt(String(req.params.postingId), 10);
-    const isDerm = req.user!.departmentId === 15 || req.user!.departmentId === 25;
+    const freeTextPostings = !!(await getDepartmentFeatures(req.user!.departmentId!)).features.freeTextPostingUnit;
     // A verified posting stays editable only when it was verified automatically (no supervisor
     // named). One a faculty member verified is locked, as it is in every other department.
-    const autoVerified = (log: any) => isDerm && log.status === "verified" && log.supervisorId === null;
+    const autoVerified = (log: any) => freeTextPostings && log.status === "verified" && log.supervisorId === null;
     const guard = await studentEditGuard(req, res, postingsTable, postingId, studentId,
       (log) => isPendingOrRejected(log) || autoVerified(log));
     if (guard.error) { res.status(guard.error).json({ message: guard.message }); return; }
@@ -1632,7 +1635,7 @@ router.patch("/:studentId/postings/:postingId", requireAuth, validate(z.object({
       const configSourceId = await resolveConfigDepartmentId(guard.caller.departmentId!);
       const [option] = await db.select({ id: departmentCatalogTable.id }).from(departmentCatalogTable).where(and(
         eq(departmentCatalogTable.departmentId, configSourceId), eq(departmentCatalogTable.kind, "posting"), eq(departmentCatalogTable.value, req.body.ward))).limit(1);
-      if (!isDerm && !option) { res.status(400).json({ message: "Select a posting from your department" }); return; }
+      if (!freeTextPostings && !option) { res.status(400).json({ message: "Select a posting from your department" }); return; }
     }
 
     if (req.body.supervisorId) {
@@ -1643,7 +1646,7 @@ router.patch("/:studentId/postings/:postingId", requireAuth, validate(z.object({
     }
 
     // Re-checked in the update itself so a review landing in between still locks the row.
-    const statusCond = isDerm 
+    const statusCond = freeTextPostings
       ? or(eq(postingsTable.status, "pending"), and(eq(postingsTable.status, "verified"), isNull(postingsTable.supervisorId)))
       : eq(postingsTable.status, "pending");
     // Naming a supervisor sends the posting to them for review, as it does on create.

@@ -60,6 +60,7 @@ async function main() {
     enabledFeatures.academicActivityExtras = true;
     enabledFeatures.freeTextPostingUnit = true;
     enabledFeatures.freeTextProcedures = true;
+    enabledFeatures.academicsFirstInNav = true;
     
     await db.update(departmentConfigsTable)
       .set({ enabledFeatures })

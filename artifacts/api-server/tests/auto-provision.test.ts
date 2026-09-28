@@ -4,6 +4,7 @@ import { setup, mail } from "./support.js";
 import { db, departmentsTable, usersTable, departmentConfigsTable, procedureTypesTable, studentsTable } from "./database.js";
 import { provisionDepartment } from "../src/lib/department-provisioning.js";
 import { eq, and } from "drizzle-orm";
+import nodemailer from "nodemailer";
 
 describe("Auto-provision Mirror Department", () => {
   let server: any;
@@ -111,5 +112,24 @@ describe("Auto-provision Mirror Department", () => {
     // Verify still exactly 3 test accounts
     const testAccounts = await db.select().from(usersTable).where(eq(usersTable.departmentId, mirrors[0].id));
     assert.equal(testAccounts.length, 3);
+  });
+
+  it("a failed HOD welcome email is logged without the HOD's email address", async () => {
+    const original = nodemailer.createTransport;
+    const warnings: string[] = [];
+    const originalWarn = console.warn;
+    nodemailer.createTransport = (() => ({ sendMail: async () => { throw new Error("mail server down"); } })) as any;
+    console.warn = (...args: unknown[]) => { warnings.push(args.map(String).join(" ")); };
+    try {
+      const result = await provisionDepartment({ name: "Mail Fail Dept", code: "MAILFAIL1",
+        hod: { fullName: "Mail Fail HOD", email: "mail-fail-hod@example.com" } }, "SecurePass123!");
+      const line = warnings.find((w) => w.includes("welcome email"));
+      assert.ok(line, "the failure is still logged");
+      assert.ok(!line!.includes("mail-fail-hod@example.com"), "the email address is not in the log");
+      assert.ok(line!.includes(String(result.departmentId)), "the department id is");
+    } finally {
+      nodemailer.createTransport = original;
+      console.warn = originalWarn;
+    }
   });
 });
