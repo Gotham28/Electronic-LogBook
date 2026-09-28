@@ -140,6 +140,13 @@ export function ClinicalWorksPage() {
   });
   const counts = new Map<string, number>();
   logs.filter((log) => log.status !== "rejected").forEach((log) => counts.set(log.category, (counts.get(log.category) ?? 0) + 1));
+  // Verified entries per category: all of them for an overall minimum, this month's for a monthly one.
+  const thisMonth = todayForInput().slice(0, 7);
+  const verifiedCounts = new Map<string, { total: number; month: number }>();
+  logs.filter((log) => log.status === "verified").forEach((log) => {
+    const current = verifiedCounts.get(log.category) ?? { total: 0, month: 0 };
+    verifiedCounts.set(log.category, { total: current.total + 1, month: current.month + (log.date.startsWith(thisMonth) ? 1 : 0) });
+  });
 
   return (
     <div className="space-y-6 pb-12">
@@ -219,12 +226,34 @@ export function ClinicalWorksPage() {
 
       {!loading && !error && clinicalWorkCategories.length > 0 && (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {clinicalWorkCategories.map((item) => (
-            <div key={item.value} className="rounded-xl border border-teal-100 bg-white p-4">
-              <p className="text-xs font-semibold leading-snug text-slate-700">{item.name}</p>
-              <p className="mt-2 text-xl font-bold text-slate-900">{counts.get(item.value) ?? 0}</p>
-            </div>
-          ))}
+          {clinicalWorkCategories.map((item) => {
+            // A minimum of 0 means the HOD has not made this category mandatory.
+            const logged = counts.get(item.value) ?? 0;
+            const monthly = item.period === "month";
+            const verified = (monthly ? verifiedCounts.get(item.value)?.month : verifiedCounts.get(item.value)?.total) ?? 0;
+            const hasMinimum = item.required > 0;
+            const done = hasMinimum && verified >= item.required;
+            const pct = hasMinimum ? Math.min(Math.round((verified / item.required) * 100), 100) : 0;
+            return (
+              <div key={item.value} className={`rounded-xl border p-4 ${done ? "border-emerald-200 bg-emerald-50/60" : "border-teal-100 bg-white"}`}>
+                <div className="flex items-start justify-between gap-2">
+                  <p className="min-w-0 break-words text-xs font-semibold leading-snug text-slate-700">{item.name}</p>
+                  {done && <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />}
+                </div>
+                <p className="mt-2 text-xl font-bold text-slate-900">{logged}</p>
+                {hasMinimum ? (
+                  <>
+                    <p className="text-[11px] text-slate-500">{verified} of {item.required} verified{monthly ? " this month" : ""}</p>
+                    <div className="mt-2 h-1.5 w-full rounded-full bg-slate-100">
+                      <div className={`h-1.5 rounded-full transition-all ${done ? "bg-emerald-500" : "bg-teal-500"}`} style={{ width: `${pct}%` }} />
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-[11px] text-slate-500">No minimum set</p>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 

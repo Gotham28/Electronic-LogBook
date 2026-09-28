@@ -480,8 +480,9 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
                                   <CompletionRing value={s.completion} />
                                 )}
                                 <div className="text-[11px] leading-5 text-slate-500">
-                                  <p>{config?.requiredCases !== null && config?.requiredCases !== undefined ? `${s.verified?.cases ?? 0}/${s.targets?.cases ?? 0} cases` : `${s.verified?.cases ?? 0} cases verified`}</p>
-                                  <p>{config?.requiredProcedures !== null && config?.requiredProcedures !== undefined ? `${s.verified?.procedures ?? 0}/${s.targets?.procedures ?? 0} procedures` : `${s.verified?.procedures ?? 0} procedures verified`}</p>
+                                  {!config?.enabledFeatures?.hideCaseLogs && <p>{config?.requiredCases !== null && config?.requiredCases !== undefined ? `${s.verified?.cases ?? 0}/${s.targets?.cases ?? 0} cases` : `${s.verified?.cases ?? 0} cases verified`}</p>}
+                                  {!config?.enabledFeatures?.hideProcedureLogs && <p>{config?.requiredProcedures !== null && config?.requiredProcedures !== undefined ? `${s.verified?.procedures ?? 0}/${s.targets?.procedures ?? 0} procedures` : `${s.verified?.procedures ?? 0} procedures verified`}</p>}
+                                  {config?.enabledFeatures?.clinicalWorks && <p>{s.targets?.clinicalWork ? `${s.verified?.clinicalWork ?? 0}/${s.targets.clinicalWork} clinical work` : `${s.verified?.clinicalWork ?? 0} clinical work verified`}</p>}
                                   <p>{config?.requiredAcademic !== null && config?.requiredAcademic !== undefined ? `${s.verified?.academics ?? 0}/${s.targets?.academics ?? 0} academics` : `${s.verified?.academics ?? 0} academics verified`}</p>
                                 </div>
                               </div>

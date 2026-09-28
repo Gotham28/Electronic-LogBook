@@ -62,6 +62,33 @@ clinical table (§3). Part 3: Sonnet.
 - Tests: `department-template.test.ts` (totals set on apply, untouched on dry run),
   `auto-provision.test.ts` (procedure total set on provisioning).
 
+## Changes — part 2 (Opus review tier)
+- Server, read-only counts on `clinical_work_logs` (new `src/lib/clinical-work-progress.ts`):
+  - `GET /api/students/:id/progress` adds `clinicalWorks: [{ value, verified, pending }]`,
+    counted per category, leaving out rejected and deleted entries. Counts only (§8).
+  - Completion % in the HOD roster (`admin.ts`), review queue (`professor.ts`), analytics
+    (`department.ts`) and student `/dashboard` now includes clinical work: verified entries
+    against the sum of the HOD's per-category overall minimums (0 when Clinical Work is off).
+  - No ownership check was changed. `/progress` evidence (§11), from
+    `tests/clinical-work-progress.test.ts`: no token → 401; faculty of another department
+    → 403; another student of the same department → 403; the student, their faculty and
+    their HOD → 200; nonexistent student id → 403 (studentAccess answers 403 for any id
+    outside the caller's scope, by design, so ids cannot be probed; same as
+    `clinical-works.test.ts`).
+- Item 6: the faculty/HOD "View Logbook" progress tab shows case, procedure and clinical
+  work sections from the department's own settings (`hideCaseLogs`, `hideProcedureLogs`,
+  `clinicalWorks`), never a fixed list, so a new department gets the right sections. The
+  HOD roster lines follow the same settings. Clinical work bars click through to a
+  filtered Clinical Work tab.
+- Item 8: the HOD sets a minimum per clinical work category (0 = optional, overall or per
+  month), when adding one and inline afterwards. The student's Clinical Work page shows
+  "N of M verified" per category; the dashboard card shows the total target.
+- Item 9: HOD page order is now "Add a new log option" (one form for every type, including
+  procedure types) then "Existing log options" (totals, procedures, clinical work,
+  catalog lists). "Conference level" is offered when the department's `conferenceLevels`
+  setting is on, replacing the hardcoded department IDs 15 and 25 (§5).
+- Tests: `tests/clinical-work-progress.test.ts` (new, 6 tests).
+
 ## Manual (developer does)
 - [ ] Review and merge each branch in order (1, then 2, then 3), by hand.
 - [ ] Radiology's saved academic total stays empty until the HOD saves any target (or the

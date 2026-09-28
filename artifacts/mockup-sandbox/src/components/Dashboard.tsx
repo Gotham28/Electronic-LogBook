@@ -77,10 +77,12 @@ export function Dashboard() {
 
   if (!logs) return null;
 
+  // The HOD's per-category minimums, summed the same way the server sums them for completion.
+  const clinicalTarget = clinicalWorkCategories.filter((item) => item.period === "total").reduce((sum, item) => sum + item.required, 0);
   const allCategories = [
     { label: "Clinical cases", logged: logs.caseLogs?.filter((l: any) => l.status !== "rejected").length || 0, required: deptConfig?.requiredCases ?? 0, verified: logs.caseLogs?.filter((l: any) => l.status === "verified").length || 0, icon: FileText, href: "/cases", tone: "from-teal-500 to-cyan-500", hasTarget: deptConfig?.requiredCases !== null && deptConfig?.requiredCases !== undefined },
     { label: "Procedures", logged: logs.procedureLogs?.filter((l: any) => l.status !== "rejected").length || 0, required: deptConfig?.requiredProcedures ?? 0, verified: logs.procedureLogs?.filter((l: any) => l.status === "verified").length || 0, icon: Stethoscope, href: "/procedures", tone: "from-cyan-500 to-sky-500", hasTarget: deptConfig?.requiredProcedures !== null && deptConfig?.requiredProcedures !== undefined },
-    { label: "Clinical work", logged: logs.clinicalWorkLogs?.filter((l: any) => l.status !== "rejected").length || 0, required: 0, verified: logs.clinicalWorkLogs?.filter((l: any) => l.status === "verified").length || 0, icon: Stethoscope, href: "/clinical-works", tone: "from-cyan-500 to-sky-500", hasTarget: false },
+    { label: "Clinical work", logged: logs.clinicalWorkLogs?.filter((l: any) => l.status !== "rejected").length || 0, required: clinicalTarget, verified: logs.clinicalWorkLogs?.filter((l: any) => l.status === "verified").length || 0, icon: Stethoscope, href: "/clinical-works", tone: "from-cyan-500 to-sky-500", hasTarget: clinicalTarget > 0 },
     { label: "Academic activities", logged: logs.academicLogs?.filter((l: any) => l.status !== "rejected").length || 0, required: deptConfig?.requiredAcademic ?? 0, verified: logs.academicLogs?.filter((l: any) => l.status === "verified").length || 0, icon: GraduationCap, href: "/academics", tone: "from-emerald-500 to-teal-500", hasTarget: deptConfig?.requiredAcademic !== null && deptConfig?.requiredAcademic !== undefined },
   ];
   const categories = allCategories.filter((item) =>

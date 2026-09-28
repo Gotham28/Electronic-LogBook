@@ -12,6 +12,7 @@ import { z } from "zod";
 import { dateSchema, idSchema, nameSchema, validate } from "../lib/validation.js";
 import { resolveConfigDepartmentId } from "../lib/department-config-source.js";
 import { getDepartmentFeatures } from "../lib/department-features.js";
+import { clinicalWorkTarget } from "../lib/clinical-work-progress.js";
 
 const router: IRouter = Router();
 router.use(requireAuth, requireRole(["student", "professor", "hod"]), requireDepartment);
@@ -106,6 +107,7 @@ router.get("/:studentId/dashboard", requireAuth, async (req, res) => {
     const reqCases = config?.requiredCases ?? 0;
     const reqProcs = config?.requiredProcedures ?? 0;
     const reqAcad = config?.requiredAcademic ?? 0;
+    const reqClinical = clinicalWorks ? await clinicalWorkTarget(configSourceId) : 0;
 
     // Recent Logs (simplified for dashboard). Scoped like /logs (student.ts:165-173):
     // professors see only entries they supervise; students (own) and HODs (dept-wide,
@@ -134,7 +136,7 @@ router.get("/:studentId/dashboard", requireAuth, async (req, res) => {
       categories: [
         ...(features.hideCaseLogs ? [] : [{ id: "cases", name: "Clinical Cases Presented", logged: cases.total, required: reqCases, verified: cases.verified, percentage: Math.min(100, Math.round((cases.verified / (reqCases || 1)) * 100)) }]),
         ...(features.hideProcedureLogs ? [] : [{ id: "procedures", name: "Required Procedures", logged: procs.total, required: reqProcs, verified: procs.verified, percentage: Math.min(100, Math.round((procs.verified / (reqProcs || 1)) * 100)) }]),
-        ...(clinicalWorks ? [{ id: "clinicalWorks", name: "Clinical Work", logged: clinicalWorks.total, required: 0, verified: clinicalWorks.verified, percentage: 0 }] : []),
+        ...(clinicalWorks ? [{ id: "clinicalWorks", name: "Clinical Work", logged: clinicalWorks.total, required: reqClinical, verified: clinicalWorks.verified, percentage: Math.min(100, Math.round((clinicalWorks.verified / (reqClinical || 1)) * 100)) }] : []),
         { id: "academics", name: "Academic Activities", logged: acads.total, required: reqAcad, verified: acads.verified, percentage: Math.min(100, Math.round((acads.verified / (reqAcad || 1)) * 100)) },
       ],
       recentLogs: [...(features.hideCaseLogs ? [] : recentCases), ...(features.hideProcedureLogs ? [] : recentProcs)]
@@ -307,9 +309,9 @@ router.get("/:studentId/progress", requireAuth, async (req, res) => {
       return;
     }
 
-    // All three queries filter by studentId only — no supervisorId filter.
+    // All four queries filter by studentId only — no supervisorId filter.
     // See the comment block above this handler for why.
-    const [caseCounts, procedureCounts, academicCounts] = await Promise.all([
+    const [caseCounts, procedureCounts, academicCounts, clinicalWorkCounts] = await Promise.all([
       // Query 1: case_logs grouped by category and status.
       // NULL category (rows predating migration 0005) is a valid group — passed through as null.
       db.select({
@@ -343,6 +345,17 @@ router.get("/:studentId/progress", requireAuth, async (req, res) => {
       .from(academicLogsTable)
       .where(eq(academicLogsTable.studentId, studentId))
       .groupBy(academicLogsTable.activityType, academicLogsTable.status),
+
+      // Query 4: clinical_work_logs grouped by category and status. Category only — the
+      // sub-type is not needed for targets, which are set per category.
+      db.select({
+        category: clinicalWorkLogsTable.category,
+        status: clinicalWorkLogsTable.status,
+        count: count(),
+      })
+      .from(clinicalWorkLogsTable)
+      .where(and(eq(clinicalWorkLogsTable.studentId, studentId), isNull(clinicalWorkLogsTable.deletedAt)))
+      .groupBy(clinicalWorkLogsTable.category, clinicalWorkLogsTable.status),
     ]);
 
     // Reshape raw per-status rows into the response shape.
@@ -427,8 +440,22 @@ router.get("/:studentId/progress", requireAuth, async (req, res) => {
       pending: counts.pending,
     }));
 
+    // --- Clinical work ---
+    const clinicalWorkMap = new Map<string, { verified: number; pending: number }>();
+    for (const row of clinicalWorkCounts) {
+      if (!clinicalWorkMap.has(row.category)) clinicalWorkMap.set(row.category, { verified: 0, pending: 0 });
+      const entry = clinicalWorkMap.get(row.category)!;
+      if (row.status === "verified") entry.verified += Number(row.count);
+      else if (row.status === "pending") entry.pending += Number(row.count);
+    }
+    const clinicalWorks = Array.from(clinicalWorkMap.entries()).map(([value, counts]) => ({
+      value,
+      verified: counts.verified,
+      pending: counts.pending,
+    }));
+
     // Counts only — no patient text, no UHID, no free-text field (AGENTS.md §8).
-    res.json({ caseCategories, procedures, academics });
+    res.json({ caseCategories, procedures, academics, clinicalWorks });
   } catch (error) {
     req.log.error({ studentId: req.params.studentId, status: 500 }, "Error fetching student progress");
     res.status(500).json({ message: "Internal server error" });
