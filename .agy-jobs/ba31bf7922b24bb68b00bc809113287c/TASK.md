@@ -1,1 +1,0 @@
-Test dispatch: read AGENTS.md and report its total line count in your summary. Make no edits to any file. Do not call run_command or any shell tool at all, for any reason.
