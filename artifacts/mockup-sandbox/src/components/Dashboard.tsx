@@ -77,10 +77,12 @@ export function Dashboard() {
 
   if (!logs) return null;
 
+  // The HOD's per-category minimums, summed the same way the server sums them for completion.
+  const clinicalTarget = clinicalWorkCategories.filter((item) => item.period === "total").reduce((sum, item) => sum + item.required, 0);
   const allCategories = [
     { label: "Clinical cases", logged: logs.caseLogs?.filter((l: any) => l.status !== "rejected").length || 0, required: deptConfig?.requiredCases ?? 0, verified: logs.caseLogs?.filter((l: any) => l.status === "verified").length || 0, icon: FileText, href: "/cases", tone: "from-teal-500 to-cyan-500", hasTarget: deptConfig?.requiredCases !== null && deptConfig?.requiredCases !== undefined },
     { label: "Procedures", logged: logs.procedureLogs?.filter((l: any) => l.status !== "rejected").length || 0, required: deptConfig?.requiredProcedures ?? 0, verified: logs.procedureLogs?.filter((l: any) => l.status === "verified").length || 0, icon: Stethoscope, href: "/procedures", tone: "from-cyan-500 to-sky-500", hasTarget: deptConfig?.requiredProcedures !== null && deptConfig?.requiredProcedures !== undefined },
-    { label: "Clinical work", logged: logs.clinicalWorkLogs?.filter((l: any) => l.status !== "rejected").length || 0, required: 0, verified: logs.clinicalWorkLogs?.filter((l: any) => l.status === "verified").length || 0, icon: Stethoscope, href: "/clinical-works", tone: "from-cyan-500 to-sky-500", hasTarget: false },
+    { label: "Clinical work", logged: logs.clinicalWorkLogs?.filter((l: any) => l.status !== "rejected").length || 0, required: clinicalTarget, verified: logs.clinicalWorkLogs?.filter((l: any) => l.status === "verified").length || 0, icon: Stethoscope, href: "/clinical-works", tone: "from-cyan-500 to-sky-500", hasTarget: clinicalTarget > 0 },
     { label: "Academic activities", logged: logs.academicLogs?.filter((l: any) => l.status !== "rejected").length || 0, required: deptConfig?.requiredAcademic ?? 0, verified: logs.academicLogs?.filter((l: any) => l.status === "verified").length || 0, icon: GraduationCap, href: "/academics", tone: "from-emerald-500 to-teal-500", hasTarget: deptConfig?.requiredAcademic !== null && deptConfig?.requiredAcademic !== undefined },
   ];
   const categories = allCategories.filter((item) =>
@@ -128,9 +130,9 @@ export function Dashboard() {
       {!configured.length && <p className="rounded-xl bg-teal-50 p-4 text-sm text-teal-800">Your HOD has not configured completion targets yet.</p>}
       <Card className="overflow-hidden border-white/70 bg-white/72 layer-2 animate-float-up">
         <div className="h-1.5 bg-gradient-to-r from-teal-500 via-cyan-400 to-emerald-400" />
-        <CardContent className="p-6 md:p-8">
+        <CardContent className="p-4 sm:p-6 md:p-8">
           <div className="grid items-stretch gap-7 xl:grid-cols-[.8fr_1.2fr]">
-            <div className="flex flex-col justify-center rounded-[24px] bg-gradient-to-br from-teal-950 via-teal-800 to-cyan-700 p-7 text-white md:p-9">
+            <div className="flex flex-col justify-center rounded-[24px] bg-gradient-to-br from-teal-950 via-teal-800 to-cyan-700 p-6 text-white md:p-9">
               <p className="text-[10px] font-bold uppercase tracking-[.2em] text-teal-100">{logs.profile?.department || "Department Unassigned"}</p>
               <h1 className="mt-3 text-3xl font-semibold leading-tight tracking-tight md:text-4xl">Welcome back, {user?.name?.split(" ")[0] || "Student"}</h1>
               <p className="mt-4 max-w-lg text-sm leading-6 text-teal-50/85">Your clinical record, academic work, and verification status are summarised here.</p>
@@ -163,16 +165,16 @@ export function Dashboard() {
       </Card>
 
       <Card className="overflow-hidden border-white/70 bg-white/78 layer-2">
-        <CardContent className="p-6 md:p-8">
+        <CardContent className="p-4 sm:p-6 md:p-8">
           <div className="grid gap-8 lg:grid-cols-[1fr_.9fr] lg:items-center">
-            <div className="flex items-center gap-6">
+            <div className="flex flex-col items-start gap-5 sm:flex-row sm:items-center sm:gap-6">
               {hasAnyNumericTargets && completion !== null && <ProgressDonut value={completion} />}
               <div>
                 <p className="page-eyebrow">Dashboard insights</p>
                 {hasAnyNumericTargets ? (
-                  <h2 className="mt-1 text-2xl font-semibold text-slate-950">You need {overallRemaining} more entries to complete the core targets.</h2>
+                  <h2 className="mt-1 text-xl font-semibold text-slate-950 sm:text-2xl">You need {overallRemaining} more entries to complete the core targets.</h2>
                 ) : (
-                  <h2 className="mt-1 text-2xl font-semibold text-slate-950">Keep logging your work.</h2>
+                  <h2 className="mt-1 text-xl font-semibold text-slate-950 sm:text-2xl">Keep logging your work.</h2>
                 )}
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">{pendingCount > 0 ? `${pendingCount} ${pendingCount === 1 ? "entry is" : "entries are"} waiting for faculty verification.` : "All submitted entries have been reviewed."}</p>
                 {hasAnyNumericTargets && <Badge variant="secondary" className="mt-4 rounded-full border-white/70 bg-teal-50 px-3 py-1 text-teal-800">{progressLabel}</Badge>}

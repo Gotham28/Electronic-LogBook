@@ -62,6 +62,7 @@ import {
 } from "lucide-react";
 import { formatLogbookDate } from "@/lib/logbook-config";
 import { apiGet, apiPatch, apiPost, apiDelete } from "@/lib/apiClient";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { getCurrentUser, isDemoMode } from "@/lib/session";
 import { QuarterlyAppraisalSection } from "@/components/QuarterlyAppraisalSection";
 import { useDepartment } from "@/lib/department-context";
@@ -102,10 +103,17 @@ type ProgressAcademic = {
   pending: number;
 };
 
+type ProgressClinicalWork = {
+  value: string;
+  verified: number;
+  pending: number;
+};
+
 type MenteeProgress = {
   caseCategories: ProgressCaseCategory[];
   procedures: ProgressProcedure[];
   academics: ProgressAcademic[];
+  clinicalWorks?: ProgressClinicalWork[];
 };
 
 // ── Click-through filter state ─────────────────────────────────────────────────
@@ -114,6 +122,7 @@ type LogFilter =
   | { tab: "case-logs"; category: string | null; label: string }
   | { tab: "proc-logs"; group: string; name: string; label: string }
   | { tab: "acad-logs"; activityType: string; label: string }
+  | { tab: "clinical-works"; category: string; label: string }
   | null;
 
 // ── Main component ─────────────────────────────────────────────────────────────
@@ -160,6 +169,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
   const [showAllCaseBars, setShowAllCaseBars] = React.useState(false);
   const [showAllProcBars, setShowAllProcBars] = React.useState(false);
   const [showAllAcadBars, setShowAllAcadBars] = React.useState(false);
+  const [showAllClinicalBars, setShowAllClinicalBars] = React.useState(false);
 
   // Assessment form state
   const [assessExamName, setAssessExamName] = React.useState("");
@@ -447,7 +457,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
               <div className="lg:col-span-2 space-y-4">
                 <Card className="border border-slate-200 shadow-xs bg-white">
                   <CardHeader className="border-b border-slate-100 pb-3">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <Badge variant="outline" className="bg-teal-50 text-teal-800 border-teal-300 text-xs">
                           Item {currentIndex + 1} of {reviews.length}
@@ -928,6 +938,10 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                       deptCaseCategories={deptCaseCategories}
                       deptProcedures={deptProcedures}
                       deptAcademics={deptAcademics}
+                      deptClinicalCategories={clinicalWorkCategories}
+                      features={config?.enabledFeatures ?? {}}
+                      showAllClinicalBars={showAllClinicalBars}
+                      setShowAllClinicalBars={setShowAllClinicalBars}
                       showAllCaseBars={showAllCaseBars}
                       setShowAllCaseBars={setShowAllCaseBars}
                       showAllProcBars={showAllProcBars}
@@ -1010,6 +1024,16 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
 
                 {/* ── Clinical Works Tab ───────────────────────────────────── */}
                 <TabsContent value="clinical-works" className="pt-3">
+                  {logFilter?.tab === "clinical-works" && (
+                    <FilterBanner
+                      label={logFilter.label}
+                      onClear={() => setLogFilter(null)}
+                      progressCount={menteeProgress?.clinicalWorks?.find((c) => c.value === (logFilter as any).category)}
+                      filteredCount={(menteeLogs?.clinicalWorkLogs ?? []).filter((log: any) =>
+                        log.category === (logFilter as any).category && log.status !== "rejected").length}
+                      callerIsHod={callerIsHod}
+                    />
+                  )}
                   {menteeLogsLoading ? (
                     <div className="flex h-32 items-center justify-center"><div className="animate-spin rounded-full border-4 border-slate-300 border-t-teal-600 h-8 w-8" /></div>
                   ) : (
@@ -1024,7 +1048,9 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                       </TableHeader>
                       <TableBody>
                         {(() => {
-                          const rows = menteeLogs?.clinicalWorkLogs ?? [];
+                          const rows = logFilter?.tab === "clinical-works"
+                            ? (menteeLogs?.clinicalWorkLogs ?? []).filter((log: any) => log.category === (logFilter as any).category)
+                            : (menteeLogs?.clinicalWorkLogs ?? []);
                           if (menteeLoadErrors.logs) {
                             return <TableRow><TableCell colSpan={4} role="alert" className="text-center text-sm font-medium text-rose-700 py-6">{menteeLoadErrors.logs}</TableCell></TableRow>;
                           }
@@ -1454,6 +1480,10 @@ function ProgressTabContent({
   deptCaseCategories,
   deptProcedures,
   deptAcademics,
+  deptClinicalCategories,
+  features,
+  showAllClinicalBars,
+  setShowAllClinicalBars,
   showAllCaseBars,
   setShowAllCaseBars,
   showAllProcBars,
@@ -1466,6 +1496,10 @@ function ProgressTabContent({
   deptCaseCategories: CatalogItem[];
   deptProcedures: DeptProcedure[];
   deptAcademics: CatalogItem[];
+  deptClinicalCategories: CatalogItem[];
+  features: Record<string, boolean>;
+  showAllClinicalBars: boolean;
+  setShowAllClinicalBars: (v: boolean) => void;
   showAllCaseBars: boolean;
   setShowAllCaseBars: (v: boolean) => void;
   showAllProcBars: boolean;
@@ -1474,10 +1508,18 @@ function ProgressTabContent({
   setShowAllAcadBars: (v: boolean) => void;
   onBarClick: (filter: LogFilter) => void;
 }) {
+  // Sections follow the department's own settings, so a department without case or
+  // procedure logs (e.g. one that logs clinical work instead) never shows them.
+  const showCases = !features.hideCaseLogs;
+  const showProcedures = !features.hideProcedureLogs;
+  const showClinical = !!features.clinicalWorks;
+  const clinicalProgress = progress.clinicalWorks ?? [];
+
   // ── Check: student has no logs at all ────────────────────────────────────────
   const totalLogs =
-    progress.caseCategories.reduce((s, c) => s + c.verified + c.pending, 0) +
-    progress.procedures.reduce((s, p) => s + p.verified + p.pending, 0) +
+    (showCases ? progress.caseCategories.reduce((s, c) => s + c.verified + c.pending, 0) : 0) +
+    (showProcedures ? progress.procedures.reduce((s, p) => s + p.verified + p.pending, 0) : 0) +
+    (showClinical ? clinicalProgress.reduce((s, c) => s + c.verified + c.pending, 0) : 0) +
     progress.academics.reduce((s, a) => s + a.verified + a.pending, 0);
 
   if (totalLogs === 0) {
@@ -1489,7 +1531,7 @@ function ProgressTabContent({
           </EmptyMedia>
           <EmptyTitle>No logs yet</EmptyTitle>
           <EmptyDescription>
-            This student has not submitted any case, procedure, or academic logs.
+            This student has not submitted any logs yet.
           </EmptyDescription>
         </EmptyHeader>
       </Empty>
@@ -1655,13 +1697,33 @@ function ProgressTabContent({
     }
   }
 
+  // ── Join: clinical work ───────────────────────────────────────────────────────
+  // Categories with a minimum get a target bar. Logged categories without one still show,
+  // as "No minimum set" (in the catalog) or "Not in current catalog" (removed since).
+  const clinicalBarItems: ProgressSectionItem[] = [];
+  for (const cat of deptClinicalCategories) {
+    if (cat.required === 0 || cat.period !== "total") continue;
+    const match = clinicalProgress.find((c) => c.value === cat.value);
+    const verified = match?.verified ?? 0;
+    clinicalBarItems.push({ key: cat.value, label: cat.name, verified, pending: match?.pending ?? 0,
+      required: cat.required, inCatalog: true, done: verified >= cat.required });
+  }
+  for (const item of clinicalProgress) {
+    if (clinicalBarItems.some((bar) => bar.key === item.value)) continue;
+    const cat = deptClinicalCategories.find((c) => c.value === item.value);
+    clinicalBarItems.push({ key: item.value, label: cat?.name ?? item.value, verified: item.verified, pending: item.pending,
+      required: null, inCatalog: !!cat, done: false });
+  }
+
   // ── Summary tile counts ───────────────────────────────────────────────────────
-  const totalCaseVerified = progress.caseCategories.reduce((s, c) => s + c.verified, 0);
-  const totalProcVerified = progress.procedures.reduce((s, p) => s + p.verified, 0);
-  const totalAcadVerified = progress.academics.reduce((s, a) => s + a.verified, 0);
-  const totalCasePending = progress.caseCategories.reduce((s, c) => s + c.pending, 0);
-  const totalProcPending = progress.procedures.reduce((s, p) => s + p.pending, 0);
-  const totalAcadPending = progress.academics.reduce((s, a) => s + a.pending, 0);
+  const sumOf = (rows: { verified: number; pending: number }[]) => ({
+    verified: rows.reduce((s, r) => s + r.verified, 0), pending: rows.reduce((s, r) => s + r.pending, 0) });
+  const tiles = [
+    ...(showCases ? [{ label: "Cases Logged", ...sumOf(progress.caseCategories) }] : []),
+    ...(showProcedures ? [{ label: "Procedures Logged", ...sumOf(progress.procedures) }] : []),
+    ...(showClinical ? [{ label: "Clinical Work Logged", ...sumOf(clinicalProgress) }] : []),
+    { label: "Academic Activities", ...sumOf(progress.academics) },
+  ];
 
   // ── Group procedures by group name ────────────────────────────────────────────
   const procGroups: Map<string, ProcBarItem[]> = new Map();
@@ -1673,26 +1735,18 @@ function ProgressTabContent({
   return (
     <div className="space-y-6">
       {/* Summary tiles */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-center">
-          <p className="metric-value">{totalCaseVerified + totalCasePending}</p>
-          <p className="metric-label mt-1">Cases Logged</p>
-          <p className="mt-1 text-[11px] text-slate-500">{totalCaseVerified} verified · {totalCasePending} pending</p>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-center">
-          <p className="metric-value">{totalProcVerified + totalProcPending}</p>
-          <p className="metric-label mt-1">Procedures Logged</p>
-          <p className="mt-1 text-[11px] text-slate-500">{totalProcVerified} verified · {totalProcPending} pending</p>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-center">
-          <p className="metric-value">{totalAcadVerified + totalAcadPending}</p>
-          <p className="metric-label mt-1">Academic Activities</p>
-          <p className="mt-1 text-[11px] text-slate-500">{totalAcadVerified} verified · {totalAcadPending} pending</p>
-        </div>
+      <div className={`grid grid-cols-2 gap-2 sm:gap-4 ${tiles.length >= 3 ? "sm:grid-cols-3" : ""}`}>
+        {tiles.map((tile) => (
+          <div key={tile.label} className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-center sm:p-4">
+            <p className="metric-value">{tile.verified + tile.pending}</p>
+            <p className="metric-label mt-1">{tile.label}</p>
+            <p className="mt-1 text-[11px] text-slate-500">{tile.verified} verified · {tile.pending} pending</p>
+          </div>
+        ))}
       </div>
 
       {/* ── Section 1: Case Categories ── */}
-      <div className="space-y-3">
+      {showCases && <div className="space-y-3">
         <h3 className="text-sm font-semibold text-slate-700">Case Categories</h3>
         {caseBarItems.length === 0 ? (
           <p className="text-xs text-slate-500 rounded-xl border border-dashed border-slate-200 p-4 text-center">
@@ -1724,10 +1778,10 @@ function ProgressTabContent({
             )}
           </>
         )}
-      </div>
+      </div>}
 
       {/* ── Section 2: Procedures (grouped) ── */}
-      <div className="space-y-3">
+      {showProcedures && <div className="space-y-3">
         <h3 className="text-sm font-semibold text-slate-700">Procedures</h3>
         {procBarItems.length === 0 ? (
           <p className="text-xs text-slate-500 rounded-xl border border-dashed border-slate-200 p-4 text-center">
@@ -1765,9 +1819,38 @@ function ProgressTabContent({
             )}
           </>
         )}
-      </div>
+      </div>}
 
-      {/* ── Section 3: Academic Activities ── */}
+      {/* ── Section 3: Clinical Work ── */}
+      {showClinical && <div className="space-y-3">
+        <h3 className="text-sm font-semibold text-slate-700">Clinical Work</h3>
+        {clinicalBarItems.length === 0 ? (
+          <p className="text-xs text-slate-500 rounded-xl border border-dashed border-slate-200 p-4 text-center">
+            No clinical work minimums set and nothing logged yet.
+          </p>
+        ) : (
+          <>
+            <ProgressSection
+              items={clinicalBarItems.slice(0, showAllClinicalBars ? undefined : 8)}
+              onItemClick={(item) => onBarClick({ tab: "clinical-works", category: item.key, label: item.label })}
+            />
+            {clinicalBarItems.length > 8 && (
+              <div className="mt-1 flex justify-center">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowAllClinicalBars(!showAllClinicalBars)}
+                  className="text-slate-500 hover:text-slate-700"
+                >
+                  {showAllClinicalBars ? "Show less" : `Show all ${clinicalBarItems.length} categories`}
+                </Button>
+              </div>
+            )}
+          </>
+        )}
+      </div>}
+
+      {/* ── Section 4: Academic Activities ── */}
       <div className="space-y-3">
         <h3 className="text-sm font-semibold text-slate-700">Academic Activities</h3>
         {acadBarItems.length === 0 ? (
@@ -1834,6 +1917,9 @@ function ProgressSection({
   items: ProgressSectionItem[];
   onItemClick: (item: any) => void;
 }) {
+  // A 600px-wide chart cannot fit a phone; show the same numbers as a tappable list.
+  const isMobile = useIsMobile();
+  if (isMobile) return <ProgressList items={items} onItemClick={onItemClick} />;
   const chartData = items.map((item) => {
     const total = item.verified + item.pending;
     const remaining = item.required !== null ? Math.max(item.required - total, 0) : 0;
@@ -1906,7 +1992,7 @@ function ProgressSection({
                         </>
                       ) : (
                         <div className="mt-2 border-t border-slate-100 pt-2 text-[10px] italic text-slate-500">
-                          Not in current catalog
+                          {data.inCatalog ? "No minimum set" : "Not in current catalog"}
                         </div>
                       )}
                       {data.byCompetency && data.byCompetency.length > 0 && (
@@ -1978,6 +2064,46 @@ function ProgressSection({
         </ChartContainer>
       </div>
     </div>
+  );
+}
+
+function ProgressList({
+  items,
+  onItemClick,
+}: {
+  items: ProgressSectionItem[];
+  onItemClick: (item: any) => void;
+}) {
+  return (
+    <ul className="space-y-2">
+      {items.map((item) => {
+        const scale = item.required ?? Math.max(item.verified + item.pending, 1);
+        const verifiedPct = Math.min((item.verified / scale) * 100, 100);
+        const pendingPct = Math.min((item.pending / scale) * 100, 100 - verifiedPct);
+        const isDone = item.done && item.required !== null;
+        return (
+          <li key={item.key}>
+            <button type="button" onClick={() => onItemClick(item)} className="w-full rounded-xl border border-slate-100 bg-white p-3 text-left transition-colors active:bg-slate-50">
+              <div className="flex items-start justify-between gap-3">
+                <span className="min-w-0 text-sm font-medium leading-snug text-slate-800">{item.label}</span>
+                <span className="shrink-0 text-xs font-semibold text-slate-700">
+                  {item.required !== null ? `${item.verified} / ${item.required}` : `${item.verified} verified`}
+                </span>
+              </div>
+              <div className="mt-2 flex h-2 overflow-hidden rounded-full bg-slate-100" aria-hidden>
+                <div className={isDone ? "bg-emerald-500" : "bg-teal-600"} style={{ width: `${verifiedPct}%` }} />
+                <div className={isDone ? "bg-emerald-300" : "bg-teal-200"} style={{ width: `${pendingPct}%` }} />
+              </div>
+              <p className="mt-1.5 text-[11px] text-slate-500">
+                {item.pending} pending
+                {item.required === null && ` · ${item.inCatalog ? "No minimum set" : "Not in current catalog"}`}
+                {item.byCompetency && item.byCompetency.length > 0 && ` · ${item.byCompetency.map((c) => `${c.level}: ${c.verified}V ${c.pending}P`).join(", ")}`}
+              </p>
+            </button>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 

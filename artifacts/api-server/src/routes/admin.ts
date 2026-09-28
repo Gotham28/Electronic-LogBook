@@ -7,6 +7,7 @@ import { requireAuth, requireRole, requireDepartment } from "../middlewares/auth
 import { completionPercent, configSchema, dateSchema, emailSchema, nameSchema, passwordSchema, targetSchema, validate } from "../lib/validation.js";
 import { resolveConfigDepartmentId } from "../lib/department-config-source.js";
 import { recomputeProcedureRequirement, recomputeCatalogRequirements } from "../lib/department-requirements.js";
+import { clinicalWorkTarget, verifiedClinicalWorkCounts } from "../lib/clinical-work-progress.js";
 import { sendAccountCreatedEmail } from "../lib/mailer.js";
 import { hardDeleteUserCascade } from "../lib/hard-delete-user.js";
 
@@ -569,7 +570,7 @@ router.get("/roster", async (req, res) => {
       .orderBy(usersTable.fullName);
 
     const configSourceId = await resolveConfigDepartmentId(departmentId);
-    const [caseCountRows, procedureCountRows, academicCountRows, configs] = await Promise.all([
+    const [caseCountRows, procedureCountRows, academicCountRows, configs, clinicalWorkTotal, clinicalWorkCounts] = await Promise.all([
       db.select({ studentId: caseLogsTable.studentId, value: count() }).from(caseLogsTable)
         .where(eq(caseLogsTable.status, "verified")).groupBy(caseLogsTable.studentId),
       db.select({ studentId: procedureLogsTable.studentId, value: count() }).from(procedureLogsTable)
@@ -577,6 +578,8 @@ router.get("/roster", async (req, res) => {
       db.select({ studentId: academicLogsTable.studentId, value: count() }).from(academicLogsTable)
         .where(eq(academicLogsTable.status, "verified")).groupBy(academicLogsTable.studentId),
       db.select().from(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, configSourceId)),
+      clinicalWorkTarget(configSourceId),
+      verifiedClinicalWorkCounts(students.map((student) => student.studentProfileId)),
     ]);
     const toMap = (rows: Array<{ studentId: number; value: number }>) =>
       new Map(rows.map((row) => [row.studentId, Number(row.value)]));
@@ -588,14 +591,17 @@ router.get("/roster", async (req, res) => {
       cases: config?.requiredCases ?? 0,
       procedures: config?.requiredProcedures ?? 0,
       academics: config?.requiredAcademic ?? 0,
+      clinicalWork: clinicalWorkTotal,
     };
     const studentsWithProgress = students.map((student) => {
       const verified = {
         cases: caseCounts.get(student.studentProfileId) || 0,
         procedures: procedureCounts.get(student.studentProfileId) || 0,
         academics: academicCounts.get(student.studentProfileId) || 0,
+        clinicalWork: clinicalWorkCounts.get(student.studentProfileId) || 0,
       };
-      const completion = completionPercent([[verified.cases, targets.cases], [verified.procedures, targets.procedures], [verified.academics, targets.academics]]);
+      const completion = completionPercent([[verified.cases, targets.cases], [verified.procedures, targets.procedures], [verified.academics, targets.academics],
+        [verified.clinicalWork, targets.clinicalWork]]);
       return { ...student, verified, targets, completion };
     });
 

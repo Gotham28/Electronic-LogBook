@@ -4,6 +4,7 @@ import { eq, and, inArray, count, sql, isNull } from "drizzle-orm";
 import { requireAuth, requireDepartment, requireRole } from "../middlewares/auth.js";
 import { completionPercent, idSchema } from "../lib/validation.js";
 import { resolveConfigDepartmentId } from "../lib/department-config-source.js";
+import { clinicalWorkTarget, verifiedClinicalWorkCounts } from "../lib/clinical-work-progress.js";
 
 const router: IRouter = Router();
 
@@ -59,8 +60,8 @@ router.get("/:departmentId/catalog", async (req, res) => {
   }
 });
 
-function computeCompletion(cases: number, procs: number, acad: number, reqCases: number | null, reqProcs: number | null, reqAcad: number | null) {
-  return completionPercent([[cases, reqCases], [procs, reqProcs], [acad, reqAcad]]);
+function computeCompletion(cases: number, procs: number, acad: number, clinical: number, reqCases: number | null, reqProcs: number | null, reqAcad: number | null, reqClinical: number) {
+  return completionPercent([[cases, reqCases], [procs, reqProcs], [acad, reqAcad], [clinical, reqClinical]]);
 }
 
 // GET /api/departments/:departmentId/config
@@ -217,9 +218,10 @@ router.get("/:departmentId/analytics", requireRole(["hod"]), async (req, res) =>
       const reqCases = config?.requiredCases ?? 0;
       const reqProcs = config?.requiredProcedures ?? 0;
       const reqAcad = config?.requiredAcademic ?? 0;
+      const [reqClinical, clinicalMap] = await Promise.all([clinicalWorkTarget(configSourceId), verifiedClinicalWorkCounts(studentIds)]);
 
       const completions = studentsInDept.map(s =>
-        computeCompletion(caseMap[s.studentId] ?? 0, procMap[s.studentId] ?? 0, acadMap[s.studentId] ?? 0, reqCases, reqProcs, reqAcad)
+        computeCompletion(caseMap[s.studentId] ?? 0, procMap[s.studentId] ?? 0, acadMap[s.studentId] ?? 0, clinicalMap.get(s.studentId) ?? 0, reqCases, reqProcs, reqAcad, reqClinical)
       ).filter((c): c is number => c !== null);
       avgCompletion = completions.length > 0
         ? Math.round(completions.reduce((a, b) => a + b, 0) / completions.length)

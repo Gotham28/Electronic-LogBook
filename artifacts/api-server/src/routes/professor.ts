@@ -4,14 +4,15 @@ import { eq, and, inArray, count, or, isNull } from "drizzle-orm";
 import { requireAuth, requireRole, requireDepartment } from "../middlewares/auth.js";
 import { completionPercent } from "../lib/validation.js";
 import { resolveConfigDepartmentId } from "../lib/department-config-source.js";
+import { clinicalWorkTarget, verifiedClinicalWorkCounts } from "../lib/clinical-work-progress.js";
 
 const router: IRouter = Router();
 
 // Both professors and HODs can access all routes in this router
 router.use(requireAuth, requireRole(["professor", "hod"]), requireDepartment);
 
-function computeCompletion(cases: number, procs: number, acad: number, reqCases: number | null, reqProcs: number | null, reqAcad: number | null) {
-  return completionPercent([[cases, reqCases], [procs, reqProcs], [acad, reqAcad]]);
+function computeCompletion(cases: number, procs: number, acad: number, clinical: number, reqCases: number | null, reqProcs: number | null, reqAcad: number | null, reqClinical: number) {
+  return completionPercent([[cases, reqCases], [procs, reqProcs], [acad, reqAcad], [clinical, reqClinical]]);
 }
 
 function shortfallStatus(pct: number | null): "on_track" | "at_risk" | "behind" | "not_tracked" {
@@ -286,12 +287,15 @@ router.get("/:professorId/review-queue", async (req, res) => {
       const reqCases = config?.requiredCases ?? 0;
       const reqProcs = config?.requiredProcedures ?? 0;
       const reqAcad = config?.requiredAcademic ?? 0;
+      const [reqClinical, clinicalMap] = await Promise.all([
+        clinicalWorkTarget(configSourceId), verifiedClinicalWorkCounts(studentsInDept.map((s) => s.studentId))]);
 
       menteesData = studentsInDept.map(s => {
         const cases = caseMap[s.studentId] ?? 0;
         const procs = procMap[s.studentId] ?? 0;
         const acad  = acadMap[s.studentId]  ?? 0;
-        const pct   = computeCompletion(cases, procs, acad, reqCases, reqProcs, reqAcad);
+        const clinical = clinicalMap.get(s.studentId) ?? 0;
+        const pct   = computeCompletion(cases, procs, acad, clinical, reqCases, reqProcs, reqAcad, reqClinical);
         return {
           id:                 s.studentId,
           name:               s.fullName,
@@ -299,7 +303,7 @@ router.get("/:professorId/review-queue", async (req, res) => {
           department:         s.deptName || "Unknown",
           overallCompletion:  pct,
           shortfallStatus:    shortfallStatus(pct),
-          logCounts: { cases, procs, acad },
+          logCounts: { cases, procs, acad, clinical },
         };
       });
     }
