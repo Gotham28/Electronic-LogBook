@@ -72,6 +72,27 @@ test("SEC-09: POST /api/arogya/ask never logs question, system prompt, or reply"
   }
 });
 
+test("SEC-10: POST /api/arogya/progress-coach never logs prompt or reply", async () => {
+  const orig = _arogya.call;
+  _arogya.call = async () => ({ reply: JSON.stringify(["Secret tip one", "Secret tip two", "Secret tip three"]), tokenCount: 10 });
+
+  const logged: string[] = [];
+  const originalLog = console.log;
+  console.log = (...args: any[]) => { logged.push(args.map(String).join(" ")); };
+
+  try {
+    const response = await call("/arogya/progress-coach", "student0", "POST");
+    assert.equal(response.status, 200);
+    for (const entry of logged) {
+      assert.ok(!entry.includes("progress coach tips"), "prompt must not appear in logs");
+      assert.ok(!entry.includes("Secret tip"), "reply must not appear in logs");
+    }
+  } finally {
+    _arogya.call = orig;
+    console.log = originalLog;
+  }
+});
+
 test("forced PATCH /:studentId/postings/:postingId failure returns a plain 500 with no error text or stack", async () => {
   const created = await call("/students/" + a.student0.studentId + "/postings", "student0", "POST",
     { ward: "unit-0", startDate: "2026-02-01", endDate: "2026-02-10", supervisorId: a.faculty0.id });

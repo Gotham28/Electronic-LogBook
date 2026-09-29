@@ -1,3 +1,8 @@
+import { eq, and, isNull, count } from "drizzle-orm";
+import { studentsTable, usersTable, caseLogsTable, procedureLogsTable, academicLogsTable, departmentConfigsTable, procedureTypesTable, departmentCatalogTable } from "@workspace/db";
+import { resolveConfigDepartmentId } from "./department-config-source.js";
+import { AuthUser } from "../middlewares/auth.js";
+
 export const DAILY_LIMIT = 20;
 
 const SYSTEM_INSTRUCTION = `Use only the facts in the facts pack provided. Do not invent any number.
@@ -10,7 +15,7 @@ const limits = new Map<string, { count: number; date: string }>();
 
 export function checkAndIncrementLimit(userId: string): void {
   const today = new Date().toISOString().split("T")[0];
-  
+
   if (limits.size > 5000) {
     for (const [k, v] of limits.entries()) {
       if (v.date !== today) limits.delete(k);
@@ -78,7 +83,7 @@ export async function callOpenAI(
     const tokenCount = data.usage?.total_tokens ?? 0;
 
     const packString = JSON.stringify(factsPack);
-    const numbersInReply = reply.match(/\d+/g) || [];
+    const numbersInReply = reply.match(/\b\d{2,}\b/g) || [];
     for (const num of numbersInReply) {
       if (!packString.includes(num)) {
         throw new Error("AROGYA_NUMBER_CHECK_FAILED");
@@ -109,3 +114,83 @@ export async function callOpenAI(
 export const _arogya = {
   call: callOpenAI,
 };
+
+export async function buildProgressFacts(user: AuthUser, db: any) {
+  const [studentMatch] = await db.select({
+    id: studentsTable.id,
+    departmentId: usersTable.departmentId,
+  })
+  .from(studentsTable)
+  .innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
+  .where(eq(studentsTable.userId, user.id))
+  .limit(1);
+
+  if (!studentMatch) throw new Error("Student not found");
+  const studentId = studentMatch.id;
+  const configSourceId = await resolveConfigDepartmentId(studentMatch.departmentId!);
+
+  const [caseCounts, procedureCounts, academicCounts, configTargets, procedureRequirements, academicRequirements] = await Promise.all([
+    db.select({ category: caseLogsTable.category, status: caseLogsTable.status, count: count() })
+      .from(caseLogsTable)
+      .where(and(eq(caseLogsTable.studentId, studentId), isNull(caseLogsTable.deletedAt)))
+      .groupBy(caseLogsTable.category, caseLogsTable.status),
+
+    db.select({ procedureGroup: procedureLogsTable.procedureGroup, procedureName: procedureLogsTable.procedureName, status: procedureLogsTable.status, count: count() })
+      .from(procedureLogsTable)
+      .where(and(eq(procedureLogsTable.studentId, studentId), isNull(procedureLogsTable.deletedAt)))
+      .groupBy(procedureLogsTable.procedureGroup, procedureLogsTable.procedureName, procedureLogsTable.status),
+
+    db.select({ activityType: academicLogsTable.activityType, status: academicLogsTable.status, count: count() })
+      .from(academicLogsTable)
+      .where(eq(academicLogsTable.studentId, studentId))
+      .groupBy(academicLogsTable.activityType, academicLogsTable.status),
+
+    db.select().from(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, configSourceId)).limit(1),
+    db.select().from(procedureTypesTable).where(eq(procedureTypesTable.departmentId, configSourceId)),
+    db.select().from(departmentCatalogTable).where(and(eq(departmentCatalogTable.departmentId, configSourceId), eq(departmentCatalogTable.kind, "academic")))
+  ]);
+
+  const caseCategoryMap = new Map<string | null, { verified: number; pending: number }>();
+  for (const row of caseCounts) {
+    const key = row.category ?? null;
+    if (!caseCategoryMap.has(key)) caseCategoryMap.set(key, { verified: 0, pending: 0 });
+    const entry = caseCategoryMap.get(key)!;
+    if (row.status === "verified") entry.verified += Number(row.count);
+    else if (row.status === "pending" || row.status === null) entry.pending += Number(row.count);
+  }
+  const caseCategories = Array.from(caseCategoryMap.entries()).map(([value, counts]) => ({
+    value, verified: counts.verified, pending: counts.pending,
+  }));
+
+  const procedureMap = new Map<string, { group: string; name: string; verified: number; pending: number; }>();
+  for (const row of procedureCounts) {
+    const key = `${row.procedureGroup}\0${row.procedureName}`;
+    if (!procedureMap.has(key)) procedureMap.set(key, { group: row.procedureGroup, name: row.procedureName, verified: 0, pending: 0 });
+    const entry = procedureMap.get(key)!;
+    if (row.status === "verified") entry.verified += Number(row.count);
+    else if (row.status === "pending") entry.pending += Number(row.count);
+  }
+  const procedures = Array.from(procedureMap.values()).map(entry => ({
+    group: entry.group, name: entry.name, verified: entry.verified, pending: entry.pending,
+  }));
+
+  const academicMap = new Map<string, { verified: number; pending: number }>();
+  for (const row of academicCounts) {
+    if (!academicMap.has(row.activityType)) academicMap.set(row.activityType, { verified: 0, pending: 0 });
+    const entry = academicMap.get(row.activityType)!;
+    if (row.status === "verified") entry.verified += Number(row.count);
+    else if (row.status === "pending") entry.pending += Number(row.count);
+  }
+  const academics = Array.from(academicMap.entries()).map(([value, counts]) => ({
+    value, verified: counts.verified, pending: counts.pending,
+  }));
+
+  return {
+    caseCategories,
+    procedures,
+    academics,
+    departmentTargets: configTargets || null,
+    procedureRequirements,
+    academicRequirements
+  };
+}

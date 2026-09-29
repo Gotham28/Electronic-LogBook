@@ -25,7 +25,7 @@ export function ArogyaPanel({ open, onOpenChange, role, notifItems, onNavigate }
   const [characterState, setCharacterState] = React.useState<ArogyaState>("idle");
   const [activeTab, setActiveTab] = React.useState<string | null>(null);
   const [question, setQuestion] = React.useState("");
-  const [reply, setReply] = React.useState<{ text: string; error?: boolean } | null>(null);
+  const [messages, setMessages] = React.useState<{ text?: string; tips?: string[]; error?: boolean; role: "user" | "arogya" }[]>([]);
 
   React.useEffect(() => {
     if (!open) return undefined;
@@ -44,8 +44,8 @@ export function ArogyaPanel({ open, onOpenChange, role, notifItems, onNavigate }
     e.preventDefault();
     if (!question.trim() || characterState === "thinking") return;
     
+    setMessages((prev) => [...prev, { role: "user", text: question }]);
     setCharacterState("thinking");
-    setReply(null);
     setActiveTab("ask_reply");
 
     try {
@@ -57,11 +57,35 @@ export function ArogyaPanel({ open, onOpenChange, role, notifItems, onNavigate }
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Arogya couldn't answer right now.");
       setCharacterState("talking");
-      setReply({ text: data.reply });
+      setMessages((prev) => [...prev, { role: "arogya", text: data.reply }]);
       setQuestion("");
     } catch (err: any) {
       setCharacterState("error");
-      setReply({ text: "Arogya couldn't answer right now.", error: true });
+      setMessages((prev) => [...prev, { role: "arogya", text: "Arogya couldn't answer right now.", error: true }]);
+    }
+  };
+
+  const handleProgressCoach = async () => {
+    if (characterState === "thinking") return;
+    
+    setMessages((prev) => [...prev, { role: "user", text: "My progress coach" }]);
+    setCharacterState("thinking");
+    setActiveTab("ask_reply");
+
+    try {
+      const res = await fetch("/api/arogya/progress-coach", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Arogya couldn't answer right now.");
+      
+      setCharacterState("talking");
+      setMessages((prev) => [...prev, { role: "arogya", tips: data.tips }]);
+    } catch (err: any) {
+      setCharacterState("error");
+      setMessages((prev) => [...prev, { role: "arogya", text: "Arogya couldn't answer right now.", error: true }]);
     }
   };
 
@@ -89,7 +113,7 @@ export function ArogyaPanel({ open, onOpenChange, role, notifItems, onNavigate }
           <div className="flex flex-wrap gap-2 shrink-0">
             {role === "Student" && (
               <>
-                <Button variant="outline" size="sm" className="rounded-full bg-white text-teal-800 border-teal-200 hover:bg-teal-50" onClick={() => setActiveTab("coach")}>
+                <Button variant="outline" size="sm" className="rounded-full bg-white text-teal-800 border-teal-200 hover:bg-teal-50" onClick={handleProgressCoach}>
                   My progress coach
                 </Button>
                 <Button variant="outline" size="sm" className="rounded-full bg-white text-teal-800 border-teal-200 hover:bg-teal-50" onClick={() => setActiveTab("student_due")}>
@@ -126,19 +150,34 @@ export function ArogyaPanel({ open, onOpenChange, role, notifItems, onNavigate }
 
           {/* Chat Bubble Area */}
           <div className="flex flex-col gap-3 mt-4">
-            {activeTab && (
+            {activeTab === "ask_reply" && messages.map((msg, idx) => (
+              <div key={idx} className={`flex gap-3 ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
+                {msg.role === "arogya" && (
+                  <div className="mt-1 shrink-0">
+                    <ArogyaCharacter state={idx === messages.length - 1 ? characterState : "idle"} size={32} />
+                  </div>
+                )}
+                <div className={`bg-white rounded-2xl p-3.5 shadow-sm border border-teal-100 text-sm text-slate-700 max-w-[85%] ${msg.role === "user" ? "bg-teal-50 rounded-tr-sm text-right" : "rounded-tl-sm text-left"}`}>
+                  {msg.tips ? (
+                    <ol className="list-decimal pl-4 space-y-2">
+                      {msg.tips.map((tip, i) => <li key={i}>{tip}</li>)}
+                    </ol>
+                  ) : (
+                    <p className={`font-medium whitespace-pre-wrap ${msg.error ? "text-red-600" : "text-slate-800"}`}>{msg.text}</p>
+                  )}
+                </div>
+              </div>
+            ))}
+
+            {activeTab && activeTab !== "ask_reply" && (
               <div className="flex gap-3">
                 <div className="mt-1 shrink-0">
                   <ArogyaCharacter state="idle" size={32} />
                 </div>
                 <div className="bg-white rounded-2xl rounded-tl-sm p-3.5 shadow-sm border border-teal-100 text-sm text-slate-700 w-full">
                   
-                  {activeTab === "ask_reply" && reply && (
-                    <p className={`font-medium ${reply.error ? "text-red-600" : "text-slate-800"}`}>{reply.text}</p>
-                  )}
-
                   {/* Coming Soon placeholders */}
-                  {["coach", "draft_remarks", "dept_report", "falling_behind"].includes(activeTab) && (
+                  {["draft_remarks", "dept_report", "falling_behind"].includes(activeTab) && (
                     <p className="font-medium">Coming soon.</p>
                   )}
 
