@@ -1206,7 +1206,7 @@ router.post("/:studentId/procedure-logs", validate(z.object({ supervisorId: idSc
       if (!compLevel) { res.status(400).json({ message: "Invalid competency level for your department" }); return; }
     } else {
       if (competencyLevel !== "N/A") {
-        res.status(400).json({ message: "Procedure experience is not enabled for your department" });
+        res.status(400).json({ message: "Competency level is not enabled for your department" });
         return;
       }
     }
@@ -1593,7 +1593,7 @@ router.patch("/:studentId/procedure-logs/:logId", requireAuth, validate(z.object
           eq(departmentCatalogTable.departmentId, configSourceId), eq(departmentCatalogTable.kind, "competency_level"), eq(departmentCatalogTable.value, req.body.competencyLevel))).limit(1);
         if (!compLevel) { res.status(400).json({ message: "Invalid competency level for your department" }); return; }
       } else if (req.body.competencyLevel !== "N/A") {
-        res.status(400).json({ message: "Procedure experience is not enabled for your department" }); return;
+        res.status(400).json({ message: "Competency level is not enabled for your department" }); return;
       }
     }
 
