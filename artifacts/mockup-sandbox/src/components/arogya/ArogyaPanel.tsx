@@ -24,6 +24,8 @@ interface ArogyaPanelProps {
 export function ArogyaPanel({ open, onOpenChange, role, notifItems, onNavigate }: ArogyaPanelProps) {
   const [characterState, setCharacterState] = React.useState<ArogyaState>("idle");
   const [activeTab, setActiveTab] = React.useState<string | null>(null);
+  const [question, setQuestion] = React.useState("");
+  const [reply, setReply] = React.useState<{ text: string; error?: boolean } | null>(null);
 
   React.useEffect(() => {
     if (!open) return undefined;
@@ -37,6 +39,31 @@ export function ArogyaPanel({ open, onOpenChange, role, notifItems, onNavigate }
   const studentDue = notifItems;
   // "My pending reviews" -> Faculty notifications strictly marked 'faculty_queue'
   const facultyPending = notifItems.filter((i) => i.id === "faculty_queue");
+
+  const handleAsk = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!question.trim() || characterState === "thinking") return;
+    
+    setCharacterState("thinking");
+    setReply(null);
+    setActiveTab("ask_reply");
+
+    try {
+      const res = await fetch("/api/arogya/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Arogya couldn't answer right now.");
+      setCharacterState("talking");
+      setReply({ text: data.reply });
+      setQuestion("");
+    } catch (err: any) {
+      setCharacterState("error");
+      setReply({ text: "Arogya couldn't answer right now.", error: true });
+    }
+  };
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -106,6 +133,10 @@ export function ArogyaPanel({ open, onOpenChange, role, notifItems, onNavigate }
                 </div>
                 <div className="bg-white rounded-2xl rounded-tl-sm p-3.5 shadow-sm border border-teal-100 text-sm text-slate-700 w-full">
                   
+                  {activeTab === "ask_reply" && reply && (
+                    <p className={`font-medium ${reply.error ? "text-red-600" : "text-slate-800"}`}>{reply.text}</p>
+                  )}
+
                   {/* Coming Soon placeholders */}
                   {["coach", "draft_remarks", "dept_report", "falling_behind"].includes(activeTab) && (
                     <p className="font-medium">Coming soon.</p>
@@ -165,20 +196,23 @@ export function ArogyaPanel({ open, onOpenChange, role, notifItems, onNavigate }
 
         {/* Input Footer */}
         <div className="p-4 bg-white border-t">
-          <div className="flex flex-col gap-2">
-            <label className="text-xs font-semibold text-slate-700">Ask Arogya anything</label>
+          <form onSubmit={handleAsk} className="flex flex-col gap-2">
+            <label htmlFor="arogya-ask-input" className="text-xs font-semibold text-slate-700">Ask Arogya anything</label>
             <div className="relative">
               <Input 
-                disabled 
-                placeholder="Coming soon..." 
+                id="arogya-ask-input"
+                value={question}
+                onChange={(e) => setQuestion(e.target.value)}
+                disabled={characterState === "thinking"}
+                placeholder="Ask a question..." 
                 className="pr-10 rounded-xl bg-slate-50"
               />
-              <Button disabled size="icon" variant="ghost" className="absolute right-1 top-1 h-8 w-8 text-teal-600">
+              <Button type="submit" disabled={characterState === "thinking" || !question.trim()} size="icon" variant="ghost" className="absolute right-1 top-1 h-8 w-8 text-teal-600">
                 <SendHorizontal className="h-4 w-4" />
               </Button>
             </div>
             <span className="text-[10px] text-slate-400 font-medium ml-1">Don't type patient details.</span>
-          </div>
+          </form>
         </div>
       </SheetContent>
     </Sheet>
