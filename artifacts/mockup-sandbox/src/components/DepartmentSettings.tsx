@@ -84,12 +84,13 @@ function SearchableSection<T extends { id: number | string; name: string }>({
 
 export function DepartmentSettings() {
   const data = useDepartment();
+  const isRadiology = data.department?.name?.toLowerCase().includes("radiology");
   const features = data.config?.enabledFeatures ?? {};
   const procedureTypesEnabled = !features.freeTextProcedures && !features.hideProcedureLogs;
   // What the HOD can add. Every option follows the department's own settings, never its id.
   const addKinds: Array<[string, string]> = [
     ...(procedureTypesEnabled ? [["procedure", "Procedure type"] as [string, string]] : []),
-    ["posting", "Ward / posting"],
+    ["posting", isRadiology ? "Posting" : "Ward / posting"],
     ["academic", "Academic activity"],
     ...(features.clinicalWorks ? [["clinical_work_category", "Clinical work category"], ["clinical_work_subtype", "Clinical work sub-type"]] as Array<[string, string]> : []),
     ...(!features.hideCaseLogs ? [["case_category", "Case category"] as [string, string]] : []),
@@ -357,7 +358,7 @@ export function DepartmentSettings() {
         </CardContent></Card>
       )}
 
-      <Card className="border-slate-200/80 shadow-sm shadow-slate-200/50"><CardHeader className="border-b border-slate-100 bg-slate-50/70 pb-4"><CardTitle className="text-base">Training catalog</CardTitle><p className="text-xs text-slate-500">Wards, academic activities and the other lists residents choose from.</p></CardHeader><CardContent className="space-y-6 p-5">
+      <Card className="border-slate-200/80 shadow-sm shadow-slate-200/50"><CardHeader className="border-b border-slate-100 bg-slate-50/70 pb-4"><CardTitle className="text-base">Training catalog</CardTitle><p className="text-xs text-slate-500">{isRadiology ? "Postings" : "Wards"}, academic activities and the other lists residents choose from.</p></CardHeader><CardContent className="space-y-6 p-5">
       <div className="grid gap-6 md:grid-cols-2">
         <SearchableSection
           title="Posting"

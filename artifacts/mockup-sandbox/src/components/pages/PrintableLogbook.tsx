@@ -179,7 +179,8 @@ function AggregateSummary({ rows, label }: { rows: any[]; label: string }) {
 export function PrintableLogbook() {
   const user = React.useMemo(() => getCurrentUser(), []);
   const hideUhid = isDemoMode();
-  const { config, clinicalWorkCategories, clinicalWorkSubtypes, competencyLevels } = useDepartment();
+  const { config, clinicalWorkCategories, clinicalWorkSubtypes, competencyLevels, department: dept } = useDepartment();
+  const isRadiology = dept?.name?.toLowerCase().includes("radiology");
   const features = config?.enabledFeatures ?? {};
   const [data, setData] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
@@ -319,7 +320,7 @@ export function PrintableLogbook() {
             <>
               <table data-mobile="cards" className="w-full border-collapse">
                 <thead><tr>
-                  <Th>Ward / Unit</Th><Th>Start</Th><Th>End</Th><Th>Supervisor</Th><Th>Status</Th>
+                  <Th>{isRadiology ? "Posting" : "Ward / Unit"}</Th><Th>Start</Th><Th>End</Th><Th>Supervisor</Th><Th>Status</Th>
                 </tr></thead>
                 <tbody>
                   {rows.map((p: any, i: number) => (

@@ -38,7 +38,8 @@ import { apiGet, apiPost, apiPatch } from "@/lib/apiClient";
 import { getCurrentUser } from "@/lib/session";
 
 export function PostingsPage() {
-  const { postings: postingOptions, config, postingSchedule } = useDepartment();
+  const { postings: postingOptions, config, postingSchedule, department } = useDepartment();
+  const isRadiology = department?.name?.toLowerCase().includes("radiology");
   const [open, setOpen] = React.useState(false);
   const [postings, setPostings] = React.useState<Posting[]>([]);
   const user = React.useMemo(() => getCurrentUser(), []);
@@ -113,7 +114,7 @@ export function PostingsPage() {
         <div>
           <p className="page-eyebrow flex items-center gap-2">Student-managed clinical training</p>
           <h2 className="page-title mt-1">Postings &amp; rotations</h2>
-          <p className="mt-2 text-sm text-slate-500">Track your individual ward postings and rotations.</p>
+          <p className="mt-2 text-sm text-slate-500">Track your individual {isRadiology ? "postings" : "ward postings and rotations"}.</p>
         </div>
         <Dialog open={open} onOpenChange={(val) => {
           setOpen(val);
@@ -128,14 +129,14 @@ export function PostingsPage() {
             <DialogHeader>
               <DialogTitle>{editId ? "Edit Posting" : "Add Posting"}</DialogTitle>
               <DialogDescription>
-                Log a new ward posting or rotation.
+                Log a new {isRadiology ? "posting" : "ward posting or rotation"}.
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleAddPosting} className="space-y-4">
               <div className="space-y-2">
-                <Label>Ward / Posting Unit</Label>
+                <Label>{isRadiology ? "Posting" : "Ward / Posting Unit"}</Label>
                 {isFreeTextWard ? (
-                  <Input value={ward} onChange={e => setWard(e.target.value)} required placeholder="Enter posting unit" />
+                  <Input value={ward} onChange={e => setWard(e.target.value)} required placeholder={isRadiology ? "Enter posting" : "Enter posting unit"} />
                 ) : (
                   <>
                     {!postingOptions.length && <p className="text-xs text-slate-500">Your HOD has not configured postings yet.</p>}
@@ -199,7 +200,7 @@ export function PostingsPage() {
               <EmptyHeader>
                 <EmptyMedia variant="icon"><CalendarDays className="h-6 w-6" /></EmptyMedia>
                 <EmptyTitle>No postings logged</EmptyTitle>
-                <EmptyDescription>Add your current ward or rotation and keep the timeline readable for review.</EmptyDescription>
+                <EmptyDescription>Add your current {isRadiology ? "posting" : "ward or rotation"} and keep the timeline readable for review.</EmptyDescription>
               </EmptyHeader>
               <EmptyContent>
                 <Button onClick={() => setOpen(true)}>Add posting</Button>
@@ -209,7 +210,7 @@ export function PostingsPage() {
             <Table>
               <TableHeader className="bg-slate-50">
                 <TableRow>
-                  <TableHead>Ward / Unit</TableHead>
+                  <TableHead>{isRadiology ? "Posting" : "Ward / Unit"}</TableHead>
                   <TableHead>Start Date</TableHead>
                   <TableHead>End Date</TableHead>
                   {!isFreeTextWard && <TableHead>Supervisor</TableHead>}
