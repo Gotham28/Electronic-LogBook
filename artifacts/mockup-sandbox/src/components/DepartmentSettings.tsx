@@ -17,14 +17,15 @@ const TARGET_KINDS = ["academic", "case_category", "conference_level", "clinical
 const COLLAPSE_THRESHOLD = 5;
 
 function SearchableSection<T extends { id: number | string; name: string }>({
-  title, items, emptyText, renderItem,
+  title, items, emptyText, renderItem, defaultOpen
 }: {
   title: string;
   items: T[];
   emptyText: string;
   renderItem: (item: T) => React.ReactNode;
+  defaultOpen?: boolean;
 }) {
-  const [open, setOpen] = React.useState(() => items.length <= COLLAPSE_THRESHOLD);
+  const [open, setOpen] = React.useState(() => defaultOpen ?? items.length <= COLLAPSE_THRESHOLD);
   const [query, setQuery] = React.useState("");
   const q = query.trim().toLowerCase();
   const visible = q ? items.filter((item) => item.name.toLowerCase().includes(q)) : items;
@@ -359,7 +360,8 @@ export function DepartmentSettings() {
       <Card className="border-slate-200/80 shadow-sm shadow-slate-200/50"><CardHeader className="border-b border-slate-100 bg-slate-50/70 pb-4"><CardTitle className="text-base">Training catalog</CardTitle><p className="text-xs text-slate-500">Wards, academic activities and the other lists residents choose from.</p></CardHeader><CardContent className="space-y-6 p-5">
       <div className="grid gap-6 md:grid-cols-2">
         <SearchableSection
-          title="Ward/Posting"
+          title="Posting"
+          defaultOpen={true}
           items={data.postings}
           emptyText="No postings configured."
           renderItem={(item) => <div className="flex items-center gap-2 rounded-xl bg-slate-50 p-3">
@@ -369,6 +371,7 @@ export function DepartmentSettings() {
         />
         <SearchableSection
           title="Academic activities"
+          defaultOpen={true}
           items={data.academics}
           emptyText="No academic activities configured."
           renderItem={(item) => <form className="flex flex-wrap items-center gap-2 rounded-xl bg-slate-50 p-3" onSubmit={(e) => { e.preventDefault(); void save(() => apiPatch(`/api/admin/department/catalog/${item.id}`, { required: Number(academicTargets[item.id] ?? item.required), period: item.period }), "Academic target updated"); }}>
