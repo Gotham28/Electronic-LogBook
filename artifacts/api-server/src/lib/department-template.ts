@@ -7,7 +7,7 @@ const templateKinds = ["posting", "academic", "case_category", "clinical_work_ca
 
 export const departmentTemplateSchema = z.object({
   features: z.record(z.string(), z.boolean()).default({}),
-  catalog: z.array(z.object({ kind: z.enum(templateKinds), name: z.string().trim().min(1).max(160),
+  catalog: z.array(z.object({ kind: z.enum(templateKinds), name: z.string().trim().min(1).max(160), value: z.string().trim().min(1).max(160).optional(),
     required: z.number().int().min(0).max(100000).default(0),
     // For clinical_work_subtype: the value of the parent clinical_work_category
     parentValue: z.string().trim().min(1).max(160).optional() }).strict()).default([]),
@@ -82,7 +82,7 @@ export async function applyDepartmentTemplate(options: ApplyTemplateOptions): Pr
       let catalogAdded = 0;
       for (const item of template?.catalog ?? []) {
         const inserted = await tx.insert(departmentCatalogTable)
-          .values({ departmentId, kind: item.kind, name: item.name, value: item.name,
+          .values({ departmentId, kind: item.kind, name: item.name, value: item.value || item.name,
             required: item.required, period: "total",
             ...(item.parentValue ? { parentValue: item.parentValue } : {}) })
           .onConflictDoNothing({ target: [departmentCatalogTable.departmentId, departmentCatalogTable.kind, departmentCatalogTable.value] })

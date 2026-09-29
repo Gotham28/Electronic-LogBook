@@ -61,242 +61,290 @@
     {
       "kind": "clinical_work_subtype",
       "name": "Abdomen",
-      "parentValue": "Ultrasound"
+      "parentValue": "Ultrasound",
+      "value": "Ultrasound - Abdomen"
     },
     {
       "kind": "clinical_work_subtype",
       "name": "KUB (Kidney, Ureter, Bladder)",
-      "parentValue": "Ultrasound"
+      "parentValue": "Ultrasound",
+      "value": "Ultrasound - KUB (Kidney, Ureter, Bladder)"
     },
     {
       "kind": "clinical_work_subtype",
       "name": "Obstetrics",
-      "parentValue": "Ultrasound"
+      "parentValue": "Ultrasound",
+      "value": "Ultrasound - Obstetrics"
     },
     {
       "kind": "clinical_work_subtype",
       "name": "Musculoskeletal",
-      "parentValue": "Ultrasound"
+      "parentValue": "Ultrasound",
+      "value": "Ultrasound - Musculoskeletal"
     },
     {
       "kind": "clinical_work_subtype",
       "name": "Neurosonogram",
-      "parentValue": "Ultrasound"
+      "parentValue": "Ultrasound",
+      "value": "Ultrasound - Neurosonogram"
     },
     {
       "kind": "clinical_work_subtype",
       "name": "Cardiovascular",
-      "parentValue": "Ultrasound"
+      "parentValue": "Ultrasound",
+      "value": "Ultrasound - Cardiovascular"
     },
     {
       "kind": "clinical_work_subtype",
       "name": "Small Parts",
-      "parentValue": "Ultrasound"
+      "parentValue": "Ultrasound",
+      "value": "Ultrasound - Small Parts"
     },
     {
       "kind": "clinical_work_subtype",
       "name": "Peripheral Arterial Doppler",
-      "parentValue": "Doppler study"
+      "parentValue": "Doppler study",
+      "value": "Doppler study - Peripheral Arterial Doppler"
     },
     {
       "kind": "clinical_work_subtype",
       "name": "Peripheral Venous Doppler",
-      "parentValue": "Doppler study"
+      "parentValue": "Doppler study",
+      "value": "Doppler study - Peripheral Venous Doppler"
     },
     {
       "kind": "clinical_work_subtype",
       "name": "Renal Doppler",
-      "parentValue": "Doppler study"
+      "parentValue": "Doppler study",
+      "value": "Doppler study - Renal Doppler"
     },
     {
       "kind": "clinical_work_subtype",
       "name": "Other Abdominal Doppler",
-      "parentValue": "Doppler study"
+      "parentValue": "Doppler study",
+      "value": "Doppler study - Other Abdominal Doppler"
     },
     {
       "kind": "clinical_work_subtype",
       "name": "Neck Vessel Carotid Doppler",
-      "parentValue": "Doppler study"
+      "parentValue": "Doppler study",
+      "value": "Doppler study - Neck Vessel Carotid Doppler"
     },
     {
       "kind": "clinical_work_subtype",
       "name": "Testicular Doppler",
-      "parentValue": "Doppler study"
+      "parentValue": "Doppler study",
+      "value": "Doppler study - Testicular Doppler"
     },
     {
       "kind": "clinical_work_subtype",
       "name": "AV Fistula Mapping",
-      "parentValue": "Doppler study"
+      "parentValue": "Doppler study",
+      "value": "Doppler study - AV Fistula Mapping"
     },
     {
       "kind": "clinical_work_subtype",
       "name": "Brain",
-      "parentValue": "CT scan"
+      "parentValue": "CT scan",
+      "value": "CT scan - Brain"
     },
     {
       "kind": "clinical_work_subtype",
       "name": "Head Neck and PNS",
-      "parentValue": "CT scan"
+      "parentValue": "CT scan",
+      "value": "CT scan - Head Neck and PNS"
     },
     {
       "kind": "clinical_work_subtype",
       "name": "Heart",
-      "parentValue": "CT scan"
+      "parentValue": "CT scan",
+      "value": "CT scan - Heart"
     },
     {
       "kind": "clinical_work_subtype",
       "name": "Spine",
-      "parentValue": "CT scan"
+      "parentValue": "CT scan",
+      "value": "CT scan - Spine"
     },
     {
       "kind": "clinical_work_subtype",
       "name": "Musculoskeletal",
-      "parentValue": "CT scan"
+      "parentValue": "CT scan",
+      "value": "CT scan - Musculoskeletal"
     },
     {
       "kind": "clinical_work_subtype",
       "name": "Abdomen",
-      "parentValue": "CT scan"
+      "parentValue": "CT scan",
+      "value": "CT scan - Abdomen"
     },
     {
       "kind": "clinical_work_subtype",
       "name": "Thorax",
-      "parentValue": "CT scan"
+      "parentValue": "CT scan",
+      "value": "CT scan - Thorax"
     },
     {
       "kind": "clinical_work_subtype",
       "name": "CT Angiogram",
-      "parentValue": "CT scan"
+      "parentValue": "CT scan",
+      "value": "CT scan - CT Angiogram"
     },
     {
       "kind": "clinical_work_subtype",
       "name": "CT Cisternography",
-      "parentValue": "CT scan"
+      "parentValue": "CT scan",
+      "value": "CT scan - CT Cisternography"
     },
     {
       "kind": "clinical_work_subtype",
       "name": "Trauma Protocol",
-      "parentValue": "CT scan"
+      "parentValue": "CT scan",
+      "value": "CT scan - Trauma Protocol"
     },
     {
       "kind": "clinical_work_subtype",
       "name": "Brain",
-      "parentValue": "MRI scan"
+      "parentValue": "MRI scan",
+      "value": "MRI scan - Brain"
     },
     {
       "kind": "clinical_work_subtype",
       "name": "Spine",
-      "parentValue": "MRI scan"
+      "parentValue": "MRI scan",
+      "value": "MRI scan - Spine"
     },
     {
       "kind": "clinical_work_subtype",
       "name": "Abdomen",
-      "parentValue": "MRI scan"
+      "parentValue": "MRI scan",
+      "value": "MRI scan - Abdomen"
     },
     {
       "kind": "clinical_work_subtype",
       "name": "MRCP",
-      "parentValue": "MRI scan"
+      "parentValue": "MRI scan",
+      "value": "MRI scan - MRCP"
     },
     {
       "kind": "clinical_work_subtype",
       "name": "MR Urogram",
-      "parentValue": "MRI scan"
+      "parentValue": "MRI scan",
+      "value": "MRI scan - MR Urogram"
     },
     {
       "kind": "clinical_work_subtype",
       "name": "MSK",
-      "parentValue": "MRI scan"
+      "parentValue": "MRI scan",
+      "value": "MRI scan - MSK"
     },
     {
       "kind": "clinical_work_subtype",
       "name": "Thorax",
-      "parentValue": "MRI scan"
+      "parentValue": "MRI scan",
+      "value": "MRI scan - Thorax"
     },
     {
       "kind": "clinical_work_subtype",
       "name": "Heart",
-      "parentValue": "MRI scan"
+      "parentValue": "MRI scan",
+      "value": "MRI scan - Heart"
     },
     {
       "kind": "clinical_work_subtype",
       "name": "MR Angio",
-      "parentValue": "MRI scan"
+      "parentValue": "MRI scan",
+      "value": "MRI scan - MR Angio"
     },
     {
       "kind": "clinical_work_subtype",
       "name": "MR Fistulogram",
-      "parentValue": "MRI scan"
+      "parentValue": "MRI scan",
+      "value": "MRI scan - MR Fistulogram"
     },
     {
       "kind": "clinical_work_subtype",
       "name": "MR Fetal and Placenta",
-      "parentValue": "MRI scan"
+      "parentValue": "MRI scan",
+      "value": "MRI scan - MR Fetal and Placenta"
     },
     {
       "kind": "clinical_work_subtype",
       "name": "Intravenous Urography (IVU)",
-      "parentValue": "Special radiographic procedures"
+      "parentValue": "Special radiographic procedures",
+      "value": "Special radiographic procedures - Intravenous Urography (IVU)"
     },
     {
       "kind": "clinical_work_subtype",
       "name": "Micturating Cystourethrography (MCU)",
-      "parentValue": "Special radiographic procedures"
+      "parentValue": "Special radiographic procedures",
+      "value": "Special radiographic procedures - Micturating Cystourethrography (MCU)"
     },
     {
       "kind": "clinical_work_subtype",
       "name": "Retrograde Urethrography (RGU)",
-      "parentValue": "Special radiographic procedures"
+      "parentValue": "Special radiographic procedures",
+      "value": "Special radiographic procedures - Retrograde Urethrography (RGU)"
     },
     {
       "kind": "clinical_work_subtype",
       "name": "Hysterosalpingography (HSG)",
-      "parentValue": "Special radiographic procedures"
+      "parentValue": "Special radiographic procedures",
+      "value": "Special radiographic procedures - Hysterosalpingography (HSG)"
     },
     {
       "kind": "clinical_work_subtype",
       "name": "Gastrointestinal Tract (GIT) Barium Studies",
-      "parentValue": "Special radiographic procedures"
+      "parentValue": "Special radiographic procedures",
+      "value": "Special radiographic procedures - Gastrointestinal Tract (GIT) Barium Studies"
     },
     {
       "kind": "clinical_work_subtype",
       "name": "Dacryocystography (DCG)",
-      "parentValue": "Special radiographic procedures"
+      "parentValue": "Special radiographic procedures",
+      "value": "Special radiographic procedures - Dacryocystography (DCG)"
     },
     {
       "kind": "clinical_work_subtype",
       "name": "Sinogram & Fistulogram",
-      "parentValue": "Special radiographic procedures"
+      "parentValue": "Special radiographic procedures",
+      "value": "Special radiographic procedures - Sinogram & Fistulogram"
     },
     {
       "kind": "clinical_work_subtype",
       "name": "CT Guided Biopsy",
-      "parentValue": "Guided procedures (CT / USG)"
+      "parentValue": "Guided procedures (CT / USG)",
+      "value": "Guided procedures (CT / USG) - CT Guided Biopsy"
     },
     {
       "kind": "clinical_work_subtype",
       "name": "USG Guided Biopsy",
-      "parentValue": "Guided procedures (CT / USG)"
+      "parentValue": "Guided procedures (CT / USG)",
+      "value": "Guided procedures (CT / USG) - USG Guided Biopsy"
     },
     {
       "kind": "clinical_work_subtype",
       "name": "USG Guided FNAC",
-      "parentValue": "Guided procedures (CT / USG)"
+      "parentValue": "Guided procedures (CT / USG)",
+      "value": "Guided procedures (CT / USG) - USG Guided FNAC"
     },
     {
       "kind": "clinical_work_subtype",
       "name": "USG Guided Ascitic Fluid and Pleural Tap",
-      "parentValue": "Guided procedures (CT / USG)"
+      "parentValue": "Guided procedures (CT / USG)",
+      "value": "Guided procedures (CT / USG) - USG Guided Ascitic Fluid and Pleural Tap"
     },
     {
       "kind": "clinical_work_subtype",
       "name": "USG Guided Drainage Tube Placement",
-      "parentValue": "Guided procedures (CT / USG)"
+      "parentValue": "Guided procedures (CT / USG)",
+      "value": "Guided procedures (CT / USG) - USG Guided Drainage Tube Placement"
     },
     {
       "kind": "clinical_work_subtype",
       "name": "Guided Abscess Drainage",
-      "parentValue": "Guided procedures (CT / USG)"
+      "parentValue": "Guided procedures (CT / USG)",
+      "value": "Guided procedures (CT / USG) - Guided Abscess Drainage"
     },
     {
       "kind": "clinical_work_category",
@@ -305,42 +353,50 @@
     {
       "kind": "clinical_work_subtype",
       "name": "Abdominal",
-      "parentValue": "Emergencies"
+      "parentValue": "Emergencies",
+      "value": "Emergencies - Abdominal"
     },
     {
       "kind": "clinical_work_subtype",
       "name": "Obstetric",
-      "parentValue": "Emergencies"
+      "parentValue": "Emergencies",
+      "value": "Emergencies - Obstetric"
     },
     {
       "kind": "clinical_work_subtype",
       "name": "Cardiovascular",
-      "parentValue": "Emergencies"
+      "parentValue": "Emergencies",
+      "value": "Emergencies - Cardiovascular"
     },
     {
       "kind": "clinical_work_subtype",
       "name": "Thoracic",
-      "parentValue": "Emergencies"
+      "parentValue": "Emergencies",
+      "value": "Emergencies - Thoracic"
     },
     {
       "kind": "clinical_work_subtype",
       "name": "Head and Neck",
-      "parentValue": "Emergencies"
+      "parentValue": "Emergencies",
+      "value": "Emergencies - Head and Neck"
     },
     {
       "kind": "clinical_work_subtype",
       "name": "MSK",
-      "parentValue": "Emergencies"
+      "parentValue": "Emergencies",
+      "value": "Emergencies - MSK"
     },
     {
       "kind": "clinical_work_subtype",
       "name": "Trauma",
-      "parentValue": "Emergencies"
+      "parentValue": "Emergencies",
+      "value": "Emergencies - Trauma"
     },
     {
       "kind": "clinical_work_subtype",
       "name": "Others",
-      "parentValue": "Emergencies"
+      "parentValue": "Emergencies",
+      "value": "Emergencies - Others"
     },
     {
       "kind": "competency_level",
