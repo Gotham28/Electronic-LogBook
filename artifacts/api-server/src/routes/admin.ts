@@ -245,7 +245,7 @@ router.post("/students", validate(z.object({
   fullName: nameSchema,
   email: emailSchema,
   password: passwordSchema,
-  registrationNumber: nameSchema,
+  registrationNumber: z.string().trim().max(100).optional().nullable(),
   batch: z.string().trim().min(1).max(40),
   dateOfJoining: dateSchema,
   kuhsId: nameSchema
@@ -253,7 +253,7 @@ router.post("/students", validate(z.object({
   try {
     const { fullName, email, password, registrationNumber, batch, dateOfJoining, kuhsId } = req.body;
 
-    if (!fullName || !email || !password || !registrationNumber || !batch || !dateOfJoining || !kuhsId) {
+    if (!fullName || !email || !password || !batch || !dateOfJoining || !kuhsId) {
       res.status(400).json({ message: "All fields are required" });
       return;
     }
