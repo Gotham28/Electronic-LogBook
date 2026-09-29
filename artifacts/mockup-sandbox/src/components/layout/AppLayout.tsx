@@ -58,6 +58,8 @@ import {
 } from "lucide-react";
 
 import { LegalDisclaimerModal } from "@/components/LegalDisclaimerModal";
+import { ArogyaCharacter } from "@/components/arogya/ArogyaCharacter";
+import { ArogyaPanel } from "@/components/arogya/ArogyaPanel";
 import { useDepartment } from "@/lib/department-context";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 
@@ -209,6 +211,7 @@ export function AppLayout({
   const [cpForm, setCpForm] = React.useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
   const [changingPassword, setChangingPassword] = React.useState(false);
   const [isTourOpen, setIsTourOpen] = React.useState(false);
+  const [arogyaOpen, setArogyaOpen] = React.useState(false);
   const tourButtonRef = React.useRef<HTMLButtonElement>(null);
   const loginSummaryShownRef = React.useRef(false);
 
@@ -624,6 +627,25 @@ export function AppLayout({
           </SidebarInset>
           <MobileBottomNav role={activeRole} items={navigationItems} location={location} />
           <Toaster position="top-right" richColors />
+
+          <ArogyaPanel 
+            open={arogyaOpen}
+            onOpenChange={setArogyaOpen}
+            role={activeRole}
+            notifItems={notifItems}
+            onNavigate={(href) => setLocation(href)}
+          />
+
+          {!arogyaOpen && (
+            <button
+              type="button"
+              aria-label="Open Arogya assistant"
+              onClick={() => setArogyaOpen(true)}
+              className="print:hidden fixed z-40 bottom-[calc(76px+env(safe-area-inset-bottom))] right-4 sm:bottom-6 sm:right-6 flex h-14 w-14 items-center justify-center rounded-full bg-white border border-teal-100 shadow-[0_12px_24px_rgba(15,23,42,0.12)] transition-transform hover:scale-105"
+            >
+              <ArogyaCharacter state="idle" size={36} />
+            </button>
+          )}
 
           <Dialog open={isChangePasswordOpen} onOpenChange={setIsChangePasswordOpen}>
             <DialogContent className="sm:max-w-md rounded-[20px]">

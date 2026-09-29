@@ -1,0 +1,186 @@
+import * as React from "react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { SendHorizontal } from "lucide-react";
+import { ArogyaCharacter, type ArogyaState } from "./ArogyaCharacter";
+
+type RoleType = "Student" | "Faculty" | "HOD";
+
+interface PanelNotifItem {
+  id: string;
+  text: string;
+  href: string;
+}
+
+interface ArogyaPanelProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  role: RoleType;
+  notifItems: PanelNotifItem[];
+  onNavigate: (href: string) => void;
+}
+
+export function ArogyaPanel({ open, onOpenChange, role, notifItems, onNavigate }: ArogyaPanelProps) {
+  const [characterState, setCharacterState] = React.useState<ArogyaState>("idle");
+  const [activeTab, setActiveTab] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (!open) return undefined;
+    setCharacterState("waving");
+    setActiveTab(null);
+    const timer = setTimeout(() => setCharacterState("idle"), 1500);
+    return () => clearTimeout(timer);
+  }, [open]);
+
+  // "What's due?" -> All current Student notifications
+  const studentDue = notifItems;
+  // "My pending reviews" -> Faculty notifications strictly marked 'faculty_queue'
+  const facultyPending = notifItems.filter((i) => i.id === "faculty_queue");
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="w-full max-w-full flex flex-col p-0 sm:max-w-md border-l border-teal-100 bg-slate-50/50">
+        <SheetDescription className="sr-only">Arogya assistant panel</SheetDescription>
+        
+        {/* Header */}
+        <SheetHeader className="flex flex-row items-center justify-between p-4 bg-white border-b shadow-sm space-y-0">
+          <div className="flex items-center gap-3">
+            <ArogyaCharacter state={characterState} size={40} />
+            <div className="flex flex-col text-left">
+              <SheetTitle className="text-base text-teal-900 font-bold">Arogya</SheetTitle>
+              <span className="text-xs text-slate-500 font-medium">Your assistant</span>
+            </div>
+          </div>
+          {/* Removed extra SheetClose here because SheetContent includes one built-in */}
+        </SheetHeader>
+
+        {/* Content Area */}
+        <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
+          
+          {/* Quick Actions (Role specific) */}
+          <div className="flex flex-wrap gap-2 shrink-0">
+            {role === "Student" && (
+              <>
+                <Button variant="outline" size="sm" className="rounded-full bg-white text-teal-800 border-teal-200 hover:bg-teal-50" onClick={() => setActiveTab("coach")}>
+                  My progress coach
+                </Button>
+                <Button variant="outline" size="sm" className="rounded-full bg-white text-teal-800 border-teal-200 hover:bg-teal-50" onClick={() => setActiveTab("student_due")}>
+                  What's due?
+                </Button>
+              </>
+            )}
+            
+            {role === "Faculty" && (
+              <>
+                <Button variant="outline" size="sm" className="rounded-full bg-white text-teal-800 border-teal-200 hover:bg-teal-50" onClick={() => setActiveTab("draft_remarks")}>
+                  Draft appraisal remarks
+                </Button>
+                <Button variant="outline" size="sm" className="rounded-full bg-white text-teal-800 border-teal-200 hover:bg-teal-50" onClick={() => setActiveTab("faculty_pending")}>
+                  My pending reviews
+                </Button>
+              </>
+            )}
+
+            {role === "HOD" && (
+              <>
+                <Button variant="outline" size="sm" className="rounded-full bg-white text-teal-800 border-teal-200 hover:bg-teal-50" onClick={() => setActiveTab("dept_report")}>
+                  Department report
+                </Button>
+                <Button variant="outline" size="sm" className="rounded-full bg-white text-teal-800 border-teal-200 hover:bg-teal-50" onClick={() => setActiveTab("falling_behind")}>
+                  Who's falling behind?
+                </Button>
+                <Button variant="outline" size="sm" className="rounded-full bg-white text-teal-800 border-teal-200 hover:bg-teal-50" onClick={() => setActiveTab("draft_remarks")}>
+                  Draft appraisal remarks
+                </Button>
+              </>
+            )}
+          </div>
+
+          {/* Chat Bubble Area */}
+          <div className="flex flex-col gap-3 mt-4">
+            {activeTab && (
+              <div className="flex gap-3">
+                <div className="mt-1 shrink-0">
+                  <ArogyaCharacter state="idle" size={32} />
+                </div>
+                <div className="bg-white rounded-2xl rounded-tl-sm p-3.5 shadow-sm border border-teal-100 text-sm text-slate-700 w-full">
+                  
+                  {/* Coming Soon placeholders */}
+                  {["coach", "draft_remarks", "dept_report", "falling_behind"].includes(activeTab) && (
+                    <p className="font-medium">Coming soon.</p>
+                  )}
+
+                  {/* Student What's Due */}
+                  {activeTab === "student_due" && (
+                    <div className="flex flex-col gap-2">
+                      <p className="font-semibold text-teal-900 mb-1">Items that need your attention:</p>
+                      {/* Empty state wording MUST be exactly "No new notifications right now." to respect AGENTS.md §7, as backend fetch errors are swallowed silently. */}
+                      {studentDue.length === 0 ? (
+                        <p className="text-slate-500">No new notifications right now.</p>
+                      ) : (
+                        studentDue.map((item) => (
+                          <button
+                            key={item.id}
+                            onClick={() => {
+                              onNavigate(item.href);
+                              onOpenChange(false);
+                            }}
+                            className="text-left w-full p-2 bg-slate-50 hover:bg-teal-50 rounded-lg border border-slate-100 transition-colors text-xs font-medium"
+                          >
+                            {item.text}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
+
+                  {/* Faculty Pending Reviews */}
+                  {activeTab === "faculty_pending" && (
+                    <div className="flex flex-col gap-2">
+                      <p className="font-semibold text-teal-900 mb-1">Your pending reviews:</p>
+                      {facultyPending.length === 0 ? (
+                        <p className="text-slate-500">No new notifications right now.</p>
+                      ) : (
+                        facultyPending.map((item) => (
+                          <button
+                            key={item.id}
+                            onClick={() => {
+                              onNavigate(item.href);
+                              onOpenChange(false);
+                            }}
+                            className="text-left w-full p-2 bg-slate-50 hover:bg-teal-50 rounded-lg border border-slate-100 transition-colors text-xs font-medium"
+                          >
+                            {item.text}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Input Footer */}
+        <div className="p-4 bg-white border-t">
+          <div className="flex flex-col gap-2">
+            <label className="text-xs font-semibold text-slate-700">Ask Arogya anything</label>
+            <div className="relative">
+              <Input 
+                disabled 
+                placeholder="Coming soon..." 
+                className="pr-10 rounded-xl bg-slate-50"
+              />
+              <Button disabled size="icon" variant="ghost" className="absolute right-1 top-1 h-8 w-8 text-teal-600">
+                <SendHorizontal className="h-4 w-4" />
+              </Button>
+            </div>
+            <span className="text-[10px] text-slate-400 font-medium ml-1">Don't type patient details.</span>
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
