@@ -94,7 +94,7 @@ export function DepartmentSettings() {
     ["academic", "Academic activity"],
     ...(features.clinicalWorks ? [["clinical_work_category", "Clinical work category"], ["clinical_work_subtype", "Clinical work sub-type"]] as Array<[string, string]> : []),
     ...(!features.hideCaseLogs ? [["case_category", "Case category"] as [string, string]] : []),
-    ...(!features.hideProcedureLogs ? [["competency_level", "Experience level"] as [string, string]] : []),
+    ...(!features.hideProcedureLogs ? [["competency_level", "Competency level"] as [string, string]] : []),
     ...(features.conferenceLevels ? [["conference_level", "Conference level"] as [string, string]] : []),
     ["leave_type", "Leave type"],
   ];
@@ -393,9 +393,9 @@ export function DepartmentSettings() {
         />}
         {data.config?.enabledFeatures?.procedureExperience && !features.hideProcedureLogs && (
           <SearchableSection
-            title="Experience levels"
+            title="Competency levels"
             items={data.competencyLevels ?? []}
-            emptyText="No experience levels configured."
+            emptyText="No competency levels configured."
             renderItem={(item) => <div className="flex items-center gap-2 rounded-xl bg-slate-50 p-3">
               <span className="flex-1">{item.name}</span>
               <Button variant="ghost" size="sm" type="button" disabled={busy || deleting} onClick={() => confirmDelete(item.id, "competency_level", item.name)} className="text-rose-700 hover:bg-rose-100 h-8 w-8 p-0"><Trash2 className="h-4 w-4" /></Button>

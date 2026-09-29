@@ -229,7 +229,7 @@ export function ProcedureLogsPage() {
                 <Field label="Age"><Input value={form.age} onChange={(e) => setForm({ ...form, age: e.target.value })} placeholder="e.g. 4 months" required /></Field>
               </div>
               {config?.enabledFeatures?.procedureExperience && (
-                <Field label="Procedure experience">
+                <Field label="Competency level">
                   <Select value={form.experience} onValueChange={(value) => setForm({ ...form, experience: value })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -237,13 +237,11 @@ export function ProcedureLogsPage() {
                     </SelectContent>
                   </Select>
                   {competencyLevels.length === 0 && (
-                    <p className="text-sm text-slate-600">No procedure experience levels are set up for your department. Ask your HOD to add them in Department Settings.</p>
+                    <p className="text-sm text-slate-600">No competency levels are set up for your department. Ask your HOD to add them in Department Settings.</p>
                   )}
                 </Field>
               )}
-              <p className="rounded-xl border border-teal-100 bg-teal-50 p-3 text-[11px] leading-5 text-teal-800">
-                Verified competency is not self-selected. It is assigned by a faculty member during procedure review.
-              </p>
+              
               <Field label="Reviewing faculty member">
                 <Select value={form.supervisorId} onValueChange={(value) => setForm({ ...form, supervisorId: value })}>
                   <SelectTrigger><SelectValue placeholder="Select a faculty member" /></SelectTrigger>
@@ -347,7 +345,7 @@ export function ProcedureLogsPage() {
             </Empty>
           ) : (
             <Table>
-              <TableHeader><TableRow><TableHead>Number</TableHead><TableHead>Date</TableHead>{!isFreeTextProcedures && <TableHead>Group</TableHead>}<TableHead>Procedure</TableHead>{!hideUhid && <TableHead>Case ID</TableHead>}<TableHead>Age</TableHead>{config?.enabledFeatures?.procedureExperience && <TableHead>Experience</TableHead>}{config?.enabledFeatures?.procedureExperience && <TableHead>Verified competency</TableHead>}<TableHead>Remarks</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Number</TableHead><TableHead>Date</TableHead>{!isFreeTextProcedures && <TableHead>Group</TableHead>}<TableHead>Procedure</TableHead>{!hideUhid && <TableHead>Case ID</TableHead>}<TableHead>Age</TableHead>{config?.enabledFeatures?.procedureExperience && <TableHead>Competency level</TableHead>}{config?.enabledFeatures?.procedureExperience && <TableHead>Verified competency</TableHead>}<TableHead>Remarks</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
               <TableBody>
                 {logs.map((log) => (
                   <TableRow key={log.id}>
