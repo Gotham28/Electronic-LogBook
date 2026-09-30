@@ -25,5 +25,5 @@ export async function findStudent(studentId: number) {
 export function callerCanAccessStudent(caller: NonNullable<Express.Request["user"]>, student: NonNullable<Awaited<ReturnType<typeof findStudent>>>) {
   if (caller.role === "student") return student.userId === caller.id;
   if (student.departmentId !== caller.departmentId) return false;
-  return caller.role !== "professor" || student.mentorId === caller.id;
+  return true;
 }

@@ -102,7 +102,6 @@ router.get("/students", staff, async (req, res) => {
         eq(usersTable.departmentId, caller.departmentId!),
         eq(usersTable.role, "student"),
         eq(usersTable.status, "approved"),
-        caller.role === "professor" ? eq(studentsTable.mentorId, caller.id) : undefined,
       ))
       .orderBy(usersTable.fullName);
     res.json(students);
@@ -147,6 +146,18 @@ router.post("/students/:studentId", staff, validate(appraisalBodySchema), async 
     if (!student) { res.status(404).json({ message: "Student not found" }); return; }
     if (!callerCanAccessStudent(caller, student)) { res.status(403).json({ message: "Student is outside your appraisal access scope" }); return; }
     const body = req.body as z.infer<typeof appraisalBodySchema>;
+    const existing = await db.select({ id: appraisalsTable.id })
+      .from(appraisalsTable)
+      .where(and(
+        eq(appraisalsTable.studentId, student.id),
+        eq(appraisalsTable.quarter, body.quarter),
+        eq(appraisalsTable.year, body.year),
+      ))
+      .limit(1);
+    if (existing.length > 0) {
+      res.status(409).json({ message: "An appraisal already exists for this student, quarter and year." });
+      return;
+    }
     const [created] = await db.insert(appraisalsTable).values({
       studentId: student.id,
       evaluatorId: caller.id,
