@@ -84,7 +84,7 @@ function SearchableSection<T extends { id: number | string; name: string }>({
 
 export function DepartmentSettings() {
   const data = useDepartment();
-  const isRadiology = data.department?.name?.toLowerCase().includes("radiology");
+  const isRadiology = data.department?.name?.toLowerCase().includes("radiology") || data.department?.name?.toLowerCase().includes("dermatology");
   const features = data.config?.enabledFeatures ?? {};
   const procedureTypesEnabled = !features.freeTextProcedures && !features.hideProcedureLogs;
   // What the HOD can add. Every option follows the department's own settings, never its id.

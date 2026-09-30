@@ -75,7 +75,7 @@ export function CaseLogsPage() {
   const [editLogId, setEditLogId] = React.useState<number | null>(null);
 
   const user = React.useMemo(() => getCurrentUser(), []);
-  const hideUhid = isDemoMode();
+  const hideUhid = true; // isDemoMode();
   const [professors, setProfessors] = React.useState<any[]>([]);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 

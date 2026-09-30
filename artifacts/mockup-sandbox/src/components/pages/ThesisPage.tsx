@@ -25,7 +25,8 @@ const emptyThesis: Thesis = { thesisTitle: "", guideId: null, coGuideId: null, p
 export function ThesisPage() {
   const user = getCurrentUser()!;
   const { config } = useDepartment();
-  const label = config?.enabledFeatures?.useThesisAndPublicationsLabel ? "Thesis and Publications" : "Thesis";
+  const isPubOnly = config?.enabledFeatures?.publicationsOnly;
+  const label = isPubOnly ? "Publications" : config?.enabledFeatures?.useThesisAndPublicationsLabel ? "Thesis and Publications" : "Thesis";
   const base = `/api/students/${user.studentProfileId}`;
   const [thesis, setThesis] = React.useState<Thesis | null>(null);
   const [draft, setDraft] = React.useState<Thesis>(emptyThesis);
@@ -50,25 +51,24 @@ export function ThesisPage() {
   async function saveThesis(event: React.FormEvent) {
     event.preventDefault(); setBusy(true);
     try {
-      // Only editable fields are sent; approval status and student identity stay server-controlled.
       const body = { thesisTitle: draft.thesisTitle, guideId: draft.guideId, coGuideId: draft.coGuideId,
         ...Object.fromEntries(dateFields.map(([key]) => [key, draft[key] ?? null])) };
       await apiPost(`${base}/thesis`, body);
-      setThesisOpen(false); toast.success("Thesis milestones saved"); await load();
-    } catch (err) { toast.error(err instanceof Error ? err.message : "Unable to save milestones"); }
+      setThesisOpen(false); toast.success(isPubOnly ? "Publication saved" : "Thesis milestones saved"); await load();
+    } catch (err) { toast.error(err instanceof Error ? err.message : "Unable to save data"); }
     finally { setBusy(false); }
   }
   const guideName = (id: number | null) => faculty.find((person) => person.id === id)?.fullName || (id ? "Inactive faculty member" : "Not selected");
   return <div className="space-y-6 pb-12">
-    <div><p className="page-eyebrow">Research</p><h2 className="page-title mt-1">{label}</h2>
-      <p className="mt-2 text-sm text-slate-500">Record your research timeline and milestones.</p></div>
+    <div><p className="page-eyebrow">{isPubOnly ? "Publications" : "Research"}</p><h2 className="page-title mt-1">{label}</h2>
+      <p className="mt-2 text-sm text-slate-500">{isPubOnly ? "Record your publications." : "Record your research timeline and milestones."}</p></div>
     {error && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-rose-700">{error} <Button variant="outline" onClick={load}>Try again</Button></div>}
-    {loading ? <p role="status">Loading thesis…</p> : !error && <>
+    {loading ? <p role="status">Loading?</p> : !error && <>
       <Card className="overflow-hidden border-white/70 bg-white/80">
         <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-4">
-          <div><p className="page-eyebrow">Thesis milestone tracker</p>
-            <CardTitle className="mt-2 max-w-3xl text-xl">{thesis?.thesisTitle || "No thesis recorded yet"}</CardTitle>
-            {thesis && <p className="mt-2 text-sm text-slate-600">Guide: {guideName(thesis.guideId)} · Co-guide: {guideName(thesis.coGuideId)}</p>}
+          <div><p className="page-eyebrow">{isPubOnly ? "Publication details" : "Thesis milestone tracker"}</p>
+            <CardTitle className="mt-2 max-w-3xl text-xl">{thesis?.thesisTitle || (isPubOnly ? "No publications recorded yet" : "No thesis recorded yet")}</CardTitle>
+            {!isPubOnly && thesis && <p className="mt-2 text-sm text-slate-600">Guide: {guideName(thesis.guideId)} | Co-guide: {guideName(thesis.coGuideId)}</p>}
             {thesis && (thesis as any).facultyRemarks && (
               <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
                 <p className="text-xs font-semibold text-amber-800">Guide remarks</p>
@@ -76,29 +76,35 @@ export function ThesisPage() {
               </div>
             )}
           </div>
-          <Button variant="outline" size="sm" onClick={() => { setDraft(thesis || emptyThesis); setThesisOpen(true); }}><Edit3 className="h-4 w-4" /> {thesis ? "Edit thesis" : "Add thesis"}</Button>
+          <Button variant="outline" size="sm" onClick={() => { setDraft(thesis || emptyThesis); setThesisOpen(true); }}><Edit3 className="h-4 w-4" /> {isPubOnly ? (thesis ? "Edit" : "Add") : (thesis ? "Edit thesis" : "Add thesis")}</Button>
         </CardHeader>
-        <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-          {dateFields.map(([key, label]) => <div key={key} className="rounded-xl border border-slate-200 p-4">
-            <p className="text-xs font-semibold text-slate-500">{label}</p><p className="mt-2 text-sm">{thesis?.[key] ? formatLogbookDate(thesis[key]!) : "Not recorded"}</p>
-          </div>)}
-        </CardContent>
+        {!isPubOnly && (
+          <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            {dateFields.map(([key, label]) => <div key={key} className="rounded-xl border border-slate-200 p-4">
+              <p className="text-xs font-semibold text-slate-500">{label}</p><p className="mt-2 text-sm">{thesis?.[key] ? formatLogbookDate(thesis[key]!) : "Not recorded"}</p>
+            </div>)}
+          </CardContent>
+        )}
       </Card>
     </>}
     <Dialog open={thesisOpen} onOpenChange={(open) => { if (!busy) setThesisOpen(open); }}>
       <DialogContent onInteractOutside={(event) => event.preventDefault()} className="max-h-[90vh] overflow-y-auto bg-white sm:max-w-2xl">
-        <DialogHeader><DialogTitle>Edit thesis milestones</DialogTitle><DialogDescription>Choose guides from your department. Leave unknown dates blank.</DialogDescription></DialogHeader>
+        <DialogHeader><DialogTitle>{isPubOnly ? "Edit publications" : "Edit thesis milestones"}</DialogTitle><DialogDescription>{isPubOnly ? "Enter your publication details." : "Choose guides from your department. Leave unknown dates blank."}</DialogDescription></DialogHeader>
         <form onSubmit={saveThesis} className="space-y-4">
-          <Field label="Topic"><Input required maxLength={4000} value={draft.thesisTitle} onChange={(e) => setDraft({ ...draft, thesisTitle: e.target.value })} /></Field>
-          <div className="grid gap-4 sm:grid-cols-2">{(["guideId", "coGuideId"] as const).map((key) => <Field key={key} label={key === "guideId" ? "Guide" : "Co-guide (optional)"}>
-            <select className="h-10 w-full rounded-md border bg-white px-3 text-sm" required={key === "guideId"} value={draft[key] ?? ""} onChange={(e) => setDraft({ ...draft, [key]: e.target.value ? Number(e.target.value) : null })}>
-              <option value="">Select faculty</option>{faculty.map((person) => <option key={person.id} value={person.id}>{person.fullName}</option>)}
-            </select>
-          </Field>)}</div>
-          <div className="grid gap-4 sm:grid-cols-2">{dateFields.map(([key, label]) => <Field key={key} label={label}>
-            <Input type="date" value={draft[key] || ""} onChange={(e) => setDraft({ ...draft, [key]: e.target.value || null })} />
-          </Field>)}</div>
-          <DialogFooter><Button type="button" variant="outline" disabled={busy} onClick={() => setThesisOpen(false)}>Cancel</Button><Button disabled={busy || !faculty.length}>{busy ? "Saving…" : "Save milestones"}</Button></DialogFooter>
+          <Field label={isPubOnly ? "Publication Details" : "Topic"}><Input required maxLength={4000} value={draft.thesisTitle} onChange={(e) => setDraft({ ...draft, thesisTitle: e.target.value })} /></Field>
+          {!isPubOnly && (
+            <>
+              <div className="grid gap-4 sm:grid-cols-2">{(["guideId", "coGuideId"] as const).map((key) => <Field key={key} label={key === "guideId" ? "Guide" : "Co-guide (optional)"}>
+                <select className="h-10 w-full rounded-md border bg-white px-3 text-sm" required={key === "guideId"} value={draft[key] ?? ""} onChange={(e) => setDraft({ ...draft, [key]: e.target.value ? Number(e.target.value) : null })}>
+                  <option value="">Select faculty</option>{faculty.map((person) => <option key={person.id} value={person.id}>{person.fullName}</option>)}
+                </select>
+              </Field>)}</div>
+              <div className="grid gap-4 sm:grid-cols-2">{dateFields.map(([key, label]) => <Field key={key} label={label}>
+                <Input type="date" value={draft[key] || ""} onChange={(e) => setDraft({ ...draft, [key]: e.target.value || null })} />
+              </Field>)}</div>
+            </>
+          )}
+          <DialogFooter><Button type="button" variant="outline" disabled={busy} onClick={() => setThesisOpen(false)}>Cancel</Button><Button disabled={busy || (!isPubOnly && !faculty.length)}>{busy ? "Saving?" : (isPubOnly ? "Save publications" : "Save milestones")}</Button></DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
