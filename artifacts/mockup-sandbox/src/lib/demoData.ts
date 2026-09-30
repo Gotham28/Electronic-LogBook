@@ -1,148 +1,100 @@
-export const demoData = {
-  departmentCatalog: {
-    department: { id: 1, name: "General Pediatrics", code: "peds" },
-    hod: { id: 3, name: "Dr. Priya Sharma", fullName: "Dr. Priya Sharma" },
-    config: {
-      requiredCases: 150,
-      requiredProcedures: 80,
-      requiredAcademic: 60,
-    },
-    procedures: [
-      { id: 1, name: "Lumbar Puncture", group: "Emergency / Diagnostics", required: 15 },
-      { id: 2, name: "Pediatric IV Cannulation", group: "Ward Procedures", required: 40 },
-      { id: 3, name: "Nebulization Technique", group: "Ward Procedures", required: 20 },
-      { id: 4, name: "Intraosseous Access", group: "Emergency / Diagnostics", required: 8 },
-      { id: 5, name: "Umbilical Catheterization", group: "Neonatal Procedures", required: 10 },
-      { id: 6, name: "Bag and Mask Ventilation", group: "Emergency / Diagnostics", required: 12 }
-    ],
-    academics: [
-      { id: 1, name: "Journal Club", kind: "academic", required: 15 },
-      { id: 2, name: "Case Presentation", kind: "academic", required: 20 }
-    ],
-    postings: [
-      { id: 1, name: "General Pediatric Ward", value: "general-pediatric-ward", required: 0, period: "total" },
-      { id: 2, name: "Neonatal Intensive Care Unit", value: "nicu", required: 0, period: "total" },
-      { id: 3, name: "Pediatric Intensive Care Unit", value: "picu", required: 0, period: "total" },
-      { id: 4, name: "Emergency Department", value: "emergency-department", required: 0, period: "total" }
-    ]
-  },
-  students: [
-    {
-      id: 1,
-      registrationNumber: "REG-PED-2024",
-      fullName: "Kavya Nair",
-      name: "Kavya Nair",
-      email: "kavya.nair.demo@example.com",
-      batch: "2024",
-      completion: 82,
-      overallCompletion: 82,
-      status: "approved",
-      shortfallStatus: "on_track",
-      department: "General Pediatrics",
-      departmentId: 1,
-      mentorId: 2,
-      verified: { cases: 120, procedures: 75, academics: 50 },
-      targets: { cases: 150, procedures: 80, academics: 60 }
-    },
-    {
-      id: 4,
-      registrationNumber: "REG-PED-2025",
-      fullName: "Rohan Verma",
-      name: "Rohan Verma",
-      email: "rohan.verma.demo@example.com",
-      batch: "2025",
-      completion: 30,
-      overallCompletion: 30,
-      status: "approved",
-      shortfallStatus: "on_track",
-      department: "General Pediatrics",
-      departmentId: 1,
-      mentorId: 2,
-      verified: { cases: 45, procedures: 20, academics: 15 },
-      targets: { cases: 150, procedures: 80, academics: 60 }
-    }
-  ],
-  studentProfile: {
-    id: 1,
-    user: { fullName: "Kavya Nair", name: "Kavya Nair", email: "kavya.nair.demo@example.com", role: "student" },
-    enrollmentYear: 2024,
-    completionStatus: "on_track",
-    departmentId: 1
-  },
-  postings: [
-    { id: 10, unit: "NICU", startDate: "2024-07-01", endDate: "2024-09-30", status: "completed" }
-  ],
-  logs: {
-    cases: [
-      { id: 101, date: "2024-10-15", diagnosisProvisional: "Acute Bronchiolitis (14-month-old)", status: "verified" },
-      { id: 102, date: "2024-10-18", diagnosisProvisional: "Febrile Seizure Workup (2-year-old)", status: "pending" },
-      { id: 103, date: "2024-10-22", diagnosisProvisional: "Neonatal Jaundice Follow-up", status: "verified" }
-    ],
-    procedures: [
-      { id: 201, date: "2024-10-12", procedureName: "Lumbar Puncture", group: "Emergency / Diagnostics", status: "verified", remarks: "Good aseptic technique." },
-      { id: 202, date: "2024-10-16", procedureName: "Pediatric IV Cannulation", group: "Ward Procedures", status: "verified" },
-      { id: 203, date: "2024-10-19", procedureName: "Nebulization Technique", group: "Ward Procedures", status: "pending" }
-    ],
-    academics: [
-      { id: 301, date: "2024-10-05", activityType: "Journal Club", topic: "RSV prophylaxis in high-risk infants", status: "verified" },
-      { id: 302, date: "2024-10-14", activityType: "Case Presentation", topic: "Kawasaki Disease", status: "pending" }
-    ]
-  },
-  professors: [
-    { id: 2, fullName: "Dr. Vivek Menon", name: "Dr. Vivek Menon", email: "vivek.menon.demo@example.com", role: "professor", title: "Associate Professor" }
-  ],
-  hodAnalytics: {
-    totalStudents: 12,
-    logsVerified: 850,
-    logsPending: 42,
-    studentsAtRisk: 1
-  },
-  leaveBalance: { casual: { total: 20, used: 4 }, academic: { total: 14, used: 2 } },
-  leaveRecords: [
-    {
-      id: 1,
-      number: 1,
-      appliedOn: "2024-08-10T10:00:00Z",
-      createdAt: "2024-08-10T10:00:00Z",
-      leaveType: "casual",
-      startDate: "2024-08-15",
-      endDate: "2024-08-18",
-      fromDate: "2024-08-15",
-      toDate: "2024-08-18",
-      totalDays: 4,
-      reason: "Family medical leave",
-      approvedBy: "Dr. Priya Sharma",
-      status: "approved"
-    },
-    {
-      id: 2,
-      number: 2,
-      appliedOn: "2024-11-01T09:15:00Z",
-      createdAt: "2024-11-01T09:15:00Z",
-      leaveType: "academic",
-      startDate: "2024-11-20",
-      endDate: "2024-11-21",
-      fromDate: "2024-11-20",
-      toDate: "2024-11-21",
-      totalDays: 2,
-      reason: "Pediatrics Conference (PEDICON) Presentation",
-      approvedBy: "Pending",
-      status: "pending"
-    }
-  ],
-  assessments: [
-    {
-      id: 1,
-      date: "2024-10-05",
-      examName: "End of Unit Pediatrics Assessment",
-      type: "internal",
-      marks: 85,
-      maximum: 100,
-      grade: "B",
-      assessorName: "Dr. Vivek Menon"
-    }
-  ]
-};
+import { demoData, getDemoResident } from './demoDepartments';
+import { playDemoSound } from './demoSounds';
+
+function requestedStudentId(path: string): number | undefined {
+  const match = path.match(/\/api\/students\/(\d+)/);
+  return match ? Number(match[1]) : undefined;
+}
+
+function countsByStatus(items: any[]) {
+  return {
+    verified: items.filter((item) => item.status === "verified").length,
+    pending: items.filter((item) => item.status === "pending").length,
+  };
+}
+
+function buildProgress(studentId?: number) {
+  const resident = getDemoResident(studentId);
+  const catalog = demoData.departmentCatalog;
+  const cases = resident.logs.cases;
+  const procedures = resident.logs.procedures;
+  const academics = resident.logs.academics;
+  const clinicalWorks = resident.logs.clinicalWorks;
+  const caseValues = catalog.caseCategories.length
+    ? catalog.caseCategories.map((category) => ({ value: category.value, ...countsByStatus(cases.filter((item) => item.category === category.value)) }))
+    : [{ value: null, ...countsByStatus(cases) }];
+  const procedureNames = new Map<string, { group: string; name: string; items: any[] }>();
+  procedures.forEach((item) => {
+    const key = String(item.group) + "::" + String(item.procedureName);
+    const value: { group: string; name: string; items: any[] } = procedureNames.get(key) ?? { group: item.group, name: item.procedureName, items: [] };
+    value.items.push(item);
+    procedureNames.set(key, value);
+  });
+  const academicNames = new Map<string, any[]>();
+  academics.forEach((item) => academicNames.set(item.activityType, [...(academicNames.get(item.activityType) ?? []), item]));
+  const clinicalNames = new Map<string, any[]>();
+  clinicalWorks.forEach((item) => clinicalNames.set(item.category, [...(clinicalNames.get(item.category) ?? []), item]));
+  return {
+    caseCategories: caseValues,
+    procedures: [...procedureNames.values()].map(({ group, name, items }) => ({
+      group,
+      name,
+      ...countsByStatus(items),
+      byCompetency: [{ level: String(items[0]?.experience ?? "assisted"), ...countsByStatus(items) }],
+    })),
+    academics: [...academicNames.entries()].map(([value, items]) => ({ value, ...countsByStatus(items) })),
+    clinicalWorks: [...clinicalNames.entries()].map(([value, items]) => ({ value, ...countsByStatus(items) })),
+  };
+}
+
+function buildReviewQueue() {
+  const user = JSON.parse(window.sessionStorage.getItem("elogbook-user") || "null");
+  const pendingReviews = demoData.students.flatMap((student: any) => {
+    const resident = getDemoResident(student.id);
+    const common = { studentId: student.id, studentName: student.fullName, registrationNumber: student.registrationNumber, department: student.department };
+    return [
+      ...resident.logs.cases.filter((item) => item.status === "pending").map((item) => ({
+        ...common, id: "case-" + item.id, dbId: item.id, logType: "case", type: "Case Log",
+        title: item.diagnosisProvisional, date: item.date, patientInfo: "Sample record",
+        detail: item.chiefComplaints, diagnosis: item.diagnosisProvisional, status: item.status,
+      })),
+      ...resident.logs.procedures.filter((item) => item.status === "pending").map((item) => ({
+        ...common, id: "procedure-" + item.id, dbId: item.id, logType: "procedure", type: "Procedure",
+        title: item.procedureName, date: item.date, patientInfo: "Sample record", detail: item.procedureGroup, status: item.status,
+      })),
+      ...resident.logs.academics.filter((item) => item.status === "pending").map((item) => ({
+        ...common, id: "academic-" + item.id, dbId: item.id, logType: "academic", type: "Academic",
+        title: item.activityType + ": " + item.topic, date: item.date, detail: item.presentationType, status: item.status,
+      })),
+      ...resident.logs.clinicalWorks.filter((item) => item.status === "pending").map((item) => ({
+        ...common, id: "clinical_work-" + item.id, dbId: item.id, logType: "clinical_work", type: "Clinical Work",
+        title: item.categoryName, date: item.date, patientInfo: "Sample record", detail: item.clinicalFindings, status: item.status,
+      })),
+    ];
+  });
+  const assignedMentees = demoData.students.map((student: any) => {
+    const logs = getDemoResident(student.id).logs;
+    return {
+      id: student.id,
+      name: student.fullName,
+      registrationNumber: student.registrationNumber,
+      department: student.department,
+      overallCompletion: student.overallCompletion,
+      shortfallStatus: student.shortfallStatus,
+      logCounts: {
+        cases: logs.cases.filter((item) => item.status === "verified").length,
+        procs: logs.procedures.filter((item) => item.status === "verified").length,
+        acad: logs.academics.filter((item) => item.status === "verified").length,
+        clinical: logs.clinicalWorks.filter((item) => item.status === "verified").length,
+      },
+    };
+  });
+  return {
+    faculty: { name: demoData.professors[0]?.name, role: user?.role === "hod" ? "hod" : "professor" },
+    pendingReviews,
+    assignedMentees,
+  };
+}
 
 export async function handleDemoRequest(method: string, path: string, body?: any) {
   await new Promise(r => setTimeout(r, 400)); // Mock network delay for realism
@@ -164,48 +116,93 @@ export async function handleDemoRequest(method: string, path: string, body?: any
     
     // Professor Review Queue
     if (path.match(/\/api\/professors\/\d+\/review-queue/)) {
-      return {
-        faculty: demoData.professors[0],
-        pendingReviews: [],
-        assignedMentees: demoData.students
-      };
+      return buildReviewQueue();
     }
     
     // Student Sub-endpoints
     if (path.match(/\/api\/students\/\d+\/logs$/)) {
+      const resident = getDemoResident(requestedStudentId(path));
       return {
-        caseLogs: demoData.logs.cases,
-        procedureLogs: demoData.logs.procedures,
-        academicLogs: demoData.logs.academics,
+        caseLogs: resident.logs.cases,
+        procedureLogs: resident.logs.procedures,
+        academicLogs: resident.logs.academics,
+        clinicalWorkLogs: resident.logs.clinicalWorks,
         profile: {
-          department: "General Pediatrics",
-          joiningYear: "2024",
-          registrationNumber: "REG-PED-2024",
-          dateOfJoining: "2024-07-01T00:00:00Z"
+          department: demoData.departmentCatalog.department.name,
+          joiningYear: resident.studentProfile.enrollmentYear ? String(resident.studentProfile.enrollmentYear) : "",
+          registrationNumber: resident.studentProfile.registrationNumber || "",
+          dateOfJoining: resident.studentProfile.dateOfJoining || ""
         }
       };
     }
-    if (path.match(/\/api\/students\/\d+\/postings$/)) return { data: demoData.postings };
+    if (path.match(/\/api\/students\/\d+\/progress$/)) return buildProgress(requestedStudentId(path));
+    if (path.match(/\/api\/students\/\d+\/postings$/)) return { data: getDemoResident(requestedStudentId(path)).postings };
     if (path.match(/\/api\/students\/\d+\/thesis$/)) return { data: (demoData as any).thesis || null };
     if (path.match(/\/api\/students\/\d+\/certifications$/)) return (demoData as any).certifications || [];
-    if (path.match(/\/api\/students\/\d+\/case-logs$/)) return demoData.logs.cases;
-    if (path.match(/\/api\/students\/\d+\/procedure-logs$/)) return demoData.logs.procedures;
-    if (path.match(/\/api\/students\/\d+\/academic-logs$/)) return demoData.logs.academics;
-    if (path.match(/\/api\/students\/\d+\/leave-records$/)) return demoData.leaveRecords;
+    if (path.match(/\/api\/students\/\d+\/case-logs$/)) return getDemoResident(requestedStudentId(path)).logs.cases;
+    if (path.match(/\/api\/students\/\d+\/procedure-logs$/)) return getDemoResident(requestedStudentId(path)).logs.procedures;
+    if (path.match(/\/api\/students\/\d+\/academic-logs$/)) return getDemoResident(requestedStudentId(path)).logs.academics;
+    if (path.match(/\/api\/students\/\d+\/clinical-works$/)) return getDemoResident(requestedStudentId(path)).logs.clinicalWorks;
+    if (path.match(/\/api\/students\/\d+\/leave-records$/)) return getDemoResident(requestedStudentId(path)).leaveRecords;
     if (path.match(/\/api\/students\/\d+\/leave-balance$/)) return demoData.leaveBalance;
     if (path.match(/\/api\/students\/\d+\/assessments$/)) return demoData.assessments;
     
     // Profile / Roster
-    if (path.match(/\/api\/students\/\d+$/)) return demoData.studentProfile;
+    if (path.match(/\/api\/students\/\d+$/)) return getDemoResident(requestedStudentId(path)).studentProfile;
     if (path.includes("/admin/students/pending")) return [];
-    if (path.includes("/admin/leaves/pending")) return [];
+    if (path.includes("/admin/leaves/pending")) return demoData.leaveRecords.filter((leave: any) => leave.status === "pending").map((leave: any) => ({
+      id: String(leave.id), number: String(leave.number), residentName: leave.residentName,
+      type: leave.type, fromDate: leave.fromDate, toDate: leave.toDate,
+      reason: leave.reason, status: leave.status, totalDays: leave.totalDays,
+    }));
     
     return []; // Safe fallback
   }
 
   // Mutations (optimistic in-memory updates so UI feels responsive)
   if (method === "POST" || method === "PATCH") {
+    const reviewMatch = path.match(/\/api\/logs\/(case|procedure|academic|clinical_work|clinical-work)\/(\d+)\/review$/);
+    if (method === "PATCH" && reviewMatch && body) {
+      const logKey = reviewMatch[1] === "case" ? "cases"
+        : reviewMatch[1] === "procedure" ? "procedures"
+        : reviewMatch[1] === "academic" ? "academics" : "clinicalWorks";
+      const dbId = Number(reviewMatch[2]);
+      const item = demoData.students
+        .map((student: any) => getDemoResident(student.id).logs[logKey].find((entry: any) => entry.id === dbId))
+        .find(Boolean);
+      if (item) {
+        item.status = body.status === "rejected" ? "rejected" : "verified";
+        item.reviewComments = body.comments || "";
+        if (item.status === "verified") playDemoSound("success");
+      }
+      return { success: true, id: dbId };
+    }
+
+    if (path.includes("/clinical-works") && body) {
+      const resident = getDemoResident(requestedStudentId(path));
+      const newClinicalWork = {
+        id: Date.now(),
+        number: resident.logs.clinicalWorks.length + 1,
+        date: body.date,
+        category: body.category,
+        subType: body.subType || null,
+        patientAge: body.patientAge || "",
+        patientSex: body.patientSex || "",
+        caseNumber: body.caseNumber || "",
+        supervisorId: Number(body.supervisorId),
+        supervisorName: demoData.professors.find((professor) => professor.id === Number(body.supervisorId))?.name || "Dr. Vivek Menon",
+        organSystem: body.organSystem || null,
+        clinicalFindings: body.clinicalFindings || null,
+        competency: body.competency || null,
+        status: "pending",
+      };
+      resident.logs.clinicalWorks.unshift(newClinicalWork);
+      playDemoSound("success");
+      return { success: true, id: newClinicalWork.id };
+    }
+
     if (path.includes("/case-logs") && body) {
+      const resident = getDemoResident(requestedStudentId(path));
       const newCaseLog = {
         id: Date.now(),
         number: demoData.logs.cases.length + 1,
@@ -224,11 +221,13 @@ export async function handleDemoRequest(method: string, path: string, body?: any
         management: body.managementPlan || "",
         status: "pending"
       };
-      demoData.logs.cases.unshift(newCaseLog as any);
+      resident.logs.cases.unshift(newCaseLog as any);
+      playDemoSound("success");
       return { success: true, id: newCaseLog.id };
     }
 
     if (path.includes("/procedure-logs") && body) {
+      const resident = getDemoResident(requestedStudentId(path));
       const newProcedureLog = {
         id: Date.now(),
         number: demoData.logs.procedures.length + 1,
@@ -242,11 +241,13 @@ export async function handleDemoRequest(method: string, path: string, body?: any
         verifiedCompetency: "No",
         status: "pending"
       };
-      demoData.logs.procedures.unshift(newProcedureLog as any);
+      resident.logs.procedures.unshift(newProcedureLog as any);
+      playDemoSound("success");
       return { success: true, id: newProcedureLog.id };
     }
 
     if (path.includes("/academic-logs") && body) {
+      const resident = getDemoResident(requestedStudentId(path));
       const facultyObj = demoData.professors.find(p => p.id === Number(body.supervisorId));
       const newAcademicLog = {
         id: Date.now(),
@@ -259,11 +260,13 @@ export async function handleDemoRequest(method: string, path: string, body?: any
         faculty: facultyObj ? facultyObj.name : "Dr. Vivek Menon",
         status: "pending"
       };
-      demoData.logs.academics.unshift(newAcademicLog as any);
+      resident.logs.academics.unshift(newAcademicLog as any);
+      playDemoSound("success");
       return { success: true, id: newAcademicLog.id };
     }
 
     if (path.includes("/postings") && body) {
+      const resident = getDemoResident(requestedStudentId(path));
       const facultyObj = demoData.professors.find(p => p.id === Number(body.supervisorId));
       const newPosting = {
         id: Date.now(),
@@ -275,7 +278,8 @@ export async function handleDemoRequest(method: string, path: string, body?: any
         supervisorName: facultyObj ? facultyObj.name : "Dr. Vivek Menon",
         status: "completed"
       };
-      demoData.postings.unshift(newPosting as any);
+      resident.postings.unshift(newPosting as any);
+      playDemoSound("success");
       return { success: true, id: newPosting.id };
     }
 
@@ -297,6 +301,7 @@ export async function handleDemoRequest(method: string, path: string, body?: any
     }
     
     if (path.includes("/leave-records") && body) {
+      const resident = getDemoResident(requestedStudentId(path));
       const start = new Date(body.startDate);
       const end = new Date(body.endDate);
       const totalDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 3600 * 24)) + 1;
@@ -316,7 +321,8 @@ export async function handleDemoRequest(method: string, path: string, body?: any
         approvedBy: "Pending",
         status: "pending"
       };
-      demoData.leaveRecords.unshift(newLeave as any);
+      resident.leaveRecords.unshift(newLeave as any);
+      playDemoSound("success");
       return { success: true, id: newLeave.id };
     }
 
@@ -353,3 +359,4 @@ export async function handleDemoRequest(method: string, path: string, body?: any
 
   return { success: true };
 }
+

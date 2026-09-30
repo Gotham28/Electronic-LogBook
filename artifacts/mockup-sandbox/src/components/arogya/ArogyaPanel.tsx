@@ -5,6 +5,8 @@ import { Input } from "@/components/ui/input";
 import { SendHorizontal } from "lucide-react";
 import { ArogyaCharacter, type ArogyaState } from "./ArogyaCharacter";
 import { apiPost } from "@/lib/apiClient";
+import { isDemoMode } from "@/lib/session";
+import { playDemoSound } from "@/lib/demoSounds";
 
 type RoleType = "Student" | "Faculty" | "HOD";
 
@@ -41,6 +43,15 @@ export function ArogyaPanel({ open, onOpenChange, role, notifItems, onNavigate }
   }[]>([]);
 
   React.useEffect(() => {
+    if (characterState !== "talking" || !isDemoMode()) return undefined;
+    playDemoSound("pop");
+    const timer = window.setTimeout(() => {
+      setCharacterState((current) => current === "talking" ? "idle" : current);
+    }, 1200);
+    return () => window.clearTimeout(timer);
+  }, [characterState]);
+
+  React.useEffect(() => {
     if (!open) return undefined;
     setCharacterState("waving");
     const timer = setTimeout(() => setCharacterState("idle"), 1500);
@@ -59,6 +70,7 @@ export function ArogyaPanel({ open, onOpenChange, role, notifItems, onNavigate }
         links: snapshot,
       },
     ]);
+    if (isDemoMode()) setCharacterState("talking");
   };
 
   const handlePendingReviews = () => {
@@ -73,6 +85,7 @@ export function ArogyaPanel({ open, onOpenChange, role, notifItems, onNavigate }
         links: snapshot,
       },
     ]);
+    if (isDemoMode()) setCharacterState("talking");
   };
 
   const handleAsk = async (e: React.FormEvent) => {

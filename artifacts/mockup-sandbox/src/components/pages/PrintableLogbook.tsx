@@ -5,6 +5,7 @@ import { formatLogbookDate } from "@/lib/logbook-config";
 import { useDepartment } from "@/lib/department-context";
 import { Printer, X, BookOpen } from "lucide-react";
 import { useMobileCellLabels } from "@/components/ui/table";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 
 class PrintErrorBoundary extends React.Component<{children: React.ReactNode}, {error: Error | null}> {
   constructor(props: {children: React.ReactNode}) {
@@ -179,6 +180,7 @@ function AggregateSummary({ rows, label }: { rows: any[]; label: string }) {
 export function PrintableLogbook() {
   const user = React.useMemo(() => getCurrentUser(), []);
   const hideUhid = isDemoMode();
+  const shouldReduceMotion = useReducedMotion();
   const { config, clinicalWorkCategories, clinicalWorkSubtypes, competencyLevels, department: dept } = useDepartment();
   const isRadiology = dept?.name?.toLowerCase().includes("radiology");
   const features = config?.enabledFeatures ?? {};
@@ -189,6 +191,8 @@ export function PrintableLogbook() {
   const documentRef = React.useRef<HTMLDivElement>(null);
   useMobileCellLabels(documentRef, true, data);
   const printStarted = React.useRef(false);
+  const [flipPreviewDone, setFlipPreviewDone] = React.useState(() => !isDemoMode());
+  const [flipPage, setFlipPage] = React.useState(0);
 
   const closePrintView = React.useCallback(() => {
     if (window.opener && !window.opener.closed) { window.close(); return; }
@@ -230,11 +234,6 @@ export function PrintableLogbook() {
         appraisals: Array.isArray(appraisalsRes) ? appraisalsRes : appraisalsRes?.data || [],
       });
 
-      if (!printStarted.current) {
-        printStarted.current = true;
-        window.addEventListener("afterprint", closePrintView, { once: true });
-        setTimeout(() => window.print(), 600);
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load your complete logbook.");
     } finally {
@@ -243,6 +242,29 @@ export function PrintableLogbook() {
   }, [user, closePrintView]);
 
   React.useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  React.useEffect(() => {
+    if (!isDemoMode() || shouldReduceMotion === true) setFlipPreviewDone(true);
+  }, [shouldReduceMotion]);
+
+  React.useEffect(() => {
+    if (!isDemoMode() || loading || !data || flipPreviewDone || shouldReduceMotion !== false) return undefined;
+    const timer = window.setTimeout(() => {
+      if (flipPage >= 3) setFlipPreviewDone(true);
+      else setFlipPage((current) => current + 1);
+    }, 430);
+    return () => window.clearTimeout(timer);
+  }, [data, flipPage, flipPreviewDone, loading, shouldReduceMotion]);
+
+  React.useEffect(() => {
+    if (loading || !data || error || printStarted.current) return undefined;
+    if (isDemoMode() && !flipPreviewDone) return undefined;
+
+    printStarted.current = true;
+    window.addEventListener("afterprint", closePrintView, { once: true });
+    const timer = window.setTimeout(() => window.print(), 600);
+    return () => window.clearTimeout(timer);
+  }, [closePrintView, data, error, flipPreviewDone, loading]);
 
   if (loading) return (
     <div className="flex flex-col items-center justify-center min-h-screen gap-4 text-slate-500">
@@ -277,6 +299,52 @@ export function PrintableLogbook() {
 
   return (
     <PrintErrorBoundary>
+      {isDemoMode() && shouldReduceMotion === false && !flipPreviewDone && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden bg-slate-950/55 p-5 print:hidden" role="status" aria-live="polite">
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(255,255,255,0.12),transparent_65%)]" />
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={flipPage}
+              initial={{ opacity: 0, rotateY: -78, x: 30 }}
+              animate={{ opacity: 1, rotateY: 0, x: 0 }}
+              exit={{ opacity: 0, rotateY: 70, x: -24 }}
+              transition={{ duration: 0.38, ease: "easeOut" }}
+              className="relative flex min-h-[min(68vh,34rem)] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-white/70 bg-white px-6 py-7 shadow-[0_30px_100px_rgba(15,23,42,0.38)] sm:px-9 sm:py-9"
+              style={{ transformOrigin: "left center", perspective: 1200 }}
+            >
+              <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-teal-700">Electronic Logbook</span>
+                <span className="text-xs font-medium tabular-nums text-slate-400">{String(flipPage + 1).padStart(2, "0")} / 04</span>
+              </div>
+              <div className="flex flex-1 flex-col justify-center py-9">
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">{user?.name ?? "Resident"}</p>
+                <h1 className="mt-3 text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">
+                  {["Training record", "Clinical activity", "Academic activity", "Progress summary"][flipPage]}
+                </h1>
+                <div className="mt-8 space-y-4" aria-hidden="true">
+                  <div className="h-2 w-4/5 rounded-full bg-slate-100" />
+                  <div className="h-2 w-full rounded-full bg-slate-100" />
+                  <div className="h-2 w-3/5 rounded-full bg-slate-100" />
+                  <div className="mt-7 grid grid-cols-2 gap-3">
+                    <div className="h-16 rounded-xl border border-teal-100 bg-teal-50/70" />
+                    <div className="h-16 rounded-xl border border-slate-100 bg-slate-50" />
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center justify-between border-t border-slate-200 pt-4">
+                <span className="text-xs text-slate-400">Preparing print view</span>
+                <button
+                  type="button"
+                  onClick={() => setFlipPreviewDone(true)}
+                  className="min-h-11 rounded-lg px-3 text-sm font-semibold text-teal-800 transition-colors hover:bg-teal-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600"
+                >
+                  Skip preview
+                </button>
+              </div>
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      )}
       <style>{`
         @media print {
           @page { size: A4; margin: 18mm 16mm; }

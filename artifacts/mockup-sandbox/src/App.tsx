@@ -1,6 +1,7 @@
 import { useEffect, useState, type ComponentType, type ReactNode } from "react";
 import { Redirect, Route, Switch, useLocation } from "wouter";
 import { AppLayout, type RoleType } from "@/components/layout/AppLayout";
+import { DemoBanner } from "@/components/layout/DemoBanner";
 import { Dashboard } from "@/components/Dashboard";
 import { ProfessorPortal } from "@/components/ProfessorPortal";
 import { HODPortal } from "@/components/HODPortal";
@@ -24,6 +25,7 @@ import { PrivacyPolicyPage } from "@/components/pages/PrivacyPolicyPage";
 import { GrievanceOfficerPage } from "@/components/pages/GrievanceOfficerPage";
 import { DataRightsPage } from "@/components/pages/DataRightsPage";
 import { getCurrentUser, clearSession, getToken, saveToken, SESSION_EXPIRED_EVENT } from "@/lib/session";
+import { DEMO_DEPARTMENT_CHANGED_EVENT, getDemoDepartmentProfile } from "@/lib/demoDepartments";
 import { apiGet, apiPost } from "@/lib/apiClient";
 import { DepartmentProvider, useDepartment } from "@/lib/department-context";
 import { startSessionKeepalive } from "@/lib/session-keepalive";
@@ -136,7 +138,7 @@ function getPreviewPath(): string | null {
 function App() {
   const [, setLocation] = useLocation();
   const previewPath = getPreviewPath();
-  const currentUser = getCurrentUser();
+  const [currentUser, setCurrentUser] = useState(() => getCurrentUser());
   
   const activeRole: RoleType = (() => {
     if (currentUser?.role === "hod") return "HOD";
@@ -152,6 +154,23 @@ function App() {
   
   const hasTokenInUrl = new URLSearchParams(window.location.search).has("impersonationToken");
   const [checkingSession, setCheckingSession] = useState(!!getToken() || hasTokenInUrl);
+
+  useEffect(() => {
+    const syncCurrentUser = () => setCurrentUser(getCurrentUser());
+    window.addEventListener(DEMO_DEPARTMENT_CHANGED_EVENT, syncCurrentUser);
+    return () => window.removeEventListener(DEMO_DEPARTMENT_CHANGED_EVENT, syncCurrentUser);
+  }, []);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (currentUser?.isDemoMode) {
+      root.style.setProperty("--demo-accent", getDemoDepartmentProfile(currentUser.departmentId).accent);
+      root.setAttribute("data-demo-mode", "true");
+    } else {
+      root.style.removeProperty("--demo-accent");
+      root.removeAttribute("data-demo-mode");
+    }
+  }, [currentUser?.departmentId, currentUser?.isDemoMode]);
   
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -165,19 +184,21 @@ function App() {
       window.history.replaceState(null, "", newUrl);
     }
 
-    if (!getToken()) { setIsAuthenticated(false); setCheckingSession(false); return; }
+    if (!getToken()) { setCurrentUser(null); setIsAuthenticated(false); setCheckingSession(false); return; }
     
     apiGet("/api/auth/me").then((user) => {
       sessionStorage.setItem("elogbook-user", JSON.stringify(user));
       window.sessionStorage.setItem("elogbook-authenticated", "true");
+      setCurrentUser(user);
       setIsAuthenticated(true);
-    }).catch(() => { clearSession(); setIsAuthenticated(false); }).finally(() => setCheckingSession(false));
+    }).catch(() => { clearSession(); setCurrentUser(null); setIsAuthenticated(false); }).finally(() => setCheckingSession(false));
   }, []);
 
   useEffect(() => {
     if (!isAuthenticated) return;
     const stopKeepalive = startSessionKeepalive();
     const onExpired = () => {
+      setCurrentUser(null);
       setIsAuthenticated(false);
       setSessionExpired(true);
       setLocation("/");
@@ -228,6 +249,7 @@ function App() {
           onRegister={() => setAuthScreen("register")}
           onSignIn={() => {
             window.sessionStorage.setItem("elogbook-authenticated", "true");
+            setCurrentUser(getCurrentUser());
             setIsAuthenticated(true);
           }}
         />
@@ -243,6 +265,7 @@ function App() {
           onSignOut={() => {
             void apiPost("/api/auth/logout", {}).catch(() => {});
             clearSession();
+            setCurrentUser(null);
             setIsAuthenticated(false);
             setLocation("/");
           }}
@@ -253,7 +276,16 @@ function App() {
   }
 
   if (window.location.pathname === "/print" && activeRole === "Student") {
-    return <DepartmentProvider departmentId={currentUser?.departmentId ?? null}><PrintableLogbook /></DepartmentProvider>;
+    return (
+      <DepartmentProvider departmentId={currentUser?.departmentId ?? null}>
+        {currentUser?.isDemoMode && (
+          <div className="print:hidden sticky top-0 z-50 bg-white/90 px-3 py-2 shadow-sm">
+            <DemoBanner />
+          </div>
+        )}
+        <PrintableLogbook />
+      </DepartmentProvider>
+    );
   }
 
   return (
@@ -263,6 +295,7 @@ function App() {
       onSignOut={() => {
         void apiPost("/api/auth/logout", {}).catch(() => {});
         clearSession();
+        setCurrentUser(null);
         setIsAuthenticated(false);
         setLocation("/");
       }}

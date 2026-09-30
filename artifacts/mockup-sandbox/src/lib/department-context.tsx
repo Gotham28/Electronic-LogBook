@@ -1,10 +1,11 @@
 import * as React from "react";
 import { apiGet } from "./apiClient";
 import { clearSession } from "./session";
+import { isDemoMode } from "./session";
 import { Button } from "@/components/ui/button";
 
 export type DepartmentConfig = {
-  requiredCases: number; requiredProcedures: number; requiredAcademic: number;
+  requiredCases: number | null; requiredProcedures: number | null; requiredAcademic: number | null;
   enabledFeatures: Record<string, boolean>;
 };
 export type CatalogItem = { id: number; name: string; value: string; required: number; period: "total" | "month"; parentValue?: string | null };
@@ -42,7 +43,10 @@ export function DepartmentProvider({ departmentId, children }: { departmentId: n
       setError("");
     } catch (err) { setError(err instanceof Error ? err.message : "Unable to load your department"); }
   }, [departmentId]);
-  React.useEffect(() => { setData(null); void refresh(); }, [refresh]);
+  React.useEffect(() => {
+    if (!isDemoMode()) setData(null);
+    void refresh();
+  }, [refresh]);
   if (!data) return <div className="mx-auto max-w-lg space-y-4 p-10" role="status">
     <p>{error || "Loading your department…"}</p>
     {error && <><Button onClick={refresh}>Try again</Button><Button variant="outline" onClick={() => { clearSession(); window.location.assign("/"); }}>Return to sign in</Button></>}

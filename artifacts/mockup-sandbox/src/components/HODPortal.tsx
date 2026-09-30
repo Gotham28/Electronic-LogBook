@@ -28,9 +28,12 @@ import { Label } from "@/components/ui/label";
 import { formatLogbookDate } from "@/lib/logbook-config";
 import { useDepartment } from "@/lib/department-context";
 import { DepartmentSettings } from "@/components/DepartmentSettings";
+import { DemoDepartmentCustomizer } from "@/components/DemoDepartmentCustomizer";
 import { apiGet, apiPost, apiDelete } from "@/lib/apiClient";
-import { getCurrentUser } from "@/lib/session";
+import { getCurrentUser, isDemoMode } from "@/lib/session";
 import { ProfessorPortal } from "@/components/ProfessorPortal";
+import { DemoCount, useDemoAnimatedValue, useDemoMotionEnabled } from "@/components/DemoMotion";
+import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 
 type Registration = {
   id: number;
@@ -352,6 +355,7 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
             </div>
           ) : (
             <>
+              {isDemoMode() && analyticsData && <DemoLogStatsChart logStats={analyticsData.logStats} />}
               {userToDelete && (
                 <Card className="border-rose-200 bg-rose-50/30 shadow-sm mb-6">
                   <CardContent className="p-4">
@@ -469,8 +473,8 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filteredStudents.map((s) => (
-                          <TableRow key={s.id}>
+                        {filteredStudents.map((s, index) => (
+                          <TableRow key={s.id} className={isDemoMode() ? "demo-stagger-item" : undefined} style={isDemoMode() ? { "--demo-stagger-index": index } as React.CSSProperties : undefined}>
                             <TableCell className="font-mono text-xs font-semibold">{s.registrationNumber}</TableCell>
                             <TableCell className="font-semibold">{s.fullName}</TableCell>
                             <TableCell className="text-xs text-slate-500">{s.email}</TableCell>
@@ -693,21 +697,55 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
           </Card>
         </TabsContent>
 
-        <TabsContent value="requirements" className="pt-4"><DepartmentSettings /></TabsContent>
+        <TabsContent value="requirements" className="pt-4">
+          {isDemoMode() && <DemoDepartmentCustomizer />}
+          <DepartmentSettings />
+        </TabsContent>
       </Tabs>
     </div>
   );
 }
 
 function SummaryCard({ label, value, error }: { label: string; value: string | number; error?: string | null }) {
-  return <Card className="border-slate-200 bg-white"><CardContent className="p-5"><p className="text-[10px] font-bold uppercase tracking-[.14em] text-slate-500">{label}</p>{error ? <p className="mt-2 text-sm font-medium text-red-500">{error}</p> : <p className="mt-2 text-3xl font-semibold text-slate-950">{value}</p>}</CardContent></Card>;
+  return <Card className={`border-slate-200 bg-white ${isDemoMode() ? "demo-lift-card" : ""}`}><CardContent className="p-5"><p className="text-[10px] font-bold uppercase tracking-[.14em] text-slate-500">{label}</p>{error ? <p className="mt-2 text-sm font-medium text-red-500">{error}</p> : <p className="mt-2 text-3xl font-semibold text-slate-950">{typeof value === "number" && isDemoMode() ? <DemoCount value={value} /> : value}</p>}</CardContent></Card>;
 }
 
 function CompletionRing({ value }: { value: number }) {
-  const safeValue = Math.max(0, Math.min(value, 100));
+  const animatedValue = useDemoAnimatedValue(value);
+  const safeValue = Math.max(0, Math.min(Math.round(animatedValue), 100));
   return (
     <div className="relative grid h-14 w-14 shrink-0 place-items-center rounded-full" style={{ background: `conic-gradient(#0d9488 ${safeValue * 3.6}deg, #e2e8f0 0deg)` }}>
       <div className="grid h-10 w-10 place-items-center rounded-full bg-white text-[11px] font-bold text-slate-900">{safeValue}%</div>
     </div>
+  );
+}
+
+function DemoLogStatsChart({ logStats }: { logStats: AnalyticsData["logStats"] }) {
+  const animateChart = useDemoMotionEnabled();
+  const rows = [
+    { name: "Verified", value: logStats.verified, color: "#0f766e" },
+    { name: "Pending", value: logStats.pending, color: "#d97706" },
+    { name: "Returned", value: logStats.rejected, color: "#e11d48" },
+  ];
+  return (
+    <Card className="mb-6 border-teal-100 bg-white shadow-sm">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base">Department log activity</CardTitle>
+        <p className="text-sm text-slate-600">Sample records across the active department.</p>
+      </CardHeader>
+      <CardContent>
+        <div className="h-52 w-full" role="img" aria-label="Sample department log activity by review status">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={rows} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
+              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: "#475569" }} />
+              <Tooltip formatter={(value) => [value, "Entries"]} cursor={{ fill: "rgba(241, 245, 249, .6)" }} />
+              <Bar dataKey="value" radius={[7, 7, 0, 0]} isAnimationActive={animateChart} animationDuration={650}>
+                {rows.map((row) => <Cell key={row.name} fill={row.color} />)}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

@@ -46,6 +46,7 @@ export function ProcedureLogsPage() {
   const user = React.useMemo(() => getCurrentUser(), []);
   const hideUhid = isDemoMode();
   const isFreeTextProcedures = Boolean(config?.enabledFeatures?.freeTextProcedures);
+  const hasProcedureTarget = config?.requiredProcedures !== null && config?.requiredProcedures !== undefined;
   const initialGroup = hideUhid ? PROCEDURE_REQUIREMENTS[0]?.group ?? "" : "";
   const [open, setOpen] = React.useState(false);
   const [logs, setLogs] = React.useState<any[]>([]);
@@ -194,7 +195,7 @@ export function ProcedureLogsPage() {
           <DialogContent className="rounded-2xl bg-white sm:max-w-xl">
             <DialogHeader>
               <DialogTitle>{editLogId ? "Edit procedure entry" : "New procedure entry"}</DialogTitle>
-              <DialogDescription>Select the required procedure and record the level of exposure.</DialogDescription>
+              <DialogDescription>{hideUhid && isFreeTextProcedures ? "Enter the procedure name and record the level of exposure." : "Select the required procedure and record the level of exposure."}</DialogDescription>
             </DialogHeader>
             <form onSubmit={submit} className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
@@ -268,8 +269,8 @@ export function ProcedureLogsPage() {
         </Dialog>
       </div>
 
-      {!PROCEDURE_REQUIREMENTS.length && <p className="rounded-xl bg-teal-50 p-4 text-sm text-teal-800">Your HOD has not configured procedure types for this department yet.</p>}
-      <div className="grid gap-4 md:grid-cols-2">
+      {!PROCEDURE_REQUIREMENTS.length && <p className="rounded-xl bg-teal-50 p-4 text-sm text-teal-800">{hideUhid && isFreeTextProcedures ? "Procedure names can be entered directly. This demo department has no configured procedure list or target." : "Your HOD has not configured procedure types for this department yet."}</p>}
+      {(PROCEDURE_REQUIREMENTS.length > 0 || !hideUhid) && <div className="grid gap-4 md:grid-cols-2">
         {(Object.keys(PROCEDURE_GROUPS) as ProcedureGroup[]).map((group) => {
           const completed = logs.filter((log) => log.procedureGroup === group && log.status !== "rejected").length;
           return (
@@ -284,14 +285,14 @@ export function ProcedureLogsPage() {
             </Card>
           );
         })}
-      </div>
+      </div>}
 
-      <div className="flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50/80 p-4">
+      {(!hideUhid || hasProcedureTarget) && <div className="flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50/80 p-4">
         <AlertCircle className="h-5 w-5 text-amber-700" />
         <p className="text-xs text-amber-900"><strong>{logs.length}/{REQUIRED_PROCEDURE_COUNT}</strong> required procedures logged. Continue adding procedures from the departmental list.</p>
-      </div>
+      </div>}
 
-      <Card>
+      {(!hideUhid || hasProcedureTarget) && <Card>
         <CardHeader className="border-b border-teal-100">
           <CardTitle className="text-lg">Number of procedures required</CardTitle>
           <p className="text-xs text-slate-500">The total is calculated from the procedure targets configured by your HOD.</p>
@@ -322,7 +323,7 @@ export function ProcedureLogsPage() {
             </TableBody>
           </Table>
         </CardContent>
-      </Card>
+      </Card>}
 
       <Card>
         <CardHeader className="border-b border-teal-100"><CardTitle className="text-lg">Procedure entries sent</CardTitle></CardHeader>
