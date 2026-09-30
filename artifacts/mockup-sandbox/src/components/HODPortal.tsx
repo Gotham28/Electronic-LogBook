@@ -329,6 +329,30 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
         </div>
       )}
 
+      <div className="rounded-2xl bg-gradient-to-r from-slate-900 via-teal-950 to-slate-900 p-6 text-white shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <Badge className="bg-teal-500/20 text-teal-300 border-teal-500/30 text-xs font-semibold mb-2">
+            Head of Department Dashboard
+          </Badge>
+          <h2 className="text-2xl font-black">{department.name}</h2>
+          <p className="text-xs text-slate-300 mt-1">{getCurrentUser()?.name} · Department overview</p>
+        </div>
+        {analyticsData && (
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="bg-slate-800/80 border border-slate-700 p-3 rounded-xl text-center">
+              <p className="text-lg font-black text-teal-300"><DemoCount value={analyticsData.totalStudents} /></p>
+              <p className="text-[10px] text-slate-400 font-semibold uppercase">Residents</p>
+            </div>
+            {analyticsData.totalStudents > 0 && (
+              <div className="bg-slate-800/80 border border-slate-700 p-3 rounded-xl text-center">
+                <p className="text-lg font-black text-emerald-400"><DemoCount value={analyticsData.avgCompletion} />%</p>
+                <p className="text-[10px] text-slate-400 font-semibold uppercase">Average progress</p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
       <Tabs value={currentTab} onValueChange={(value) => setLocation(paths[value] ?? "/")}>
 
         {/* Review Queue tab — reuses ProfessorPortal which accepts HOD role */}
