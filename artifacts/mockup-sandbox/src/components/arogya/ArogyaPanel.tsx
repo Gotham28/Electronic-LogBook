@@ -89,6 +89,30 @@ export function ArogyaPanel({ open, onOpenChange, role, notifItems, onNavigate }
     }
   };
 
+  const handleDepartmentReport = async (type: "report" | "falling_behind") => {
+    if (characterState === "thinking") return;
+    
+    setMessages((prev) => [...prev, { role: "user", text: type === "report" ? "Department report" : "Who's falling behind?" }]);
+    setCharacterState("thinking");
+    setActiveTab("ask_reply");
+
+    try {
+      const res = await fetch("/api/arogya/department-report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Arogya couldn't answer right now.");
+      
+      setCharacterState("talking");
+      setMessages((prev) => [...prev, { role: "arogya", text: data.reply }]);
+    } catch (err: any) {
+      setCharacterState("error");
+      setMessages((prev) => [...prev, { role: "arogya", text: err.message || "Arogya couldn't answer right now.", error: true }]);
+    }
+  };
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full max-w-full flex flex-col p-0 sm:max-w-md border-l border-teal-100 bg-slate-50/50">
@@ -135,10 +159,10 @@ export function ArogyaPanel({ open, onOpenChange, role, notifItems, onNavigate }
 
             {role === "HOD" && (
               <>
-                <Button variant="outline" size="sm" className="rounded-full bg-white text-teal-800 border-teal-200 hover:bg-teal-50" onClick={() => setActiveTab("dept_report")}>
+                <Button variant="outline" size="sm" className="rounded-full bg-white text-teal-800 border-teal-200 hover:bg-teal-50" onClick={() => handleDepartmentReport("report")}>
                   Department report
                 </Button>
-                <Button variant="outline" size="sm" className="rounded-full bg-white text-teal-800 border-teal-200 hover:bg-teal-50" onClick={() => setActiveTab("falling_behind")}>
+                <Button variant="outline" size="sm" className="rounded-full bg-white text-teal-800 border-teal-200 hover:bg-teal-50" onClick={() => handleDepartmentReport("falling_behind")}>
                   Who's falling behind?
                 </Button>
                 <Button variant="outline" size="sm" className="rounded-full bg-white text-teal-800 border-teal-200 hover:bg-teal-50" onClick={() => setActiveTab("draft_remarks")}>
@@ -177,7 +201,7 @@ export function ArogyaPanel({ open, onOpenChange, role, notifItems, onNavigate }
                 <div className="bg-white rounded-2xl rounded-tl-sm p-3.5 shadow-sm border border-teal-100 text-sm text-slate-700 w-full">
                   
                   {/* Coming Soon placeholders */}
-                  {["draft_remarks", "dept_report", "falling_behind"].includes(activeTab) && (
+                  {["draft_remarks"].includes(activeTab) && (
                     <p className="font-medium">Coming soon.</p>
                   )}
 

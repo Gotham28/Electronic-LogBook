@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { requireAuth } from "../middlewares/auth.js";
 import { _arogya, checkAndIncrementLimit, buildProgressFacts, buildAppraisalFacts } from "../lib/arogya.js";
 import { findStudent } from "../lib/appraisals.js";
+import { buildDepartmentReportFacts } from "../lib/department-report.js";
 import { db, studentsTable, usersTable } from "@workspace/db";
 import { getDepartmentFeatures } from "../lib/department-features.js";
 import { resolveConfigDepartmentId } from "../lib/department-config-source.js";
@@ -189,6 +190,51 @@ router.post("/appraisal-draft/:studentId", requireAuth, async (req, res) => {
       return;
     }
     console.log(JSON.stringify({ userId, feature: "appraisal-draft", httpStatus: 500, tokenCount: 0 }));
+    res.status(500).json({ error: "Arogya couldn't answer right now." });
+  }
+});
+
+router.post("/department-report", requireAuth, async (req, res) => {
+  const userId = String(req.user!.id);
+
+  if (req.user!.role !== "hod") {
+    res.status(403).json({ error: "Department report is only available for HODs." });
+    return;
+  }
+
+  if (!req.user!.departmentId) {
+    res.status(403).json({ error: "Arogya is not available for this account type." });
+    return;
+  }
+
+  try {
+    let type = req.body.type;
+    if (type !== "report" && type !== "falling_behind") type = "report";
+
+    checkAndIncrementLimit(userId);
+
+    const { facts, nameMap } = await buildDepartmentReportFacts(req.user!.departmentId, db);
+
+    const userMessage = type === "report"
+      ? "Write a short department progress report (4-6 sentences) for the HOD based only on the facts provided. Mention overall completion, any residents significantly behind, and the professor review backlog. Use the resident and professor placeholders as given. Do not invent any number."
+      : "List only the residents who are below target (belowTarget: true in the facts). For each, write one sentence describing their specific gaps using only the facts provided. Use the resident placeholders as given. Return a plain list, one resident per line. Do not invent any number. If no residents are below target, say so.";
+
+    const { reply, tokenCount } = await _arogya.call(userMessage, facts, nameMap);
+
+    console.log(JSON.stringify({ userId, feature: "department-report", httpStatus: 200, tokenCount }));
+    res.json({ reply, type });
+  } catch (err: any) {
+    if (err.message === "AROGYA_UNAVAILABLE") {
+      console.log(JSON.stringify({ userId, feature: "department-report", httpStatus: 503, tokenCount: 0 }));
+      res.status(503).json({ error: "Arogya is not available right now." });
+      return;
+    }
+    if (err.message === "AROGYA_LIMIT_REACHED") {
+      console.log(JSON.stringify({ userId, feature: "department-report", httpStatus: 429, tokenCount: 0 }));
+      res.status(429).json({ error: "You've reached today's Arogya limit. Try again tomorrow." });
+      return;
+    }
+    console.log(JSON.stringify({ userId, feature: "department-report", httpStatus: 500, tokenCount: 0 }));
     res.status(500).json({ error: "Arogya couldn't answer right now." });
   }
 });
