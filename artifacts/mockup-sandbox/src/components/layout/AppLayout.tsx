@@ -1,6 +1,7 @@
 import { MaintenanceBanner } from "./MaintenanceBanner";
 import * as React from "react";
 import { Link, useLocation } from "wouter";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
@@ -27,7 +28,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiGet, apiPost } from "@/lib/apiClient";
-import { getCurrentUser } from "@/lib/session";
+import { getCurrentUser, isDemoMode } from "@/lib/session";
+import { DEMO_DEPARTMENT_CHANGED_EVENT } from "@/lib/demoDepartments";
 import { GuidedTour, type TourStep } from "@/components/GuidedTour";
 import {
   DropdownMenu,
@@ -63,6 +65,7 @@ import { ArogyaCharacter } from "@/components/arogya/ArogyaCharacter";
 import { ArogyaPanel } from "@/components/arogya/ArogyaPanel";
 import { useDepartment } from "@/lib/department-context";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
+import { DemoBanner } from "@/components/layout/DemoBanner";
 
 export type RoleType = "Student" | "Faculty" | "HOD";
 
@@ -102,7 +105,7 @@ const navigationDescriptions: Record<string, string> = {
   Requirements: "Configure the case, procedure, and academic requirements used to measure progress.",
 };
 
-function navigationForRole(role: RoleType, dashboardData?: any, loadingBadges?: boolean, config?: any): NavigationItem[] {
+function navigationForRole(role: RoleType, dashboardData?: any, loadingBadges?: boolean, config?: any, demoMode = false): NavigationItem[] {
   if (role === "Faculty") {
     return [
       { title: "Evaluation Queue", icon: FileText, href: "/" },
@@ -137,13 +140,21 @@ function navigationForRole(role: RoleType, dashboardData?: any, loadingBadges?: 
     return `${cat.logged}/${required}`;
   };
 
+  const features = config?.enabledFeatures ?? {};
   // A department that lists academic activities before its logs (the academicsFirstInNav setting).
-  if (config?.enabledFeatures?.academicsFirstInNav) {
+  if (features.academicsFirstInNav) {
     const dermItems: NavigationItem[] = [];
     dermItems.push({ title: "Dashboard", icon: LayoutDashboard, href: "/" });
     dermItems.push({ title: "Academic Activities", icon: GraduationCap, href: "/academics" });
-    dermItems.push({ title: "Case Logs", icon: FileText, href: "/cases", badge: getCount("cases"), badgeLoading: loadingBadges });
-    dermItems.push({ title: "Procedure Logs", icon: Stethoscope, href: "/procedures", badge: getCount("procedures"), badgeLoading: loadingBadges });
+    if (!demoMode || !features.hideCaseLogs) {
+      dermItems.push({ title: "Case Logs", icon: FileText, href: "/cases", badge: getCount("cases"), badgeLoading: loadingBadges });
+    }
+    if (!demoMode || !features.hideProcedureLogs) {
+      dermItems.push({ title: "Procedure Logs", icon: Stethoscope, href: "/procedures", badge: getCount("procedures"), badgeLoading: loadingBadges });
+    }
+    if (demoMode && features.clinicalWorks) {
+      dermItems.push({ title: "Clinical Work", icon: Stethoscope, href: "/clinical-works", badge: getCount("clinicalWorks"), badgeLoading: loadingBadges });
+    }
     if (config?.enabledFeatures?.attendedConferences) {
       dermItems.push({ title: "Conferences and CME", icon: Presentation, href: "/conferences" });
     }
@@ -164,7 +175,6 @@ function navigationForRole(role: RoleType, dashboardData?: any, loadingBadges?: 
     return dermItems;
   }
 
-  const features = config?.enabledFeatures ?? {};
   const items: NavigationItem[] = [
     { title: "Dashboard", icon: LayoutDashboard, href: "/" },
     { title: "Postings & Rotations", icon: CalendarDays, href: "/postings" },
@@ -205,6 +215,9 @@ export function AppLayout({
 }: AppLayoutProps) {
   const [location, setLocation] = useLocation();
   const { department, config } = useDepartment();
+  const demoMode = isDemoMode();
+  const reduceMotion = useReducedMotion();
+  const [isDepartmentSwitching, setIsDepartmentSwitching] = React.useState(false);
   const [dashboardData, setDashboardData] = React.useState<any>(null);
   const [loadingBadges, setLoadingBadges] = React.useState(activeRole === "Student");
 
@@ -227,6 +240,12 @@ export function AppLayout({
 
   // Notification state — populated by the effects below, never fabricated (§7)
   const [notifItems, setNotifItems] = React.useState<NotifItem[]>([]);
+
+  React.useEffect(() => {
+    const onDepartmentChange = () => setIsDepartmentSwitching(true);
+    window.addEventListener(DEMO_DEPARTMENT_CHANGED_EVENT, onDepartmentChange);
+    return () => window.removeEventListener(DEMO_DEPARTMENT_CHANGED_EVENT, onDepartmentChange);
+  }, []);
 
   // Fix: Get actual user from session for the sidebar profile
   const currentUser = getCurrentUser();
@@ -384,9 +403,10 @@ export function AppLayout({
 
 
   const navigationItems = React.useMemo(
-    () => navigationForRole(activeRole, dashboardData, loadingBadges, config),
-    [activeRole, dashboardData, loadingBadges, config],
+    () => navigationForRole(activeRole, dashboardData, loadingBadges, config, demoMode),
+    [activeRole, dashboardData, loadingBadges, config, demoMode],
   );
+  const visibleNavigationItems = isDepartmentSwitching ? [] : navigationItems;
   const closeTour = React.useCallback(() => {
     setIsTourOpen(false);
     window.requestAnimationFrame(() => tourButtonRef.current?.focus());
@@ -474,7 +494,7 @@ export function AppLayout({
           <Sidebar collapsible="icon" className="print-hidden border-r border-slate-200/80 bg-white/95 shadow-[0_24px_80px_rgba(15,23,42,0.06)] backdrop-blur-xl">
             <SidebarHeader className="h-[74px] overflow-hidden border-b border-slate-100 p-4 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-2">
               <div className="relative flex h-full w-full items-center overflow-hidden group-data-[collapsible=icon]:justify-center">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-600 text-white shadow-[0_12px_28px_rgba(13,148,136,0.2)]">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-600 text-white shadow-[0_12px_28px_rgba(13,148,136,0.2)] transition-colors duration-200" style={demoMode ? { backgroundColor: "var(--demo-accent)" } : undefined}>
                   <BookOpenCheck className="h-6 w-6" />
                 </div>
                 <div className="absolute left-[52px] top-1/2 w-[180px] -translate-y-1/2 whitespace-nowrap transition-opacity duration-150 group-data-[collapsible=icon]:pointer-events-none group-data-[collapsible=icon]:opacity-0">
@@ -491,47 +511,64 @@ export function AppLayout({
                 </SidebarGroupLabel>
                 <SidebarGroupContent>
                   <SidebarMenu className="gap-1">
-                    {navigationItems.map((item, index) => {
+                    <AnimatePresence>
+                    {visibleNavigationItems.map((item, index) => {
                       const isActive =
                         location === item.href ||
                         (item.href !== "/" && location.startsWith(item.href));
                       const Icon = item.icon;
+                      const menuButton = (
+                        <SidebarMenuButton
+                          data-tour-id={`navigation-${index}`}
+                          asChild
+                          isActive={isActive}
+                          tooltip={item.title}
+                          className={`h-11 w-full rounded-xl px-3 transition-all duration-200 group-data-[collapsible=icon]:mx-auto! group-data-[collapsible=icon]:h-11! group-data-[collapsible=icon]:w-11! group-data-[collapsible=icon]:p-0! ${
+                            isActive
+                              ? `border border-white/60 font-semibold text-white shadow-[0_16px_36px_rgba(13,148,136,0.22)] hover:text-white ${demoMode ? "" : "bg-gradient-to-r from-teal-600 to-cyan-500"}`
+                              : "text-slate-600 hover:border hover:border-white/70 hover:bg-white/80 hover:text-teal-900"
+                          }`}
+                          style={demoMode && isActive ? { backgroundColor: "var(--demo-accent)" } : undefined}
+                        >
+                          <Link href={item.href} className="flex w-full items-center gap-3 group-data-[collapsible=icon]:justify-center">
+                            <Icon className={`h-4 w-4 ${isActive ? "text-white" : demoMode ? "text-[var(--demo-accent)]" : "text-teal-600"}`} />
+                            <span className="flex-1 truncate text-[13px] group-data-[collapsible=icon]:hidden">{item.title}</span>
+
+                            {item.badgeLoading ? (
+                              <Skeleton className="h-4 w-12 rounded-full bg-teal-100/50 group-data-[collapsible=icon]:hidden" />
+                            ) : item.badge ? (
+                              <Badge
+                                variant="outline"
+                                className={`rounded-full px-1.5 py-0 text-[9px] group-data-[collapsible=icon]:hidden ${
+                                  isActive
+                                    ? "border-white/25 bg-white/15 text-white"
+                                    : item.badgeColor || "border-teal-100 bg-teal-50 text-teal-700"
+                                }`}
+                              >
+                                {item.badge}
+                              </Badge>
+                            ) : null}
+                          </Link>
+                        </SidebarMenuButton>
+                      );
                       return (
-                        <SidebarMenuItem key={item.href}>
-                          <SidebarMenuButton
-                            data-tour-id={`navigation-${index}`}
-                            asChild
-                            isActive={isActive}
-                            tooltip={item.title}
-                            className={`h-11 w-full rounded-xl px-3 transition-all duration-200 group-data-[collapsible=icon]:mx-auto! group-data-[collapsible=icon]:h-11! group-data-[collapsible=icon]:w-11! group-data-[collapsible=icon]:p-0! ${
-                              isActive
-                                ? "border border-white/60 bg-gradient-to-r from-teal-600 to-cyan-500 font-semibold text-white shadow-[0_16px_36px_rgba(13,148,136,0.22)] hover:text-white"
-                                : "text-slate-600 hover:border hover:border-white/70 hover:bg-white/80 hover:text-teal-900"
-                            }`}
+                        demoMode ? (
+                          <motion.li
+                            key={`${department.id}-${item.href}`}
+                            className="group/menu-item relative"
+                            initial={reduceMotion ? false : { opacity: 0, x: -8 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={reduceMotion ? { opacity: 0 } : { opacity: 0, x: 8, transition: { duration: 0.12 } }}
+                            transition={{ duration: reduceMotion ? 0 : 0.16, delay: reduceMotion ? 0 : Math.min(index * 0.025, 0.2) }}
                           >
-                            <Link href={item.href} className="flex w-full items-center gap-3 group-data-[collapsible=icon]:justify-center">
-                              <Icon className={`h-4 w-4 ${isActive ? "text-white" : "text-teal-600"}`} />
-                              <span className="flex-1 truncate text-[13px] group-data-[collapsible=icon]:hidden">{item.title}</span>
-                              
-                              {item.badgeLoading ? (
-                                <Skeleton className="h-4 w-12 rounded-full bg-teal-100/50 group-data-[collapsible=icon]:hidden" />
-                              ) : item.badge ? (
-                                <Badge
-                                  variant="outline"
-                                  className={`rounded-full px-1.5 py-0 text-[9px] group-data-[collapsible=icon]:hidden ${
-                                    isActive
-                                      ? "border-white/25 bg-white/15 text-white"
-                                      : item.badgeColor || "border-teal-100 bg-teal-50 text-teal-700"
-                                  }`}
-                                >
-                                  {item.badge}
-                                </Badge>
-                              ) : null}
-                            </Link>
-                          </SidebarMenuButton>
-                        </SidebarMenuItem>
+                            {menuButton}
+                          </motion.li>
+                        ) : (
+                          <SidebarMenuItem key={item.href}>{menuButton}</SidebarMenuItem>
+                        )
                       );
                     })}
+                    </AnimatePresence>
                   </SidebarMenu>
                 </SidebarGroupContent>
               </SidebarGroup>
@@ -644,15 +681,28 @@ export function AppLayout({
             </header>
 
             <main className="mx-auto w-full max-w-[1380px] flex-1 p-4 pb-28 sm:pb-4 md:p-6 lg:p-8">
+                <DemoBanner />
                 <MaintenanceBanner announcements={announcements} />
               <div className="print-only mb-6 border-b border-slate-300 pb-4">
                 <p className="page-eyebrow">Department of {department.name}</p>
                 <h1 className="mt-1 text-2xl font-bold">Resident Training Record</h1>
               </div>
-              {children}
+              {demoMode && reduceMotion === false ? (
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.div
+                    key={location}
+                    initial={{ opacity: 0, x: 12 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -8 }}
+                    transition={{ duration: 0.2, ease: "easeOut" }}
+                  >
+                    {children}
+                  </motion.div>
+                </AnimatePresence>
+              ) : children}
             </main>
           </SidebarInset>
-          <MobileBottomNav role={activeRole} items={navigationItems} location={location} />
+          <MobileBottomNav role={activeRole} items={navigationItems} location={location} departmentKey={department.id} switching={isDepartmentSwitching} />
           <Toaster position="top-right" richColors />
 
           <ArogyaPanel 

@@ -32,7 +32,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Progress } from "@/components/ui/progress";
+import { DemoCount, DemoProgress, useDemoMotionEnabled } from "@/components/DemoMotion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Empty,
@@ -412,13 +412,13 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
             </Badge>
             <h2 className="text-2xl font-black">Welcome, {data?.faculty?.name || getCurrentUser()?.name}</h2>
             <p className="text-xs text-slate-300">
-              Department faculty • <strong>{allStudents.length} approved students</strong>
+              Department faculty • <strong><DemoCount value={allStudents.length} /> approved students</strong>
             </p>
           </div>
 
           <div className="flex items-center gap-3">
             <div className="bg-teal-500/10 border border-teal-500/30 px-4 py-2 rounded-xl text-right">
-              <p className="text-xl font-extrabold text-teal-300">{Math.max(0, reviews.length - Object.keys(evaluatedLogs).length)}</p>
+              <p className="text-xl font-extrabold text-teal-300"><DemoCount value={Math.max(0, reviews.length - Object.keys(evaluatedLogs).length)} /></p>
               <p className="text-[11px] text-slate-300 font-medium">Pending Review Items</p>
             </div>
           </div>
@@ -432,10 +432,10 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
         {!embedded && (
           <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-white p-1 shadow-sm sm:w-auto">
             <TabsTrigger value="review-queue" className="gap-2 text-xs font-semibold">
-              <FileCheck className="h-4 w-4" /> Sequential Review Queue ({Math.max(0, reviews.length - Object.keys(evaluatedLogs).length)})
+              <FileCheck className="h-4 w-4" /> Sequential Review Queue (<DemoCount value={Math.max(0, reviews.length - Object.keys(evaluatedLogs).length)} />)
             </TabsTrigger>
             <TabsTrigger value="mentees" className="gap-2 text-xs font-semibold">
-              <UserCheck className="h-4 w-4" /> All Students ({allStudents.length})
+              <UserCheck className="h-4 w-4" /> All Students (<DemoCount value={allStudents.length} />)
             </TabsTrigger>
             <TabsTrigger value="assessments" className="gap-2 text-xs font-semibold">
               <Award className="h-4 w-4" /> Add Assessment
@@ -675,8 +675,8 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {mentees.map((m: any) => (
-                    <TableRow key={m.id}>
+                  {mentees.map((m: any, index: number) => (
+                    <TableRow key={m.id} className={isDemoMode() ? "demo-stagger-item" : undefined} style={isDemoMode() ? { "--demo-stagger-index": index } as React.CSSProperties : undefined}>
                       <TableCell className="font-bold text-xs text-slate-900">
                         {m.name}
                         <p className="text-[11px] text-slate-500 font-normal">{m.registrationNumber}</p>
@@ -685,9 +685,9 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                         {m.overallCompletion !== null && m.overallCompletion !== undefined ? (
                           <>
                             <div className="flex items-center justify-between text-[11px] mb-1">
-                              <span className="font-semibold text-slate-700">{m.overallCompletion}%</span>
+                              <span className="font-semibold text-slate-700"><DemoCount value={m.overallCompletion} suffix="%" /></span>
                             </div>
-                            <Progress value={m.overallCompletion} className="h-2" />
+                            <DemoProgress value={m.overallCompletion} className="h-2" />
                           </>
                         ) : (
                           <span className="text-slate-400">Not configured</span>
@@ -853,9 +853,9 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                 <div className="bg-slate-50 p-4 rounded-xl space-y-2 border border-slate-200">
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-semibold text-slate-700">Overall MCI Requirement Completion</span>
-                    <span className="font-bold text-teal-800">{selectedMentee.overallCompletion}%</span>
+                    <span className="font-bold text-teal-800"><DemoCount value={selectedMentee.overallCompletion} suffix="%" /></span>
                   </div>
-                  <Progress value={selectedMentee.overallCompletion} className="h-2" />
+                  <DemoProgress value={selectedMentee.overallCompletion} className="h-2" />
                 </div>
               )}
 
@@ -1915,6 +1915,7 @@ function ProgressSection({
 }) {
   // A 600px-wide chart cannot fit a phone; show the same numbers as a tappable list.
   const isMobile = useIsMobile();
+  const animateDemo = useDemoMotionEnabled();
   if (isMobile) return <ProgressList items={items} onItemClick={onItemClick} />;
   const chartData = items.map((item) => {
     const total = item.verified + item.pending;
@@ -2016,7 +2017,8 @@ function ProgressSection({
             <Bar
               dataKey="verifiedVal"
               stackId="a"
-              isAnimationActive={false}
+              isAnimationActive={animateDemo}
+              animationDuration={650}
               onClick={(_, index) => onItemClick(items[index])}
             >
               {chartData.map((entry, index) => {
@@ -2033,7 +2035,8 @@ function ProgressSection({
             <Bar
               dataKey="pendingVal"
               stackId="a"
-              isAnimationActive={false}
+              isAnimationActive={animateDemo}
+              animationDuration={650}
               onClick={(_, index) => onItemClick(items[index])}
             >
               {chartData.map((entry, index) => {
@@ -2052,7 +2055,8 @@ function ProgressSection({
               stackId="a"
               fill="#f1f5f9"
               radius={[0, 4, 4, 0]}
-              isAnimationActive={false}
+              isAnimationActive={animateDemo}
+              animationDuration={650}
               onClick={(_, index) => onItemClick(items[index])}
               className="cursor-pointer"
             />
@@ -2070,6 +2074,7 @@ function ProgressList({
   items: ProgressSectionItem[];
   onItemClick: (item: any) => void;
 }) {
+  const animateDemo = useDemoMotionEnabled();
   return (
     <ul className="space-y-2">
       {items.map((item) => {
@@ -2087,8 +2092,8 @@ function ProgressList({
                 </span>
               </div>
               <div className="mt-2 flex h-2 overflow-hidden rounded-full bg-slate-100" aria-hidden>
-                <div className={isDone ? "bg-emerald-500" : "bg-teal-600"} style={{ width: `${verifiedPct}%` }} />
-                <div className={isDone ? "bg-emerald-300" : "bg-teal-200"} style={{ width: `${pendingPct}%` }} />
+                <div className={`${isDone ? "bg-emerald-500" : "bg-teal-600"} ${animateDemo ? "demo-progress-fill" : ""}`} style={{ width: `${verifiedPct}%` }} />
+                <div className={`${isDone ? "bg-emerald-300" : "bg-teal-200"} ${animateDemo ? "demo-progress-fill" : ""}`} style={{ width: `${pendingPct}%` }} />
               </div>
               <p className="mt-1.5 text-[11px] text-slate-500">
                 {item.pending} pending

@@ -16,7 +16,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
+import { DemoCount, DemoProgress, useDemoAnimatedValue } from "@/components/DemoMotion";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { formatLogbookDate } from "@/lib/logbook-config";
@@ -172,11 +172,11 @@ export function Dashboard() {
               <div>
                 <p className="page-eyebrow">Dashboard insights</p>
                 {hasAnyNumericTargets ? (
-                  <h2 className="mt-1 text-xl font-semibold text-slate-950 sm:text-2xl">You need {overallRemaining} more entries to complete the core targets.</h2>
+                  <h2 className="mt-1 text-xl font-semibold text-slate-950 sm:text-2xl">You need <DemoCount value={overallRemaining} /> more entries to complete the core targets.</h2>
                 ) : (
                   <h2 className="mt-1 text-xl font-semibold text-slate-950 sm:text-2xl">Keep logging your work.</h2>
                 )}
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">{pendingCount > 0 ? `${pendingCount} ${pendingCount === 1 ? "entry is" : "entries are"} waiting for faculty verification.` : "All submitted entries have been reviewed."}</p>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">{pendingCount > 0 ? <><DemoCount value={pendingCount} /> {pendingCount === 1 ? "entry is" : "entries are"} waiting for faculty verification.</> : "All submitted entries have been reviewed."}</p>
                 {hasAnyNumericTargets && <Badge variant="secondary" className="mt-4 rounded-full border-white/70 bg-teal-50 px-3 py-1 text-teal-800">{progressLabel}</Badge>}
               </div>
             </div>
@@ -188,9 +188,9 @@ export function Dashboard() {
                     <div key={item.label}>
                       <div className="mb-2 flex items-center justify-between text-xs">
                         <span className="font-semibold text-slate-700">{item.label}</span>
-                        <span className="font-bold text-teal-700">{percent}%</span>
+                        <span className="font-bold text-teal-700"><DemoCount value={percent} suffix="%" /></span>
                       </div>
-                      <Progress value={percent} className="h-2 bg-slate-200" />
+                      <DemoProgress value={percent} className="h-2 bg-slate-200" />
                     </div>
                   );
                 })}
@@ -207,7 +207,7 @@ export function Dashboard() {
           const remaining = Math.max(item.required - item.verified, 0);
           return (
             <Link key={item.label} href={item.href}>
-              <Card className="h-full cursor-pointer border-white/70 bg-white/76 shadow-[0_18px_48px_rgba(15,23,42,0.05)] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_24px_70px_rgba(15,23,42,0.08)]">
+              <Card className={`h-full cursor-pointer border-white/70 bg-white/76 shadow-[0_18px_48px_rgba(15,23,42,0.05)] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_24px_70px_rgba(15,23,42,0.08)] ${isDemoMode() ? "demo-lift-card" : ""}`}>
                 <CardContent className="p-5">
                   <div className="flex items-start justify-between gap-4">
                     <div className={`flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br ${item.tone} text-white shadow-[0_12px_28px_rgba(13,148,136,0.18)]`}><Icon className="h-5 w-5" /></div>
@@ -215,7 +215,7 @@ export function Dashboard() {
                       <CircularProgress value={percent} />
                     ) : (
                       <div className="grid h-14 w-14 place-items-center rounded-full bg-slate-100 shadow-inner">
-                        <div className="grid h-10 w-10 place-items-center rounded-full bg-white text-xs font-bold text-slate-900">{item.logged}</div>
+                        <div className="grid h-10 w-10 place-items-center rounded-full bg-white text-xs font-bold text-slate-900"><DemoCount value={item.logged} /></div>
                       </div>
                     )}
                     <div className="sr-only">
@@ -225,15 +225,15 @@ export function Dashboard() {
                   <p className="mt-4 text-sm font-semibold text-slate-900">{item.label}</p>
                   {item.hasTarget ? (
                     <>
-                      <p className="mt-1 text-[11px] text-slate-500">{item.logged} of {item.required} required</p>
-                      <Progress value={percent} className="mt-4 h-2" />
+                      <p className="mt-1 text-[11px] text-slate-500"><DemoCount value={item.logged} /> of <DemoCount value={item.required} /> required</p>
+                      <DemoProgress value={percent} className="mt-4 h-2" />
                       <div className="mt-3 flex items-center justify-between text-[11px] text-slate-500">
-                        <span>{remaining} remaining</span>
-                        <span>{percent}%</span>
+                        <span><DemoCount value={remaining} /> remaining</span>
+                        <span><DemoCount value={percent} suffix="%" /></span>
                       </div>
                     </>
                   ) : (
-                    <p className="mt-1 text-[11px] text-slate-500">{item.logged} logged</p>
+                    <p className="mt-1 text-[11px] text-slate-500"><DemoCount value={item.logged} /> logged</p>
                   )}
                 </CardContent>
               </Card>
@@ -270,7 +270,7 @@ export function Dashboard() {
                 <TableHeader><TableRow><TableHead>#</TableHead><TableHead>Date</TableHead><TableHead>Type</TableHead><TableHead>Entry</TableHead>{!hideUhid && <TableHead>Case ID</TableHead>}<TableHead>Status</TableHead></TableRow></TableHeader>
                 <TableBody>
                   {recent.map((item, index) => (
-                    <TableRow key={`${item.type}-${item.number}`}>
+                    <TableRow key={`${item.type}-${item.number}`} className={isDemoMode() ? "demo-stagger-item" : undefined} style={isDemoMode() ? { "--demo-stagger-index": index } as React.CSSProperties : undefined}>
                       <TableCell className="font-bold">{index + 1}</TableCell>
                       <TableCell>{formatLogbookDate(item.date)}</TableCell>
                       <TableCell><Badge variant="outline" className="border-teal-100 bg-teal-50 text-teal-800">{item.type}</Badge></TableCell>
@@ -339,7 +339,8 @@ function Status({ value }: { value: string }) {
 }
 
 function CircularProgress({ value }: { value: number }) {
-  const safeValue = Math.max(0, Math.min(value, 100));
+  const animatedValue = useDemoAnimatedValue(value);
+  const safeValue = Math.max(0, Math.min(Math.round(animatedValue), 100));
   return (
     <div className="relative grid h-14 w-14 place-items-center rounded-full" style={{ background: `conic-gradient(#0d9488 ${safeValue * 3.6}deg, #e2e8f0 0deg)` }}>
       <div className="grid h-10 w-10 place-items-center rounded-full bg-white text-[11px] font-bold text-slate-900">{safeValue}%</div>
@@ -348,7 +349,8 @@ function CircularProgress({ value }: { value: number }) {
 }
 
 function ProgressDonut({ value }: { value: number }) {
-  const safeValue = Math.max(0, Math.min(value, 100));
+  const animatedValue = useDemoAnimatedValue(value);
+  const safeValue = Math.max(0, Math.min(Math.round(animatedValue), 100));
   return (
     <div className="relative grid h-32 w-32 shrink-0 place-items-center rounded-full p-3 shadow-[0_18px_45px_rgba(13,148,136,.12)]" style={{ background: `conic-gradient(from -90deg, #0d9488 0deg, #06b6d4 ${safeValue * 3.6}deg, #e2e8f0 ${safeValue * 3.6}deg)` }} aria-label={`Overall progress ${safeValue}%`}>
       <div className="grid h-full w-full place-items-center rounded-full bg-white text-center shadow-inner">

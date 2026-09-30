@@ -12,6 +12,7 @@ import { apiPost, ApiError } from "@/lib/apiClient";
 import { LoginProductPreview } from "@/components/LoginProductPreview";
 import { saveToken } from "@/lib/session";
 import { PaymentStep } from "@/components/PaymentStep";
+import { unlockDemoAudio } from "@/lib/demoSounds";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -94,6 +95,7 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
   // ── Demo auto-login ───────────────────────────────────────────────────────
 
   const handleDemoLogin = async (portal: typeof DEMO_PORTALS[number]) => {
+    unlockDemoAudio();
     setDemoLoading(portal.key);
     try {
       // Mock network delay
@@ -101,8 +103,8 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
       
       // Determine fake user data based on portal key
       const roleMap: Record<string, string> = { "student": "student", "faculty": "professor", "hod": "hod" };
-      const emailMap: Record<string, string> = { "student": "kavya.nair.demo@example.com", "faculty": "arjun.mehta.demo@example.com", "hod": "priya.sharma.demo@example.com" };
-      const nameMap: Record<string, string> = { "student": "Kavya Nair", "faculty": "Dr. Arjun Mehta", "hod": "Dr. Priya Sharma" };
+      const emailMap: Record<string, string> = { "student": "resident1.demo@example.com", "faculty": "vivek.menon.demo@example.com", "hod": "priya.sharma.demo@example.com" };
+      const nameMap: Record<string, string> = { "student": "Demo Resident 01", "faculty": "Dr. Vivek Menon", "hod": "Dr. Priya Sharma" };
       
       const user = {
         id: 999,
