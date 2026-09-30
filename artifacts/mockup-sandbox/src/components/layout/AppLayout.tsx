@@ -1,4 +1,3 @@
-import { MaintenanceBanner } from "./MaintenanceBanner";
 import * as React from "react";
 import { Link, useLocation } from "wouter";
 import { Toaster } from "@/components/ui/sonner";
@@ -61,10 +60,21 @@ import {
 import { LegalDisclaimerModal } from "@/components/LegalDisclaimerModal";
 import { ArogyaCharacter } from "@/components/arogya/ArogyaCharacter";
 import { ArogyaPanel } from "@/components/arogya/ArogyaPanel";
+import { MaintenanceNoticeBubble } from "@/components/arogya/MaintenanceNoticeBubble";
 import { useDepartment } from "@/lib/department-context";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 
 export type RoleType = "Student" | "Faculty" | "HOD";
+
+type MaintenanceAnnouncement = {
+  id: number;
+  title: string;
+  message: string;
+  startAt: string;
+  endAt: string;
+  status: "scheduled" | "active";
+  updatedAt: string;
+};
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -213,9 +223,13 @@ export function AppLayout({
   const [changingPassword, setChangingPassword] = React.useState(false);
   const [isTourOpen, setIsTourOpen] = React.useState(false);
   const [arogyaOpen, setArogyaOpen] = React.useState(false);
+  const [disclaimerBlocksNotice, setDisclaimerBlocksNotice] = React.useState(activeRole === "Student");
   const tourButtonRef = React.useRef<HTMLButtonElement>(null);
   const loginSummaryShownRef = React.useRef(false);
-  const [announcements, setAnnouncements] = React.useState<any[]>([]);
+  const [announcements, setAnnouncements] = React.useState<MaintenanceAnnouncement[]>([]);
+  const [bubbleNotice, setBubbleNotice] = React.useState<MaintenanceAnnouncement | null>(null);
+  const [maintenanceLoadError, setMaintenanceLoadError] = React.useState<string | null>(null);
+  const [maintenanceRefreshToken, setMaintenanceRefreshToken] = React.useState(0);
 
   // Notification item type
   type NotifItem = {
@@ -230,6 +244,16 @@ export function AppLayout({
 
   // Fix: Get actual user from session for the sidebar profile
   const currentUser = getCurrentUser();
+  const currentActiveNotice = announcements.find((announcement) => announcement.status === "active") ?? null;
+  const panelMaintenanceNotice = currentActiveNotice ?? announcements.find((announcement) => announcement.status === "scheduled") ?? null;
+  const allNotifItems = React.useMemo<NotifItem[]>(() => [
+    ...notifItems,
+    ...announcements.map((announcement) => ({
+      id: `maintenance_${announcement.id}`,
+      text: `${announcement.title}: ${announcement.message}`,
+      href: "#",
+    })),
+  ], [notifItems, announcements]);
   const displayName = currentUser?.name || "";
   const initials = currentUser?.name 
     ? currentUser.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()
@@ -423,26 +447,36 @@ export function AppLayout({
   
   React.useEffect(() => {
     if (!currentUser) return;
-    apiGet<any[]>("/api/announcements/current")
-      .then(data => {
+    let cancelled = false;
+    const refresh = async () => {
+      try {
+        const data = await apiGet<MaintenanceAnnouncement[]>("/api/announcements/current");
+        if (cancelled) return;
         setAnnouncements(data);
-        const notifs = data.map(a => ({
-          id: `announcement_${a.id}`,
-          text: `[Maintenance: ${a.title}] ${new Date(a.startAt).toLocaleString('en-IN', {timeZone: 'Asia/Kolkata', dateStyle:'short', timeStyle:'short'})} to ${new Date(a.endAt).toLocaleString('en-IN', {timeZone: 'Asia/Kolkata', dateStyle:'short', timeStyle:'short'})}. The website will remain accessible.`,
-          href: "#",
-          onDismiss: () => {
-             localStorage.setItem(`maintenance_dismissed_${a.id}_${a.updatedAt}`, "1");
-             // trigger re-render of banner
-             setAnnouncements(prev => [...prev]);
-          }
-        }));
-        setNotifItems(prev => {
-          const f = prev.filter(p => !p.id.startsWith("announcement_"));
-          return [...f, ...notifs];
-        });
-      })
-      .catch(console.error);
-  }, [currentUser]);
+        setMaintenanceLoadError(null);
+      } catch {
+        if (!cancelled) setMaintenanceLoadError("Maintenance notice status could not be checked. Retry to check again.");
+      }
+    };
+    void refresh();
+    const interval = window.setInterval(() => { void refresh(); }, 60_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [currentUser?.id, maintenanceRefreshToken]);
+
+  React.useEffect(() => {
+    if (!currentActiveNotice) {
+      setBubbleNotice(null);
+      return;
+    }
+    if (!currentUser || disclaimerBlocksNotice || arogyaOpen) return;
+    const key = `elogbook-maintenance-notice-shown_${currentUser.id}_${currentActiveNotice.id}`;
+    if (window.sessionStorage.getItem(key)) return;
+    window.sessionStorage.setItem(key, "shown");
+    setBubbleNotice(currentActiveNotice);
+  }, [currentActiveNotice?.id, currentActiveNotice?.updatedAt, currentUser?.id, disclaimerBlocksNotice, arogyaOpen]);
 
   const handleChangePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -613,7 +647,7 @@ export function AppLayout({
                   <DropdownMenuTrigger asChild>
                     <button data-tour-id="notifications" aria-label="Open notifications" className="relative rounded-xl border border-white/70 bg-white/72 p-2 text-teal-800 shadow-[0_12px_24px_rgba(15,23,42,0.05)] transition hover:-translate-y-0.5 hover:bg-white">
                       <Bell className="h-4 w-4" />
-                      {notifItems.length > 0 && (
+                      {allNotifItems.length > 0 && (
                         <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-rose-500 ring-2 ring-white" />
                       )}
                     </button>
@@ -621,11 +655,18 @@ export function AppLayout({
                   <DropdownMenuContent align="end" className="w-80 rounded-2xl border-white/70 bg-white/92 p-2 shadow-[0_24px_60px_rgba(15,23,42,0.12)] backdrop-blur-xl">
                     <DropdownMenuLabel className="px-3 pt-2">Notifications</DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                    {notifItems.length > 0 ? (
-                      notifItems.map((item) => (
+                    {maintenanceLoadError && <div role="alert" className="mx-2 my-1 rounded-lg bg-amber-50 p-2 text-xs text-amber-900">
+                      {maintenanceLoadError} <button type="button" className="ml-1 font-semibold underline" onClick={() => setMaintenanceRefreshToken((value) => value + 1)}>Retry</button>
+                    </div>}
+                    {allNotifItems.length > 0 ? (
+                      allNotifItems.map((item) => (
                         <DropdownMenuItem
                           key={item.id}
                           onClick={() => {
+                            if (item.id.startsWith("maintenance_")) {
+                              setArogyaOpen(true);
+                              return;
+                            }
                             item.onDismiss?.();
                             setNotifItems((prev) => prev.filter((i) => i.id !== item.id));
                             setLocation(item.href);
@@ -644,7 +685,9 @@ export function AppLayout({
             </header>
 
             <main className="mx-auto w-full max-w-[1380px] flex-1 p-4 pb-28 sm:pb-4 md:p-6 lg:p-8">
-                <MaintenanceBanner announcements={announcements} />
+              {maintenanceLoadError && <div role="alert" className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+                {maintenanceLoadError} <button type="button" className="ml-2 font-semibold underline" onClick={() => setMaintenanceRefreshToken((value) => value + 1)}>Retry</button>
+              </div>}
               <div className="print-only mb-6 border-b border-slate-300 pb-4">
                 <p className="page-eyebrow">Department of {department.name}</p>
                 <h1 className="mt-1 text-2xl font-bold">Resident Training Record</h1>
@@ -659,9 +702,21 @@ export function AppLayout({
             open={arogyaOpen}
             onOpenChange={setArogyaOpen}
             role={activeRole}
-            notifItems={notifItems}
+            notifItems={allNotifItems}
+            maintenanceNotice={panelMaintenanceNotice}
             onNavigate={(href) => setLocation(href)}
           />
+
+          {bubbleNotice && !arogyaOpen && !disclaimerBlocksNotice && <MaintenanceNoticeBubble
+            heading={bubbleNotice.title}
+            message={bubbleNotice.message}
+            onOpen={() => setArogyaOpen(true)}
+            onDismiss={() => setBubbleNotice(null)}
+          />}
+
+          {maintenanceLoadError && !arogyaOpen && !bubbleNotice && <div role="alert" className="print:hidden fixed bottom-[calc(144px+env(safe-area-inset-bottom))] right-4 z-40 max-w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-amber-200 bg-white p-3 text-xs text-amber-950 shadow-lg sm:bottom-24 sm:right-6">
+            {maintenanceLoadError} <button type="button" className="ml-1 font-semibold underline" onClick={() => setMaintenanceRefreshToken((value) => value + 1)}>Retry</button>
+          </div>}
 
           {!arogyaOpen && (
             <button
@@ -701,7 +756,7 @@ export function AppLayout({
             </DialogContent>
           </Dialog>
           <GuidedTour open={isTourOpen} steps={tourSteps} onClose={closeTour} />
-          <LegalDisclaimerModal activeRole={activeRole} />
+          <LegalDisclaimerModal activeRole={activeRole} onBlockingChange={setDisclaimerBlocksNotice} />
         </div>
       </div>
     </SidebarProvider>

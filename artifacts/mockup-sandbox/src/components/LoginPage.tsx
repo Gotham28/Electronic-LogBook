@@ -10,7 +10,7 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp
 import { toast } from "sonner";
 import { apiPost, ApiError } from "@/lib/apiClient";
 import { LoginProductPreview } from "@/components/LoginProductPreview";
-import { saveToken } from "@/lib/session";
+import { clearMaintenanceNoticeSession, saveToken } from "@/lib/session";
 import { PaymentStep } from "@/components/PaymentStep";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -116,6 +116,7 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
         isDemoMode: true
       };
       
+      clearMaintenanceNoticeSession();
       saveToken(user.token);
       window.sessionStorage.setItem("elogbook-user", JSON.stringify(user));
       window.sessionStorage.setItem("elogbook-login-summary-pending", "true");
@@ -139,6 +140,7 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
 
       const user = await apiPost("/api/auth/login", { username, password });
 
+      clearMaintenanceNoticeSession();
       if (user.token) saveToken(user.token);
       window.sessionStorage.setItem("elogbook-user", JSON.stringify(user));
       window.sessionStorage.setItem("elogbook-login-summary-pending", "true");

@@ -25,10 +25,11 @@ interface ArogyaPanelProps {
   onOpenChange: (open: boolean) => void;
   role: RoleType;
   notifItems: PanelNotifItem[];
+  maintenanceNotice?: { title: string; message: string } | null;
   onNavigate: (href: string) => void;
 }
 
-export function ArogyaPanel({ open, onOpenChange, role, notifItems, onNavigate }: ArogyaPanelProps) {
+export function ArogyaPanel({ open, onOpenChange, role, notifItems, maintenanceNotice, onNavigate }: ArogyaPanelProps) {
   const [characterState, setCharacterState] = React.useState<ArogyaState>("idle");
   const [question, setQuestion] = React.useState("");
   const [messages, setMessages] = React.useState<{
@@ -149,6 +150,13 @@ export function ArogyaPanel({ open, onOpenChange, role, notifItems, onNavigate }
 
         {/* Content Area */}
         <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
+          {maintenanceNotice && (
+            <section aria-label="ELogbook service notice" className="shrink-0 rounded-xl border border-slate-200 border-l-4 border-l-teal-700 bg-white p-4 shadow-sm">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-teal-800">ELogbook service notice</p>
+              <h2 className="mt-1 text-sm font-semibold text-slate-900">{maintenanceNotice.title}</h2>
+              <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{maintenanceNotice.message}</p>
+            </section>
+          )}
           
           {/* Quick Actions (Role specific) */}
           <div className="flex flex-wrap gap-2 shrink-0">
