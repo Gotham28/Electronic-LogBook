@@ -4,7 +4,8 @@ import { resolveConfigDepartmentId } from "./department-config-source.js";
 import { buildProgressFacts } from "./arogya.js";
 
 export type DepartmentReportFacts = {
-  department: { totalStudents: number; totalVerified: number; totalPending: number; totalRejected: number };
+  fieldGuide: string;
+  department: { totalStudents: number; totalVerifiedLogs: number; totalPendingLogs: number; totalRejectedLogs: number };
   students: Array<{
     placeholder: string;
     overallPct: number;
@@ -111,7 +112,7 @@ export async function buildDepartmentReportFacts(
   }
 
   // 2f. Fetch department-level aggregate stats
-  const studentIds = students.map(s => s.id);
+  const studentIds = students.map((s: any) => s.id);
   
   let totalRejected = 0;
   if (studentIds.length > 0) {
@@ -123,7 +124,8 @@ export async function buildDepartmentReportFacts(
 
   return {
     facts: {
-      department: { totalStudents: students.length, totalVerified: deptVerified, totalPending: deptPending, totalRejected },
+      fieldGuide: "totalStudents counts resident profiles. totalVerifiedLogs, totalPendingLogs, and totalRejectedLogs count clinical work entries (cases, procedures, academics), NOT residents.",
+      department: { totalStudents: students.length, totalVerifiedLogs: deptVerified, totalPendingLogs: deptPending, totalRejectedLogs: totalRejected },
       students: studentFacts,
       professors: professorFacts,
     },
