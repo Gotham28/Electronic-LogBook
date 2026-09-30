@@ -548,7 +548,7 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
     if (!addForm.fullName || !addForm.email || !addForm.password) return;
     
     if (addFormType === "resident") {
-      if (!addForm.registrationNumber || !addForm.batch || !addForm.dateOfJoining || !addForm.kuhsId) {
+      if (!addForm.batch || !addForm.dateOfJoining || !addForm.kuhsId) {
         toast.error("Please fill in all resident fields.");
         return;
       }
@@ -893,7 +893,7 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
                     <div className="flex flex-col sm:flex-row gap-4 items-end">
                       <div className="space-y-2 flex-1 w-full">
                         <Label>Registration Number</Label>
-                        <Input placeholder="Reg No." value={addForm.registrationNumber} onChange={e => setAddForm({...addForm, registrationNumber: e.target.value})} required />
+                        <Input placeholder="Reg No." value={addForm.registrationNumber} onChange={e => setAddForm({...addForm, registrationNumber: e.target.value})} />
                       </div>
                       <div className="space-y-2 flex-1 w-full">
                         <Label>Batch</Label>

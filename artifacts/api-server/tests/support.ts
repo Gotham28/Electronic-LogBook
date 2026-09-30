@@ -1,6 +1,5 @@
 import { randomBytes } from "node:crypto";
 import { once } from "node:events";
-import nodemailer from "nodemailer";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { applyMigrations } from "../../../lib/db/src/migrations.js";
@@ -11,13 +10,27 @@ process.env.JWT_SECRET = randomBytes(48).toString("hex");
 process.env.NODE_ENV = "test";
 process.env.LOG_LEVEL = "error";
 process.env.ALLOWED_ORIGINS = "http://localhost:5173";
-// Tests capture outbound codes; this transport is never part of the application bundle.
 export const mail = new Map<string, string>();
-nodemailer.createTransport = (() => ({ sendMail: async (message: any) => {
-  const match = message.text ? message.text.match(/\b\d{6}\b/) : null;
-  mail.set(message.to, match ? match[0] : "SENT");
-  return { accepted: [message.to] };
-} })) as any;
+export const simulateFailure = { enabled: false };
+
+process.env.RESEND_API_KEY = "test-only-resend-key";
+process.env.EMAIL_FROM = "noreply@elogbookgothos.test";
+
+// Intercept all outgoing mail to prevent real sends during tests and capture
+// verification codes for the test flow to use.
+const originalFetch = globalThis.fetch;
+globalThis.fetch = async (url: string | URL | Request, options?: RequestInit) => {
+  if (url === "https://api.resend.com/emails") {
+    if (simulateFailure.enabled) {
+      return { ok: false, status: 503 } as Response;
+    }
+    const body = JSON.parse(options?.body as string);
+    const match = body.text ? body.text.match(/\b\d{6}\b/) : null;
+    mail.set(body.to, match ? match[0] : "SENT");
+    return { ok: true, status: 200 } as Response;
+  }
+  return originalFetch ? originalFetch(url, options) : Promise.reject(new Error("fetch not found"));
+};
 
 export const password = "Test-only-pass-492!";
 export type Account = { id: number; departmentId: number; role: string; email: string; token: string; studentId?: number };

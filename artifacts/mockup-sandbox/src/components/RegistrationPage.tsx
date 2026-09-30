@@ -235,7 +235,7 @@ export function RegistrationPage({
                   {departmentError && <p role="alert" className="text-sm text-rose-700">We could not load the department directory. Check that the API is running with the current branch, then <button type="button" className="font-semibold underline underline-offset-2" onClick={loadDepartments}>try again</button>.</p>}
                   {!departmentsLoading && !departmentError && !departments.length && <p className="text-sm text-slate-500">No departments are accepting registrations yet. Contact your institution.</p>}
                   <Field label="University ID" htmlFor="registration-university-id"><Input id="registration-university-id" value={form.kuhsId} onChange={(e) => setForm({ ...form, kuhsId: e.target.value })} required /></Field>
-                  <Field label="University registration number" htmlFor="registration-number"><Input id="registration-number" value={form.registrationNumber} onChange={(e) => setForm({ ...form, registrationNumber: e.target.value })} required /></Field>
+                  <Field label="University registration number (Optional)" htmlFor="registration-number"><Input id="registration-number" value={form.registrationNumber} onChange={(e) => setForm({ ...form, registrationNumber: e.target.value })} /></Field>
                   <Field label="Exact joining date" htmlFor="registration-joining-date">
                     <Input id="registration-joining-date" type="date" value={form.joiningDate} onChange={(e) => setForm({ ...form, joiningDate: e.target.value })} required />
                     <p className="text-[10px] text-slate-500">Day, month and year are required.</p>

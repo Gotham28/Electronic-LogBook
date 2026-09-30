@@ -553,7 +553,7 @@ const createStudentBody = z.object({
   fullName: nameSchema,
   email: emailSchema,
   password: passwordSchema,
-  registrationNumber: nameSchema,
+  registrationNumber: z.string().trim().max(100).optional().nullable(),
   batch: z.string().trim().min(1).max(40),
   dateOfJoining: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((s) => {
     const d = new Date(s + "T00:00:00Z");
