@@ -5,6 +5,7 @@ import { z } from "zod";
 import { db, appraisalsTable, departmentsTable, studentsTable, usersTable } from "@workspace/db";
 import { requireAuth, requireDepartment, requireRole } from "../middlewares/auth.js";
 import { dateSchema, idSchema, validate } from "../lib/validation.js";
+import { findStudent, callerCanAccessStudent } from "../lib/appraisals.js";
 
 const router: IRouter = Router();
 const staff = requireRole(["professor", "hod"]);
@@ -27,6 +28,7 @@ const appraisalBodySchema = z.object({
   professionalismScore: scoreSchema,
   publications: z.boolean(),
   remediationSuggestions: z.string().max(5000).optional().default(""),
+  facultyRemarks: z.string().max(5000).optional().default(""),
 }).strict().superRefine((values, context) => {
   const hasLowScore = [
     values.journalRecentAdvancesLearningScore,
@@ -46,30 +48,6 @@ const appraisalBodySchema = z.object({
 });
 
 const appraisalStudentUsers = aliasedTable(usersTable, "appraisal_student_users");
-
-async function findStudent(studentId: number) {
-  const [student] = await db.select({
-    id: studentsTable.id,
-    userId: studentsTable.userId,
-    mentorId: studentsTable.mentorId,
-    name: appraisalStudentUsers.fullName,
-    registrationNumber: studentsTable.registrationNumber,
-    batch: studentsTable.batch,
-    departmentId: appraisalStudentUsers.departmentId,
-    departmentName: departmentsTable.name,
-  }).from(studentsTable)
-    .innerJoin(appraisalStudentUsers, eq(studentsTable.userId, appraisalStudentUsers.id))
-    .innerJoin(departmentsTable, eq(appraisalStudentUsers.departmentId, departmentsTable.id))
-    .where(and(eq(studentsTable.id, studentId), eq(appraisalStudentUsers.role, "student"), eq(appraisalStudentUsers.status, "approved")))
-    .limit(1);
-  return student;
-}
-
-function callerCanAccessStudent(caller: NonNullable<Express.Request["user"]>, student: NonNullable<Awaited<ReturnType<typeof findStudent>>>) {
-  if (caller.role === "student") return student.userId === caller.id;
-  if (student.departmentId !== caller.departmentId) return false;
-  return caller.role !== "professor" || student.mentorId === caller.id;
-}
 
 async function listStudentAppraisals(studentId: number) {
   return db.select({
@@ -124,7 +102,6 @@ router.get("/students", staff, async (req, res) => {
         eq(usersTable.departmentId, caller.departmentId!),
         eq(usersTable.role, "student"),
         eq(usersTable.status, "approved"),
-        caller.role === "professor" ? eq(studentsTable.mentorId, caller.id) : undefined,
       ))
       .orderBy(usersTable.fullName);
     res.json(students);
@@ -169,6 +146,18 @@ router.post("/students/:studentId", staff, validate(appraisalBodySchema), async 
     if (!student) { res.status(404).json({ message: "Student not found" }); return; }
     if (!callerCanAccessStudent(caller, student)) { res.status(403).json({ message: "Student is outside your appraisal access scope" }); return; }
     const body = req.body as z.infer<typeof appraisalBodySchema>;
+    const existing = await db.select({ id: appraisalsTable.id })
+      .from(appraisalsTable)
+      .where(and(
+        eq(appraisalsTable.studentId, student.id),
+        eq(appraisalsTable.quarter, body.quarter),
+        eq(appraisalsTable.year, body.year),
+      ))
+      .limit(1);
+    if (existing.length > 0) {
+      res.status(409).json({ message: "An appraisal already exists for this student, quarter and year." });
+      return;
+    }
     const [created] = await db.insert(appraisalsTable).values({
       studentId: student.id,
       evaluatorId: caller.id,
@@ -190,6 +179,7 @@ router.post("/students/:studentId", staff, validate(appraisalBodySchema), async 
       professionalismScore: body.professionalismScore,
       publications: body.publications,
       remediationSuggestions: body.remediationSuggestions.trim() || null,
+      facultyRemarks: body.facultyRemarks.trim() || null,
     }).returning({ id: appraisalsTable.id });
     res.status(201).json({ id: created.id, message: "Quarterly appraisal saved" });
   } catch {

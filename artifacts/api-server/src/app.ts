@@ -2,8 +2,9 @@ import express, { type Express, type ErrorRequestHandler } from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import pinoHttp from "pino-http";
-import router from "./routes";
-import { logger } from "./lib/logger";
+import router from "./routes/index.js";
+import arogyaRouter from "./routes/arogya.js";
+import { logger } from "./lib/logger.js";
 
 const app: Express = express();
 
@@ -91,6 +92,7 @@ app.use(express.json({
   type: (req) => req.url?.split("?")[0] !== RAZORPAY_WEBHOOK_PATH && /^application\/json(?:;|$)/i.test(req.headers["content-type"] || ""),
 }));
 
+app.use("/api/arogya", arogyaRouter);
 app.use("/api", router);
 app.use((_req, res) => { res.status(404).json({ message: "Route not found" }); });
 

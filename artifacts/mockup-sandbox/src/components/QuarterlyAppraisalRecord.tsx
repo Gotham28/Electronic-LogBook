@@ -77,6 +77,13 @@ export function QuarterlyAppraisalRecord({ appraisal }: { appraisal: QuarterlyAp
           </div>
         )}
 
+        {appraisal.facultyRemarks && (
+          <section className="rounded-lg border border-slate-200 bg-slate-50/60 p-4">
+            <h4 className="text-sm font-semibold text-slate-900">Faculty remarks</h4>
+            <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{appraisal.facultyRemarks}</p>
+          </section>
+        )}
+
         {appraisal.remediationSuggestions && (
           <section className="rounded-lg border border-amber-200 bg-amber-50/60 p-4">
             <h4 className="text-sm font-semibold text-slate-900">Remarks / remediation suggestions</h4>

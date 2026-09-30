@@ -13,6 +13,7 @@ import { before, after, test } from "node:test";
 import assert from "node:assert/strict";
 import { setup, request, accounts as a } from "./support.js";
 import { engine, db } from "./database.js";
+import { _arogya } from "../src/lib/arogya.js";
 import { sql } from "drizzle-orm";
 
 process.env.NODE_ENV = "production";
@@ -47,6 +48,49 @@ test("SEC-08: forced POST /admin/professors failure logs department id and statu
 
   console.log("SEC-08 forced-failure response ->", response.status, JSON.stringify(response.body));
   assert.equal(response.status, 500);
+});
+
+test("SEC-09: POST /api/arogya/ask never logs question, system prompt, or reply", async () => {
+  const orig = _arogya.call;
+  _arogya.call = async () => ({ reply: "Ask your supervisor for guidance.", tokenCount: 10 });
+
+  const logged: string[] = [];
+  const originalLog = console.log;
+  console.log = (...args: any[]) => { logged.push(args.map(String).join(" ")); };
+
+  try {
+    const response = await call("/arogya/ask", "student0", "POST", { question: "Secret question" });
+    assert.equal(response.status, 200);
+    for (const entry of logged) {
+      assert.ok(!entry.includes("Secret question"), "question must not appear in logs");
+      assert.ok(!entry.includes("Use only the facts"), "system prompt must not appear in logs");
+      assert.ok(!entry.includes("Ask your supervisor"), "reply must not appear in logs");
+    }
+  } finally {
+    _arogya.call = orig;
+    console.log = originalLog;
+  }
+});
+
+test("SEC-10: POST /api/arogya/progress-coach never logs prompt or reply", async () => {
+  const orig = _arogya.call;
+  _arogya.call = async () => ({ reply: JSON.stringify(["Secret tip one", "Secret tip two", "Secret tip three"]), tokenCount: 10 });
+
+  const logged: string[] = [];
+  const originalLog = console.log;
+  console.log = (...args: any[]) => { logged.push(args.map(String).join(" ")); };
+
+  try {
+    const response = await call("/arogya/progress-coach", "student0", "POST");
+    assert.equal(response.status, 200);
+    for (const entry of logged) {
+      assert.ok(!entry.includes("progress coach tips"), "prompt must not appear in logs");
+      assert.ok(!entry.includes("Secret tip"), "reply must not appear in logs");
+    }
+  } finally {
+    _arogya.call = orig;
+    console.log = originalLog;
+  }
 });
 
 test("forced PATCH /:studentId/postings/:postingId failure returns a plain 500 with no error text or stack", async () => {
