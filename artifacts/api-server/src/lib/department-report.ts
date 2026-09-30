@@ -124,7 +124,7 @@ export async function buildDepartmentReportFacts(
 
   return {
     facts: {
-      fieldGuide: "totalStudents counts resident profiles. totalVerifiedLogs, totalPendingLogs, and totalRejectedLogs count clinical work entries (cases, procedures, academics), NOT residents.",
+      fieldGuide: "totalStudents counts resident profiles. totalVerifiedLogs, totalPendingLogs, and totalRejectedLogs count case, procedure and academic log entries, NOT residents.",
       department: { totalStudents: students.length, totalVerifiedLogs: deptVerified, totalPendingLogs: deptPending, totalRejectedLogs: totalRejected },
       students: studentFacts,
       professors: professorFacts,
