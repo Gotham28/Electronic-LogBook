@@ -1,6 +1,6 @@
 import { before, after, test } from "node:test";
 import assert from "node:assert/strict";
-import { setup, request, accounts as a, departmentIds, mail, password } from "./support.js";
+import { setup, request, accounts as a, departmentIds, mail, password, simulateFailure } from "./support.js";
 import { engine, db, usersTable, studentsTable, assignmentsTable, assignmentRecipientsTable, auditTable, subscriptionPlansTable, paymentsTable } from "./database.js";
 import { eq, and } from "drizzle-orm";
 import jwt from "jsonwebtoken";
@@ -278,6 +278,22 @@ test("OTP attempts are bounded and password-reset proofs cannot be forged or rep
   assert.equal((await call("/auth/login", undefined, "POST", { username: nextEmail, password: reset.newPassword })).status, 200);
 });
 
+test("send-otp fails cleanly when mailer fails and allows immediate retry", async () => {
+  const email = "failtest@example.test";
+  simulateFailure.enabled = true;
+  try {
+    const res = await call("/auth/send-otp", undefined, "POST", { email });
+    assert.equal(res.status, 503);
+    assert.equal(res.body.message, "We couldn't send the verification code right now. Please try again in a few minutes.");
+    assert.ok(!mail.has(email));
+    simulateFailure.enabled = false;
+    const res2 = await call("/auth/send-otp", undefined, "POST", { email });
+    assert.equal(res2.status, 200);
+    assert.match(mail.get(email)!, /^\d{6}$/);
+  } finally {
+    simulateFailure.enabled = false;
+  }
+});
 test("deactivation revokes live sessions and reactivation never restores an old token", async () => {
   assert.equal((await call("/admin/users/" + a.faculty2.id, "hod2", "DELETE")).status, 200);
   assert.equal((await call("/assignments", "faculty2")).status, 401);

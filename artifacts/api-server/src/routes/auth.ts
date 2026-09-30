@@ -115,7 +115,15 @@ for (const flow of [
       return true;
     });
     if (!issued) { res.status(429).json({ message: "Please wait 60 seconds before requesting another code" }); return; }
-    await flow.mail(email, otp);
+    try {
+      await flow.mail(email, otp);
+    } catch (error: unknown) {
+      await db.delete(flow.table).where(and(eq(flow.table.email, email), eq(flow.table.otpHash, otpHash)));
+      const status = error instanceof Error && /^\d{3}$/.test(error.message) ? Number(error.message) : undefined;
+      req.log.error({ purpose: flow.purpose, ...(status ? { status } : {}) }, "Verification email failed");
+      res.status(503).json({ message: "We couldn't send the verification code right now. Please try again in a few minutes." });
+      return;
+    }
     res.json({ message });
   });
 

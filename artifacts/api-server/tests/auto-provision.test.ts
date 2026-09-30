@@ -1,10 +1,9 @@
 import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { setup, mail } from "./support.js";
+import { setup, mail, simulateFailure } from "./support.js";
 import { db, departmentsTable, usersTable, departmentConfigsTable, procedureTypesTable, studentsTable } from "./database.js";
 import { provisionDepartment } from "../src/lib/department-provisioning.js";
 import { eq, and } from "drizzle-orm";
-import nodemailer from "nodemailer";
 
 describe("Auto-provision Mirror Department", () => {
   let server: any;
@@ -115,10 +114,9 @@ describe("Auto-provision Mirror Department", () => {
   });
 
   it("a failed HOD welcome email is logged without the HOD's email address", async () => {
-    const original = nodemailer.createTransport;
+    simulateFailure.enabled = true;
     const warnings: string[] = [];
     const originalWarn = console.warn;
-    nodemailer.createTransport = (() => ({ sendMail: async () => { throw new Error("mail server down"); } })) as any;
     console.warn = (...args: unknown[]) => { warnings.push(args.map(String).join(" ")); };
     try {
       const result = await provisionDepartment({ name: "Mail Fail Dept", code: "MAILFAIL1",
@@ -128,7 +126,7 @@ describe("Auto-provision Mirror Department", () => {
       assert.ok(!line!.includes("mail-fail-hod@example.com"), "the email address is not in the log");
       assert.ok(line!.includes(String(result.departmentId)), "the department id is");
     } finally {
-      nodemailer.createTransport = original;
+      simulateFailure.enabled = false;
       console.warn = originalWarn;
     }
   });
