@@ -336,3 +336,8 @@ E-Logbook Support Team`;
     throw new Error(String(response.status));
   }
 };
+
+
+export async function sendAnnouncementEmails(announcement: any, eventType: string) {
+  console.log("Sending " + eventType + " emails for announcement: " + announcement.title);
+}

@@ -1,3 +1,4 @@
+import { MaintenanceAnnouncements } from './MaintenanceAnnouncements';
 import { useEffect, useState, useMemo } from "react";
 import { toast } from "sonner";
 import { Building2, Users, UserCheck, UserX, Plus, GraduationCap, ArrowRight, XCircle, ChevronDown, ChevronRight, Info, UserPlus, Trash2, AlertTriangle } from "lucide-react";
@@ -336,6 +337,8 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
           </CardContent>
         </Card>
       </div>
+
+      <MaintenanceAnnouncements />
 
       {/* New department panel */}
       {showNewDeptPanel && (

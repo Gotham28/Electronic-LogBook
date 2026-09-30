@@ -1,3 +1,4 @@
+import { MaintenanceBanner } from "./MaintenanceBanner";
 import * as React from "react";
 import { Link, useLocation } from "wouter";
 import { Toaster } from "@/components/ui/sonner";
@@ -214,6 +215,7 @@ export function AppLayout({
   const [arogyaOpen, setArogyaOpen] = React.useState(false);
   const tourButtonRef = React.useRef<HTMLButtonElement>(null);
   const loginSummaryShownRef = React.useRef(false);
+  const [announcements, setAnnouncements] = React.useState<any[]>([]);
 
   // Notification item type
   type NotifItem = {
@@ -418,6 +420,30 @@ export function AppLayout({
     ];
   }, [activeRole, navigationItems]);
 
+  
+  React.useEffect(() => {
+    if (!currentUser) return;
+    apiGet<any[]>("/api/announcements/current")
+      .then(data => {
+        setAnnouncements(data);
+        const notifs = data.map(a => ({
+          id: `announcement_${a.id}`,
+          text: `[Maintenance: ${a.title}] ${new Date(a.startAt).toLocaleString('en-IN', {timeZone: 'Asia/Kolkata', dateStyle:'short', timeStyle:'short'})} to ${new Date(a.endAt).toLocaleString('en-IN', {timeZone: 'Asia/Kolkata', dateStyle:'short', timeStyle:'short'})}. The website will remain accessible.`,
+          href: "#",
+          onDismiss: () => {
+             localStorage.setItem(`maintenance_dismissed_${a.id}_${a.updatedAt}`, "1");
+             // trigger re-render of banner
+             setAnnouncements(prev => [...prev]);
+          }
+        }));
+        setNotifItems(prev => {
+          const f = prev.filter(p => !p.id.startsWith("announcement_"));
+          return [...f, ...notifs];
+        });
+      })
+      .catch(console.error);
+  }, [currentUser]);
+
   const handleChangePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (cpForm.newPassword !== cpForm.confirmPassword) {
@@ -618,6 +644,7 @@ export function AppLayout({
             </header>
 
             <main className="mx-auto w-full max-w-[1380px] flex-1 p-4 pb-28 sm:pb-4 md:p-6 lg:p-8">
+                <MaintenanceBanner announcements={announcements} />
               <div className="print-only mb-6 border-b border-slate-300 pb-4">
                 <p className="page-eyebrow">Department of {department.name}</p>
                 <h1 className="mt-1 text-2xl font-bold">Resident Training Record</h1>
