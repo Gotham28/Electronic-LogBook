@@ -44,7 +44,7 @@ export function ProcedureLogsPage() {
   const REQUIRED_PROCEDURE_COUNT = PROCEDURE_REQUIREMENTS.reduce((sum, p) => sum + p.required, 0);
   const groupNames: Record<string, string> = Object.fromEntries(Object.keys(PROCEDURE_GROUPS).map((group) => [group, group]));
   const user = React.useMemo(() => getCurrentUser(), []);
-  const hideUhid = isDemoMode();
+  const hideUhid = true; // isDemoMode();
   const isFreeTextProcedures = Boolean(config?.enabledFeatures?.freeTextProcedures);
   const initialGroup = hideUhid ? PROCEDURE_REQUIREMENTS[0]?.group ?? "" : "";
   const [open, setOpen] = React.useState(false);
