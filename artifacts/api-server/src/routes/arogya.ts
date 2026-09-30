@@ -2,7 +2,7 @@ import { Router } from "express";
 import { eq } from "drizzle-orm";
 import { requireAuth } from "../middlewares/auth.js";
 import { _arogya, checkAndIncrementLimit, buildProgressFacts, buildAppraisalFacts } from "../lib/arogya.js";
-import { findStudent, callerCanAccessStudent } from "../lib/appraisals.js";
+import { findStudent } from "../lib/appraisals.js";
 import { db, studentsTable, usersTable } from "@workspace/db";
 import { getDepartmentFeatures } from "../lib/department-features.js";
 import { resolveConfigDepartmentId } from "../lib/department-config-source.js";
@@ -147,9 +147,9 @@ router.post("/appraisal-draft/:studentId", requireAuth, async (req, res) => {
       return;
     }
 
-    // Step 5: access control
-    if (!callerCanAccessStudent(req.user!, student)) {
-      res.status(403).json({ error: "Student is outside your appraisal access scope." });
+    // Step 5: access control — department match only (mentor relationship not required for draft)
+    if (student.departmentId !== req.user!.departmentId) {
+      res.status(403).json({ error: "Student is outside your department." });
       return;
     }
 
