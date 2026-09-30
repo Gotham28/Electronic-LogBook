@@ -59,7 +59,7 @@ router.get("/departments", async (req, res) => {
     res.json(departments.map((d) => ({ ...d, hod: hodByDept.get(d.id) || null, mirrorDepartmentId: mirrorByRealDeptId.get(d.id)?.id ?? null, mirrorCode: mirrorByRealDeptId.get(d.id)?.code ?? null })));
   } catch (error) {
     req.log.error({ userId: req.user!.id, status: 500 }, "Error listing departments");
-    res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({ message: "Internal server error" });
   }
 });
 
@@ -92,7 +92,7 @@ router.post("/departments", validate(createDepartmentBody), async (req, res) => 
       return;
     }
     req.log.error({ userId: req.user!.id, status: 500 }, "Error provisioning department");
-    res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({ message: "Internal server error" });
   }
 });
 
@@ -134,7 +134,7 @@ router.post("/departments/backfill-test-departments", async (req, res) => {
     res.json({ provisioned, skipped, failed });
   } catch (error) {
     req.log.error({ userId: req.user!.id, status: 500 }, "Error backfilling mirror test departments");
-    res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({ message: "Internal server error" });
   }
 });
 
@@ -183,7 +183,7 @@ router.post("/departments/:id/reset-test-credentials", async (req, res) => {
     res.json({ mirrorCode: mirror.code });
   } catch (error) {
     req.log.error({ userId: req.user!.id, status: 500 }, "Error resetting test credentials");
-    res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({ message: "Internal server error" });
   }
 });
 
@@ -257,7 +257,7 @@ router.post("/departments/:id/replace-hod", validate(replaceHodBody), async (req
     res.json({ message: "HOD replaced successfully", demotedId: result.demotedId, promotedId: result.promotedId });
   } catch (error) {
     req.log.error({ departmentId, userId: req.user!.id, status: 500 }, "Error replacing HOD");
-    res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({ message: "Internal server error" });
   }
 });
 
@@ -470,7 +470,7 @@ router.delete("/departments/:id", async (req, res) => {
       return;
     }
     req.log.error({ departmentId, userId: req.user!.id, status: 500 }, "Error deleting department");
-    res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({ message: "Internal server error" });
   }
 });
 
@@ -498,7 +498,7 @@ router.get("/departments/:id/roster", async (req, res) => {
     res.json(users);
   } catch (error) {
     req.log.error({ departmentId, userId: req.user!.id, status: 500 }, "Error fetching roster");
-    res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({ message: "Internal server error" });
   }
 });
 
@@ -540,7 +540,7 @@ router.post("/departments/:id/faculty", validate(createFacultyBody), async (req,
     res.status(201).json({ message: "Faculty account created", faculty: { id: created.id, fullName, email, departmentId } });
   } catch (error) {
     req.log.error({ departmentId, userId: req.user!.id, status: 500 }, "Error creating faculty");
-    res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({ message: "Internal server error" });
   }
 });
 
@@ -591,7 +591,7 @@ router.post("/departments/:id/students", validate(createStudentBody), async (req
     res.status(201).json({ message: "Student account created and approved", student: { id: created.id, fullName, email, departmentId } });
   } catch (error) {
     req.log.error({ departmentId, userId: req.user!.id, status: 500 }, "Error creating student");
-    res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({ message: "Internal server error" });
   }
 });
 
@@ -627,7 +627,7 @@ router.post("/users/:id/deactivate", validate(z.object({}).strict()), async (req
     res.json({ message: "Account deactivated; records retained" });
   } catch (error) {
     req.log.error({ targetId, userId: req.user!.id, status: 500 }, "Error deactivating account");
-    res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({ message: "Internal server error" });
   }
 });
 
@@ -660,7 +660,7 @@ router.post("/users/:id/reactivate", validate(z.object({}).strict()), async (req
     res.json({ message: "Account reactivated. The user must sign in again." });
   } catch (error) {
     req.log.error({ targetId, userId: req.user!.id, status: 500 }, "Error reactivating account");
-    res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({ message: "Internal server error" });
   }
 });
 
@@ -702,7 +702,7 @@ router.delete("/users/:id/hard", async (req, res) => {
       return;
     }
     req.log.error({ targetId, userId: req.user!.id, status: 500 }, "Error hard-deleting account");
-    res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({ message: "Internal server error" });
   }
 });
 
@@ -769,8 +769,158 @@ router.post("/users/:id/impersonate", validate(z.object({}).strict()), async (re
     res.json({ ...await sessionProfile(target.id), token });
   } catch (error) {
     req.log.error({ targetId, adminId, status: 500 }, "Error impersonating user");
-    res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({ message: "Internal server error" });
   }
 });
 
 export default router;
+
+import { maintenanceAnnouncementsTable } from "@workspace/db";
+import { sendAnnouncementEmails } from "../lib/mailer.js";
+
+// Validation schema for announcements
+const announcementSchema = z.object({
+  title: z.string().min(1).max(255),
+  description: z.string().min(1),
+  expectedImpact: z.string().optional().nullable(),
+  startAt: z.string().datetime(),
+  endAt: z.string().datetime(),
+  audienceRoles: z.array(z.string()).min(1),
+  sendEmail: z.boolean().default(false)
+}).refine(data => new Date(data.endAt) > new Date(data.startAt), {
+  message: "End time must be after start time",
+  path: ["endAt"]
+});
+
+// GET /api/superadmin/announcements
+router.get("/announcements", async (req, res) => {
+  try {
+    const announcements = await db.select()
+      .from(maintenanceAnnouncementsTable)
+      .orderBy(sql`${maintenanceAnnouncementsTable.startAt} DESC`);
+      
+    const mapped = announcements.map((a: any) => {
+      let status = "scheduled";
+      const now = new Date();
+      if (a.cancelledAt) status = "cancelled";
+      else if (a.startAt <= now && a.endAt > now) status = "active";
+      else if (a.endAt <= now) status = "completed";
+      
+      return { ...a, status };
+    });
+    
+    res.json(mapped);
+  } catch (error) {
+    return res.status(500).json({ message: "Failed to fetch announcements" });
+  }
+});
+
+// POST /api/superadmin/announcements
+router.post("/announcements", validate(announcementSchema), async (req, res) => {
+  try {
+    const { title, description, expectedImpact, startAt, endAt, audienceRoles, sendEmail } = req.body;
+    
+    if (new Date(startAt) <= new Date()) {
+      return res.status(400).json({ message: "Start time must be in the future" });
+    }
+    
+    const [inserted] = await db.insert(maintenanceAnnouncementsTable)
+      .values({
+        title, description, expectedImpact,
+        startAt: new Date(startAt),
+        endAt: new Date(endAt),
+        audienceRoles,
+        createdBy: req.user!.id
+      }).returning();
+      
+    // Audit trail
+    await db.insert(auditTable).values({
+      tableName: "maintenance_announcements",
+      recordId: String(inserted.id),
+      action: "CREATE",
+      performedById: req.user!.id,
+      afterState: inserted
+    });
+    
+    if (sendEmail) {
+      sendAnnouncementEmails(inserted, "New Maintenance Scheduled").catch(console.error);
+    }
+    
+    return res.status(201).json(inserted);
+  } catch (error) {
+    return res.status(500).json({ message: "Failed to create announcement" });
+  }
+});
+
+// PUT /api/superadmin/announcements/:id
+router.patch("/announcements/:id", validate(announcementSchema), async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const { title, description, expectedImpact, startAt, endAt, audienceRoles, sendEmail } = req.body;
+    
+    const [before] = await db.select().from(maintenanceAnnouncementsTable).where(eq(maintenanceAnnouncementsTable.id, id));
+    if (!before) return res.status(404).json({ message: "Not found" });
+    if (before.cancelledAt) return res.status(400).json({ message: "Cannot edit a cancelled announcement" });
+    
+    const [updated] = await db.update(maintenanceAnnouncementsTable)
+      .set({
+        title, description, expectedImpact,
+        startAt: new Date(startAt),
+        endAt: new Date(endAt),
+        audienceRoles,
+        updatedAt: new Date()
+      })
+      .where(eq(maintenanceAnnouncementsTable.id, id))
+      .returning();
+      
+    await db.insert(auditTable).values({
+      tableName: "maintenance_announcements",
+      recordId: String(id),
+      action: "UPDATE",
+      performedById: req.user!.id,
+      beforeState: before,
+      afterState: updated
+    });
+    
+    if (sendEmail) {
+      sendAnnouncementEmails(updated, "Maintenance Updated").catch(console.error);
+    }
+    
+    return res.json(updated);
+  } catch (error) {
+    return res.status(500).json({ message: "Failed to update announcement" });
+  }
+});
+
+// POST /api/superadmin/announcements/:id/cancel
+router.post("/announcements/:id/cancel", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    
+    const [before] = await db.select().from(maintenanceAnnouncementsTable).where(eq(maintenanceAnnouncementsTable.id, id));
+    if (!before) return res.status(404).json({ message: "Not found" });
+    if (before.cancelledAt) return res.status(400).json({ message: "Already cancelled" });
+    
+    const [updated] = await db.update(maintenanceAnnouncementsTable)
+      .set({ cancelledAt: new Date(), updatedAt: new Date() })
+      .where(eq(maintenanceAnnouncementsTable.id, id))
+      .returning();
+      
+    await db.insert(auditTable).values({
+      tableName: "maintenance_announcements",
+      recordId: String(id),
+      action: "UPDATE",
+      performedById: req.user!.id,
+      beforeState: before,
+      afterState: updated
+    });
+    
+    // Optional email
+    sendAnnouncementEmails(updated, "Maintenance Cancelled").catch(console.error);
+    
+    return res.json(updated);
+  } catch (error) {
+    return res.status(500).json({ message: "Failed to cancel announcement" });
+  }
+});
+

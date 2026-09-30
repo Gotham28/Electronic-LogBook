@@ -15,6 +15,13 @@
       "when": 1790699389163,
       "tag": "0001_conscious_gideon",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790774229681,
+      "tag": "0002_loving_sandman",
+      "breakpoints": true
     }
   ]
 }
