@@ -13,6 +13,12 @@ interface PanelNotifItem {
   href: string;
 }
 
+interface SnapshotLink {
+  id: string;
+  text: string;
+  href: string;
+}
+
 interface ArogyaPanelProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -23,22 +29,50 @@ interface ArogyaPanelProps {
 
 export function ArogyaPanel({ open, onOpenChange, role, notifItems, onNavigate }: ArogyaPanelProps) {
   const [characterState, setCharacterState] = React.useState<ArogyaState>("idle");
-  const [activeTab, setActiveTab] = React.useState<string | null>(null);
   const [question, setQuestion] = React.useState("");
-  const [messages, setMessages] = React.useState<{ text?: string; tips?: string[]; error?: boolean; role: "user" | "arogya" }[]>([]);
+  const [messages, setMessages] = React.useState<{
+    role: "user" | "arogya";
+    text?: string;
+    tips?: string[];
+    error?: boolean;
+    links?: SnapshotLink[];
+    heading?: string;
+  }[]>([]);
 
   React.useEffect(() => {
     if (!open) return undefined;
     setCharacterState("waving");
-    setActiveTab(null);
     const timer = setTimeout(() => setCharacterState("idle"), 1500);
     return () => clearTimeout(timer);
   }, [open]);
 
-  // "What's due?" -> All current Student notifications
-  const studentDue = notifItems;
-  // "My pending reviews" -> Faculty notifications strictly marked 'faculty_queue'
-  const facultyPending = notifItems.filter((i) => i.id === "faculty_queue");
+  const handleWhatsDue = () => {
+    // Snapshot at click time so a later bell change does not rewrite history (req 5)
+    const snapshot = notifItems.slice();
+    setMessages((prev) => [
+      ...prev,
+      { role: "user", text: "What's due?" },
+      {
+        role: "arogya",
+        heading: "Items that need your attention:",
+        links: snapshot,
+      },
+    ]);
+  };
+
+  const handlePendingReviews = () => {
+    // Snapshot filtered at click time (req 5)
+    const snapshot = notifItems.filter((i) => i.id === "faculty_queue");
+    setMessages((prev) => [
+      ...prev,
+      { role: "user", text: "My pending reviews" },
+      {
+        role: "arogya",
+        heading: "Your pending reviews:",
+        links: snapshot,
+      },
+    ]);
+  };
 
   const handleAsk = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,7 +80,6 @@ export function ArogyaPanel({ open, onOpenChange, role, notifItems, onNavigate }
     
     setMessages((prev) => [...prev, { role: "user", text: question }]);
     setCharacterState("thinking");
-    setActiveTab("ask_reply");
 
     try {
       const res = await fetch("/api/arogya/ask", {
@@ -70,7 +103,6 @@ export function ArogyaPanel({ open, onOpenChange, role, notifItems, onNavigate }
     
     setMessages((prev) => [...prev, { role: "user", text: "My progress coach" }]);
     setCharacterState("thinking");
-    setActiveTab("ask_reply");
 
     try {
       const res = await fetch("/api/arogya/progress-coach", {
@@ -94,7 +126,6 @@ export function ArogyaPanel({ open, onOpenChange, role, notifItems, onNavigate }
     
     setMessages((prev) => [...prev, { role: "user", text: type === "report" ? "Department report" : "Who's falling behind?" }]);
     setCharacterState("thinking");
-    setActiveTab("ask_reply");
 
     try {
       const res = await fetch("/api/arogya/department-report", {
@@ -140,7 +171,7 @@ export function ArogyaPanel({ open, onOpenChange, role, notifItems, onNavigate }
                 <Button variant="outline" size="sm" className="rounded-full bg-white text-teal-800 border-teal-200 hover:bg-teal-50" onClick={handleProgressCoach}>
                   My progress coach
                 </Button>
-                <Button variant="outline" size="sm" className="rounded-full bg-white text-teal-800 border-teal-200 hover:bg-teal-50" onClick={() => setActiveTab("student_due")}>
+                <Button variant="outline" size="sm" className="rounded-full bg-white text-teal-800 border-teal-200 hover:bg-teal-50" onClick={handleWhatsDue}>
                   What's due?
                 </Button>
               </>
@@ -148,7 +179,7 @@ export function ArogyaPanel({ open, onOpenChange, role, notifItems, onNavigate }
             
             {role === "Faculty" && (
               <>
-                <Button variant="outline" size="sm" className="rounded-full bg-white text-teal-800 border-teal-200 hover:bg-teal-50" onClick={() => setActiveTab("faculty_pending")}>
+                <Button variant="outline" size="sm" className="rounded-full bg-white text-teal-800 border-teal-200 hover:bg-teal-50" onClick={handlePendingReviews}>
                   My pending reviews
                 </Button>
               </>
@@ -168,7 +199,7 @@ export function ArogyaPanel({ open, onOpenChange, role, notifItems, onNavigate }
 
           {/* Chat Bubble Area */}
           <div className="flex flex-col gap-3 mt-4">
-            {activeTab === "ask_reply" && messages.map((msg, idx) => (
+            {messages.length > 0 && messages.map((msg, idx) => (
               <div key={idx} className={`flex gap-3 ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
                 {msg.role === "arogya" && (
                   <div className="mt-1 shrink-0">
@@ -176,7 +207,25 @@ export function ArogyaPanel({ open, onOpenChange, role, notifItems, onNavigate }
                   </div>
                 )}
                 <div className={`bg-white rounded-2xl p-3.5 shadow-sm border border-teal-100 text-sm text-slate-700 max-w-[85%] ${msg.role === "user" ? "bg-teal-50 rounded-tr-sm text-right" : "rounded-tl-sm text-left"}`}>
-                  {msg.tips ? (
+                  {msg.links !== undefined ? (
+                    <div className="flex flex-col gap-2">
+                      <p className="font-semibold text-teal-900 mb-1">{msg.heading}</p>
+                      {/* Empty state wording MUST be exactly "No new notifications right now." — AGENTS.md §7: bell fetch errors are silent */}
+                      {msg.links.length === 0 ? (
+                        <p className="text-slate-500">No new notifications right now.</p>
+                      ) : (
+                        msg.links.map((item) => (
+                          <button
+                            key={item.id}
+                            onClick={() => { onNavigate(item.href); onOpenChange(false); }}
+                            className="text-left w-full p-2 bg-slate-50 hover:bg-teal-50 rounded-lg border border-slate-100 transition-colors text-xs font-medium"
+                          >
+                            {item.text}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  ) : msg.tips ? (
                     <ol className="list-decimal pl-4 space-y-2">
                       {msg.tips.map((tip, i) => <li key={i}>{tip}</li>)}
                     </ol>
@@ -186,63 +235,6 @@ export function ArogyaPanel({ open, onOpenChange, role, notifItems, onNavigate }
                 </div>
               </div>
             ))}
-
-            {activeTab && activeTab !== "ask_reply" && (
-              <div className="flex gap-3">
-                <div className="mt-1 shrink-0">
-                  <ArogyaCharacter state="idle" size={32} />
-                </div>
-                <div className="bg-white rounded-2xl rounded-tl-sm p-3.5 shadow-sm border border-teal-100 text-sm text-slate-700 w-full">
-                  
-                  {/* Student What's Due */}
-                  {activeTab === "student_due" && (
-                    <div className="flex flex-col gap-2">
-                      <p className="font-semibold text-teal-900 mb-1">Items that need your attention:</p>
-                      {/* Empty state wording MUST be exactly "No new notifications right now." to respect AGENTS.md §7, as backend fetch errors are swallowed silently. */}
-                      {studentDue.length === 0 ? (
-                        <p className="text-slate-500">No new notifications right now.</p>
-                      ) : (
-                        studentDue.map((item) => (
-                          <button
-                            key={item.id}
-                            onClick={() => {
-                              onNavigate(item.href);
-                              onOpenChange(false);
-                            }}
-                            className="text-left w-full p-2 bg-slate-50 hover:bg-teal-50 rounded-lg border border-slate-100 transition-colors text-xs font-medium"
-                          >
-                            {item.text}
-                          </button>
-                        ))
-                      )}
-                    </div>
-                  )}
-
-                  {/* Faculty Pending Reviews */}
-                  {activeTab === "faculty_pending" && (
-                    <div className="flex flex-col gap-2">
-                      <p className="font-semibold text-teal-900 mb-1">Your pending reviews:</p>
-                      {facultyPending.length === 0 ? (
-                        <p className="text-slate-500">No new notifications right now.</p>
-                      ) : (
-                        facultyPending.map((item) => (
-                          <button
-                            key={item.id}
-                            onClick={() => {
-                              onNavigate(item.href);
-                              onOpenChange(false);
-                            }}
-                            className="text-left w-full p-2 bg-slate-50 hover:bg-teal-50 rounded-lg border border-slate-100 transition-colors text-xs font-medium"
-                          >
-                            {item.text}
-                          </button>
-                        ))
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
           </div>
         </div>
 
