@@ -2,11 +2,19 @@
 // sent from the application's own address. Markup in that name must arrive as text.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import nodemailer from "nodemailer";
 import { sendAccountCreatedEmail, sendHODApprovalRequestEmail } from "../src/lib/mailer.js";
 
 const sent: Array<{ to: string; text: string; html: string }> = [];
-nodemailer.createTransport = (() => ({ sendMail: async (message: any) => { sent.push(message); return {}; } })) as any;
+
+const originalFetch = globalThis.fetch;
+globalThis.fetch = async (url: string | URL | Request, options?: RequestInit) => {
+  if (url === "https://api.resend.com/emails") {
+    const body = JSON.parse(options?.body as string);
+    sent.push(body);
+    return { ok: true, status: 200 } as Response;
+  }
+  return originalFetch ? originalFetch(url, options) : Promise.reject(new Error("fetch not found"));
+};
 
 const injected = `Asha <a href="https://phish.example/login">Your session expired - sign in again</a>`;
 
