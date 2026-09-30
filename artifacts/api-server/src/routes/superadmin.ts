@@ -12,7 +12,6 @@ import { JWT_SECRET } from "../lib/env.js";
 import { IMPERSONATION_TOKEN_LIFETIME } from "../lib/session-tokens.js";
 import { sessionProfile } from "./auth.js";
 import { hardDeleteUserCascade } from "../lib/hard-delete-user.js";
-import { buildMaintenanceNotice } from "../lib/maintenance-messages.js";
 
 const router = Router();
 
@@ -777,17 +776,17 @@ router.post("/users/:id/impersonate", validate(z.object({}).strict()), async (re
 export default router;
 
 import { maintenanceAnnouncementsTable } from "@workspace/db";
+import { sendAnnouncementEmails } from "../lib/mailer.js";
 
 // Validation schema for announcements
 const announcementSchema = z.object({
-  // Accept legacy fields while older admin tabs are open, but never trust or persist them.
-  title: z.string().max(255).optional(),
-  description: z.string().max(8000).optional(),
-  expectedImpact: z.string().max(2000).optional().nullable(),
+  title: z.string().min(1).max(255),
+  description: z.string().min(1),
+  expectedImpact: z.string().optional().nullable(),
   startAt: z.string().datetime(),
   endAt: z.string().datetime(),
-  audienceRoles: z.array(z.enum(["student", "professor", "hod"])).min(1)
-    .refine((roles) => new Set(roles).size === roles.length, "Audience roles must be unique"),
+  audienceRoles: z.array(z.string()).min(1),
+  sendEmail: z.boolean().default(false)
 }).refine(data => new Date(data.endAt) > new Date(data.startAt), {
   message: "End time must be after start time",
   path: ["endAt"]
@@ -807,8 +806,7 @@ router.get("/announcements", async (req, res) => {
       else if (a.startAt <= now && a.endAt > now) status = "active";
       else if (a.endAt <= now) status = "completed";
       
-      const notice = buildMaintenanceNotice(a.startAt, a.endAt, status === "active" ? "active" : "scheduled");
-      return { ...a, title: notice.heading, description: notice.message, expectedImpact: null, status };
+      return { ...a, status };
     });
     
     res.json(mapped);
@@ -820,7 +818,7 @@ router.get("/announcements", async (req, res) => {
 // POST /api/superadmin/announcements
 router.post("/announcements", validate(announcementSchema), async (req, res) => {
   try {
-    const { startAt, endAt, audienceRoles } = req.body;
+    const { title, description, expectedImpact, startAt, endAt, audienceRoles, sendEmail } = req.body;
     
     if (new Date(startAt) <= new Date()) {
       return res.status(400).json({ message: "Start time must be in the future" });
@@ -828,9 +826,7 @@ router.post("/announcements", validate(announcementSchema), async (req, res) => 
     
     const [inserted] = await db.insert(maintenanceAnnouncementsTable)
       .values({
-        title: "ELogbook scheduled maintenance",
-        description: buildMaintenanceNotice(startAt, endAt, "scheduled").message,
-        expectedImpact: null,
+        title, description, expectedImpact,
         startAt: new Date(startAt),
         endAt: new Date(endAt),
         audienceRoles,
@@ -846,6 +842,10 @@ router.post("/announcements", validate(announcementSchema), async (req, res) => 
       afterState: inserted
     });
     
+    if (sendEmail) {
+      sendAnnouncementEmails(inserted, "New Maintenance Scheduled").catch(console.error);
+    }
+    
     return res.status(201).json(inserted);
   } catch (error) {
     return res.status(500).json({ message: "Failed to create announcement" });
@@ -856,24 +856,15 @@ router.post("/announcements", validate(announcementSchema), async (req, res) => 
 router.patch("/announcements/:id", validate(announcementSchema), async (req, res) => {
   try {
     const id = Number(req.params.id);
-    const { startAt, endAt, audienceRoles } = req.body;
+    const { title, description, expectedImpact, startAt, endAt, audienceRoles, sendEmail } = req.body;
     
     const [before] = await db.select().from(maintenanceAnnouncementsTable).where(eq(maintenanceAnnouncementsTable.id, id));
     if (!before) return res.status(404).json({ message: "Not found" });
     if (before.cancelledAt) return res.status(400).json({ message: "Cannot edit a cancelled announcement" });
-    const now = new Date();
-    if (before.endAt <= now) return res.status(400).json({ message: "Cannot edit a completed announcement" });
-    if (before.startAt > now && new Date(startAt) <= now) return res.status(400).json({ message: "Start time must be in the future" });
-    if (before.startAt <= now && new Date(startAt).getTime() !== before.startAt.getTime()) {
-      return res.status(400).json({ message: "The start time of active maintenance cannot be changed" });
-    }
-    if (new Date(endAt) <= now) return res.status(400).json({ message: "End time must be in the future" });
-
+    
     const [updated] = await db.update(maintenanceAnnouncementsTable)
       .set({
-        title: "ELogbook scheduled maintenance",
-        description: buildMaintenanceNotice(startAt, endAt, "scheduled").message,
-        expectedImpact: null,
+        title, description, expectedImpact,
         startAt: new Date(startAt),
         endAt: new Date(endAt),
         audienceRoles,
@@ -890,6 +881,10 @@ router.patch("/announcements/:id", validate(announcementSchema), async (req, res
       beforeState: before,
       afterState: updated
     });
+    
+    if (sendEmail) {
+      sendAnnouncementEmails(updated, "Maintenance Updated").catch(console.error);
+    }
     
     return res.json(updated);
   } catch (error) {
@@ -919,6 +914,9 @@ router.post("/announcements/:id/cancel", async (req, res) => {
       beforeState: before,
       afterState: updated
     });
+    
+    // Optional email
+    sendAnnouncementEmails(updated, "Maintenance Cancelled").catch(console.error);
     
     return res.json(updated);
   } catch (error) {

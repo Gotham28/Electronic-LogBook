@@ -5,10 +5,9 @@ import { getCurrentUser } from "@/lib/session";
 
 interface Props {
   activeRole: string;
-  onBlockingChange?: (blocking: boolean) => void;
 }
 
-export function LegalDisclaimerModal({ activeRole, onBlockingChange }: Props) {
+export function LegalDisclaimerModal({ activeRole }: Props) {
   const [isOpen, setIsOpen] = React.useState(false);
   const [canAccept, setCanAccept] = React.useState(false);
   const contentRef = React.useRef<HTMLDivElement>(null);
@@ -16,26 +15,20 @@ export function LegalDisclaimerModal({ activeRole, onBlockingChange }: Props) {
 
   React.useEffect(() => {
     // Only apply to Student (Resident) role
-    if (activeRole !== "Student" || !user) {
-      onBlockingChange?.(false);
-      return;
-    }
+    if (activeRole !== "Student" || !user) return;
     
     // Check if they've already accepted on this device
     const accepted = localStorage.getItem(`disclaimer_accepted_${user.id}`);
     if (!accepted) {
       setIsOpen(true);
-      onBlockingChange?.(true);
       // Disable scrolling on the body behind the modal
       document.body.style.overflow = 'hidden';
-    } else {
-      onBlockingChange?.(false);
     }
 
     return () => {
       document.body.style.overflow = 'unset';
     };
-  }, [activeRole, user, onBlockingChange]);
+  }, [activeRole, user]);
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
@@ -62,7 +55,6 @@ export function LegalDisclaimerModal({ activeRole, onBlockingChange }: Props) {
     }
     document.body.style.overflow = 'unset';
     setIsOpen(false);
-    onBlockingChange?.(false);
   };
 
   // Note: No onClose handlers, no keyboard listeners, no click-outside. Strictly blocking.
