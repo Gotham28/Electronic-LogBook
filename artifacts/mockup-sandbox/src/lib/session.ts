@@ -33,6 +33,15 @@ export function getToken(): string | null {
   return window.sessionStorage.getItem(TOKEN_KEY);
 }
 
+export function clearMaintenanceNoticeSession(): void {
+  const keysToRemove: string[] = [];
+  for (let i = 0; i < window.sessionStorage.length; i++) {
+    const key = window.sessionStorage.key(i);
+    if (key?.startsWith("elogbook-maintenance-notice-shown_")) keysToRemove.push(key);
+  }
+  keysToRemove.forEach((key) => window.sessionStorage.removeItem(key));
+}
+
 export function getTokenTimes(token: string | null = getToken()): { iat: number; exp: number } | null {
   if (!token) return null;
   try {
@@ -49,6 +58,7 @@ export function clearSession(): void {
   window.sessionStorage.removeItem('elogbook-authenticated');
   window.sessionStorage.removeItem(TOKEN_KEY);
   window.sessionStorage.removeItem('elogbook-login-summary-pending');
+  clearMaintenanceNoticeSession();
   
   const keysToRemove: string[] = [];
   for (let i = 0; i < window.sessionStorage.length; i++) {

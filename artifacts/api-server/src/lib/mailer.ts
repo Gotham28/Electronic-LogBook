@@ -1,5 +1,6 @@
 // Names, registration numbers and passwords come from user input (self-registration included),
 // so every value placed in an HTML template goes through this first.
+
 export function escapeHtml(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
@@ -336,8 +337,3 @@ E-Logbook Support Team`;
     throw new Error(String(response.status));
   }
 };
-
-
-export async function sendAnnouncementEmails(announcement: any, eventType: string) {
-  console.log("Sending " + eventType + " emails for announcement: " + announcement.title);
-}

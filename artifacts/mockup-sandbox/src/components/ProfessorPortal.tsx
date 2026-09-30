@@ -61,6 +61,7 @@ import {
   Pencil,
 } from "lucide-react";
 import { formatLogbookDate } from "@/lib/logbook-config";
+import { CaseLogDetails, type CaseLogDetailRecord } from "@/components/CaseLogDetails";
 import { apiGet, apiPatch, apiPost, apiDelete } from "@/lib/apiClient";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { getCurrentUser, isDemoMode } from "@/lib/session";
@@ -159,6 +160,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
   const [menteeAwards, setMenteeAwards] = React.useState<any[]>([]);
   const [menteeAssessments, setMenteeAssessments] = React.useState<any[]>([]);
   const [reviewBusy, setReviewBusy] = React.useState(false);
+  const [expandedCaseIds, setExpandedCaseIds] = React.useState<Set<number>>(new Set());
 
 
   // Dialog inner tab & click-through filter
@@ -501,62 +503,36 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                       <span className="text-xs text-slate-400 font-mono">{formatLogbookDate(currentItem.date)}</span>
                     </div>
 
-                    <div className="bg-slate-50 p-4 rounded-xl space-y-2 border border-slate-200/60">
-                      <h4 className="text-xs font-semibold uppercase text-slate-500">Submission Details</h4>
-                      <p className="text-sm text-slate-800 leading-relaxed">{currentItem.detail}</p>
-                      {currentItem.patientInfo && (
-                        <p className="text-xs text-slate-600 font-medium">Patient Info: {currentItem.patientInfo}</p>
-                      )}
-                      {!hideUhid && currentItem.patientUhid && (
-                        <p className="text-xs font-semibold text-teal-800">Case ID: {currentItem.patientUhid}</p>
-                      )}
-                      {!hideUhid && currentItem.caseNumber && (
-                        <p className="text-xs font-semibold text-teal-800">Case number: {currentItem.caseNumber}</p>
-                      )}
-                      
-                      {currentItem.type === "Conference" && currentItem.location && (
-                        <p className="text-xs text-slate-600 font-medium">Location: {currentItem.location}</p>
-                      )}
-                      {currentItem.type === "Conference" && currentItem.conferenceType && (
-                        <p className="text-xs text-slate-600 font-medium">Type: {currentItem.conferenceType === 'cme' ? 'CME' : 'Conference'}</p>
-                      )}
-                      {currentItem.type === "Conference" && currentItem.level && (
-                        <p className="text-xs text-slate-600 font-medium">Level: {currentItem.level}</p>
-                      )}
-                      {currentItem.type === "Conference" && currentItem.category && (
-                        <p className="text-xs text-slate-600 font-medium">Category: {currentItem.category}</p>
-                      )}
-                      
-                      {currentItem.type === "Academic" && config?.enabledFeatures?.academicActivityExtras && (
-                        <>
-                          {currentItem.presentationType && (
-                            <p className="text-xs text-slate-600 font-medium">Format: {currentItem.presentationType}</p>
-                          )}
-                          {currentItem.description && (
-                            <div className="mt-2 pt-2 border-t border-slate-200/50">
-                              <p className="text-xs font-semibold text-slate-500 uppercase">Description</p>
-                              <p className="text-sm text-slate-800 leading-relaxed whitespace-pre-wrap mt-0.5">{currentItem.description}</p>
-                            </div>
-                          )}
-                        </>
-                      )}
-                      
-                      {currentItem.type === "Procedure" && config?.enabledFeatures?.freeTextProcedures && (
-                        <>
-                          {currentItem.diagnosis && (
-                            <p className="text-xs text-slate-600 font-medium">Diagnosis: {currentItem.diagnosis}</p>
-                          )}
-                          {currentItem.sex && (
-                            <p className="text-xs text-slate-600 font-medium">Sex: {currentItem.sex}</p>
-                          )}
-                        </>
-                      )}
-                      {currentItem.type === "Conference" && currentItem.certificateUrl && (
-                        <p className="text-xs text-slate-600 font-medium overflow-hidden text-ellipsis whitespace-nowrap">
-                          Certificate: <a href={currentItem.certificateUrl} target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline">{currentItem.certificateUrl}</a>
-                        </p>
-                      )}
-                    </div>
+                    {currentItem.type === "Case Log" ? (
+                      <CaseLogDetails caseLog={currentItem as CaseLogDetailRecord} hideUhid={hideUhid} />
+                    ) : (
+                      <div className="bg-slate-50 p-4 rounded-xl space-y-2 border border-slate-200/60">
+                        <h4 className="text-xs font-semibold uppercase text-slate-500">Submission Details</h4>
+                        <p className="text-sm text-slate-800 leading-relaxed whitespace-pre-wrap">{currentItem.detail}</p>
+                        {currentItem.patientInfo && <p className="text-xs text-slate-600 font-medium">Patient Info: {currentItem.patientInfo}</p>}
+                        {!hideUhid && currentItem.patientUhid && <p className="text-xs font-semibold text-teal-800">Case ID: {currentItem.patientUhid}</p>}
+                        {!hideUhid && currentItem.caseNumber && <p className="text-xs font-semibold text-teal-800">Case number: {currentItem.caseNumber}</p>}
+                        {currentItem.type === "Conference" && currentItem.location && <p className="text-xs text-slate-600 font-medium">Location: {currentItem.location}</p>}
+                        {currentItem.type === "Conference" && currentItem.conferenceType && <p className="text-xs text-slate-600 font-medium">Type: {currentItem.conferenceType === 'cme' ? 'CME' : 'Conference'}</p>}
+                        {currentItem.type === "Conference" && currentItem.level && <p className="text-xs text-slate-600 font-medium">Level: {currentItem.level}</p>}
+                        {currentItem.type === "Conference" && currentItem.category && <p className="text-xs text-slate-600 font-medium">Category: {currentItem.category}</p>}
+                        {currentItem.type === "Academic" && config?.enabledFeatures?.academicActivityExtras && (
+                          <>
+                            {currentItem.presentationType && <p className="text-xs text-slate-600 font-medium">Format: {currentItem.presentationType}</p>}
+                            {currentItem.description && <div className="mt-2 pt-2 border-t border-slate-200/50"><p className="text-xs font-semibold text-slate-500 uppercase">Description</p><p className="text-sm text-slate-800 leading-relaxed whitespace-pre-wrap mt-0.5">{currentItem.description}</p></div>}
+                          </>
+                        )}
+                        {currentItem.type === "Procedure" && config?.enabledFeatures?.freeTextProcedures && (
+                          <>
+                            {currentItem.diagnosis && <p className="text-xs text-slate-600 font-medium">Diagnosis: {currentItem.diagnosis}</p>}
+                            {currentItem.sex && <p className="text-xs text-slate-600 font-medium">Sex: {currentItem.sex}</p>}
+                          </>
+                        )}
+                        {currentItem.type === "Conference" && currentItem.certificateUrl && (
+                          <p className="text-xs text-slate-600 font-medium overflow-hidden text-ellipsis whitespace-nowrap">Certificate: <a href={currentItem.certificateUrl} target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline">{currentItem.certificateUrl}</a></p>
+                        )}
+                      </div>
+                    )}
 
                     {evaluatedLogs[currentItem.id] && (
                       <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center justify-between">
@@ -999,19 +975,38 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                           if (!rows.length) {
                             return <TableRow><TableCell colSpan={4} className="text-center text-sm text-slate-500 py-6">No case logs found.</TableCell></TableRow>;
                           }
-                          return rows.map((log: any) => (
-                            <TableRow key={log.id}>
-                              <TableCell className="text-xs font-medium">{formatLogbookDate(log.date)}</TableCell>
-                              <TableCell className="text-xs font-bold text-slate-900">{log.diagnosisFinal}</TableCell>
-                              <TableCell className="text-xs text-slate-600">
-                                {!hideUhid && <p className="font-semibold text-teal-800">{log.patientUhid || "—"}</p>}
-                                <p>{log.patientAge} / {log.patientGender}</p>
-                              </TableCell>
-                              <TableCell className="text-right">
-                                {renderLogStatusBadge(log.status)}
-                              </TableCell>
-                            </TableRow>
-                          ));
+                          return rows.map((log: CaseLogDetailRecord & { id: number }) => {
+                            const expanded = expandedCaseIds.has(log.id);
+                            return (
+                              <React.Fragment key={log.id}>
+                                <TableRow>
+                                  <TableCell className="text-xs font-medium">{formatLogbookDate(log.date)}</TableCell>
+                                  <TableCell className="text-xs font-bold text-slate-900">{log.diagnosisFinal}</TableCell>
+                                  <TableCell className="text-xs text-slate-600">
+                                    {!hideUhid && <p className="font-semibold text-teal-800">{log.patientUhid || "—"}</p>}
+                                    <p>{log.patientAge} / {log.patientGender}</p>
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <div className="flex items-center justify-end gap-2">
+                                      {log.status ? renderLogStatusBadge(log.status) : <Badge variant="outline">Unknown status</Badge>}
+                                      <Button type="button" size="sm" variant="outline" aria-expanded={expanded}
+                                        aria-controls={`case-details-${log.id}`}
+                                        onClick={() => setExpandedCaseIds((current) => {
+                                          const next = new Set(current);
+                                          if (next.has(log.id)) next.delete(log.id); else next.add(log.id);
+                                          return next;
+                                        })}>
+                                        {expanded ? "Hide details" : "View details"}
+                                      </Button>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                                {expanded && <TableRow><TableCell id={`case-details-${log.id}`} colSpan={4} className="bg-slate-50 p-3">
+                                  <CaseLogDetails caseLog={log} hideUhid={hideUhid} showReview />
+                                </TableCell></TableRow>}
+                              </React.Fragment>
+                            );
+                          });
                         })()}
                       </TableBody>
                     </Table>
