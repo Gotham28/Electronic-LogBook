@@ -148,9 +148,6 @@ export function ArogyaPanel({ open, onOpenChange, role, notifItems, onNavigate }
             
             {role === "Faculty" && (
               <>
-                <Button variant="outline" size="sm" className="rounded-full bg-white text-teal-800 border-teal-200 hover:bg-teal-50" onClick={() => setActiveTab("draft_remarks")}>
-                  Draft appraisal remarks
-                </Button>
                 <Button variant="outline" size="sm" className="rounded-full bg-white text-teal-800 border-teal-200 hover:bg-teal-50" onClick={() => setActiveTab("faculty_pending")}>
                   My pending reviews
                 </Button>
@@ -164,9 +161,6 @@ export function ArogyaPanel({ open, onOpenChange, role, notifItems, onNavigate }
                 </Button>
                 <Button variant="outline" size="sm" className="rounded-full bg-white text-teal-800 border-teal-200 hover:bg-teal-50" onClick={() => handleDepartmentReport("falling_behind")}>
                   Who's falling behind?
-                </Button>
-                <Button variant="outline" size="sm" className="rounded-full bg-white text-teal-800 border-teal-200 hover:bg-teal-50" onClick={() => setActiveTab("draft_remarks")}>
-                  Draft appraisal remarks
                 </Button>
               </>
             )}
@@ -200,11 +194,6 @@ export function ArogyaPanel({ open, onOpenChange, role, notifItems, onNavigate }
                 </div>
                 <div className="bg-white rounded-2xl rounded-tl-sm p-3.5 shadow-sm border border-teal-100 text-sm text-slate-700 w-full">
                   
-                  {/* Coming Soon placeholders */}
-                  {["draft_remarks"].includes(activeTab) && (
-                    <p className="font-medium">Coming soon.</p>
-                  )}
-
                   {/* Student What's Due */}
                   {activeTab === "student_due" && (
                     <div className="flex flex-col gap-2">
