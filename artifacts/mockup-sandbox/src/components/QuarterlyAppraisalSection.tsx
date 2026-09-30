@@ -1,5 +1,5 @@
 import * as React from "react";
-import { ClipboardCheck, Printer, Save } from "lucide-react";
+import { ClipboardCheck, Printer, Save, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -38,9 +38,12 @@ export function QuarterlyAppraisalSection() {
   const [appraisalDate, setAppraisalDate] = React.useState(localDateValue(now));
   const [publications, setPublications] = React.useState("");
   const [scores, setScores] = React.useState<Record<AppraisalScoreKey, string>>(blankScores);
+  const [facultyRemarks, setFacultyRemarks] = React.useState("");
   const [remediationSuggestions, setRemediationSuggestions] = React.useState("");
   const [formError, setFormError] = React.useState<string | null>(null);
   const [saving, setSaving] = React.useState(false);
+  const [draftLoading, setDraftLoading] = React.useState(false);
+  const [draftError, setDraftError] = React.useState<string | null>(null);
 
   const loadStudents = React.useCallback(async () => {
     setStudentsLoading(true);
@@ -80,9 +83,11 @@ export function QuarterlyAppraisalSection() {
   const onStudentChange = (value: string) => {
     setStudentId(value);
     setScores(blankScores());
+    setFacultyRemarks("");
     setRemediationSuggestions("");
     setPublications("");
     setFormError(null);
+    setDraftError(null);
   };
 
   const handleSave = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -111,11 +116,13 @@ export function QuarterlyAppraisalSection() {
         year: Number(year),
         appraisalDate,
         publications: publications === "yes",
+        facultyRemarks: facultyRemarks.trim(),
         remediationSuggestions: remediationSuggestions.trim(),
         ...scoreValues,
       });
       toast.success("Quarterly appraisal saved");
       setScores(blankScores());
+      setFacultyRemarks("");
       setRemediationSuggestions("");
       setPublications("");
       await loadAppraisals(studentId);
@@ -123,6 +130,23 @@ export function QuarterlyAppraisalSection() {
       setFormError(error?.message || "Could not save this quarterly appraisal. Check the entries and try again.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDraftWithArogya = async () => {
+    if (!studentId || draftLoading) return;
+    setDraftLoading(true);
+    setDraftError(null);
+    try {
+      const result = await apiPost(`/api/arogya/appraisal-draft/${studentId}`, {});
+      setFacultyRemarks(result.facultyRemarks ?? "");
+      setRemediationSuggestions(result.remediationSuggestions ?? "");
+    } catch (err: any) {
+      // apiPost throws ApiError; the Arogya routes return { error: "..." } not { message: "..." }
+      // so we read err.data.error first, then fall back to err.message
+      setDraftError(err?.data?.error || err?.message || "Arogya couldn't draft remarks right now.");
+    } finally {
+      setDraftLoading(false);
     }
   };
 
@@ -234,19 +258,47 @@ export function QuarterlyAppraisalSection() {
                 </div>
               </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="appraisal-remediation">Remarks / remediation suggestions</Label>
-                <p id="appraisal-remediation-help" className="text-xs text-slate-600">Required if any category score is below 4.</p>
-                <Textarea
-                  id="appraisal-remediation"
-                  aria-invalid={Boolean(formError && quarterlyAppraisalCategories.some(({ key }) => Number(scores[key]) < 4) && !remediationSuggestions.trim())}
-                  aria-describedby="appraisal-remediation-help"
-                  className="min-h-24 resize-none"
-                  maxLength={5000}
-                  value={remediationSuggestions}
-                  onChange={(event) => setRemediationSuggestions(event.target.value)}
-                  placeholder="Add the suggested remediation when a score is below 4"
-                />
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between gap-3">
+                    <Label htmlFor="appraisal-faculty-remarks">Faculty remarks</Label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={!studentId || draftLoading}
+                      onClick={handleDraftWithArogya}
+                      className="gap-1.5 text-teal-700 border-teal-200 hover:bg-teal-50"
+                      id="appraisal-draft-arogya"
+                    >
+                      <Wand2 className="h-3.5 w-3.5" aria-hidden="true" />
+                      {draftLoading ? "Drafting…" : "Draft with Arogya"}
+                    </Button>
+                  </div>
+                  {draftError && <p className="text-xs text-rose-700" role="alert">{draftError}</p>}
+                  <Textarea
+                    id="appraisal-faculty-remarks"
+                    className="min-h-24 resize-none"
+                    maxLength={5000}
+                    value={facultyRemarks}
+                    onChange={(event) => setFacultyRemarks(event.target.value)}
+                    placeholder="Faculty remarks on this student's progress"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="appraisal-remediation">Remediation suggestions</Label>
+                  <p id="appraisal-remediation-help" className="text-xs text-slate-600">Required if any category score is below 4.</p>
+                  <Textarea
+                    id="appraisal-remediation"
+                    aria-invalid={Boolean(formError && quarterlyAppraisalCategories.some(({ key }) => Number(scores[key]) < 4) && !remediationSuggestions.trim())}
+                    aria-describedby="appraisal-remediation-help"
+                    className="min-h-24 resize-none"
+                    maxLength={5000}
+                    value={remediationSuggestions}
+                    onChange={(event) => setRemediationSuggestions(event.target.value)}
+                    placeholder="Add the suggested remediation when a score is below 4"
+                  />
+                </div>
               </div>
 
               {formError && <p className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800" role="alert">{formError}</p>}

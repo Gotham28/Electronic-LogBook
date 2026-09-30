@@ -5,6 +5,7 @@ import { z } from "zod";
 import { db, appraisalsTable, departmentsTable, studentsTable, usersTable } from "@workspace/db";
 import { requireAuth, requireDepartment, requireRole } from "../middlewares/auth.js";
 import { dateSchema, idSchema, validate } from "../lib/validation.js";
+import { findStudent, callerCanAccessStudent } from "../lib/appraisals.js";
 
 const router: IRouter = Router();
 const staff = requireRole(["professor", "hod"]);
@@ -27,6 +28,7 @@ const appraisalBodySchema = z.object({
   professionalismScore: scoreSchema,
   publications: z.boolean(),
   remediationSuggestions: z.string().max(5000).optional().default(""),
+  facultyRemarks: z.string().max(5000).optional().default(""),
 }).strict().superRefine((values, context) => {
   const hasLowScore = [
     values.journalRecentAdvancesLearningScore,
@@ -46,30 +48,6 @@ const appraisalBodySchema = z.object({
 });
 
 const appraisalStudentUsers = aliasedTable(usersTable, "appraisal_student_users");
-
-async function findStudent(studentId: number) {
-  const [student] = await db.select({
-    id: studentsTable.id,
-    userId: studentsTable.userId,
-    mentorId: studentsTable.mentorId,
-    name: appraisalStudentUsers.fullName,
-    registrationNumber: studentsTable.registrationNumber,
-    batch: studentsTable.batch,
-    departmentId: appraisalStudentUsers.departmentId,
-    departmentName: departmentsTable.name,
-  }).from(studentsTable)
-    .innerJoin(appraisalStudentUsers, eq(studentsTable.userId, appraisalStudentUsers.id))
-    .innerJoin(departmentsTable, eq(appraisalStudentUsers.departmentId, departmentsTable.id))
-    .where(and(eq(studentsTable.id, studentId), eq(appraisalStudentUsers.role, "student"), eq(appraisalStudentUsers.status, "approved")))
-    .limit(1);
-  return student;
-}
-
-function callerCanAccessStudent(caller: NonNullable<Express.Request["user"]>, student: NonNullable<Awaited<ReturnType<typeof findStudent>>>) {
-  if (caller.role === "student") return student.userId === caller.id;
-  if (student.departmentId !== caller.departmentId) return false;
-  return caller.role !== "professor" || student.mentorId === caller.id;
-}
 
 async function listStudentAppraisals(studentId: number) {
   return db.select({
@@ -190,6 +168,7 @@ router.post("/students/:studentId", staff, validate(appraisalBodySchema), async 
       professionalismScore: body.professionalismScore,
       publications: body.publications,
       remediationSuggestions: body.remediationSuggestions.trim() || null,
+      facultyRemarks: body.facultyRemarks.trim() || null,
     }).returning({ id: appraisalsTable.id });
     res.status(201).json({ id: created.id, message: "Quarterly appraisal saved" });
   } catch {
