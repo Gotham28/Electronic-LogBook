@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { setup, accounts as a } from "./support.js";
 import { engine, db, caseLogsTable, studentsTable, usersTable } from "./database.js";
 import { buildDepartmentReportFacts } from "../src/lib/department-report.js";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 
 let runtime: Awaited<ReturnType<typeof setup>>;
 before(async () => { runtime = await setup(); });
@@ -42,6 +42,9 @@ test("buildDepartmentReportFacts returns correct shape, counts and anonymised na
       supervisorId: a.faculty0.id,
       status: "verified",
       notes: "Log A",
+      patientAge: "25",
+      patientGender: "female",
+      diagnosisFinal: "Test Diagnosis",
     },
     {
       studentId: sId,
@@ -50,6 +53,9 @@ test("buildDepartmentReportFacts returns correct shape, counts and anonymised na
       supervisorId: a.faculty0.id,
       status: "verified",
       notes: "Log B",
+      patientAge: "30",
+      patientGender: "male",
+      diagnosisFinal: "Test Diagnosis",
     }
   ]);
 
@@ -58,9 +64,16 @@ test("buildDepartmentReportFacts returns correct shape, counts and anonymised na
   // a. fieldGuide and counts
   assert.equal(typeof facts.fieldGuide, "string");
   assert.ok(facts.fieldGuide.length > 0);
+  assert.ok(facts.fieldGuide.includes("case, procedure and academic log entries"));
   assert.equal(typeof facts.department.totalVerifiedLogs, "number");
   assert.equal(typeof facts.department.totalPendingLogs, "number");
   assert.equal(typeof facts.department.totalRejectedLogs, "number");
+
+  // Count approved resident users in department for exact totalStudents assertion
+  const deptApprovedStudents = await db.select({ id: studentsTable.id })
+    .from(studentsTable)
+    .innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
+    .where(and(eq(usersTable.departmentId, deptId), eq(usersTable.role, "student"), eq(usersTable.status, "approved")));
 
   // b. old keys NOT present
   const deptAny = facts.department as any;
@@ -85,8 +98,7 @@ test("buildDepartmentReportFacts returns correct shape, counts and anonymised na
   assert.ok(foundProf);
   assert.ok(foundRes);
 
-  // d. totalVerifiedLogs equals log count, totalStudents equals resident count
-  assert.ok(facts.department.totalVerifiedLogs >= 2);
-  assert.ok(facts.department.totalStudents >= 1);
-  assert.notEqual(facts.department.totalVerifiedLogs, facts.department.totalStudents);
+  // d. totalVerifiedLogs equals seeded verified logs count, totalStudents equals dept approved residents count
+  assert.equal(facts.department.totalVerifiedLogs, 2);
+  assert.equal(facts.department.totalStudents, deptApprovedStudents.length);
 });
