@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SendHorizontal } from "lucide-react";
 import { ArogyaCharacter, type ArogyaState } from "./ArogyaCharacter";
+import { apiPost } from "@/lib/apiClient";
 
 type RoleType = "Student" | "Faculty" | "HOD";
 
@@ -82,19 +83,14 @@ export function ArogyaPanel({ open, onOpenChange, role, notifItems, onNavigate }
     setCharacterState("thinking");
 
     try {
-      const res = await fetch("/api/arogya/ask", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Arogya couldn't answer right now.");
+      const data = await apiPost("/api/arogya/ask", { question });
+      if (typeof data.reply !== "string") throw new Error("Invalid shape");
       setCharacterState("talking");
       setMessages((prev) => [...prev, { role: "arogya", text: data.reply }]);
       setQuestion("");
     } catch (err: any) {
       setCharacterState("error");
-      setMessages((prev) => [...prev, { role: "arogya", text: "Arogya couldn't answer right now.", error: true }]);
+      setMessages((prev) => [...prev, { role: "arogya", text: err?.data?.error ?? "Arogya couldn't answer right now.", error: true }]);
     }
   };
 
@@ -105,19 +101,14 @@ export function ArogyaPanel({ open, onOpenChange, role, notifItems, onNavigate }
     setCharacterState("thinking");
 
     try {
-      const res = await fetch("/api/arogya/progress-coach", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Arogya couldn't answer right now.");
+      const data = await apiPost("/api/arogya/progress-coach", {});
+      if (!Array.isArray(data.tips)) throw new Error("Invalid shape");
       
       setCharacterState("talking");
       setMessages((prev) => [...prev, { role: "arogya", tips: data.tips }]);
     } catch (err: any) {
       setCharacterState("error");
-      setMessages((prev) => [...prev, { role: "arogya", text: "Arogya couldn't answer right now.", error: true }]);
+      setMessages((prev) => [...prev, { role: "arogya", text: err?.data?.error ?? "Arogya couldn't answer right now.", error: true }]);
     }
   };
 
@@ -128,19 +119,14 @@ export function ArogyaPanel({ open, onOpenChange, role, notifItems, onNavigate }
     setCharacterState("thinking");
 
     try {
-      const res = await fetch("/api/arogya/department-report", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Arogya couldn't answer right now.");
+      const data = await apiPost("/api/arogya/department-report", { type });
+      if (typeof data.reply !== "string") throw new Error("Invalid shape");
       
       setCharacterState("talking");
       setMessages((prev) => [...prev, { role: "arogya", text: data.reply }]);
     } catch (err: any) {
       setCharacterState("error");
-      setMessages((prev) => [...prev, { role: "arogya", text: err.message || "Arogya couldn't answer right now.", error: true }]);
+      setMessages((prev) => [...prev, { role: "arogya", text: err?.data?.error ?? "Arogya couldn't answer right now.", error: true }]);
     }
   };
 
