@@ -118,7 +118,7 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
   const [filterStatus, setFilterStatus] = React.useState("all");
 
   // Professor Form State
-  const [profForm, setProfForm] = React.useState({ fullName: "", email: "", password: "" });
+  const [profForm, setProfForm] = React.useState({ fullName: "", email: "" });
   const [creatingProf, setCreatingProf] = React.useState(false);
 
   // Leave approvals
@@ -265,9 +265,7 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
     e.preventDefault();
     setCreatingProf(true);
     try {
-      const result = await apiPost<{ emailAccepted: boolean; emailFailure?: { failure: string; providerStatus?: number } }>("/api/admin/professors", {
-        ...profForm
-      });
+      const result = await apiPost<{ emailAccepted: boolean; emailFailure?: { failure: string; providerStatus?: number } }>("/api/admin/professors", profForm);
       toast.success("Faculty account created successfully");
       if (!result.emailAccepted) {
         const detail = result.emailFailure?.failure === "missing_configuration" ? "Email service configuration is missing"
@@ -275,7 +273,7 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
             : "Email provider could not be reached";
         toast.warning(`Faculty account created. ${detail}; check the server log and Resend Events.`);
       }
-      setProfForm({ fullName: "", email: "", password: "" });
+      setProfForm({ fullName: "", email: "" });
       setRoster(null);
     } catch (err: any) {
       toast.error(err.message || "Failed to create faculty account");
@@ -659,10 +657,7 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
                   <Label htmlFor="prof-email">Email Address</Label>
                   <Input id="prof-email" type="email" value={profForm.email} onChange={(e) => setProfForm({...profForm, email: e.target.value})} required />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="prof-pass">Initial Password</Label>
-                  <Input id="prof-pass" type="password" value={profForm.password} onChange={(e) => setProfForm({...profForm, password: e.target.value})} minLength={8} required />
-                </div>
+                <p className="text-sm text-slate-600">A secure temporary password will be generated and sent to the faculty member’s email. They can change it after signing in.</p>
                 <Button type="submit" disabled={creatingProf} className="w-full">
                   <UserPlus className="h-4 w-4 mr-2" /> {creatingProf ? "Creating..." : "Create Faculty Account"}
                 </Button>

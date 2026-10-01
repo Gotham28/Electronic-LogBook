@@ -3,6 +3,7 @@ import { db, usersTable, studentsTable, departmentsTable, departmentConfigsTable
 import { eq, and, count, inArray, sql, or, isNull } from "drizzle-orm";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
+import { randomBytes } from "node:crypto";
 import { splitLeaveDaysByYear } from "../lib/leave.js";
 import { requireAuth, requireRole, requireDepartment } from "../middlewares/auth.js";
 import { completionPercent, configSchema, dateSchema, emailSchema, nameSchema, passwordSchema, targetSchema, validate } from "../lib/validation.js";
@@ -202,14 +203,9 @@ router.delete("/users/:id", async (req, res) => {
 
 // POST /api/admin/professors
 // Create a new professor account
-router.post("/professors", validate(z.object({ fullName: nameSchema, email: emailSchema, password: passwordSchema }).strict()), async (req, res) => {
+router.post("/professors", validate(z.object({ fullName: nameSchema, email: emailSchema }).strict()), async (req, res) => {
   try {
-    const { fullName, email, password } = req.body;
-
-    if (!fullName || !email || !password) {
-      res.status(400).json({ message: "Full name, email, and password are required" });
-      return;
-    }
+    const { fullName, email } = req.body;
 
     const existingUser = await db.select().from(usersTable).where(eq(usersTable.email, email)).limit(1);
     if (existingUser.length > 0) {
@@ -217,7 +213,8 @@ router.post("/professors", validate(z.object({ fullName: nameSchema, email: emai
       return;
     }
 
-    const passwordHash = await bcrypt.hash(password, 12);
+    const initialPassword = randomBytes(24).toString("base64url");
+    const passwordHash = await bcrypt.hash(initialPassword, 12);
 
     const [newProf] = await db.insert(usersTable).values({
       fullName,
@@ -234,7 +231,7 @@ router.post("/professors", validate(z.object({ fullName: nameSchema, email: emai
       const [dept] = await db.select({ name: departmentsTable.name }).from(departmentsTable)
         .where(eq(departmentsTable.id, req.user!.departmentId!)).limit(1);
         
-      await sendAccountCreatedEmail(email, fullName, password, "professor", dept?.name);
+      await sendAccountCreatedEmail(email, fullName, initialPassword, "professor", dept?.name);
       emailAccepted = true;
     } catch (error) {
       // Id only: the welcome email carries the plaintext password, so its error is never logged.
@@ -256,8 +253,8 @@ router.post("/professors", validate(z.object({ fullName: nameSchema, email: emai
     });
   } catch (error) {
     // Never the error object itself: a failed insert throws DrizzleQueryError, whose
-    // message carries the SQL plus every bound parameter - including the new professor's
-    // passwordHash. Id and status code only, matching app.ts:96.
+    // message carries the SQL plus every bound parameter - including the generated
+    // professor password hash. Id and status code only, matching app.ts:96.
     req.log.error({ departmentId: req.user!.departmentId, status: 500 }, "Error creating professor");
     res.status(500).json({ message: "Internal server error" });
   }

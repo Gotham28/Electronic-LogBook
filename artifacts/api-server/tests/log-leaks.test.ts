@@ -5,8 +5,9 @@
 // transport pino uses in dev/test, so the JSON line prints once, on this process's own
 // stdout - node:test's own runner then carries it into whoever reads this run's output)
 // and LOG_LEVEL=error (support.ts otherwise sets LOG_LEVEL=silent). A secret marker is
-// planted in the field that would leak (the leave reason; the plaintext password) so its
-// absence from the captured line is a direct, checkable fact, not an inference. The CHECK
+// planted in the leave reason so its absence from the captured line is a direct, checkable
+// fact. HOD faculty passwords are now generated inside the route; the second test forces an
+// insert failure and prints the resulting id/status-only log line for review. The CHECK
 // constraint that forces each failure is added and dropped inside its own test, touching
 // no fixture data used elsewhere in the suite.
 import { before, after, test } from "node:test";
@@ -39,11 +40,10 @@ test("SEC-03: forced POST /:studentId/leave-records failure logs id and status o
   assert.equal(response.status, 500);
 });
 
-test("SEC-08: forced POST /admin/professors failure logs department id and status only, never the password", async () => {
+test("SEC-08: forced HOD faculty creation failure logs department id and status only", async () => {
   await db.execute(sql`ALTER TABLE users ADD CONSTRAINT force_fail_sec08 CHECK (false) NOT VALID`);
-  const secretPassword = "SEC08EvidenceMarkerPlaintextPW!";
   const response = await call("/admin/professors", "hod0", "POST",
-    { fullName: "SEC-08 evidence professor", email: "sec08-evidence@example.test", password: secretPassword });
+    { fullName: "SEC-08 evidence professor", email: "sec08-evidence@example.test" });
   await db.execute(sql`ALTER TABLE users DROP CONSTRAINT force_fail_sec08`);
 
   console.log("SEC-08 forced-failure response ->", response.status, JSON.stringify(response.body));
