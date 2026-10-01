@@ -3,7 +3,6 @@ import crypto from "node:crypto";
 import { db, paymentsTable } from "@workspace/db";
 import { and, eq, inArray } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
-import { notifyCurrentHodOfPaidStudent } from "../lib/student-notifications.js";
 
 const router = Router();
 
@@ -100,17 +99,8 @@ router.post("/webhook", async (req, res) => {
       // payment.failed then payment.captured for the same order_id. 'paid' is excluded (never
       // reprocess an already-paid row) and 'refunded' is excluded (never silently resurrect a
       // refunded payment back to paid) - inArray only, no "status != 'paid'" shortcut.
-      const [updated] = await db.update(paymentsTable).set({ status: "paid", razorpayPaymentId: paymentId, updatedAt: new Date() })
-        .where(and(eq(paymentsTable.razorpayOrderId, orderId), inArray(paymentsTable.status, ["created", "failed"])))
-        .returning({ id: paymentsTable.id });
-      if (updated) {
-        try {
-          await notifyCurrentHodOfPaidStudent(row.userId);
-          logger.info({ event, eventId, orderId, status: 200 }, "HOD student approval request email accepted after payment");
-        } catch {
-          logger.error({ event, eventId, orderId, status: 200 }, "HOD student approval request email failed after payment");
-        }
-      }
+      await db.update(paymentsTable).set({ status: "paid", razorpayPaymentId: paymentId, updatedAt: new Date() })
+        .where(and(eq(paymentsTable.razorpayOrderId, orderId), inArray(paymentsTable.status, ["created", "failed"])));
       logger.info({ event, eventId, orderId, status: 200 }, "Razorpay webhook: processed");
       res.sendStatus(200);
       return;

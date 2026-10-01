@@ -1,6 +1,6 @@
 import { before, after, test } from "node:test";
 import assert from "node:assert/strict";
-import { setup, request, accounts as a, departmentIds, password, sentEmails } from "./support.js";
+import { setup, request, accounts as a, departmentIds, password } from "./support.js";
 import { engine, db, usersTable, studentsTable, caseLogsTable, departmentsTable, departmentConfigsTable, departmentCatalogTable, procedureTypesTable, assignmentTypesTable, assignmentsTable, assignmentRecipientsTable } from "./database.js";
 import { eq, and, sql } from "drizzle-orm";
 import jwt from "jsonwebtoken";
@@ -162,15 +162,11 @@ test("admin can view any department roster (plain user rows only)", async () => 
 // 6. Admin can create faculty in any department
 // =========================================================================
 test("admin can create faculty in any department", async () => {
-  const emailStart = sentEmails.length;
   const res = await call("/superadmin/departments/" + departmentIds[1] + "/faculty", "admin", "POST", {
     fullName: "Admin-Created Faculty", email: "admin-fac@example.test", password,
   });
   assert.equal(res.status, 201);
   assert.equal(res.body.faculty.departmentId, departmentIds[1]);
-  assert.equal(res.body.emailAccepted, true);
-  const welcome = sentEmails.slice(emailStart).find((email) => email.to === "admin-fac@example.test");
-  assert.equal(welcome?.subject, "Your E-LogBook Account Has Been Created");
 
   // Duplicate email rejected
   const dup = await call("/superadmin/departments/" + departmentIds[1] + "/faculty", "admin", "POST", {
@@ -227,17 +223,12 @@ test("HOD swap: success, sessionVersion bump, wrong-role/wrong-dept/nonexistent-
   const profId = profRes.body.faculty.id;
 
   // Successful HOD swap
-  const swapEmailStart = sentEmails.length;
   const swapRes = await call("/superadmin/departments/" + deptId + "/replace-hod", "admin", "POST", {
     incomingUserId: profId,
   });
   assert.equal(swapRes.status, 200);
   assert.equal(swapRes.body.demotedId, originalHodId);
   assert.equal(swapRes.body.promotedId, profId);
-  assert.equal(swapRes.body.emailAccepted, true);
-  const appointment = sentEmails.slice(swapEmailStart).find((email) => email.subject === "You Have Been Appointed HOD in E-LogBook");
-  assert.equal(appointment?.to, "swap-prof@example.test");
-  assert.match(appointment?.text ?? "", /existing account/);
 
   // Verify: original HOD is now professor
   const [demoted] = await db.select().from(usersTable).where(eq(usersTable.id, originalHodId));

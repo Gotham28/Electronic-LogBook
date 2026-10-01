@@ -57,57 +57,6 @@ function credentialRow(label: string, valueHtml: string, last = false) {
   </tr>`;
 }
 
-export type EmailFailure = "missing_configuration" | "network_failure" | "provider_rejected";
-
-export class EmailDeliveryError extends Error {
-  constructor(public readonly failure: EmailFailure, public readonly providerStatus?: number) {
-    super(failure === "provider_rejected" && providerStatus
-      ? `Email provider rejected request (${providerStatus})`
-      : failure === "network_failure" ? "Email provider network failure or timeout" : "Email service is not configured");
-    this.name = "EmailDeliveryError";
-  }
-}
-
-export function getEmailFailure(error: unknown): { failure: EmailFailure; providerStatus?: number } {
-  if (error instanceof EmailDeliveryError) {
-    return { failure: error.failure, ...(error.providerStatus ? { providerStatus: error.providerStatus } : {}) };
-  }
-  return { failure: "network_failure" };
-}
-
-async function sendEmail(email: string, subject: string, text: string, html: string): Promise<void> {
-  if (!process.env.RESEND_API_KEY || !process.env.EMAIL_FROM) {
-    throw new EmailDeliveryError("missing_configuration");
-  }
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 10000);
-  let response: Response;
-  try {
-    response = await globalThis.fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${process.env.RESEND_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from: `"E-LogBook" <${process.env.EMAIL_FROM}>`,
-        to: email,
-        subject,
-        text,
-        html,
-      }),
-      signal: controller.signal,
-    });
-  } catch {
-    throw new EmailDeliveryError("network_failure");
-  } finally {
-    clearTimeout(timeoutId);
-  }
-
-  if (!response.ok) throw new EmailDeliveryError("provider_rejected", response.status);
-}
-
 export const sendOtpEmail = async (email: string, otp: string) => {
   const textTemplate = `Your verification code is: ${otp}. It expires in 10 minutes.`;
   const htmlTemplate = wrapEmail(
@@ -124,7 +73,33 @@ export const sendOtpEmail = async (email: string, otp: string) => {
      <p style="margin:0; font-size:13px; color:#64748b; line-height:1.6;">If you did not request this code, you can ignore this email.</p>`
   );
 
-  await sendEmail(email, "E-LogBook Registration OTP", textTemplate, htmlTemplate);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
+  let response;
+  try {
+    response = await globalThis.fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${process.env.RESEND_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        from: `"E-LogBook" <${process.env.EMAIL_FROM}>`,
+        to: email,
+        subject: "E-LogBook Registration OTP",
+        text: textTemplate,
+        html: htmlTemplate,
+      }),
+      signal: controller.signal
+    });
+  } catch {
+    throw new Error("Network failure or timeout");
+  } finally {
+    clearTimeout(timeoutId);
+  }
+  if (!response.ok) {
+    throw new Error(String(response.status));
+  }
 };
 
 export const sendPasswordResetEmail = async (email: string, otp: string) => {
@@ -143,7 +118,33 @@ export const sendPasswordResetEmail = async (email: string, otp: string) => {
      <p style="margin:0; font-size:13px; color:#64748b; line-height:1.6;">If you did not request a password reset, you can ignore this email.</p>`
   );
 
-  await sendEmail(email, "E-LogBook Password Reset", textTemplate, htmlTemplate);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
+  let response;
+  try {
+    response = await globalThis.fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${process.env.RESEND_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        from: `"E-LogBook" <${process.env.EMAIL_FROM}>`,
+        to: email,
+        subject: "E-LogBook Password Reset",
+        text: textTemplate,
+        html: htmlTemplate,
+      }),
+      signal: controller.signal
+    });
+  } catch {
+    throw new Error("Network failure or timeout");
+  } finally {
+    clearTimeout(timeoutId);
+  }
+  if (!response.ok) {
+    throw new Error(String(response.status));
+  }
 };
 
 export const sendAccountCreatedEmail = async (
@@ -240,7 +241,33 @@ gothoslabs@gmail.com`;
      </table>`
   );
 
-  await sendEmail(email, "Your E-LogBook Account Has Been Created", textTemplate, htmlTemplate);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
+  let response;
+  try {
+    response = await globalThis.fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${process.env.RESEND_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        from: `"E-LogBook" <${process.env.EMAIL_FROM}>`,
+        to: email,
+        subject: "Your E-LogBook Account Has Been Created",
+        text: textTemplate,
+        html: htmlTemplate,
+      }),
+      signal: controller.signal
+    });
+  } catch {
+    throw new Error("Network failure or timeout");
+  } finally {
+    clearTimeout(timeoutId);
+  }
+  if (!response.ok) {
+    throw new Error(String(response.status));
+  }
 };
 
 export const sendHODApprovalRequestEmail = async (
@@ -282,29 +309,31 @@ E-Logbook Support Team`;
      <p style="margin:16px 0 0; font-size:15px; line-height:1.7; color:#475569;">Please log in and go to the "Student Access" tab in your portal to approve or deny the request.</p>`
   );
 
-  await sendEmail(hodEmail, "Action Required: Pending Student Approval", textTemplate, htmlTemplate);
-};
-
-export const sendHODAppointmentEmail = async (email: string, fullName: string, departmentName: string) => {
-  const appUrl = process.env.APP_URL || "https://elogbookgothos.in";
-  const html = { fullName: escapeHtml(fullName), departmentName: escapeHtml(departmentName), appUrl: escapeHtml(appUrl) };
-  const text = `Dear ${fullName},\n\nYour E-LogBook account has been assigned the Head of Department (HOD) role for ${departmentName}.\n\nPlease sign in with your existing account at ${appUrl}. You do not need a new password. Open your HOD portal to review department activity and pending student requests.\n\nIf you were not expecting this change, contact the E-LogBook Support Team.\n\nBest regards,\nE-LogBook Support Team`;
-  const htmlBody = wrapEmail("You Have Been Appointed HOD in E-LogBook",
-    `<p style="margin:0;font-size:22px;font-weight:bold;color:#0f172a;">Your account is now an HOD account</p>
-     <p style="margin:16px 0 0;font-size:15px;line-height:1.7;color:#475569;">Dear ${html.fullName}, your E-LogBook account has been assigned the Head of Department (HOD) role for ${html.departmentName}.</p>
-     <p style="margin:16px 0 0;font-size:15px;line-height:1.7;color:#475569;">Sign in with your existing account. You do not need a new password.</p>
-     <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:28px 0 12px;"><tr><td style="background-color:#0f766e;"><a href="${html.appUrl}" style="display:inline-block;padding:14px 28px;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold;color:#fff;text-decoration:none;">Open E-LogBook</a></td></tr></table>`);
-  await sendEmail(email, "You Have Been Appointed HOD in E-LogBook", text, htmlBody);
-};
-
-export const sendStudentApprovalEmail = async (email: string, fullName: string, departmentName: string) => {
-  const appUrl = process.env.APP_URL || "https://elogbookgothos.in";
-  const html = { fullName: escapeHtml(fullName), departmentName: escapeHtml(departmentName), appUrl: escapeHtml(appUrl) };
-  const text = `Dear ${fullName},\n\nYour E-LogBook account for ${departmentName} has been approved by your Head of Department.\n\nYou can now sign in at ${appUrl} with your existing account credentials.\n\nIf you have trouble signing in, contact the E-LogBook Support Team.\n\nBest regards,\nE-LogBook Support Team`;
-  const htmlBody = wrapEmail("Your E-LogBook Account Has Been Approved",
-    `<p style="margin:0;font-size:22px;font-weight:bold;color:#0f172a;">Your account has been approved</p>
-     <p style="margin:16px 0 0;font-size:15px;line-height:1.7;color:#475569;">Dear ${html.fullName}, your E-LogBook account for ${html.departmentName} has been approved by your Head of Department.</p>
-     <p style="margin:16px 0 0;font-size:15px;line-height:1.7;color:#475569;">You can now sign in with your existing account credentials.</p>
-     <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:28px 0 12px;"><tr><td style="background-color:#0f766e;"><a href="${html.appUrl}" style="display:inline-block;padding:14px 28px;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold;color:#fff;text-decoration:none;">Log in to E-LogBook</a></td></tr></table>`);
-  await sendEmail(email, "Your E-LogBook Account Has Been Approved", text, htmlBody);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
+  let response;
+  try {
+    response = await globalThis.fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${process.env.RESEND_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        from: `"E-LogBook" <${process.env.EMAIL_FROM}>`,
+        to: hodEmail,
+        subject: "Action Required: Pending Student Approval",
+        text: textTemplate,
+        html: htmlTemplate,
+      }),
+      signal: controller.signal
+    });
+  } catch {
+    throw new Error("Network failure or timeout");
+  } finally {
+    clearTimeout(timeoutId);
+  }
+  if (!response.ok) {
+    throw new Error(String(response.status));
+  }
 };

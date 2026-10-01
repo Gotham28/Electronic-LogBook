@@ -1,11 +1,11 @@
 import { Router } from "express";
 import { db, usersTable, departmentsTable, studentsTable, departmentConfigsTable, departmentCatalogTable, procedureTypesTable, assignmentTypesTable, assignmentsTable, assignmentRecipientsTable, caseLogsTable, procedureLogsTable, academicLogsTable, leaveRecordsTable, postingsTable, researchTable, assessmentsTable, attendanceLogsTable, leaveApplicationsTable, thesisMilestonesTable, appraisalsTable, auditTable, clinicalWorkLogsTable, departmentPostingScheduleTable, conferencesTable, awardsTable, certificationsTable } from "@workspace/db";
-import { eq, and, sql, inArray, or, gt, isNull } from "drizzle-orm";
+import { eq, and, sql, inArray, or } from "drizzle-orm";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { requireAuth, requireRole } from "../middlewares/auth.js";
 import { emailSchema, nameSchema, passwordSchema, idSchema, validate } from "../lib/validation.js";
-import { getEmailFailure, sendAccountCreatedEmail, sendHODAppointmentEmail } from "../lib/mailer.js";
+import { sendAccountCreatedEmail } from "../lib/mailer.js";
 import { provisionDepartment, provisionMirrorForRealDepartment } from "../lib/department-provisioning.js";
 import jwt from "jsonwebtoken";
 import { JWT_SECRET } from "../lib/env.js";
@@ -254,20 +254,8 @@ router.post("/departments/:id/replace-hod", validate(replaceHodBody), async (req
       return;
     }
 
-    let emailAccepted = false;
-    try {
-      const [incomingHod] = await db.select({ email: usersTable.email, fullName: usersTable.fullName, departmentName: departmentsTable.name })
-        .from(usersTable).innerJoin(departmentsTable, eq(departmentsTable.id, usersTable.departmentId))
-        .where(and(eq(usersTable.id, result.promotedId), eq(usersTable.role, "hod"), eq(usersTable.departmentId, departmentId))).limit(1);
-      if (!incomingHod) throw new Error("Promoted HOD details unavailable");
-      await sendHODAppointmentEmail(incomingHod.email, incomingHod.fullName, incomingHod.departmentName);
-      emailAccepted = true;
-    } catch {
-      req.log.error({ userId: result.promotedId, departmentId, status: 200 }, "HOD appointment email failed");
-    }
-
     req.log.info({ departmentId, demotedId: result.demotedId, promotedId: result.promotedId, status: 200 }, "HOD replaced");
-    return res.json({ message: "HOD replaced successfully", demotedId: result.demotedId, promotedId: result.promotedId, emailAccepted });
+    res.json({ message: "HOD replaced successfully", demotedId: result.demotedId, promotedId: result.promotedId });
   } catch (error) {
     req.log.error({ departmentId, userId: req.user!.id, status: 500 }, "Error replacing HOD");
     return res.status(500).json({ message: "Internal server error" });
@@ -542,19 +530,15 @@ router.post("/departments/:id/faculty", validate(createFacultyBody), async (req,
       role: "professor", status: "approved", departmentId: dept.id,
     }).returning({ id: usersTable.id });
 
-    let emailAccepted = false;
-    let emailFailure: ReturnType<typeof getEmailFailure> | undefined;
     try {
       await sendAccountCreatedEmail(email, fullName, password, "professor", dept.name);
-      emailAccepted = true;
-    } catch (error) {
+    } catch {
       // Account created successfully; email failure is non-fatal.
-      emailFailure = getEmailFailure(error);
-      req.log.error({ userId: created.id, status: 201, ...emailFailure }, "Faculty welcome email failed");
+      req.log.error({ userId: created.id, status: 200 }, "Faculty welcome email failed");
     }
 
     req.log.info({ createdId: created.id, departmentId, status: 201 }, "Faculty created by admin");
-    res.status(201).json({ message: "Faculty account created", faculty: { id: created.id, fullName, email, departmentId }, emailAccepted, ...(emailFailure ? { emailFailure } : {}) });
+    res.status(201).json({ message: "Faculty account created", faculty: { id: created.id, fullName, email, departmentId } });
   } catch (error) {
     req.log.error({ departmentId, userId: req.user!.id, status: 500 }, "Error creating faculty");
     return res.status(500).json({ message: "Internal server error" });
@@ -812,20 +796,22 @@ const announcementSchema = z.object({
 // GET /api/superadmin/announcements
 router.get("/announcements", async (req, res) => {
   try {
-    const now = new Date();
     const announcements = await db.select()
       .from(maintenanceAnnouncementsTable)
-      .where(and(gt(maintenanceAnnouncementsTable.endAt, now), isNull(maintenanceAnnouncementsTable.cancelledAt)))
       .orderBy(sql`${maintenanceAnnouncementsTable.startAt} DESC`);
       
     const mapped = announcements.map((a: any) => {
-      const status = a.startAt <= now ? "active" : "scheduled";
+      let status = "scheduled";
+      const now = new Date();
+      if (a.cancelledAt) status = "cancelled";
+      else if (a.startAt <= now && a.endAt > now) status = "active";
+      else if (a.endAt <= now) status = "completed";
       
       const notice = buildMaintenanceNotice(a.startAt, a.endAt, status === "active" ? "active" : "scheduled");
       return { ...a, title: notice.heading, description: notice.message, expectedImpact: null, status };
     });
     
-    return res.json(mapped);
+    res.json(mapped);
   } catch (error) {
     return res.status(500).json({ message: "Failed to fetch announcements" });
   }

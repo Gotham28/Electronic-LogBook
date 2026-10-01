@@ -66,20 +66,18 @@ export async function provisionDepartment(input: unknown, initialPassword: unkno
 
   try {
     await provisionMirrorForRealDepartment(result.departmentId, setup.name, setup.description);
-  } catch {
+  } catch (error) {
     console.warn(`Failed to provision mirror test department for ${setup.code}`);
   }
 
-  let emailAccepted = false;
   try {
     await sendAccountCreatedEmail(setup.hod.email, setup.hod.fullName, password as string, "hod", setup.name);
-    emailAccepted = true;
-  } catch {
+  } catch (error) {
     // The department id only; never the HOD's email address or name in a log.
     console.warn(`HOD account created but the welcome email failed to send (department ${result.departmentId})`);
   }
 
-  return { ...result, emailAccepted };
+  return result;
 }
 
 export async function provisionMirrorForRealDepartment(

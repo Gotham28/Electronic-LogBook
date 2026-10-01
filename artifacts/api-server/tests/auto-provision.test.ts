@@ -1,6 +1,6 @@
 import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { setup, mail, simulateFailure, sentEmails } from "./support.js";
+import { setup, mail, simulateFailure } from "./support.js";
 import { db, departmentsTable, usersTable, departmentConfigsTable, procedureTypesTable, studentsTable } from "./database.js";
 import { provisionDepartment } from "../src/lib/department-provisioning.js";
 import { eq, and } from "drizzle-orm";
@@ -29,13 +29,8 @@ describe("Auto-provision Mirror Department", () => {
       procedures: [{ name: "Proc A", group: "Group A", required: 10 }]
     };
 
-    const emailStart = sentEmails.length;
     const result = await provisionDepartment(input, "SecurePass123!");
     const realDeptId = result.departmentId;
-    assert.equal(result.emailAccepted, true);
-    const welcome = sentEmails.slice(emailStart).find((email) => email.to === input.hod.email);
-    assert.equal(welcome?.subject, "Your E-LogBook Account Has Been Created");
-    assert.match(welcome?.text ?? "", /Role:\s+HOD, New Real Dept/);
 
     // 0. Totals are summed from the targets given, not left empty
     const [config] = await db.select().from(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, realDeptId));
@@ -126,7 +121,6 @@ describe("Auto-provision Mirror Department", () => {
     try {
       const result = await provisionDepartment({ name: "Mail Fail Dept", code: "MAILFAIL1",
         hod: { fullName: "Mail Fail HOD", email: "mail-fail-hod@example.com" } }, "SecurePass123!");
-      assert.equal(result.emailAccepted, false);
       const line = warnings.find((w) => w.includes("welcome email"));
       assert.ok(line, "the failure is still logged");
       assert.ok(!line!.includes("mail-fail-hod@example.com"), "the email address is not in the log");

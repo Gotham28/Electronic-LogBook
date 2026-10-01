@@ -1,6 +1,6 @@
 import { before, after, test } from "node:test";
 import assert from "node:assert/strict";
-import { setup, request, accounts as a, departmentIds, mail, password, simulateFailure, sentEmails } from "./support.js";
+import { setup, request, accounts as a, departmentIds, mail, password, simulateFailure } from "./support.js";
 import { engine, db, usersTable, studentsTable, assignmentsTable, assignmentRecipientsTable, auditTable, subscriptionPlansTable, paymentsTable } from "./database.js";
 import { eq, and } from "drizzle-orm";
 import jwt from "jsonwebtoken";
@@ -73,23 +73,12 @@ test("session authority comes from current database state, not role or departmen
 
 test("HOD-created faculty are bound to their HOD's department; client role or department overrides are rejected", async () => {
   const body = { fullName: "Additional faculty", email: "additional@example.test", password };
-  const emailStart = sentEmails.length;
   assert.equal((await call("/admin/professors", "hod1", "POST", { ...body, departmentId: departmentIds[0] })).status, 400);
   assert.equal((await call("/admin/professors", "student1", "POST", body)).status, 403);
   const created = await call("/admin/professors", "hod1", "POST", body);
   assert.equal(created.status, 201);
   assert.equal(created.body.professor.departmentId, departmentIds[1]);
-  assert.equal(created.body.emailAccepted, true);
-  assert.equal(sentEmails.slice(emailStart).find((email) => email.to === body.email)?.subject, "Your E-LogBook Account Has Been Created");
   assert.ok(!JSON.stringify(created.body).includes("passwordHash"));
-  simulateFailure.enabled = true;
-  try {
-    const failedEmail = await call("/admin/professors", "hod1", "POST", { ...body, email: "additional-failed@example.test" });
-    assert.equal(failedEmail.status, 201);
-    assert.equal(failedEmail.body.emailAccepted, false);
-  } finally {
-    simulateFailure.enabled = false;
-  }
 });
 
 test("HOD-created students are bound to their HOD's department and require no payment; duplicate emails are rejected", async () => {
@@ -244,8 +233,6 @@ test("student self-registration needs possession of a verified single-use proof 
   assert.equal((await call("/auth/register", undefined, "POST", { ...registration, role: "hod" })).status, 400);
   assert.equal((await call("/auth/register", undefined, "POST", { ...registration, departmentId: 999999 })).status, 400);
   assert.equal((await call("/auth/register", undefined, "POST", registration)).status, 201);
-  assert.equal(sentEmails.filter((email) => email.subject === "Action Required: Pending Student Approval").length, 0,
-    "registration alone must not alert the HOD before the student can be approved");
   assert.equal((await call("/auth/register", undefined, "POST", registration)).status, 400);
   const unpaidLogin = await call("/auth/login", undefined, "POST", { username: email, password });
   assert.equal(unpaidLogin.status, 402);
@@ -262,41 +249,14 @@ test("student self-registration needs possession of a verified single-use proof 
   assert.equal((await call("/admin/students/" + nonexistentId + "/approve", "hod1", "POST")).status, 403);
   assert.equal((await call("/admin/students/" + pending.id + "/approve", "hod1", "POST")).status, 402);
   assert.equal((await db.select().from(usersTable).where(eq(usersTable.id, pending.id)))[0].status, "pending");
-  const approvalEmailStart = sentEmails.length;
   const [plan] = await db.insert(subscriptionPlansTable).values({ code: "TEST-PLAN-" + pending.id, name: "Test plan", amountPaise: 140000, durationMonths: 12 }).returning();
   await db.insert(paymentsTable).values({ userId: pending.id, planId: plan.id, razorpayOrderId: "test-order-" + pending.id, amountPaise: 140000, currency: "INR", status: "paid" });
-  const approved = await call("/admin/students/" + pending.id + "/approve", "hod1", "POST");
-  assert.equal(approved.status, 200);
-  assert.equal(approved.body.emailAccepted, true);
-  const approvalEmails = sentEmails.slice(approvalEmailStart).filter((email) => email.subject === "Your E-LogBook Account Has Been Approved");
-  assert.equal(approvalEmails.length, 1);
-  assert.equal(approvalEmails[0].to, email);
-  assert.match(approvalEmails[0].text, /has been approved by your Head of Department/);
-  assert.equal((await call("/admin/students/" + pending.id + "/approve", "hod1", "POST")).status, 403);
-  assert.equal(sentEmails.slice(approvalEmailStart).filter((email) => email.subject === "Your E-LogBook Account Has Been Approved").length, 1);
+  assert.equal((await call("/admin/students/" + pending.id + "/approve", "hod1", "POST")).status, 200);
   const login = await call("/auth/login", undefined, "POST", { username: email, password });
   assert.equal(login.status, 200);
   assert.equal(login.body.role, "student");
   assert.equal(login.body.departmentName, "Dermatology");
   assert.ok(login.body.studentProfileId);
-});
-
-test("student approval email failure is reported while the approved status remains saved", async () => {
-  const pending = a.pending2;
-  const [plan] = await db.insert(subscriptionPlansTable).values({
-    code: "TEST-EMAIL-FAIL-" + pending.id, name: "Test email failure", amountPaise: 140000, durationMonths: 12,
-  }).returning();
-  await db.insert(paymentsTable).values({ userId: pending.id, planId: plan.id, razorpayOrderId: "email-fail-order-" + pending.id,
-    amountPaise: 140000, currency: "INR", status: "paid" });
-  simulateFailure.enabled = true;
-  try {
-    const response = await call("/admin/students/" + pending.id + "/approve", "hod2", "POST");
-    assert.equal(response.status, 200);
-    assert.equal(response.body.emailAccepted, false);
-    assert.equal((await db.select().from(usersTable).where(eq(usersTable.id, pending.id)))[0].status, "approved");
-  } finally {
-    simulateFailure.enabled = false;
-  }
 });
 
 test("OTP attempts are bounded and password-reset proofs cannot be forged or replayed", async () => {
