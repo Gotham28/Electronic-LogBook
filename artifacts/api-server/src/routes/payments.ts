@@ -4,6 +4,7 @@ import { z } from "zod";
 import { db, paymentsTable, subscriptionPlansTable, usersTable } from "@workspace/db";
 import { eq, and, isNull, desc, gt, sql } from "drizzle-orm";
 import { requirePaymentToken } from "../middlewares/payment-token.js";
+import { notifyCurrentHodOfPaidStudent } from "../lib/student-notifications.js";
 import { validate } from "../lib/validation.js";
 import { logger } from "../lib/logger.js";
 
@@ -199,7 +200,15 @@ router.post("/verify", validate(verifyBody), async (req, res) => {
     return;
   }
 
-  res.json({ status: "paid" });
+  let hodEmailAccepted = false;
+  try {
+    await notifyCurrentHodOfPaidStudent(payment.userId);
+    hodEmailAccepted = true;
+  } catch {
+    req.log.error({ userId: payment.userId, status: 200 }, "HOD student approval request email failed after payment");
+  }
+
+  res.json({ status: "paid", hodEmailAccepted });
 });
 
 export default router;

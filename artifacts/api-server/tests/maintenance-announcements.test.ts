@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import jwt from "jsonwebtoken";
 import { setup, request, accounts as a, mail } from "./support.js";
 import { db, engine, usersTable } from "./database.js";
+import { maintenanceAnnouncementsTable } from "@workspace/db";
 import { istDateTimeInputToIso, isoToIstDateTimeInput } from "../../mockup-sandbox/src/lib/maintenanceTime.js";
 
 let runtime: Awaited<ReturnType<typeof setup>>;
@@ -62,6 +63,23 @@ test("maintenance schedule uses fixed copy, IST-safe dates and audience, without
   assert.doesNotMatch(created.body.description, /Untrusted/);
   assert.equal(created.body.emailDelivery, undefined);
   assert.equal(mail.size, 0);
+
+  const now = new Date();
+  const historicalStart = new Date(now.getTime() - 2 * 60_000);
+  const historicalEnd = new Date(now.getTime() - 60_000);
+  const activeStart = new Date(now.getTime() - 60_000);
+  const activeEnd = new Date(now.getTime() + 60_000);
+  const cancelledStart = new Date(now.getTime() + 2 * 60_000);
+  const cancelledEnd = new Date(now.getTime() + 3 * 60_000);
+  const seeded = await db.insert(maintenanceAnnouncementsTable).values([
+    { title: "Historical", description: "Historical", startAt: historicalStart, endAt: historicalEnd, audienceRoles: ["student"], createdBy: admin.id },
+    { title: "Active", description: "Active", startAt: activeStart, endAt: activeEnd, audienceRoles: ["student"], createdBy: admin.id },
+    { title: "Cancelled", description: "Cancelled", startAt: cancelledStart, endAt: cancelledEnd, cancelledAt: now, audienceRoles: ["student"], createdBy: admin.id },
+  ]).returning({ id: maintenanceAnnouncementsTable.id, title: maintenanceAnnouncementsTable.title });
+  const adminList = await request(runtime.base, "/superadmin/announcements", admin);
+  assert.equal(adminList.status, 200);
+  assert.deepEqual(new Set(adminList.body.map((item: any) => item.id)), new Set([created.body.id, seeded[1].id]));
+  assert.deepEqual(adminList.body.map((item: any) => item.status).sort(), ["active", "scheduled"]);
 
   const readBefore = mail.size;
   const current = await request(runtime.base, "/announcements/current", a.student0);
