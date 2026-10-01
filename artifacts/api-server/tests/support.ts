@@ -11,6 +11,7 @@ process.env.NODE_ENV = "test";
 process.env.LOG_LEVEL = "error";
 process.env.ALLOWED_ORIGINS = "http://localhost:5173";
 export const mail = new Map<string, string>();
+export const sentEmails: Array<{ to: string; subject: string; text: string; html: string }> = [];
 export const simulateFailure = { enabled: false };
 
 process.env.RESEND_API_KEY = "test-only-resend-key";
@@ -25,6 +26,7 @@ globalThis.fetch = async (url: string | URL | Request, options?: RequestInit) =>
       return { ok: false, status: 503 } as Response;
     }
     const body = JSON.parse(options?.body as string);
+    sentEmails.push(body);
     const match = body.text ? body.text.match(/\b\d{6}\b/) : null;
     mail.set(body.to, match ? match[0] : "SENT");
     return { ok: true, status: 200 } as Response;
