@@ -72,21 +72,37 @@ test("session authority comes from current database state, not role or departmen
 });
 
 test("HOD-created faculty are bound to their HOD's department; client role or department overrides are rejected", async () => {
-  const body = { fullName: "Additional faculty", email: "additional@example.test", password };
+  const body = { fullName: "Additional faculty", email: "additional@example.test" };
   const emailStart = sentEmails.length;
+  assert.equal((await call("/admin/professors", "hod1", "POST", { ...body, password })).status, 400,
+    "the HOD endpoint must reject client-supplied passwords");
   assert.equal((await call("/admin/professors", "hod1", "POST", { ...body, departmentId: departmentIds[0] })).status, 400);
   assert.equal((await call("/admin/professors", "student1", "POST", body)).status, 403);
   const created = await call("/admin/professors", "hod1", "POST", body);
   assert.equal(created.status, 201);
   assert.equal(created.body.professor.departmentId, departmentIds[1]);
   assert.equal(created.body.emailAccepted, true);
-  assert.equal(sentEmails.slice(emailStart).find((email) => email.to === body.email)?.subject, "Your E-LogBook Account Has Been Created");
-  assert.ok(!JSON.stringify(created.body).includes("passwordHash"));
+  const welcomeEmail = sentEmails.slice(emailStart).find((email) => email.to === body.email);
+  assert.equal(welcomeEmail?.subject, "Your E-LogBook Account Has Been Created");
+  const generatedPassword = welcomeEmail?.text.match(/^Password:\s*(\S+)$/m)?.[1];
+  assert.ok(generatedPassword, "the onboarding email must contain the generated password");
+  assert.match(generatedPassword!, /^[A-Za-z0-9_-]{32}$/, "the generated password must be random URL-safe text");
+  assert.ok(!JSON.stringify(created.body).includes(generatedPassword!), "the generated password must not be returned by the API");
+  const facultyLogin = await call("/auth/login", undefined, "POST", { username: body.email, password: generatedPassword });
+  assert.equal(facultyLogin.status, 200, "the emailed temporary password must authenticate");
+  assert.equal(facultyLogin.body.role, "professor");
+  const facultySession = { ...created.body.professor, role: "professor", token: facultyLogin.body.token };
+  const changedPassword = "Faculty-changed-pass-682!";
+  const changeResult = await request(runtime.base, "/auth/change-password", facultySession, "POST",
+    { currentPassword: generatedPassword, newPassword: changedPassword });
+  assert.equal(changeResult.status, 200, "faculty must be able to change the generated temporary password");
+  assert.equal((await call("/auth/login", undefined, "POST", { username: body.email, password: changedPassword })).status, 200);
   simulateFailure.enabled = true;
   try {
     const failedEmail = await call("/admin/professors", "hod1", "POST", { ...body, email: "additional-failed@example.test" });
     assert.equal(failedEmail.status, 201);
     assert.equal(failedEmail.body.emailAccepted, false);
+    assert.ok(!JSON.stringify(failedEmail.body).includes("password"), "failed-email response must not disclose the generated password");
   } finally {
     simulateFailure.enabled = false;
   }

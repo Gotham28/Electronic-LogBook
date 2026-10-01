@@ -1,8 +1,9 @@
 import { before, after, test } from "node:test";
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
+import jwt from "jsonwebtoken";
 import { setup, accounts as a, sentEmails } from "./support.js";
-import { engine, db, paymentsTable, subscriptionPlansTable } from "./database.js";
+import { engine, db, paymentsTable, subscriptionPlansTable, usersTable } from "./database.js";
 import { eq } from "drizzle-orm";
 
 // Fixture tests against PGlite (see support.ts / database.ts) - these prove the route's
@@ -10,6 +11,9 @@ import { eq } from "drizzle-orm";
 // behave correctly. They do NOT exercise the raw-body middleware wiring against real
 // Razorpay traffic (real HTTP framing, chunked bodies, etc.) - that needs a live test webhook.
 process.env.RAZORPAY_WEBHOOK_SECRET = "test-only-webhook-secret";
+const razorpayTestSecret = "test-only-razorpay-key-secret";
+process.env.RAZORPAY_KEY_ID = "test-only-razorpay-key-id";
+process.env.RAZORPAY_KEY_SECRET = razorpayTestSecret;
 
 let runtime: Awaited<ReturnType<typeof setup>>;
 let planId: number;
@@ -57,6 +61,44 @@ function failedBody(orderId: string, paymentId: string, amount: number) {
   return JSON.stringify({ event: "payment.failed", payload: { payment: { entity: { id: paymentId, order_id: orderId, amount } } } });
 }
 
+test("verified payment alerts the HOD but leaves approval pending until the HOD decides (no live charge)", async () => {
+  const orderId = "order_verify_without_charge";
+  const paymentId = "pay_test_only_verified";
+  const student = a.pending2;
+  await insertPayment(orderId, student.id);
+  const paymentToken = jwt.sign({ id: student.id, scope: "payment" }, process.env.JWT_SECRET!, { expiresIn: "10m" });
+  const signature = crypto.createHmac("sha256", razorpayTestSecret).update(`${orderId}|${paymentId}`).digest("hex");
+  const emailStart = sentEmails.length;
+
+  const verify = await fetch(runtime.base + "/api/payments/verify", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${paymentToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ razorpay_order_id: orderId, razorpay_payment_id: paymentId, razorpay_signature: signature }),
+  });
+  assert.equal(verify.status, 200);
+  assert.deepEqual(await verify.json(), { status: "paid", hodEmailAccepted: true });
+  assert.equal((await paymentRow(orderId))!.status, "paid");
+  assert.equal((await db.select({ status: usersTable.status }).from(usersTable).where(eq(usersTable.id, student.id)).limit(1))[0].status, "pending",
+    "payment confirmation must not approve the student's account");
+
+  const paymentEmails = sentEmails.slice(emailStart);
+  const hodNotice = paymentEmails.filter((email) => email.subject === "Action Required: Pending Student Approval");
+  assert.equal(hodNotice.length, 1);
+  assert.equal(hodNotice[0].to, a.hod2.email);
+  assert.equal(paymentEmails.filter((email) => email.subject === "Your E-LogBook Account Has Been Approved").length, 0,
+    "the student must not receive an approval email before HOD review");
+
+  const decision = await fetch(runtime.base + `/api/admin/students/${student.id}/approve`, {
+    method: "POST", headers: { Authorization: `Bearer ${a.hod2.token}`, "Content-Type": "application/json" }, body: "{}",
+  });
+  assert.equal(decision.status, 200);
+  assert.equal((await decision.json()).emailAccepted, true);
+  assert.equal((await db.select({ status: usersTable.status }).from(usersTable).where(eq(usersTable.id, student.id)).limit(1))[0].status, "approved");
+  const studentNotices = sentEmails.slice(emailStart).filter((email) => email.subject === "Your E-LogBook Account Has Been Approved");
+  assert.equal(studentNotices.length, 1);
+  assert.equal(studentNotices[0].to, student.email);
+});
+
 test("missing X-Razorpay-Signature header -> 400, payments row unchanged", async () => {
   await insertPayment("order_missing_sig", a.pending0.id);
   const body = capturedBody("order_missing_sig", "pay_1", 140000);
@@ -82,6 +124,8 @@ test("valid signature, payment.captured, known order at 'created' -> 200, row be
   const row = await paymentRow("order_captured");
   assert.equal(row!.status, "paid");
   assert.equal(row!.razorpayPaymentId, "pay_captured_1");
+  assert.equal((await db.select({ status: usersTable.status }).from(usersTable).where(eq(usersTable.id, a.pending0.id)).limit(1))[0].status, "pending",
+    "payment capture must leave the student's HOD approval status unchanged");
   const notices = sentEmails.slice(emailStart).filter((email) => email.subject === "Action Required: Pending Student Approval");
   assert.equal(notices.length, 1);
   assert.equal(notices[0].to, a.hod0.email);
