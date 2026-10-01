@@ -7,6 +7,9 @@ import { ArogyaCharacter, type ArogyaState } from "./ArogyaCharacter";
 import { apiPost } from "@/lib/apiClient";
 import { isDemoMode } from "@/lib/session";
 import { playDemoSound } from "@/lib/demoSounds";
+import { ARO_DEMO_COMMAND_EVENT, type AroDemoCommand } from "../demo-movie/movieBridge";
+import { DemoTypedText } from "../demo-movie/DemoTypedText";
+import { DEMO_MOVIE_CHANGED_EVENT, isDemoMovieActive } from "@/lib/demoSession";
 
 type RoleType = "Student" | "Faculty" | "HOD";
 
@@ -43,14 +46,24 @@ export function ArogyaPanel({ open, onOpenChange, role, notifItems, maintenanceN
     heading?: string;
   }[]>([]);
 
+  const handleRevealDone = React.useCallback(() => {
+    setCharacterState((current) => current === "talking" ? "idle" : current);
+  }, []);
+
   React.useEffect(() => {
     if (characterState !== "talking" || !isDemoMode()) return undefined;
     playDemoSound("pop");
-    const timer = window.setTimeout(() => {
-      setCharacterState((current) => current === "talking" ? "idle" : current);
-    }, 1200);
-    return () => window.clearTimeout(timer);
-  }, [characterState]);
+    
+    const isTypingResponse = messages.length > 0 && messages[messages.length - 1].role === "arogya" && (messages[messages.length - 1].text || messages[messages.length - 1].tips);
+    
+    if (!isTypingResponse) {
+      const timer = window.setTimeout(() => {
+        setCharacterState((current) => current === "talking" ? "idle" : current);
+      }, 1200);
+      return () => window.clearTimeout(timer);
+    }
+    return undefined;
+  }, [characterState, messages]);
 
   React.useEffect(() => {
     if (!open) return undefined;
@@ -89,15 +102,16 @@ export function ArogyaPanel({ open, onOpenChange, role, notifItems, maintenanceN
     if (isDemoMode()) setCharacterState("talking");
   };
 
-  const handleAsk = async (e: React.FormEvent) => {
+  const handleAsk = async (e: React.FormEvent | Event, overrideQuestion?: string) => {
     e.preventDefault();
-    if (!question.trim() || characterState === "thinking") return;
+    const q = overrideQuestion ?? question;
+    if (!q.trim() || characterState === "thinking") return;
     
-    setMessages((prev) => [...prev, { role: "user", text: question }]);
+    setMessages((prev) => [...prev, { role: "user", text: q }]);
     setCharacterState("thinking");
 
     try {
-      const data = await apiPost("/api/arogya/ask", { question });
+      const data = await apiPost("/api/arogya/ask", { question: q });
       if (typeof data.reply !== "string") throw new Error("Invalid shape");
       setCharacterState("talking");
       setMessages((prev) => [...prev, { role: "arogya", text: data.reply }]);
@@ -144,11 +158,121 @@ export function ArogyaPanel({ open, onOpenChange, role, notifItems, maintenanceN
     }
   };
 
+  const handleAskRef = React.useRef(handleAsk);
+  const handleProgressCoachRef = React.useRef(handleProgressCoach);
+  const handleDepartmentReportRef = React.useRef(handleDepartmentReport);
+  handleAskRef.current = handleAsk;
+  handleProgressCoachRef.current = handleProgressCoach;
+  handleDepartmentReportRef.current = handleDepartmentReport;
+
+  React.useEffect(() => {
+    if (!open || !isDemoMode() || !isDemoMovieActive()) return undefined;
+
+    let observer: ResizeObserver | null = null;
+    let pollInterval: number | undefined;
+    let attempts = 0;
+
+    const tryInitObserver = () => {
+      attempts++;
+      const messagesEl = document.querySelector('[data-tour="arogya-messages"]');
+      if (messagesEl) {
+        const scrollContainer = messagesEl.closest('.overflow-y-auto');
+        if (scrollContainer) {
+          if (pollInterval !== undefined) window.clearInterval(pollInterval);
+          observer = new ResizeObserver(() => {
+            scrollContainer.scrollTo({
+              top: scrollContainer.scrollHeight,
+              behavior: "auto"
+            });
+          });
+          observer.observe(messagesEl);
+          return;
+        }
+      }
+      if (attempts >= 30) {
+        if (pollInterval !== undefined) window.clearInterval(pollInterval);
+      }
+    };
+    
+    pollInterval = window.setInterval(tryInitObserver, 100);
+    return () => {
+      if (pollInterval !== undefined) window.clearInterval(pollInterval);
+      if (observer) observer.disconnect();
+    };
+  }, [open]);
+
+  React.useEffect(() => {
+    if (!isDemoMode()) return undefined;
+
+    let typingTimeout: number | undefined;
+    let isCleanedUp = false;
+    let isCommandRunning = false;
+
+    const cancelRun = () => {
+      if (typingTimeout !== undefined) window.clearTimeout(typingTimeout);
+      isCommandRunning = false;
+    };
+    const movieChangeHandler = () => {
+      if (!isDemoMovieActive()) cancelRun();
+    };
+    window.addEventListener(DEMO_MOVIE_CHANGED_EVENT, movieChangeHandler);
+
+    const handler = (e: Event) => {
+      const event = e as CustomEvent<AroDemoCommand>;
+      const command = event.detail;
+
+      if (isCommandRunning) return;
+      isCommandRunning = true;
+
+      if (command.type === "ask") {
+        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+          setQuestion(command.question);
+          typingTimeout = window.setTimeout(() => {
+            if (!isCleanedUp) handleAskRef.current(new Event("submit"), command.question);
+            isCommandRunning = false;
+          }, 0);
+        } else {
+          let i = 0;
+          setQuestion("");
+          const typeChar = () => {
+            if (isCleanedUp) return;
+            if (i < command.question.length) {
+              setQuestion(command.question.slice(0, i + 1));
+              i++;
+              typingTimeout = window.setTimeout(typeChar, 30);
+            } else {
+              handleAskRef.current(new Event("submit"), command.question);
+              isCommandRunning = false;
+            }
+          };
+          typeChar();
+        }
+      } else if (command.type === "progress-coach" && role === "Student") {
+        handleProgressCoachRef.current();
+        isCommandRunning = false;
+      } else if (command.type === "department-report" && role === "HOD") {
+        handleDepartmentReportRef.current(command.reportType);
+        isCommandRunning = false;
+      } else {
+        isCommandRunning = false;
+      }
+    };
+
+    window.addEventListener(ARO_DEMO_COMMAND_EVENT, handler);
+    return () => {
+      isCleanedUp = true;
+      cancelRun();
+      window.removeEventListener(ARO_DEMO_COMMAND_EVENT, handler);
+      window.removeEventListener(DEMO_MOVIE_CHANGED_EVENT, movieChangeHandler);
+    };
+  }, [role]);
+
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger asChild>
         <button
           type="button"
+          data-tour="arogya-launcher"
           aria-label={open ? "Close Arogya assistant" : "Open Arogya assistant"}
           className="print:hidden fixed bottom-[calc(76px+env(safe-area-inset-bottom))] right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full border border-teal-100 bg-white shadow-[0_12px_24px_rgba(15,23,42,0.12)] transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2 sm:bottom-6 sm:right-6"
         >
@@ -162,6 +286,7 @@ export function ArogyaPanel({ open, onOpenChange, role, notifItems, maintenanceN
         collisionPadding={12}
         aria-labelledby="arogya-panel-heading"
         aria-describedby="arogya-panel-description"
+        data-tour="arogya-panel"
         className="flex h-[min(68dvh,38rem)] min-h-[min(24rem,calc(100dvh-2rem))] w-[min(26rem,calc(100vw-1.5rem))] max-h-[calc(100dvh-1.5rem)] flex-col gap-0 overflow-hidden rounded-[1.5rem] border border-white/80 bg-white/85 p-0 text-slate-800 shadow-[0_28px_80px_rgba(15,23,42,0.2)] backdrop-blur-2xl motion-reduce:animate-none supports-[backdrop-filter]:bg-white/70"
       >
         <header className="flex shrink-0 items-center justify-between border-b border-white/80 bg-white/55 px-4 py-3 backdrop-blur-xl">
@@ -201,7 +326,7 @@ export function ArogyaPanel({ open, onOpenChange, role, notifItems, maintenanceN
             <div className="flex flex-wrap gap-2">
               {role === "Student" && (
                 <>
-                  <Button type="button" variant="outline" size="sm" className="min-h-11 rounded-full border-teal-200/90 bg-white/80 px-3 text-xs text-teal-900 shadow-sm hover:bg-teal-50" onClick={handleProgressCoach}>
+                  <Button type="button" variant="outline" size="sm" data-tour="arogya-coach" className="min-h-11 rounded-full border-teal-200/90 bg-white/80 px-3 text-xs text-teal-900 shadow-sm hover:bg-teal-50" onClick={handleProgressCoach}>
                     My progress coach
                   </Button>
                   <Button type="button" variant="outline" size="sm" className="min-h-11 rounded-full border-teal-200/90 bg-white/80 px-3 text-xs text-teal-900 shadow-sm hover:bg-teal-50" onClick={handleWhatsDue}>
@@ -216,7 +341,7 @@ export function ArogyaPanel({ open, onOpenChange, role, notifItems, maintenanceN
               )}
               {role === "HOD" && (
                 <>
-                  <Button type="button" variant="outline" size="sm" className="min-h-11 rounded-full border-teal-200/90 bg-white/80 px-3 text-xs text-teal-900 shadow-sm hover:bg-teal-50" onClick={() => handleDepartmentReport("report")}>
+                  <Button type="button" variant="outline" size="sm" data-tour="arogya-report" className="min-h-11 rounded-full border-teal-200/90 bg-white/80 px-3 text-xs text-teal-900 shadow-sm hover:bg-teal-50" onClick={() => handleDepartmentReport("report")}>
                     Department report
                   </Button>
                   <Button type="button" variant="outline" size="sm" className="min-h-11 rounded-full border-teal-200/90 bg-white/80 px-3 text-xs text-teal-900 shadow-sm hover:bg-teal-50" onClick={() => handleDepartmentReport("falling_behind")}>
@@ -227,7 +352,7 @@ export function ArogyaPanel({ open, onOpenChange, role, notifItems, maintenanceN
             </div>
           </section>
 
-          <div role="log" aria-label="Arogya conversation" aria-live="polite" className="flex min-h-0 flex-1 flex-col gap-3">
+          <div role="log" aria-label="Arogya conversation" aria-live="polite" data-tour="arogya-messages" className="flex min-h-0 flex-1 flex-col gap-3">
             {messages.length === 0 ? (
               <div className="my-auto flex min-h-32 flex-col items-center justify-center rounded-2xl border border-white/80 bg-white/55 px-5 py-5 text-center shadow-sm">
                 <ArogyaCharacter state={characterState} size={54} />
@@ -262,11 +387,27 @@ export function ArogyaPanel({ open, onOpenChange, role, notifItems, maintenanceN
                       )}
                     </div>
                   ) : msg.tips ? (
-                    <ol className="list-decimal space-y-2 pl-4">
-                      {msg.tips.map((tip, i) => <li key={i}>{tip}</li>)}
-                    </ol>
+                    <>
+                      <ol className="list-decimal space-y-2 pl-4">
+                        {msg.tips.map((tip, i) => (
+                          <li key={i}>
+                            {isDemoMode() ? (
+                              <DemoTypedText text={tip} onDone={i === msg.tips!.length - 1 && idx === messages.length - 1 ? handleRevealDone : undefined} />
+                            ) : tip}
+                          </li>
+                        ))}
+                      </ol>
+                      {isDemoMode() && <p className="mt-2 text-[10px] text-slate-400 font-medium">Sample AI output</p>}
+                    </>
                   ) : (
-                    <p className={`whitespace-pre-wrap font-medium ${msg.error ? "text-red-700" : "text-slate-800"}`}>{msg.text}</p>
+                    <>
+                      <p className={`whitespace-pre-wrap font-medium ${msg.error ? "text-red-700" : "text-slate-800"}`}>
+                        {isDemoMode() && !msg.error && msg.role === "arogya" && msg.text ? (
+                          <DemoTypedText text={msg.text} onDone={idx === messages.length - 1 ? handleRevealDone : undefined} />
+                        ) : msg.text}
+                      </p>
+                      {isDemoMode() && !msg.error && msg.role === "arogya" && <p className="mt-2 text-[10px] text-slate-400 font-medium">Sample AI output</p>}
+                    </>
                   )}
                 </div>
               </div>
@@ -280,6 +421,7 @@ export function ArogyaPanel({ open, onOpenChange, role, notifItems, maintenanceN
             <div className="relative">
               <Input
                 id="arogya-ask-input"
+                data-tour="arogya-input"
                 value={question}
                 onChange={(e) => setQuestion(e.target.value)}
                 disabled={characterState === "thinking"}

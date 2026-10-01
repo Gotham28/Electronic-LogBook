@@ -1,5 +1,8 @@
 import { demoData, getDemoResident } from './demoDepartments';
 import { playDemoSound } from './demoSounds';
+import { isDemoMovieActive } from './demoSession';
+
+export const DEMO_MOVIE_ASK_QUESTION = "How am I doing on my procedure and case targets?";
 
 function requestedStudentId(path: string): number | undefined {
   const match = path.match(/\/api\/students\/(\d+)/);
@@ -156,11 +159,107 @@ export async function handleDemoRequest(method: string, path: string, body?: any
       reason: leave.reason, status: leave.status, totalDays: leave.totalDays,
     }));
     
+    if (path.match(/^\/api\/appraisals\/students$/)) {
+      return demoData.students
+        .filter((student: any) => !student.status || student.status === "approved")
+        .map((student: any) => ({
+          id: student.id,
+          name: student.fullName ?? student.name,
+          registrationNumber: student.registrationNumber,
+          batch: student.batch ?? "",
+        }));
+    }
+    
+    if (path.match(/^\/api\/appraisals\/students\/\d+$/)) {
+      return [];
+    }
+    
     return []; // Safe fallback
   }
 
   // Mutations (optimistic in-memory updates so UI feels responsive)
   if (method === "POST" || method === "PATCH") {
+    if (path.includes("/api/arogya/ask") && body) {
+      const q = (body.question || "").toLowerCase();
+      if (q.includes("procedure") || q.includes("case") || q.includes("progress") || q.includes("target")) {
+        const student = demoData.students[0];
+        const cases = student.targets.cases;
+        const procs = student.targets.procedures;
+        let reply = "";
+        if (typeof student.overallCompletion === "number") {
+          reply += `You have completed ${student.overallCompletion}% of your overall training targets. `;
+        }
+        if (cases != null) reply += `For clinical cases, you have verified ${student.verified.cases} out of ${cases}. `;
+        if (procs != null) reply += `For procedures, you have verified ${student.verified.procedures} out of ${procs}. `;
+        reply += "Keep up the good work!";
+        return { reply: reply.trim() };
+      }
+      return { reply: "I can answer questions based on the sample data in this demo. Try asking me about your procedure or case progress!" };
+    }
+
+    if (path.includes("/api/arogya/progress-coach")) {
+      const student = demoData.students[0];
+      const tips: string[] = [];
+      if (typeof student.overallCompletion === "number") {
+        tips.push(`You are at ${student.overallCompletion}% overall completion for your logbook targets.`);
+      }
+      if (student.targets.cases != null) {
+        tips.push(`You have verified ${student.verified.cases} of your ${student.targets.cases} required clinical cases.`);
+      }
+      if (student.targets.procedures != null) {
+        tips.push(`You have ${student.verified.procedures} verified procedures out of your target of ${student.targets.procedures}.`);
+      }
+      
+      const resident = getDemoResident(student.id);
+      const pendingCount = 
+        resident.logs.cases.filter((l: any) => l.status === "pending").length +
+        resident.logs.procedures.filter((l: any) => l.status === "pending").length +
+        resident.logs.academics.filter((l: any) => l.status === "pending").length +
+        resident.logs.clinicalWorks.filter((l: any) => l.status === "pending").length;
+        
+      if (pendingCount > 0) {
+        tips.push(`Focus on getting your ${pendingCount} pending log${pendingCount === 1 ? "" : "s"} verified by your supervisor.`);
+      }
+      
+      return { tips };
+    }
+
+    if (path.includes("/api/arogya/department-report") && body) {
+      const stats = demoData.hodAnalytics;
+      if (body.type === "falling_behind") {
+        const atRiskCount = demoData.students.filter((s: any) => s.shortfallStatus === "at_risk" || s.shortfallStatus === "behind").length;
+        if (atRiskCount === 0) {
+          return { reply: "No residents are currently flagged as behind their targets in the sample data." };
+        }
+        return { reply: `There ${atRiskCount === 1 ? "is" : "are"} currently ${atRiskCount} student${atRiskCount === 1 ? "" : "s"} at risk of falling behind their required logging targets.` };
+      }
+      return { reply: `The department currently has ${stats.totalStudents} active residents. Across the department, there are ${stats.logStats.verified} verified logs and ${stats.logStats.pending} logs pending review. Average completion against targets is ${stats.avgCompletion}%.` };
+    }
+
+    const appraisalMatch = path.match(/\/api\/arogya\/appraisal-draft\/(\d+)/);
+    if (appraisalMatch) {
+      const studentId = Number(appraisalMatch[1]);
+      const student = demoData.students.find((s: any) => s.id === studentId) || demoData.students[0];
+      
+      let remarks = "";
+      if (typeof student.overallCompletion === "number") {
+        remarks += `The resident has completed ${student.overallCompletion}% of their overall targets. `;
+      }
+      const verifiedList = [];
+      if (student.targets.cases != null) verifiedList.push(`${student.verified.cases} verified cases`);
+      if (student.targets.procedures != null) verifiedList.push(`${student.verified.procedures} verified procedures`);
+      if (verifiedList.length > 0) {
+        remarks += `They have ${verifiedList.join(" and ")}.`
+      }
+      
+      return {
+        facultyRemarks: remarks.trim() || "The resident is progressing through their clinical training.",
+        remediationSuggestions: student.shortfallStatus === "behind" || student.shortfallStatus === "at_risk" 
+          ? "The resident should focus on logging more clinical cases and procedures to meet the required targets." 
+          : "No specific remediation required at this time. The resident is on track."
+      };
+    }
+
     const reviewMatch = path.match(/\/api\/logs\/(case|procedure|academic|clinical_work|clinical-work)\/(\d+)\/review$/);
     if (method === "PATCH" && reviewMatch && body) {
       const logKey = reviewMatch[1] === "case" ? "cases"
@@ -171,9 +270,11 @@ export async function handleDemoRequest(method: string, path: string, body?: any
         .map((student: any) => getDemoResident(student.id).logs[logKey].find((entry: any) => entry.id === dbId))
         .find(Boolean);
       if (item) {
-        item.status = body.status === "rejected" ? "rejected" : "verified";
-        item.reviewComments = body.comments || "";
-        if (item.status === "verified") playDemoSound("success");
+        if (!isDemoMovieActive()) {
+          item.status = body.status === "rejected" ? "rejected" : "verified";
+          item.reviewComments = body.comments || "";
+        }
+        if (body.status !== "rejected") playDemoSound("success");
       }
       return { success: true, id: dbId };
     }

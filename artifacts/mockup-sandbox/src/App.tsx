@@ -25,6 +25,7 @@ import { PrivacyPolicyPage } from "@/components/pages/PrivacyPolicyPage";
 import { GrievanceOfficerPage } from "@/components/pages/GrievanceOfficerPage";
 import { DataRightsPage } from "@/components/pages/DataRightsPage";
 import { getCurrentUser, clearSession, getToken, saveToken, SESSION_EXPIRED_EVENT } from "@/lib/session";
+import { DEMO_SESSION_CHANGED_EVENT } from "@/lib/demoSession";
 import { DEMO_DEPARTMENT_CHANGED_EVENT, getDemoDepartmentProfile } from "@/lib/demoDepartments";
 import { apiGet, apiPost } from "@/lib/apiClient";
 import { DepartmentProvider, useDepartment } from "@/lib/department-context";
@@ -206,7 +207,11 @@ function App() {
   useEffect(() => {
     const syncCurrentUser = () => setCurrentUser(getCurrentUser());
     window.addEventListener(DEMO_DEPARTMENT_CHANGED_EVENT, syncCurrentUser);
-    return () => window.removeEventListener(DEMO_DEPARTMENT_CHANGED_EVENT, syncCurrentUser);
+    window.addEventListener(DEMO_SESSION_CHANGED_EVENT, syncCurrentUser);
+    return () => {
+      window.removeEventListener(DEMO_DEPARTMENT_CHANGED_EVENT, syncCurrentUser);
+      window.removeEventListener(DEMO_SESSION_CHANGED_EVENT, syncCurrentUser);
+    };
   }, []);
 
   useEffect(() => {
