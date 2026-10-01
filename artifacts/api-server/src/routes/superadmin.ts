@@ -13,6 +13,7 @@ import { IMPERSONATION_TOKEN_LIFETIME } from "../lib/session-tokens.js";
 import { sessionProfile } from "./auth.js";
 import { hardDeleteUserCascade } from "../lib/hard-delete-user.js";
 import { buildMaintenanceNotice } from "../lib/maintenance-messages.js";
+import { notifyCurrentHodOfPendingStudent } from "../lib/student-notifications.js";
 
 const router = Router();
 
@@ -51,13 +52,21 @@ router.get("/departments", async (req, res) => {
 
     const mirrors = await db.select({
       id: departmentsTable.id,
+      name: departmentsTable.name,
       code: departmentsTable.code,
       configSourceDepartmentId: departmentsTable.configSourceDepartmentId,
     }).from(departmentsTable).where(eq(departmentsTable.isTest, true));
 
-    const mirrorByRealDeptId = new Map(mirrors.filter(m => m.configSourceDepartmentId !== null).map((m) => [m.configSourceDepartmentId!, { id: m.id, code: m.code }]));
+    const mirrorByRealDeptId = new Map(mirrors.filter(m => m.configSourceDepartmentId !== null).map((m) => [m.configSourceDepartmentId!, {
+      id: m.id, name: m.name, code: m.code, hod: hodByDept.get(m.id) || null,
+    }]));
 
-    res.json(departments.map((d) => ({ ...d, hod: hodByDept.get(d.id) || null, mirrorDepartmentId: mirrorByRealDeptId.get(d.id)?.id ?? null, mirrorCode: mirrorByRealDeptId.get(d.id)?.code ?? null })));
+    res.json(departments.map((d) => ({ ...d, hod: hodByDept.get(d.id) || null,
+      mirrorDepartmentId: mirrorByRealDeptId.get(d.id)?.id ?? null,
+      mirrorDepartmentName: mirrorByRealDeptId.get(d.id)?.name ?? null,
+      mirrorHod: mirrorByRealDeptId.get(d.id)?.hod ?? null,
+      mirrorCode: mirrorByRealDeptId.get(d.id)?.code ?? null,
+    })));
   } catch (error) {
     req.log.error({ userId: req.user!.id, status: 500 }, "Error listing departments");
     return res.status(500).json({ message: "Internal server error" });
@@ -577,6 +586,7 @@ const createStudentBody = z.object({
     return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
   }, "Invalid date"),
   kuhsId: nameSchema,
+  approvalMode: z.enum(["hod", "automatic"]).default("automatic"),
 }).strict();
 
 router.post("/departments/:id/students", validate(createStudentBody), async (req, res) => {
@@ -586,26 +596,53 @@ router.post("/departments/:id/students", validate(createStudentBody), async (req
       .where(eq(departmentsTable.id, departmentId)).limit(1);
     if (!dept) { res.status(404).json({ message: "Department not found" }); return; }
 
-    const { fullName, email, password, registrationNumber, batch, dateOfJoining, kuhsId } = req.body;
+    const { fullName, email, password, registrationNumber, batch, dateOfJoining, kuhsId, approvalMode } = req.body;
     const [existing] = await db.select({ id: usersTable.id }).from(usersTable)
       .where(eq(usersTable.email, email)).limit(1);
     if (existing) { res.status(400).json({ message: "Email already registered" }); return; }
 
     const passwordHash = await bcrypt.hash(password, 12);
     const created = await db.transaction(async (tx) => {
+      let activeHodId: number | null = null;
+      if (approvalMode === "hod") {
+        const [hod] = await tx.select({ id: usersTable.id }).from(usersTable)
+          .where(and(eq(usersTable.departmentId, dept.id), eq(usersTable.role, "hod"), eq(usersTable.status, "approved"))).limit(1);
+        activeHodId = hod?.id ?? null;
+      }
+      const status = approvalMode === "hod" && activeHodId !== null ? "pending" : "approved";
       const [user] = await tx.insert(usersTable).values({
         fullName, email, passwordHash,
-        role: "student", status: "approved", departmentId: dept.id,
+        role: "student", status, departmentId: dept.id,
       }).returning({ id: usersTable.id });
       await tx.insert(studentsTable).values({
         userId: user.id, registrationNumber, batch,
-        dateOfJoining, kuhsId, specialty: dept.name,
+        dateOfJoining, kuhsId, specialty: dept.name, adminProvisioned: true,
       });
-      return user;
+      return { ...user, status, activeHodId };
     });
 
+    let hodEmailAccepted: boolean | null = null;
+    if (created.status === "pending") {
+      try {
+        await notifyCurrentHodOfPendingStudent(created.id);
+        hodEmailAccepted = true;
+      } catch {
+        hodEmailAccepted = false;
+        req.log.error({ userId: created.id, departmentId, status: 201 }, "Student approval notification failed");
+      }
+    }
+
+    const fallback = approvalMode === "hod" && created.status === "approved" ? "no_active_hod" : null;
     req.log.info({ createdId: created.id, departmentId, status: 201 }, "Student created by admin");
-    res.status(201).json({ message: "Student account created and approved", student: { id: created.id, fullName, email, departmentId } });
+    res.status(201).json({
+      message: created.status === "pending" ? "Resident account created and is awaiting HOD approval"
+        : fallback ? "Resident account created and automatically approved because no active HOD is assigned"
+          : "Resident account created and approved",
+      student: { id: created.id, fullName, email, departmentId, status: created.status },
+      approvalMode,
+      approvalFallback: fallback,
+      hodEmailAccepted,
+    });
   } catch (error) {
     req.log.error({ departmentId, userId: req.user!.id, status: 500 }, "Error creating student");
     return res.status(500).json({ message: "Internal server error" });
@@ -636,9 +673,22 @@ router.post("/users/:id/deactivate", validate(z.object({}).strict()), async (req
       return;
     }
 
-    await db.update(usersTable)
+    const [deactivated] = await db.update(usersTable)
       .set({ status: "rejected", sessionVersion: sql`${usersTable.sessionVersion} + 1` })
-      .where(and(eq(usersTable.id, targetId), eq(usersTable.status, "approved")));
+      .where(and(eq(usersTable.id, targetId), inArray(usersTable.status, ["approved", "pending"])))
+      .returning({ id: usersTable.id });
+
+    if (!deactivated) {
+      const [current] = await db.select({ status: usersTable.status }).from(usersTable)
+        .where(eq(usersTable.id, targetId)).limit(1);
+      if (!current) { res.status(404).json({ message: "User not found" }); return; }
+      if (current.status === "rejected") {
+        res.json({ message: "Account is already deactivated; records retained" });
+        return;
+      }
+      res.status(409).json({ message: "Account status changed before deactivation could be completed" });
+      return;
+    }
 
     req.log.info({ targetId, status: 200 }, "Account deactivated by admin");
     res.json({ message: "Account deactivated; records retained" });

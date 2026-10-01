@@ -211,6 +211,12 @@ router.post("/login", validate(z.object({ username: z.string().trim().min(1).max
   }
   loginFailures.delete(accountKey);
   if (user.role === "student" && user.status === "pending") {
+    const [student] = await db.select({ adminProvisioned: studentsTable.adminProvisioned }).from(studentsTable)
+      .where(eq(studentsTable.userId, user.id)).limit(1);
+    if (student?.adminProvisioned) {
+      res.status(403).json({ message: "Your account is awaiting department HOD approval" });
+      return;
+    }
     const [paid] = await db.select({ id: paymentsTable.id }).from(paymentsTable)
       .where(and(eq(paymentsTable.userId, user.id), eq(paymentsTable.status, "paid"))).limit(1);
     if (!paid) {

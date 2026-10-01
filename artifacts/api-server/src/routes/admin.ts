@@ -77,8 +77,10 @@ router.post("/students/:id/approve", async (req, res) => {
     }
 
     const departmentId = req.user?.departmentId;
-    const [target] = await db.select({ id: usersTable.id, email: usersTable.email, fullName: usersTable.fullName, departmentId: usersTable.departmentId })
+    const [target] = await db.select({ id: usersTable.id, email: usersTable.email, fullName: usersTable.fullName,
+      departmentId: usersTable.departmentId, adminProvisioned: studentsTable.adminProvisioned })
       .from(usersTable)
+      .leftJoin(studentsTable, eq(studentsTable.userId, usersTable.id))
       .where(and(eq(usersTable.id, userId), eq(usersTable.role, "student"), eq(usersTable.status, "pending")))
       .limit(1);
     // Nonexistent id and wrong-department both return the same status and body (SEC-36):
@@ -91,11 +93,13 @@ router.post("/students/:id/approve", async (req, res) => {
     // target.id (and therefore userId, since the lookup above matched eq(usersTable.id, userId))
     // is a usersTable.id. paymentsTable.userId is also a usersTable.id (see lib/db/src/schema/payments.ts),
     // so no separate studentsTable lookup is needed to compare them.
-    const [paidPayment] = await db.select({ id: paymentsTable.id }).from(paymentsTable)
-      .where(and(eq(paymentsTable.userId, userId), eq(paymentsTable.status, "paid"))).limit(1);
-    if (!paidPayment) {
-      res.status(402).json({ message: "This student has not completed payment and cannot be approved yet" });
-      return;
+    if (!target.adminProvisioned) {
+      const [paidPayment] = await db.select({ id: paymentsTable.id }).from(paymentsTable)
+        .where(and(eq(paymentsTable.userId, userId), eq(paymentsTable.status, "paid"))).limit(1);
+      if (!paidPayment) {
+        res.status(402).json({ message: "This student has not completed payment and cannot be approved yet" });
+        return;
+      }
     }
 
     const [approved] = await db.update(usersTable)

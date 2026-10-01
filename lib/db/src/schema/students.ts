@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, timestamp, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { usersTable } from "./users.js";
 
@@ -11,6 +11,7 @@ export const studentsTable = pgTable("students", {
   kuhsId: text("kuhs_id").notNull().unique(),
   specialty: text("specialty").notNull(),
   mentorId: integer("mentor_id").references(() => usersTable.id),
+  adminProvisioned: boolean("admin_provisioned").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

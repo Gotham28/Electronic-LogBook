@@ -137,6 +137,8 @@ export type AdminDepartment = {
   residentCount?: number;
   pendingCount?: number;
   mirrorDepartmentId: number | null;
+  mirrorDepartmentName: string | null;
+  mirrorHod: { id: number; fullName: string; email: string } | null;
   mirrorCode: string | null;
 };
 
@@ -168,7 +170,13 @@ export function createAdminFaculty(departmentId: number, data: { fullName: strin
   return apiPost(`/api/superadmin/departments/${departmentId}/faculty`, data);
 }
 
-export function createAdminStudent(departmentId: number, data: { fullName: string; email: string; password: string; registrationNumber: string; batch: string; dateOfJoining: string; kuhsId: string }) {
+export function createAdminStudent(departmentId: number, data: { fullName: string; email: string; password: string; registrationNumber: string; batch: string; dateOfJoining: string; kuhsId: string; approvalMode: "hod" | "automatic" }): Promise<{
+  message: string;
+  student: { id: number; fullName: string; email: string; departmentId: number; status: "approved" | "pending" };
+  approvalMode: "hod" | "automatic";
+  approvalFallback: "no_active_hod" | null;
+  hodEmailAccepted: boolean | null;
+}> {
   return apiPost(`/api/superadmin/departments/${departmentId}/students`, data);
 }
 

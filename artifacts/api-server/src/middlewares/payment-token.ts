@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
-import { db, usersTable } from "@workspace/db";
+import { db, studentsTable, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
 import { JWT_SECRET } from "../lib/env.js";
@@ -32,10 +32,16 @@ export async function requirePaymentToken(req: Request, res: Response, next: Nex
       res.status(401).json({ message: "Invalid payment token" });
       return;
     }
-    const [account] = await db.select({ id: usersTable.id, status: usersTable.status })
-      .from(usersTable).where(eq(usersTable.id, decoded.id!)).limit(1);
+    const [account] = await db.select({ id: usersTable.id, status: usersTable.status,
+      adminProvisioned: studentsTable.adminProvisioned })
+      .from(usersTable).leftJoin(studentsTable, eq(studentsTable.userId, usersTable.id))
+      .where(eq(usersTable.id, decoded.id!)).limit(1);
     if (!account) {
       res.status(401).json({ message: "Invalid payment token" });
+      return;
+    }
+    if (account.adminProvisioned) {
+      res.status(403).json({ message: "This account does not use the payment flow" });
       return;
     }
     if (account.status !== "pending") {
