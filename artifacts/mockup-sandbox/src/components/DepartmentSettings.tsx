@@ -1,85 +1,29 @@
 import * as React from "react";
 import { toast } from "sonner";
 import { apiPost, apiPatch, apiGet, apiDelete } from "@/lib/apiClient";
-import { Trash2, AlertTriangle, ChevronDown, Search, SlidersHorizontal, ClipboardList, PlusCircle } from "lucide-react";
+import { Trash2, AlertTriangle, ChevronDown, Search } from "lucide-react";
 import { useDepartment } from "@/lib/department-context";
 import { Button } from "@/components/ui/button";
-
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
-// Option types that carry a required count (a minimum residents must log).
 const TARGET_KINDS = ["academic", "case_category", "conference_level", "clinical_work_category"];
-
-// Lists longer than this start collapsed and get a search box when expanded.
 const COLLAPSE_THRESHOLD = 5;
 
-function SearchableSection<T extends { id: number | string; name: string }>({
-  title, items, emptyText, renderItem, defaultOpen
-}: {
-  title: string;
-  items: T[];
-  emptyText: string;
-  renderItem: (item: T) => React.ReactNode;
-  defaultOpen?: boolean;
-}) {
-  const [open, setOpen] = React.useState(() => defaultOpen ?? items.length <= COLLAPSE_THRESHOLD);
-  const [query, setQuery] = React.useState("");
+function useSearch<T extends { name: string }>(items: T[], query: string): T[] {
   const q = query.trim().toLowerCase();
-  const visible = q ? items.filter((item) => item.name.toLowerCase().includes(q)) : items;
-  return (
-    <section className="rounded-2xl border border-slate-200/80 bg-white/80 p-2 shadow-sm shadow-slate-200/40">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
-        className="flex w-full items-center justify-between gap-2 rounded-xl px-3 py-3 text-left transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
-      >
-        <span className="flex items-center gap-2 font-semibold">
-          <span className="text-sm tracking-tight text-slate-800">{title}</span>
-          {items.length > 0 && (
-              <span className="rounded-full bg-teal-50 px-2 py-0.5 text-[11px] font-semibold text-teal-700">
-              {items.length}
-            </span>
-          )}
-        </span>
-        <ChevronDown className={`h-4 w-4 shrink-0 text-slate-500 transition-transform ${open ? "" : "-rotate-90"}`} />
-      </button>
-      {!items.length && <p className="mt-2 px-3 text-sm text-slate-500">{emptyText}</p>}
-      {open && items.length > 0 && (
-        <div className="mt-2 space-y-2 px-3">
-          {items.length > COLLAPSE_THRESHOLD && (
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <Input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder={`Search ${title.toLowerCase()}...`}
-                aria-label={`Search ${title}`}
-                className="pl-9"
-              />
-            </div>
-          )}
-          {visible.length === 0 ? (
-            <p className="py-2 text-sm text-slate-500">No matches for &ldquo;{query.trim()}&rdquo;.</p>
-          ) : (
-            <>
-              {q && (
-                <p className="text-xs text-slate-500">
-                  Showing {visible.length} of {items.length}
-                </p>
-              )}
-              <ul className="max-h-80 space-y-2 overflow-y-auto pr-1 text-sm">
-                {visible.map((item) => <li key={item.id}>{renderItem(item)}</li>)}
-              </ul>
-            </>
-          )}
-        </div>
-      )}
-    </section>
-  );
+  return React.useMemo(() => {
+    return q ? items.filter((item) => item.name.toLowerCase().includes(q)) : items;
+  }, [items, q]) as T[];
 }
 
 export function DepartmentSettings() {
@@ -87,27 +31,29 @@ export function DepartmentSettings() {
   const isRadiology = data.department?.name?.toLowerCase().includes("radiology") || data.department?.name?.toLowerCase().includes("dermatology");
   const features = data.config?.enabledFeatures ?? {};
   const procedureTypesEnabled = !features.freeTextProcedures && !features.hideProcedureLogs;
-  // What the HOD can add. Every option follows the department's own settings, never its id.
-  const addKinds: Array<[string, string]> = [
-    ...(procedureTypesEnabled ? [["procedure", "Procedure type"] as [string, string]] : []),
-    ["posting", isRadiology ? "Posting" : "Ward / posting"],
-    ["academic", "Academic activity"],
-    ...(features.clinicalWorks ? [["clinical_work_category", "Clinical work category"], ["clinical_work_subtype", "Clinical work sub-type"]] as Array<[string, string]> : []),
-    ...(!features.hideCaseLogs ? [["case_category", "Case category"] as [string, string]] : []),
-    ...(!features.hideProcedureLogs ? [["competency_level", "Competency level"] as [string, string]] : []),
-    ...(features.conferenceLevels ? [["conference_level", "Conference level"] as [string, string]] : []),
-    ["leave_type", "Leave type"],
-  ];
-  const [entry, setEntry] = React.useState({ kind: addKinds[0][0], name: "", required: "", period: "total", parentValue: "" });
-  const [procedureGroup, setProcedureGroup] = React.useState("");
-  const [busy, setBusy] = React.useState(false);
-  const [targets, setTargets] = React.useState<Record<number, string>>({});
-  const [academicTargets, setAcademicTargets] = React.useState<Record<number, string>>({});
-  const [conferenceTargets, setConferenceTargets] = React.useState<Record<number, string>>({});
-  const [leaveTargets, setLeaveTargets] = React.useState<Record<number, string>>({});
-  const [clinicalTargets, setClinicalTargets] = React.useState<Record<number, string>>({});
-  // Clinical work has no stored total; it is the sum of per-category minimums, as the server
-  // counts it for completion (clinical-work-progress.ts).
+  
+  const sections = React.useMemo(() => {
+    const list = [];
+    if (procedureTypesEnabled) list.push({ id: "procedures", label: "Procedures", items: data.procedures, kind: "procedure", addLabel: "+ Add procedure", desc: "Procedure groups and types, with the required count for each." });
+    if (features.clinicalWorks) list.push({ id: "clinical", label: "Clinical work", items: data.clinicalWorkCategories, kind: "clinical_work_category", addLabel: "+ Add category", desc: "Categories residents log under, the minimum for each (0 means optional), and the sub-types offered. A category with no sub-types is logged without one." });
+    list.push({ id: "postings", label: isRadiology ? "Postings" : "Wards / postings", items: data.postings, kind: "posting", addLabel: "+ Add posting", desc: `${isRadiology ? "Postings" : "Wards"}, academic activities and the other lists residents choose from.` });
+    list.push({ id: "academic", label: "Academic activities", items: data.academics, kind: "academic", addLabel: "+ Add activity" });
+    if (!features.hideCaseLogs) list.push({ id: "cases", label: "Case categories", items: data.caseCategories ?? [], kind: "case_category", addLabel: "+ Add case category" });
+    if (!features.hideProcedureLogs) list.push({ id: "competency", label: "Competency levels", items: data.competencyLevels ?? [], kind: "competency_level", addLabel: "+ Add competency level" });
+    if (features.conferenceLevels) list.push({ id: "conference", label: "Conference levels", items: data.conferenceLevels ?? [], kind: "conference_level", addLabel: "+ Add conference level" });
+    list.push({ id: "leaves", label: "Leave types", items: data.leaveTypes ?? [], kind: "leave_type", addLabel: "+ Add leave type" });
+    return list;
+  }, [procedureTypesEnabled, features, data, isRadiology]);
+
+  const [activeSectionId, setActiveSectionId] = React.useState(sections[0].id);
+  React.useEffect(() => {
+    if (!sections.find(s => s.id === activeSectionId)) {
+      setActiveSectionId(sections[0].id);
+    }
+  }, [sections, activeSectionId]);
+
+  const activeSection = sections.find(s => s.id === activeSectionId) || sections[0];
+
   const clinicalTotal = data.clinicalWorkCategories.filter((item) => item.period === "total").reduce((sum, item) => sum + item.required, 0);
   const totals = [
     ...(!features.hideCaseLogs ? [{ key: "cases", label: "Required clinical cases", value: data.config?.requiredCases }] : []),
@@ -115,11 +61,25 @@ export function DepartmentSettings() {
     ...(features.clinicalWorks ? [{ key: "clinical", label: "Required clinical work", value: clinicalTotal }] : []),
     { key: "academic", label: "Required academic activities", value: data.config?.requiredAcademic },
   ];
-  const [procedureGroups, setProcedureGroups] = React.useState<{id: string, name: string, count: number}[]>([]);
-  const [isAddingNewGroup, setIsAddingNewGroup] = React.useState(false);
 
+  const [drafts, setDrafts] = React.useState<Record<string, string>>({});
+  const getDraft = (kind: string, id: number | string, current: number) => {
+    return drafts[`${kind}:${id}`] ?? String(current);
+  };
+  const setDraft = (kind: string, id: number | string, value: string) => {
+    setDrafts(prev => ({ ...prev, [`${kind}:${id}`]: value }));
+  };
+  const isDraftDifferent = (kind: string, id: number | string, current: number) => {
+    return drafts[`${kind}:${id}`] !== undefined && drafts[`${kind}:${id}`] !== String(current);
+  };
+
+  const [procedureGroups, setProcedureGroups] = React.useState<{id: string, name: string, count: number}[]>([]);
+  const [groupsError, setGroupsError] = React.useState(false);
   const fetchGroups = React.useCallback(() => {
-    apiGet<{id: string, name: string, count: number}[]>("/api/admin/department/procedure-groups").then(setProcedureGroups).catch(console.error);
+    setGroupsError(false);
+    apiGet<{id: string, name: string, count: number}[]>("/api/admin/department/procedure-groups")
+      .then(setProcedureGroups)
+      .catch(() => setGroupsError(true));
   }, []);
 
   React.useEffect(() => {
@@ -127,10 +87,16 @@ export function DepartmentSettings() {
   }, [fetchGroups, data.department.id]);
 
   const [deleteTarget, setDeleteTarget] = React.useState<{id: number | string, type: "procedure" | "posting" | "academic" | "case_category" | "competency_level" | "leave_type" | "procedure_group" | "conference_level" | "clinical_work_category" | "clinical_work_subtype", name: string, count: number | null} | null>(null);
+  const deleteRequestRef = React.useRef(0);
+  const lastDeleteTarget = React.useRef<{id: number | string, type: any, name: string, count: number | null} | null>(null);
+  React.useEffect(() => {
+    if (deleteTarget) lastDeleteTarget.current = deleteTarget;
+  }, [deleteTarget]);
   const [deleting, setDeleting] = React.useState(false);
   const [deleteError, setDeleteError] = React.useState<string | null>(null);
 
-  const confirmDelete = async (id: number | string, type: "procedure" | "posting" | "academic" | "case_category" | "competency_level" | "leave_type" | "procedure_group" | "conference_level" | "clinical_work_category" | "clinical_work_subtype", name: string) => {
+  const confirmDelete = async (id: number | string, type: any, name: string) => {
+    const requestId = ++deleteRequestRef.current;
     setDeleteTarget({ id, type, name, count: null });
     setDeleteError(null);
     try {
@@ -138,9 +104,13 @@ export function DepartmentSettings() {
         : type === "procedure_group" ? `/api/admin/department/procedure-groups/${encodeURIComponent(id as string)}/usage-count` 
         : `/api/admin/department/catalog/${id}/usage-count`;
       const res = await apiGet<{ count: number }>(endpoint);
-      setDeleteTarget({ id, type, name, count: res.count });
+      if (requestId === deleteRequestRef.current) {
+        setDeleteTarget({ id, type, name, count: res.count });
+      }
     } catch (err: any) {
-      setDeleteError(err.message || "Failed to get usage count");
+      if (requestId === deleteRequestRef.current) {
+        setDeleteError(err.message || "Failed to get usage count");
+      }
     }
   };
 
@@ -157,8 +127,9 @@ export function DepartmentSettings() {
       try {
         await data.refresh();
       } catch (err: any) {
-        toast.warning("Deleted, but the list may be out of date — refresh the page");
+        toast.warning("Deleted, but the list may be out of date \u2014 refresh the page");
       }
+      fetchGroups();
       setDeleteTarget(null);
     } catch (err: any) {
       if (err?.message?.includes("cannot be removed")) {
@@ -171,6 +142,7 @@ export function DepartmentSettings() {
     }
   };
 
+  const [busy, setBusy] = React.useState(false);
   async function save(operation: () => Promise<unknown>, message: string) {
     setBusy(true);
     try { await operation(); await data.refresh(); fetchGroups(); toast.success(message); }
@@ -178,256 +150,668 @@ export function DepartmentSettings() {
     finally { setBusy(false); }
   }
 
-  return <div className="space-y-6">
-    <div className="relative overflow-hidden rounded-3xl border border-teal-100 bg-gradient-to-br from-slate-950 via-slate-900 to-teal-950 px-6 py-7 text-white shadow-lg shadow-slate-200/60 sm:px-8">
-      <div className="absolute -right-16 -top-20 h-56 w-56 rounded-full bg-teal-400/15 blur-3xl" />
-      <div className="relative">
-        <div className="max-w-2xl">
-          <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-teal-300"><SlidersHorizontal className="h-4 w-4" /> Department setup</div>
-          <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Training references</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-300">Department of {data.department.name}</p>
-        </div>
+  const patchItem = (id: number | string, kind: string, currentVal: number, period: string | undefined, successMsg: string) => {
+    if (!isDraftDifferent(kind, id, currentVal)) return;
+    void save(() => apiPatch(`/api/admin/department/${kind === 'procedure' ? 'procedures' : 'catalog'}/${id}`, { 
+      required: Number(drafts[`${kind}:${id}`]),
+      ...(kind !== 'procedure' ? { period } : {})
+    }), successMsg);
+  };
+
+  const [isAdding, setIsAdding] = React.useState(false);
+  const [entryName, setEntryName] = React.useState("");
+  const [entryRequired, setEntryRequired] = React.useState("");
+  const [entryPeriod, setEntryPeriod] = React.useState("total");
+  const [procedureGroup, setProcedureGroup] = React.useState("");
+  const [isAddingNewGroup, setIsAddingNewGroup] = React.useState(false);
+  const [searchQuery, setSearchQuery] = React.useState("");
+
+  const resetAddForm = () => {
+    setEntryName("");
+    setEntryRequired("");
+    setEntryPeriod("total");
+    setProcedureGroup("");
+    setIsAddingNewGroup(false);
+    setIsAdding(false);
+  };
+
+  React.useEffect(() => {
+    setIsAdding(false);
+    setEntryName("");
+    setEntryRequired("");
+    setEntryPeriod("total");
+    setProcedureGroup("");
+    setIsAddingNewGroup(false);
+    setSearchQuery("");
+  }, [activeSectionId]);
+
+  const handleAddSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    void save(async () => {
+      if (activeSection.kind === "procedure") {
+        await apiPost("/api/admin/department/procedures", { name: entryName, group: procedureGroup, required: Number(entryRequired) });
+      } else {
+        await apiPost("/api/admin/department/catalog", { 
+          kind: activeSection.kind, 
+          name: entryName, 
+          required: TARGET_KINDS.includes(activeSection.kind) ? Number(entryRequired) : 0, 
+          period: entryPeriod, 
+          value: entryName.trim()
+        });
+      }
+      resetAddForm();
+    }, activeSection.kind === "procedure" ? "Procedure type added" : "Log option added");
+  };
+
+  const visibleItems = useSearch<{ id: number; name: string; required: number }>(activeSection.items, searchQuery);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col gap-1 border-b border-slate-200 pb-4">
+        <h2 className="text-2xl font-semibold tracking-tight text-slate-900">Training requirements</h2>
+        <p className="text-sm text-slate-500">Department of {data.department.name}</p>
       </div>
-    </div>
 
-    {deleteTarget && (
-      <Card className="border-rose-200 bg-rose-50/30 shadow-sm">
-        <CardContent className="p-4">
-          <div className="flex items-start gap-3">
-            <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-rose-100">
-              <AlertTriangle className="h-4 w-4 text-rose-700" />
-            </div>
-            <div className="flex-1 space-y-3">
-              <div>
-                <h4 className="font-semibold text-rose-900">Delete {deleteTarget.name}?</h4>
-                {deleteTarget.count === null ? (
-                  deleteError ? (
-                    <p className="text-sm text-rose-800 mt-1 leading-relaxed">Checking usage failed.</p>
-                  ) : (
-                    <p className="text-sm text-rose-800 mt-1 leading-relaxed animate-pulse">Checking usage...</p>
-                  )
-                ) : deleteTarget.count > 0 ? (
-                  <p className="text-sm text-rose-800 mt-1 leading-relaxed">
-                    {deleteTarget.count} student {deleteTarget.count === 1 ? 'record currently uses' : 'records currently use'} '{deleteTarget.name}'. Deleting it will not affect those existing records, but it will be removed from the dropdown for future entries. Delete anyway?
-                  </p>
-                ) : (
-                  <p className="text-sm text-rose-800 mt-1 leading-relaxed">
-                    No student records currently use this option. Delete?
-                  </p>
-                )}
+      <div className="flex flex-wrap gap-3">
+        {totals.map(({ key, label, value }) => (
+          <div key={key} className="flex flex-col justify-between rounded-xl border border-slate-200 bg-white p-4 shadow-sm min-w-[12rem] flex-1">
+            <p className="text-xs font-semibold text-slate-600">{label}</p>
+            {value ? (
+              <div className="mt-2 flex items-baseline gap-2">
+                <span className="text-2xl font-semibold tracking-tight text-slate-950">{value}</span>
+                <span className="text-[11px] text-slate-500">Target total</span>
               </div>
-              {deleteError && (
-                <div className="p-3 bg-rose-100 border border-rose-300 rounded-md text-sm text-rose-900 font-medium">
-                  {deleteError}
-                </div>
-              )}
-              <div className="flex gap-2 justify-end">
-                <Button type="button" variant="outline" onClick={() => { setDeleteTarget(null); setDeleteError(null); }}>
-                  Cancel
-                </Button>
-                {deleteTarget.count === null && deleteError ? (
-                  <Button type="button" onClick={() => confirmDelete(deleteTarget.id, deleteTarget.type, deleteTarget.name)} className="bg-rose-600 hover:bg-rose-700 text-white">
-                    Try again
-                  </Button>
-                ) : (
-                  <Button
-                    onClick={handleDelete}
-                    disabled={deleting || deleteTarget.count === null}
-                    className="bg-rose-600 hover:bg-rose-700 text-white"
-                  >
-                    {deleting ? "Deleting..." : "Delete"}
-                  </Button>
-                )}
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    )}
-
-    <Card className="border-teal-200 shadow-sm shadow-teal-100/60">
-      <CardHeader className="border-b border-teal-100 bg-teal-50/60 pb-4">
-        <div className="flex items-center gap-2"><PlusCircle className="h-4 w-4 text-teal-700" /><CardTitle className="text-base">Add a new log option</CardTitle></div>
-        <p className="text-xs text-slate-600">Add something residents can choose while logging. Where it applies, set the minimum they must complete; 0 means it is optional.</p>
-      </CardHeader>
-      <CardContent className="p-5">
-        <form className="grid items-end gap-4 md:grid-cols-2 xl:grid-cols-4" onSubmit={(e) => { e.preventDefault(); void save(async () => {
-          if (entry.kind === "procedure") {
-            await apiPost("/api/admin/department/procedures", { name: entry.name, group: procedureGroup, required: Number(entry.required) });
-            setProcedureGroup("");
-            setIsAddingNewGroup(false);
-          } else {
-            if (entry.kind === "clinical_work_subtype" && !entry.parentValue) throw new Error("Choose the category this sub-type belongs to");
-            const { parentValue, ...fields } = entry;
-            await apiPost("/api/admin/department/catalog", { ...fields, value: entry.name.trim(), required: TARGET_KINDS.includes(entry.kind) ? Number(entry.required) : 0,
-              ...(entry.kind === "clinical_work_subtype" ? { parentValue } : {}) });
-          }
-          setEntry({ ...entry, name: "", required: "" });
-        }, entry.kind === "procedure" ? "Procedure type added" : "Log option added"); }}>
-          <div className="space-y-2"><Label htmlFor="catalog-kind">Type</Label><select id="catalog-kind" className="h-11 w-full rounded-xl border bg-white px-3 text-sm" value={entry.kind} onChange={(e) => setEntry({ ...entry, kind: e.target.value, required: "" })}>{addKinds.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></div>
-          {entry.kind === "clinical_work_subtype" && <div className="space-y-2"><Label htmlFor="catalog-parent">Belongs to</Label><select id="catalog-parent" required className="h-11 w-full rounded-xl border bg-white px-3 text-sm" value={entry.parentValue} onChange={(e) => setEntry({ ...entry, parentValue: e.target.value })}><option value="">Select a category</option>{data.clinicalWorkCategories.map((item) => <option key={item.value} value={item.value}>{item.name}</option>)}</select></div>}
-          <div className="space-y-2"><Label htmlFor="catalog-name">Name</Label><Input id="catalog-name" required maxLength={160} value={entry.name} onChange={(e) => setEntry({ ...entry, name: e.target.value })} /></div>
-          {entry.kind === "procedure" && <div className="space-y-2">
-            <Label htmlFor="procedure-group">Group</Label>
-            {isAddingNewGroup ? (
-              <Input id="procedure-group" required maxLength={160} value={procedureGroup} onChange={(e) => setProcedureGroup(e.target.value)} placeholder="Enter new group name" />
             ) : (
-              <Select value={procedureGroup} onValueChange={(v) => { if (v === "NEW_GROUP") { setIsAddingNewGroup(true); setProcedureGroup(""); } else { setProcedureGroup(v); } }}>
-                <SelectTrigger id="procedure-group"><SelectValue placeholder="Select a group" /></SelectTrigger>
-                <SelectContent>
-                  {procedureGroups.map(g => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}
-                  <SelectItem value="NEW_GROUP" className="font-semibold text-teal-700">+ Add new group</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="mt-2 flex flex-col gap-0.5">
+                <span className="text-sm font-semibold text-slate-700">No minimum set yet</span>
+                <span className="text-[11px] leading-4 text-slate-500">Residents can still log these. Set a required count on any item below and this total will add them up.</span>
+              </div>
             )}
-          </div>}
-          {(entry.kind === "procedure" || TARGET_KINDS.includes(entry.kind)) && <div className="space-y-2"><Label htmlFor="catalog-required">{entry.kind === "clinical_work_category" ? "Minimum required (0 = optional)" : "Required count"}</Label><Input id="catalog-required" type="number" min={0} max={100000} required value={entry.required} onChange={(e) => setEntry({ ...entry, required: e.target.value })} /></div>}
-          {TARGET_KINDS.includes(entry.kind) && <div className="space-y-2"><Label htmlFor="catalog-period">Period</Label><select id="catalog-period" className="h-11 w-full rounded-xl border bg-white px-3 text-sm" value={entry.period} onChange={(e) => setEntry({ ...entry, period: e.target.value })}><option value="total">Overall</option><option value="month">Per month</option></select></div>}
-          <Button disabled={busy} type="submit">Add log option</Button>
-        </form>
-      </CardContent>
-    </Card>
-
-    <section aria-labelledby="existing-heading" className="space-y-5">
-      <div className="border-t border-slate-200 px-1 pt-6">
-        <div className="flex items-center gap-2"><ClipboardList className="h-4 w-4 text-teal-600" /><h3 id="existing-heading" className="text-lg font-semibold text-slate-900">Existing log options</h3></div>
-        <p className="mt-1 text-xs text-slate-500">What residents of {data.department.name} can log today. Change a number and press Save to update its minimum.</p>
+          </div>
+        ))}
       </div>
 
-      <div className={`grid w-full grid-cols-1 gap-3 ${totals.length === 2 ? "md:grid-cols-2" : totals.length === 3 ? "md:grid-cols-3" : totals.length >= 4 ? "md:grid-cols-2 xl:grid-cols-4" : ""}`}>
-        {totals.map(({ key, label, value }, index) => <Card key={key} className={`overflow-hidden border-0 shadow-sm ring-1 ring-inset ${index % 3 === 0 ? "bg-gradient-to-br from-teal-50 to-white ring-teal-100" : index % 3 === 1 ? "bg-gradient-to-br from-sky-50 to-white ring-sky-100" : "bg-gradient-to-br from-violet-50 to-white ring-violet-100"}`}>
-          <CardContent className="relative p-5"><div className={`absolute right-0 top-0 h-20 w-20 -translate-y-1/3 translate-x-1/3 rounded-full blur-2xl ${index % 3 === 0 ? "bg-teal-200/50" : index % 3 === 1 ? "bg-sky-200/50" : "bg-violet-200/50"}`} /><p className="relative max-w-[13rem] text-xs font-semibold leading-5 text-slate-600">{label}</p>{value ? <><p className="relative mt-3 text-3xl font-semibold tracking-tight text-slate-950">{value}</p><p className="relative mt-1 text-[11px] text-slate-500">Target total</p></>
-            : <><p className="relative mt-3 text-base font-semibold text-slate-700">No minimum set yet</p><p className="relative mt-1 text-[11px] leading-4 text-slate-500">Residents can still log these. Set a required count on any item below and this total will add them up.</p></>}</CardContent>
-        </Card>)}
-      </div>
+      <div className="grid gap-6 lg:grid-cols-[15rem_1fr]">
+        <div className="space-y-2 lg:sticky lg:top-4 h-fit">
+          <div className="lg:hidden">
+            <Label htmlFor="section-select" className="sr-only">Section</Label>
+            <select 
+              id="section-select" 
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+              value={activeSectionId}
+              onChange={(e) => setActiveSectionId(e.target.value)}
+            >
+              {sections.map(s => (
+                <option key={s.id} value={s.id}>{s.label}</option>
+              ))}
+            </select>
+          </div>
+          
+          <ul className="hidden lg:flex lg:flex-col gap-1">
+            {sections.map(s => (
+              <li key={s.id}>
+                <button
+                  type="button"
+                  aria-current={activeSectionId === s.id ? "page" : undefined}
+                  onClick={() => setActiveSectionId(s.id)}
+                  className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                    activeSectionId === s.id 
+                      ? "bg-teal-50 text-teal-900" 
+                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                  }`}
+                >
+                  <span>{s.label}</span>
+                  <span className={`rounded-full px-2 py-0.5 text-xs ${
+                    activeSectionId === s.id ? "bg-teal-100 text-teal-800" : "bg-slate-100 text-slate-600"
+                  }`}>
+                    {s.items.length}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
 
-      {procedureTypesEnabled && (
-        <Card className="border-slate-200/80 shadow-sm shadow-slate-200/50"><CardHeader className="border-b border-slate-100 bg-slate-50/70 pb-4"><CardTitle className="text-base">Procedures</CardTitle><p className="text-xs text-slate-500">Procedure groups and types, with the required count for each.</p></CardHeader><CardContent className="grid gap-6 p-5 md:grid-cols-2">
-          <SearchableSection
-            title="Procedure groups"
-            items={procedureGroups}
-            emptyText="No procedure groups."
-            renderItem={(g) => <div className="flex items-center gap-2 rounded-xl bg-slate-50 p-3">
-              <span className="flex-1 text-sm">{g.name} <span className="text-xs text-slate-500">({g.count} procedure types)</span></span>
-              <Button variant="ghost" size="sm" type="button" disabled={busy || deleting} onClick={() => confirmDelete(g.id, "procedure_group", g.name)} className="text-rose-700 hover:bg-rose-100 h-8 w-8 p-0"><Trash2 className="h-4 w-4" /></Button>
-            </div>}
-          />
-          <SearchableSection
-            title="Procedure types"
-            items={data.procedures}
-            emptyText="No procedure types configured."
-            renderItem={(p) => <form className="flex flex-wrap items-end gap-2 rounded-xl bg-slate-50 p-3" onSubmit={(e) => { e.preventDefault(); void save(() => apiPatch(`/api/admin/department/procedures/${p.id}`, { required: Number(targets[p.id] ?? p.required) }), "Procedure target updated"); }}>
-              <div className="min-w-0 grow basis-full sm:basis-0"><p className="text-sm font-medium">{p.name}</p><p className="text-xs text-slate-500">{p.group}</p></div>
-              <Input aria-label={`Required count for ${p.name}`} className="w-24" type="number" min={0} max={100000} required value={targets[p.id] ?? p.required} onChange={(e) => setTargets({ ...targets, [p.id]: e.target.value })} />
-              <Button variant="outline" size="sm" disabled={busy} type="submit">Save</Button>
-              <Button variant="outline" size="sm" type="button" disabled={busy || deleting} onClick={() => confirmDelete(p.id, "procedure", p.name)} className="text-rose-700 border-rose-200 hover:bg-rose-50 px-2"><Trash2 className="h-4 w-4" /></Button>
-            </form>}
-          />
-        </CardContent></Card>
-      )}
+        <div className="min-w-0 flex flex-col gap-4 pb-12">
+          <div className="flex flex-col gap-2 border-b border-slate-200 pb-4">
+            <div className="flex items-center justify-between gap-4">
+              <h3 className="text-lg font-semibold text-slate-900">{activeSection.label}</h3>
+              <Button size="sm" onClick={() => setIsAdding(!isAdding)}>
+                {activeSection.addLabel}
+              </Button>
+            </div>
+            {activeSection.desc && <p className="text-sm text-slate-500">{activeSection.desc}</p>}
+          </div>
 
-      {features.clinicalWorks && (
-        <Card className="border-slate-200/80 shadow-sm shadow-slate-200/50"><CardHeader className="border-b border-slate-100 bg-slate-50/70 pb-4"><CardTitle className="text-base">Clinical work</CardTitle><p className="text-xs text-slate-500">Categories residents log under, the minimum for each (0 means optional), and the sub-types offered. A category with no sub-types is logged without one.</p></CardHeader><CardContent className="p-5">
-          {data.clinicalWorkCategories.length === 0 ? <p className="rounded-xl bg-slate-50 p-3 text-sm text-slate-500">No clinical work categories configured.</p> : (
-            <div className="grid gap-3 md:grid-cols-2">
-              {data.clinicalWorkCategories.map((category) => {
-                const subTypes = data.clinicalWorkSubtypes.filter((item) => item.parentValue === category.value);
-                return (
-                  <div key={category.id} className="rounded-xl bg-slate-50 p-3">
-                    <form className="flex flex-wrap items-center gap-2" onSubmit={(e) => { e.preventDefault(); void save(() => apiPatch(`/api/admin/department/catalog/${category.id}`, { required: Number(clinicalTargets[category.id] ?? category.required), period: category.period }), "Clinical work minimum updated"); }}>
-                      <span className="min-w-0 grow basis-full text-sm font-medium sm:basis-0">{category.name}{category.period === "month" && <span className="font-normal text-slate-500"> (per month)</span>}</span>
-                      <Input className="w-20" type="number" min={0} max={100000} required aria-label={`Minimum for ${category.name}`} value={clinicalTargets[category.id] ?? category.required} onChange={(e) => setClinicalTargets({ ...clinicalTargets, [category.id]: e.target.value })} />
-                      <Button size="sm" variant="outline" disabled={busy} type="submit">Save</Button>
-                      <Button variant="outline" size="sm" type="button" aria-label={`Delete ${category.name}`} disabled={busy || deleting} onClick={() => confirmDelete(category.id, "clinical_work_category", category.name)} className="text-rose-700 border-rose-200 hover:bg-rose-50 px-2"><Trash2 className="h-4 w-4" /></Button>
-                    </form>
-                    {subTypes.length === 0 ? <p className="mt-1 text-xs text-slate-500">No sub-types yet</p> : (
-                      <ul className="mt-2 flex flex-wrap gap-1.5">
-                        {subTypes.map((item) => (
-                          <li key={item.id} className="flex items-center gap-1 rounded-full border border-slate-200 bg-white py-0.5 pl-2.5 pr-1 text-xs text-slate-700">
-                            {item.name}
-                            <button type="button" aria-label={`Delete ${item.name}`} disabled={busy || deleting} onClick={() => confirmDelete(item.id, "clinical_work_subtype", item.name)} className="rounded-full p-0.5 text-rose-600 hover:bg-rose-50"><Trash2 className="h-3 w-3" /></button>
-                          </li>
-                        ))}
-                      </ul>
+          {isAdding && (
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 mb-2">
+              <form onSubmit={handleAddSubmit} className="flex flex-wrap items-end gap-4">
+                <div className="space-y-2 flex-1 min-w-[200px]">
+                  <Label htmlFor="add-name">Name</Label>
+                  <Input id="add-name" required maxLength={160} value={entryName} onChange={(e) => setEntryName(e.target.value)} />
+                </div>
+                
+                {activeSection.kind === "procedure" && (
+                  <div className="space-y-2 flex-1 min-w-[200px]">
+                    <Label htmlFor="add-group">Group</Label>
+                    {isAddingNewGroup ? (
+                      <Input id="add-group" required maxLength={160} value={procedureGroup} onChange={(e) => setProcedureGroup(e.target.value)} placeholder="Enter new group name" />
+                    ) : (
+                      <>
+                        <Select value={procedureGroup} onValueChange={(v) => { if (v === "NEW_GROUP") { setIsAddingNewGroup(true); setProcedureGroup(""); } else { setProcedureGroup(v); } }}>
+                          <SelectTrigger id="add-group"><SelectValue placeholder="Select a group" /></SelectTrigger>
+                          <SelectContent>
+                            {procedureGroups.map(g => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}
+                            <SelectItem value="NEW_GROUP" className="font-semibold text-teal-700">+ Add new group</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {groupsError && (
+                          <div className="flex items-center gap-3 mt-1">
+                            <p className="text-sm text-rose-600">Could not load procedure groups.</p>
+                            <Button type="button" variant="outline" size="sm" onClick={fetchGroups} disabled={busy}>Retry</Button>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
-                );
-              })}
+                )}
+
+                {(activeSection.kind === "procedure" || TARGET_KINDS.includes(activeSection.kind)) && (
+                  <div className="space-y-2 w-32">
+                    <Label htmlFor="add-required">
+                      {activeSection.kind === "clinical_work_category" ? "Minimum" : "Required count"}
+                    </Label>
+                    <Input id="add-required" type="number" min={0} max={100000} required value={entryRequired} onChange={(e) => setEntryRequired(e.target.value)} />
+                  </div>
+                )}
+
+                {TARGET_KINDS.includes(activeSection.kind) && (
+                  <div className="space-y-2 w-32">
+                    <Label htmlFor="add-period">Period</Label>
+                    <select id="add-period" className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring" value={entryPeriod} onChange={(e) => setEntryPeriod(e.target.value)}>
+                      <option value="total">Overall</option>
+                      <option value="month">Per month</option>
+                    </select>
+                  </div>
+                )}
+
+                <div className="flex gap-2 w-full justify-end mt-2">
+                  <Button type="button" variant="outline" onClick={resetAddForm}>Cancel</Button>
+                  <Button type="submit" disabled={busy}>Add log option</Button>
+                </div>
+              </form>
             </div>
           )}
-        </CardContent></Card>
-      )}
 
-      <Card className="border-slate-200/80 shadow-sm shadow-slate-200/50"><CardHeader className="border-b border-slate-100 bg-slate-50/70 pb-4"><CardTitle className="text-base">Training catalog</CardTitle><p className="text-xs text-slate-500">{isRadiology ? "Postings" : "Wards"}, academic activities and the other lists residents choose from.</p></CardHeader><CardContent className="space-y-6 p-5">
-      <div className="grid gap-6 md:grid-cols-2">
-        <SearchableSection
-          title="Posting"
-          defaultOpen={true}
-          items={data.postings}
-          emptyText="No postings configured."
-          renderItem={(item) => <div className="flex items-center gap-2 rounded-xl bg-slate-50 p-3">
-            <span className="flex-1">{item.name}</span>
-            <Button variant="ghost" size="sm" type="button" disabled={busy || deleting} onClick={() => confirmDelete(item.id, "posting", item.name)} className="text-rose-700 hover:bg-rose-100 h-8 w-8 p-0"><Trash2 className="h-4 w-4" /></Button>
-          </div>}
-        />
-        <SearchableSection
-          title="Academic activities"
-          defaultOpen={true}
-          items={data.academics}
-          emptyText="No academic activities configured."
-          renderItem={(item) => <form className="flex flex-wrap items-center gap-2 rounded-xl bg-slate-50 p-3" onSubmit={(e) => { e.preventDefault(); void save(() => apiPatch(`/api/admin/department/catalog/${item.id}`, { required: Number(academicTargets[item.id] ?? item.required), period: item.period }), "Academic target updated"); }}>
-            <span className="min-w-0 grow basis-full text-sm sm:basis-0">{item.name} ({item.period === "month" ? "per month" : "overall"})</span><Input className="w-24" type="number" min={0} max={100000} required aria-label={`Required count for ${item.name}`} value={academicTargets[item.id] ?? item.required} onChange={(e) => setAcademicTargets({ ...academicTargets, [item.id]: e.target.value })} /><Button size="sm" variant="outline" disabled={busy} type="submit">Save</Button>
-            <Button variant="outline" size="sm" type="button" disabled={busy || deleting} onClick={() => confirmDelete(item.id, "academic", item.name)} className="text-rose-700 border-rose-200 hover:bg-rose-50 px-2"><Trash2 className="h-4 w-4" /></Button>
-          </form>}
-        />
+          {activeSection.items.length > COLLAPSE_THRESHOLD && (
+            <div className="relative mb-2">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={`Search ${activeSection.label.toLowerCase()}...`}
+                aria-label={`Search ${activeSection.label}`}
+                className="pl-9"
+              />
+            </div>
+          )}
+
+          {activeSection.kind === "procedure" && (
+            <ProceduresList
+              query={searchQuery}
+              procedureGroups={procedureGroups}
+              procedures={activeSection.items}
+              getDraft={getDraft}
+              setDraft={setDraft}
+              isDraftDifferent={isDraftDifferent}
+              patchItem={patchItem}
+              confirmDelete={confirmDelete}
+              busy={busy}
+              deleting={deleting}
+              groupsError={groupsError}
+              fetchGroups={fetchGroups}
+            />
+          )}
+
+          {activeSection.kind === "clinical_work_category" && (
+            <div className="flex flex-col space-y-3">
+              {activeSection.items.length === 0 && !searchQuery.trim() ? (
+                <p className="py-2 text-sm text-slate-500">No clinical work categories configured.</p>
+              ) : visibleItems.length === 0 ? (
+                <p className="py-2 text-sm text-slate-500">No matches for &ldquo;{searchQuery.trim()}&rdquo;.</p>
+              ) : (
+                <>
+                  {searchQuery.trim() && (
+                    <p className="text-xs text-slate-500">Showing {visibleItems.length} of {activeSection.items.length}</p>
+                  )}
+                  {visibleItems.map(category => (
+                    <ClinicalWorkRow
+                      key={category.id}
+                      category={category as any}
+                      subTypes={data.clinicalWorkSubtypes.filter(item => item.parentValue === (category as any).value)}
+                      getDraft={getDraft}
+                      setDraft={setDraft}
+                      isDraftDifferent={isDraftDifferent}
+                      patchItem={patchItem}
+                      confirmDelete={confirmDelete}
+                      busy={busy}
+                      deleting={deleting}
+                      save={save}
+                    />
+                  ))}
+                </>
+              )}
+            </div>
+          )}
+
+          {!["procedure", "clinical_work_category"].includes(activeSection.kind) && (
+            <div className="flex flex-col">
+              {visibleItems.length === 0 ? (
+                <p className="py-2 text-sm text-slate-500">
+                  {searchQuery.trim() ? `No matches for \u201c${searchQuery.trim()}\u201d.` : 
+                    activeSection.kind === "posting" ? "No postings configured." :
+                    activeSection.kind === "academic" ? "No academic activities configured." :
+                    activeSection.kind === "case_category" ? "No case categories configured." :
+                    activeSection.kind === "competency_level" ? "No competency levels configured." :
+                    activeSection.kind === "conference_level" ? "No conference levels configured." :
+                    "No leave types configured."
+                  }
+                </p>
+              ) : (
+                <>
+                  {searchQuery.trim() && (
+                    <p className="mb-2 text-xs text-slate-500">
+                      Showing {visibleItems.length} of {activeSection.items.length}
+                    </p>
+                  )}
+                  <div className="flex flex-col divide-y divide-slate-100 border-t border-slate-100">
+                    {visibleItems.map(item => {
+                      const hasCount = ["academic", "case_category", "conference_level", "leave_type"].includes(activeSection.kind);
+                      const isLeave = activeSection.kind === "leave_type";
+                      return (
+                        <div key={item.id} className="flex items-center justify-between py-3">
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium text-slate-900">{item.name}</span>
+                            {TARGET_KINDS.includes(activeSection.kind) && (item as any).period && (
+                              <span className="text-xs text-slate-500">{(item as any).period === "month" ? "per month" : "overall"}</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3">
+                            {hasCount && (
+                              <form onSubmit={(e) => {
+                                e.preventDefault();
+                                patchItem(
+                                  item.id, 
+                                  activeSection.kind, 
+                                  (item as any).required, 
+                                  (item as any).period,
+                                  activeSection.kind === "academic" ? "Academic target updated" :
+                                  activeSection.kind === "case_category" ? "Case target updated" :
+                                  activeSection.kind === "conference_level" ? "Conference level target updated" :
+                                  "Leave allowance updated"
+                                );
+                              }} className="flex items-center gap-2">
+                                <Label htmlFor={`target-${item.id}`} className="text-xs text-slate-500">
+                                  {isLeave ? "Days" : "Minimum"}
+                                </Label>
+                                <Input 
+                                  id={`target-${item.id}`}
+                                  type="number" 
+                                  min={0} 
+                                  max={isLeave ? 365 : 100000} 
+                                  required 
+                                  className="w-20"
+                                  aria-label={
+                                    isLeave ? `Allowance for ${item.name}` :
+                                    `Required count for ${item.name}`
+                                  }
+                                  value={getDraft(activeSection.kind, item.id, (item as any).required)}
+                                  onChange={(e) => setDraft(activeSection.kind, item.id, e.target.value)}
+                                />
+                                <Button 
+                                  type="submit"
+                                  size="sm" 
+                                  variant="outline"
+                                  disabled={busy || !isDraftDifferent(activeSection.kind, item.id, (item as any).required) || getDraft(activeSection.kind, item.id, (item as any).required).trim() === ""}
+                                >
+                                  Save
+                                </Button>
+                              </form>
+                            )}
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              className="h-8 w-8 text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+                              aria-label={`Delete ${item.name}`}
+                              disabled={busy || deleting}
+                              onClick={() => confirmDelete(item.id, activeSection.kind as any, item.name)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+        </div>
       </div>
-      {(!features.hideCaseLogs || (features.procedureExperience && !features.hideProcedureLogs)) && <div className="grid gap-6 md:grid-cols-2 mt-8 pt-8 border-t">
-        {!features.hideCaseLogs && <SearchableSection
-          title="Case Categories"
-          items={data.caseCategories ?? []}
-          emptyText="No case categories configured."
-          renderItem={(item) => <form className="flex flex-wrap items-center gap-2 rounded-xl bg-slate-50 p-3" onSubmit={(e) => { e.preventDefault(); void save(() => apiPatch(`/api/admin/department/catalog/${item.id}`, { required: Number(academicTargets[item.id] ?? item.required), period: item.period }), "Case target updated"); }}>
-            <span className="min-w-0 grow basis-full text-sm sm:basis-0">{item.name}</span><Input className="w-16" type="number" min={0} max={100000} required aria-label={`Required count for ${item.name}`} value={academicTargets[item.id] ?? item.required} onChange={(e) => setAcademicTargets({ ...academicTargets, [item.id]: e.target.value })} /><Button size="sm" variant="outline" disabled={busy} type="submit">Save</Button>
-            <Button variant="outline" size="sm" type="button" disabled={busy || deleting} onClick={() => confirmDelete(item.id, "case_category", item.name)} className="text-rose-700 border-rose-200 hover:bg-rose-50 px-2"><Trash2 className="h-4 w-4" /></Button>
-          </form>}
-        />}
-        {data.config?.enabledFeatures?.procedureExperience && !features.hideProcedureLogs && (
-          <SearchableSection
-            title="Competency levels"
-            items={data.competencyLevels ?? []}
-            emptyText="No competency levels configured."
-            renderItem={(item) => <div className="flex items-center gap-2 rounded-xl bg-slate-50 p-3">
-              <span className="flex-1">{item.name}</span>
-              <Button variant="ghost" size="sm" type="button" disabled={busy || deleting} onClick={() => confirmDelete(item.id, "competency_level", item.name)} className="text-rose-700 hover:bg-rose-100 h-8 w-8 p-0"><Trash2 className="h-4 w-4" /></Button>
-            </div>}
-          />
-        )}
-      </div>}
-      {data.config?.enabledFeatures?.conferenceLevels && (
-      <div className="grid gap-6 md:grid-cols-2 mt-8 pt-8 border-t">
-        <SearchableSection
-          title="Conference Levels"
-          items={data.conferenceLevels ?? []}
-          emptyText="No conference levels configured."
-          renderItem={(item) => <form className="flex flex-wrap items-center gap-2 rounded-xl bg-slate-50 p-3" onSubmit={(e) => { e.preventDefault(); void save(() => apiPatch(`/api/admin/department/catalog/${item.id}`, { required: Number(conferenceTargets[item.id] ?? item.required), period: item.period }), "Conference level target updated"); }}>
-            <span className="min-w-0 grow basis-full text-sm sm:basis-0">{item.name}</span><Input className="w-16" type="number" min={0} max={100000} required aria-label={`Required count for ${item.name}`} value={conferenceTargets[item.id] ?? item.required} onChange={(e) => setConferenceTargets({ ...conferenceTargets, [item.id]: e.target.value })} /><Button size="sm" variant="outline" disabled={busy} type="submit">Save</Button>
-            <Button variant="outline" size="sm" type="button" disabled={busy || deleting} onClick={() => confirmDelete(item.id, "conference_level", item.name)} className="text-rose-700 border-rose-200 hover:bg-rose-50 px-2"><Trash2 className="h-4 w-4" /></Button>
-          </form>}
-        />
-      </div>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open && !deleting) { ++deleteRequestRef.current; setDeleteTarget(null); setDeleteError(null); } }}>
+        <AlertDialogContent>
+          {(() => {
+            const shownTarget = deleteTarget ?? lastDeleteTarget.current;
+            return (
+              <>
+                <AlertDialogHeader>
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-rose-100">
+                      <AlertTriangle className="h-4 w-4 text-rose-700" />
+                    </div>
+                    <div className="flex-1 space-y-3">
+                      <AlertDialogTitle className="text-rose-900">Delete {shownTarget?.name}?</AlertDialogTitle>
+                      <AlertDialogDescription asChild>
+                        <div>
+                          {shownTarget?.count === null ? (
+                            deleteError ? (
+                              <p className="text-sm text-rose-800 mt-1 leading-relaxed">Checking usage failed.</p>
+                            ) : (
+                              <p className="text-sm text-rose-800 mt-1 leading-relaxed animate-pulse">Checking usage...</p>
+                            )
+                          ) : shownTarget && shownTarget.count !== null && shownTarget.count > 0 ? (
+                            <p className="text-sm text-rose-800 mt-1 leading-relaxed">
+                              {shownTarget.count} student {shownTarget.count === 1 ? 'record currently uses' : 'records currently use'} &apos;{shownTarget.name}&apos;. Deleting it will not affect those existing records, but it will be removed from the dropdown for future entries. Delete anyway?
+                            </p>
+                          ) : (
+                            <p className="text-sm text-rose-800 mt-1 leading-relaxed">
+                              No student records currently use this option. Delete?
+                            </p>
+                          )}
+                          {deleteError && shownTarget && shownTarget.count !== null && (
+                            <div className="mt-3 p-3 bg-rose-100 border border-rose-300 rounded-md text-sm text-rose-900 font-medium">
+                              {deleteError}
+                            </div>
+                          )}
+                        </div>
+                      </AlertDialogDescription>
+                    </div>
+                  </div>
+                </AlertDialogHeader>
+                <AlertDialogFooter className="mt-4">
+                  <Button type="button" variant="outline" disabled={deleting} onClick={() => { ++deleteRequestRef.current; setDeleteTarget(null); setDeleteError(null); }}>
+                    Cancel
+                  </Button>
+                  {shownTarget && shownTarget.count === null && deleteError ? (
+                    <Button type="button" onClick={() => { if (deleteTarget) confirmDelete(deleteTarget.id, deleteTarget.type, deleteTarget.name); }} className="bg-rose-600 hover:bg-rose-700 text-white">
+                      Try again
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={handleDelete}
+                      disabled={deleting || !deleteTarget || deleteTarget.count === null}
+                      className="bg-rose-600 hover:bg-rose-700 text-white"
+                    >
+                      {deleting ? "Deleting..." : "Delete"}
+                    </Button>
+                  )}
+                </AlertDialogFooter>
+              </>
+            );
+          })()}
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
+function ProceduresList({
+  query, procedureGroups, procedures, getDraft, setDraft, isDraftDifferent, patchItem, confirmDelete, busy, deleting, groupsError, fetchGroups
+}: any) {
+  const groupsMap = new Map();
+  procedureGroups.forEach((g: any) => {
+    groupsMap.set(g.id, { id: g.id, name: g.name, count: g.count, isOfficial: true, types: [] });
+  });
+
+  procedures.forEach((p: any) => {
+    let gId = p.group;
+    if (!groupsMap.has(gId)) {
+      groupsMap.set(gId, { id: gId, name: gId, count: 0, isOfficial: false, types: [] });
+    }
+    groupsMap.get(gId).types.push(p);
+  });
+
+  const allGroups = Array.from(groupsMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+
+  const renderedBlocks: any[] = [];
+  let shown = 0;
+
+  allGroups.forEach(g => {
+    const matchingTypes = query.trim() 
+      ? g.types.filter((t: any) => t.name.toLowerCase().includes(query.trim().toLowerCase()))
+      : g.types;
+    
+    const groupMatches = g.name.toLowerCase().includes(query.trim().toLowerCase());
+    if (query.trim() && matchingTypes.length === 0 && !groupMatches) return;
+    
+    const finalTypes = query.trim() && !groupMatches ? matchingTypes : g.types;
+    shown += finalTypes.length;
+
+    renderedBlocks.push(
+      <ProcedureGroupBlock 
+        key={g.id} 
+        group={g} 
+        types={finalTypes}
+        forceExpand={query.trim().length > 0 && matchingTypes.length > 0}
+        {...{ getDraft, setDraft, isDraftDifferent, patchItem, confirmDelete, busy, deleting }}
+      />
+    );
+  });
+
+  return (
+    <div className="flex flex-col space-y-3">
+      {groupsError && (
+        <div className="py-4 flex items-center gap-3">
+          <p className="text-sm text-rose-600">Could not load procedure groups.</p>
+          <Button type="button" variant="outline" size="sm" onClick={fetchGroups} disabled={busy}>Retry</Button>
+        </div>
       )}
-      <div className="grid gap-6 md:grid-cols-2 mt-8 pt-8 border-t">
-        <SearchableSection
-          title="Leave types"
-          items={data.leaveTypes ?? []}
-          emptyText="No leave types configured."
-          renderItem={(item) => <form className="flex flex-wrap items-center gap-2 rounded-xl bg-slate-50 p-3" onSubmit={(e) => { e.preventDefault(); void save(() => apiPatch(`/api/admin/department/catalog/${item.id}`, { required: Number(leaveTargets[item.id] ?? item.required), period: item.period }), "Leave allowance updated"); }}>
-            <span className="min-w-0 grow basis-full text-sm sm:basis-0">{item.name}</span><Input className="w-16" type="number" min={0} max={365} required aria-label={`Allowance for ${item.name}`} value={leaveTargets[item.id] ?? item.required} onChange={(e) => setLeaveTargets({ ...leaveTargets, [item.id]: e.target.value })} /><Button size="sm" variant="outline" disabled={busy} type="submit">Save</Button>
-            <Button variant="outline" size="sm" type="button" disabled={busy || deleting} onClick={() => confirmDelete(item.id, "leave_type", item.name)} className="text-rose-700 border-rose-200 hover:bg-rose-50 px-2"><Trash2 className="h-4 w-4" /></Button>
-          </form>}
-        />
+      {allGroups.length === 0 && !query.trim() ? (
+        <p className="py-4 text-sm text-slate-500">No procedure types configured.</p>
+      ) : renderedBlocks.length === 0 ? (
+        <p className="py-2 text-sm text-slate-500">No matches for &ldquo;{query.trim()}&rdquo;.</p>
+      ) : (
+        <>
+          {query.trim() && (
+            <p className="text-xs text-slate-500">Showing {shown} of {procedures.length}</p>
+          )}
+          {renderedBlocks}
+        </>
+      )}
+    </div>
+  );
+}
+
+function ProcedureGroupBlock({ group, types, forceExpand, getDraft, setDraft, isDraftDifferent, patchItem, confirmDelete, busy, deleting }: any) {
+  const [expanded, setExpanded] = React.useState(false);
+  const isExpanded = forceExpand || expanded;
+
+  return (
+    <div className="flex flex-col border border-slate-200 rounded-xl bg-white overflow-hidden">
+      <div className="flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100/50 transition-colors">
+        <button 
+          type="button" 
+          aria-expanded={isExpanded}
+          onClick={() => setExpanded(!expanded)}
+          className="flex flex-1 items-center gap-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 rounded"
+        >
+          <ChevronDown className={`h-4 w-4 shrink-0 text-slate-500 transition-transform ${isExpanded ? "" : "-rotate-90"}`} />
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-slate-900">{group.name}</span>
+            <span className="text-xs text-slate-500">({group.isOfficial ? group.count : types.length} procedure types)</span>
+          </div>
+        </button>
+        {group.isOfficial && (
+          <Button 
+            variant="ghost" size="icon" className="h-8 w-8 text-rose-600 hover:bg-rose-100"
+            aria-label={`Delete ${group.name}`}
+            disabled={busy || deleting}
+            onClick={() => confirmDelete(group.id, "procedure_group", group.name)}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        )}
       </div>
-    </CardContent></Card>
-    </section>
-  </div>;
+      {isExpanded && types.length > 0 && (
+        <div className="flex flex-col divide-y divide-slate-100 border-t border-slate-200">
+          {types.map((p: any) => (
+            <div key={p.id} className="flex flex-wrap items-center justify-between p-3 gap-2">
+              <div className="flex flex-col">
+                <span className="text-sm text-slate-900 font-medium">{p.name}</span>
+                <span className="text-xs text-slate-500">{p.group}</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  patchItem(p.id, "procedure", p.required, undefined, "Procedure target updated");
+                }} className="flex items-center gap-2">
+                  <Label htmlFor={`target-proc-${p.id}`} className="text-xs text-slate-500">Minimum</Label>
+                  <Input 
+                    id={`target-proc-${p.id}`}
+                    type="number" min={0} max={100000} required className="w-20"
+                    aria-label={`Required count for ${p.name}`}
+                    value={getDraft("procedure", p.id, p.required)}
+                    onChange={(e) => setDraft("procedure", p.id, e.target.value)}
+                  />
+                  <Button 
+                    type="submit"
+                    size="sm" variant="outline"
+                    disabled={busy || !isDraftDifferent("procedure", p.id, p.required) || getDraft("procedure", p.id, p.required).trim() === ""}
+                  >
+                    Save
+                  </Button>
+                </form>
+                <Button 
+                  variant="ghost" size="icon" className="h-8 w-8 text-rose-600 hover:bg-rose-50"
+                  aria-label={`Delete ${p.name}`}
+                  disabled={busy || deleting}
+                  onClick={() => confirmDelete(p.id, "procedure", p.name)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ClinicalWorkRow({ 
+  category, subTypes, getDraft, setDraft, isDraftDifferent, patchItem, confirmDelete, busy, deleting, save
+}: any) {
+  const [expanded, setExpanded] = React.useState(false);
+  const [newSubTypeName, setNewSubTypeName] = React.useState("");
+
+  const handleAddSubType = (e: React.FormEvent) => {
+    e.preventDefault();
+    void save(async () => {
+      await apiPost("/api/admin/department/catalog", { 
+        kind: "clinical_work_subtype", 
+        name: newSubTypeName, 
+        required: 0, 
+        period: "total", 
+        value: newSubTypeName.trim(), 
+        parentValue: category.value 
+      });
+      setNewSubTypeName("");
+    }, "Log option added");
+  };
+
+  return (
+    <div className="flex flex-col border border-slate-200 rounded-xl bg-white overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between p-3 bg-slate-50 gap-2">
+        <button 
+          type="button" 
+          aria-expanded={expanded}
+          onClick={() => setExpanded(!expanded)}
+          className="flex flex-1 items-center gap-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 rounded min-w-[200px]"
+        >
+          <ChevronDown className={`h-4 w-4 shrink-0 text-slate-500 transition-transform ${expanded ? "" : "-rotate-90"}`} />
+          <div className="flex flex-col">
+            <span className="text-sm font-medium text-slate-900">{category.name}</span>
+            {category.period === "month" && <span className="text-xs text-slate-500">per month</span>}
+          </div>
+        </button>
+        <div className="flex items-center gap-3 md:pl-4 md:border-l border-slate-200">
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            patchItem(category.id, "clinical_work_category", category.required, category.period, "Clinical work minimum updated");
+          }} className="flex items-center gap-2">
+            <Label htmlFor={`target-${category.id}`} className="text-xs text-slate-500">Minimum</Label>
+            <Input 
+              id={`target-${category.id}`}
+              type="number" min={0} max={100000} required className="w-20"
+              aria-label={`Minimum for ${category.name}`}
+              value={getDraft("clinical_work_category", category.id, category.required)}
+              onChange={(e) => setDraft("clinical_work_category", category.id, e.target.value)}
+            />
+            <Button 
+              type="submit"
+              size="sm" variant="outline"
+              disabled={busy || !isDraftDifferent("clinical_work_category", category.id, category.required) || getDraft("clinical_work_category", category.id, category.required).trim() === ""}
+            >
+              Save
+            </Button>
+          </form>
+          <Button 
+            variant="ghost" size="icon" className="h-8 w-8 text-rose-600 hover:bg-rose-50"
+            aria-label={`Delete ${category.name}`}
+            disabled={busy || deleting}
+            onClick={() => confirmDelete(category.id, "clinical_work_category", category.name)}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+      {expanded && (
+        <div className="bg-white p-4 border-t border-slate-200 space-y-4">
+          {subTypes.length === 0 ? (
+            <p className="text-sm text-slate-500">No sub-types yet</p>
+          ) : (
+            <ul className="flex flex-col divide-y divide-slate-100 border border-slate-200 rounded-lg">
+              {subTypes.map((item: any) => (
+                <li key={item.id} className="flex items-center justify-between p-2">
+                  <span className="text-sm pl-2">{item.name}</span>
+                  <Button 
+                    variant="ghost" size="icon" className="h-8 w-8 text-rose-600 hover:bg-rose-50"
+                    aria-label={`Delete ${item.name}`}
+                    disabled={busy || deleting}
+                    onClick={() => confirmDelete(item.id, "clinical_work_subtype", item.name)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <form onSubmit={handleAddSubType} className="flex items-end gap-2 max-w-sm">
+            <div className="space-y-1 flex-1">
+              <Label htmlFor={`add-subtype-${category.id}`} className="text-xs font-semibold">Add sub-type</Label>
+              <Input 
+                id={`add-subtype-${category.id}`}
+                required maxLength={160}
+                value={newSubTypeName} onChange={e => setNewSubTypeName(e.target.value)}
+              />
+            </div>
+            <Button type="submit" variant="secondary" disabled={busy}>Add log option</Button>
+          </form>
+        </div>
+      )}
+    </div>
+  );
 }
