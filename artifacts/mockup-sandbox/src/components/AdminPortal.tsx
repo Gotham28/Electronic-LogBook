@@ -127,7 +127,7 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
     }
     setCreatingDept(true);
     try {
-      await createAdminDepartment({
+      const result = await createAdminDepartment({
         setup: {
           name: newDeptForm.name,
           code: newDeptForm.code,
@@ -139,6 +139,7 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
         hodPassword: newDeptForm.hodPassword
       });
       toast.success("Department and HOD created successfully");
+      if (!result.emailAccepted) toast.warning("The HOD account was created, but the onboarding email could not be accepted by the email provider.");
       setShowNewDeptPanel(false);
       setNewDeptForm({ name: "", code: "", hodFullName: "", hodEmail: "", hodPassword: "" });
       fetchDepartments();
@@ -532,8 +533,9 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
     setReplacingHod(true);
     setReplaceHodError(null);
     try {
-      await replaceAdminHod(department.id, incomingFaculty.id);
+      const result = await replaceAdminHod(department.id, incomingFaculty.id);
       toast.success("HOD replaced successfully");
+      if (!result.emailAccepted) toast.warning("The HOD role changed, but the appointment email could not be accepted by the email provider.");
       setShowReplaceHod(false);
       setReplaceHodEmail("");
       onRefresh(); // Refresh parent to get updated HOD info
@@ -560,12 +562,18 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
     setAddingUser(true);
     try {
       if (addFormType === "faculty") {
-        await createAdminFaculty(department.id, {
+        const result = await createAdminFaculty(department.id, {
           fullName: addForm.fullName,
           email: addForm.email,
           password: addForm.password
         });
         toast.success("Faculty account created");
+        if (!result.emailAccepted) {
+          const detail = result.emailFailure?.failure === "missing_configuration" ? "Email service configuration is missing"
+            : result.emailFailure?.failure === "provider_rejected" ? `Email provider rejected it${result.emailFailure.providerStatus ? ` (HTTP ${result.emailFailure.providerStatus})` : ""}`
+              : "Email provider could not be reached";
+          toast.warning(`Faculty account created. ${detail}; check the server log and Resend Events.`);
+        }
       } else {
         await createAdminStudent(department.id, {
           fullName: addForm.fullName,

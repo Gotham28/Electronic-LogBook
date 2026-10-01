@@ -1,7 +1,7 @@
 import { before, after, test } from "node:test";
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
-import { setup, accounts as a } from "./support.js";
+import { setup, accounts as a, sentEmails } from "./support.js";
 import { engine, db, paymentsTable, subscriptionPlansTable } from "./database.js";
 import { eq } from "drizzle-orm";
 
@@ -75,21 +75,28 @@ test("wrong signature -> 400, payments row unchanged", async () => {
 
 test("valid signature, payment.captured, known order at 'created' -> 200, row becomes 'paid' with razorpay_payment_id stored", async () => {
   await insertPayment("order_captured", a.pending0.id);
+  const emailStart = sentEmails.length;
   const body = capturedBody("order_captured", "pay_captured_1", 140000);
   const status = await postWebhook(body, sign(body));
   assert.equal(status, 200);
   const row = await paymentRow("order_captured");
   assert.equal(row!.status, "paid");
   assert.equal(row!.razorpayPaymentId, "pay_captured_1");
+  const notices = sentEmails.slice(emailStart).filter((email) => email.subject === "Action Required: Pending Student Approval");
+  assert.equal(notices.length, 1);
+  assert.equal(notices[0].to, a.hod0.email);
+  assert.match(notices[0].text, /is awaiting your approval/);
 });
 
 test("the exact same request replayed a second time -> 200, row still 'paid', unchanged", async () => {
+  const emailStart = sentEmails.length;
   const body = capturedBody("order_captured", "pay_captured_1", 140000);
   const status = await postWebhook(body, sign(body));
   assert.equal(status, 200);
   const row = await paymentRow("order_captured");
   assert.equal(row!.status, "paid");
   assert.equal(row!.razorpayPaymentId, "pay_captured_1");
+  assert.equal(sentEmails.slice(emailStart).filter((email) => email.subject === "Action Required: Pending Student Approval").length, 0);
 });
 
 test("valid signature, payment.captured, unknown order id -> 200, no row created", async () => {
