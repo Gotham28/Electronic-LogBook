@@ -51,7 +51,16 @@ export function MaintenanceAnnouncements() {
     }
   };
 
-  React.useEffect(() => { void fetchAnnouncements(); }, []);
+  React.useEffect(() => {
+    void fetchAnnouncements();
+    const refresh = window.setInterval(() => { void fetchAnnouncements(); }, 60_000);
+    const refreshOnFocus = () => { if (document.visibilityState === "visible") void fetchAnnouncements(); };
+    document.addEventListener("visibilitychange", refreshOnFocus);
+    return () => {
+      window.clearInterval(refresh);
+      document.removeEventListener("visibilitychange", refreshOnFocus);
+    };
+  }, []);
 
   const startIso = istDateTimeInputToIso(form.startAt);
   const endIso = istDateTimeInputToIso(form.endAt);

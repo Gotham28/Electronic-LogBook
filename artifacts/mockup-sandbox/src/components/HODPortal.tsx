@@ -195,8 +195,9 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
 
   const approveStudent = async (id: number) => {
     try {
-      await apiPost(`/api/admin/students/${id}/approve`, {});
+      const result = await apiPost<{ emailAccepted: boolean }>(`/api/admin/students/${id}/approve`, {});
       toast.success("Student approved successfully");
+      if (!result.emailAccepted) toast.warning("Student approval is complete, but the confirmation email could not be accepted by the email provider.");
       setPendingStudents((current) => current.filter((s) => s.id !== id));
       setRoster(null);
     } catch (err: any) {
@@ -264,10 +265,16 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
     e.preventDefault();
     setCreatingProf(true);
     try {
-      await apiPost("/api/admin/professors", {
+      const result = await apiPost<{ emailAccepted: boolean; emailFailure?: { failure: string; providerStatus?: number } }>("/api/admin/professors", {
         ...profForm
       });
       toast.success("Faculty account created successfully");
+      if (!result.emailAccepted) {
+        const detail = result.emailFailure?.failure === "missing_configuration" ? "Email service configuration is missing"
+          : result.emailFailure?.failure === "provider_rejected" ? `Email provider rejected it${result.emailFailure.providerStatus ? ` (HTTP ${result.emailFailure.providerStatus})` : ""}`
+            : "Email provider could not be reached";
+        toast.warning(`Faculty account created. ${detail}; check the server log and Resend Events.`);
+      }
       setProfForm({ fullName: "", email: "", password: "" });
       setRoster(null);
     } catch (err: any) {

@@ -9,7 +9,7 @@ import { completionPercent, configSchema, dateSchema, emailSchema, nameSchema, p
 import { resolveConfigDepartmentId } from "../lib/department-config-source.js";
 import { recomputeProcedureRequirement, recomputeCatalogRequirements } from "../lib/department-requirements.js";
 import { clinicalWorkTarget, verifiedClinicalWorkCounts } from "../lib/clinical-work-progress.js";
-import { sendAccountCreatedEmail } from "../lib/mailer.js";
+import { getEmailFailure, sendAccountCreatedEmail, sendStudentApprovalEmail } from "../lib/mailer.js";
 import { hardDeleteUserCascade } from "../lib/hard-delete-user.js";
 
 const router = Router();
@@ -76,7 +76,8 @@ router.post("/students/:id/approve", async (req, res) => {
     }
 
     const departmentId = req.user?.departmentId;
-    const [target] = await db.select().from(usersTable)
+    const [target] = await db.select({ id: usersTable.id, email: usersTable.email, fullName: usersTable.fullName, departmentId: usersTable.departmentId })
+      .from(usersTable)
       .where(and(eq(usersTable.id, userId), eq(usersTable.role, "student"), eq(usersTable.status, "pending")))
       .limit(1);
     // Nonexistent id and wrong-department both return the same status and body (SEC-36):
@@ -96,11 +97,28 @@ router.post("/students/:id/approve", async (req, res) => {
       return;
     }
 
-    await db.update(usersTable)
+    const [approved] = await db.update(usersTable)
       .set({ status: "approved" })
-      .where(and(eq(usersTable.id, userId), eq(usersTable.departmentId, departmentId!), eq(usersTable.status, "pending")));
+      .where(and(eq(usersTable.id, userId), eq(usersTable.departmentId, departmentId!), eq(usersTable.status, "pending")))
+      .returning({ id: usersTable.id });
 
-    res.json({ message: "Student approved successfully" });
+    if (!approved) {
+      res.status(409).json({ message: "Student status changed before approval could be completed" });
+      return;
+    }
+
+    let emailAccepted = false;
+    try {
+      const [department] = await db.select({ name: departmentsTable.name }).from(departmentsTable)
+        .where(eq(departmentsTable.id, target.departmentId!)).limit(1);
+      if (!department) throw new Error("Department details unavailable");
+      await sendStudentApprovalEmail(target.email, target.fullName, department.name);
+      emailAccepted = true;
+    } catch {
+      req.log.error({ userId, departmentId, status: 200 }, "Student approval email failed");
+    }
+
+    res.json({ message: "Student approved successfully", emailAccepted });
   } catch (error) {
     req.log.error({ userId: req.params.id, status: 500 }, "Error approving student");
     res.status(500).json({ message: "Internal server error" });
@@ -210,19 +228,25 @@ router.post("/professors", validate(z.object({ fullName: nameSchema, email: emai
       departmentId: req.user!.departmentId!
     }).returning();
 
+    let emailAccepted = false;
+    let emailFailure: ReturnType<typeof getEmailFailure> | undefined;
     try {
       const [dept] = await db.select({ name: departmentsTable.name }).from(departmentsTable)
         .where(eq(departmentsTable.id, req.user!.departmentId!)).limit(1);
         
       await sendAccountCreatedEmail(email, fullName, password, "professor", dept?.name);
-    } catch {
+      emailAccepted = true;
+    } catch (error) {
       // Id only: the welcome email carries the plaintext password, so its error is never logged.
-      req.log.error({ userId: newProf.id, status: 201 }, "Faculty welcome email failed");
+      emailFailure = getEmailFailure(error);
+      req.log.error({ userId: newProf.id, status: 201, ...emailFailure }, "Faculty welcome email failed");
       // Continue without returning error to allow account creation to succeed
     }
 
     res.status(201).json({ 
       message: "Faculty account created successfully",
+      emailAccepted,
+      ...(emailFailure ? { emailFailure } : {}),
       professor: {
         id: newProf.id,
         fullName: newProf.fullName,

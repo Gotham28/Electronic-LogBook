@@ -1,15 +1,12 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 
-// mailer.ts reads these directly and has no boot-time check of its own. A missing value is
-// otherwise invisible until a real applicant's registration or password-reset email fails
-// with a missing credential error. This must never throw or exit - Render restarts crashed
-// services, and a failed deploy would take the whole ELogBook offline for residents who have
-// nothing to do with registration.
+// A missing value is visible at startup, while the app remains available. Email routes also
+// surface per-message acceptance failures to the actor who initiated the action.
 const missingEmailVars = ["RESEND_API_KEY", "EMAIL_FROM"].filter((name) => !process.env[name]);
 if (missingEmailVars.length > 0) {
   logger.error({ missing: missingEmailVars },
-    `Missing email credentials (${missingEmailVars.join(", ")}); registration and password-reset emails will fail until they are set`);
+    `Missing email credentials (${missingEmailVars.join(", ")}); automated email delivery is unavailable until they are set`);
 }
 
 // Use Render's port if available, otherwise default to 3000 for local testing
