@@ -51,9 +51,9 @@ export function MobileBottomNav({ role, items, location, departmentKey, switchin
           const itemContent = (
             <Link href={item.href} aria-current={isActive ? "page" : undefined}
               className={`${cell} ${isActive ? (demoMode ? "" : "text-teal-800") : "text-slate-500 hover:text-slate-800"}`}
-              style={demoMode && isActive ? { color: "var(--demo-accent)" } : undefined}>
+              style={demoMode && isActive ? { color: "var(--demo-accent-readable)" } : undefined}>
               <span data-mobile-nav-icon className={`grid h-8 w-9 place-items-center rounded-full transition-colors ${isActive && !demoMode ? "bg-teal-50 text-teal-700" : "text-slate-500"}`}
-                style={demoMode && isActive ? { backgroundColor: "color-mix(in srgb, var(--demo-accent) 10%, white)", color: "var(--demo-accent)" } : undefined}>
+                style={demoMode && isActive ? { backgroundColor: "color-mix(in srgb, var(--demo-accent) 10%, white)", color: "var(--demo-accent-readable)" } : undefined}>
                 <Icon className="h-5 w-5" aria-hidden="true" />
               </span>
               <span className="w-full truncate text-center tracking-tight">{SHORT_LABELS[item.title] ?? item.title}</span>

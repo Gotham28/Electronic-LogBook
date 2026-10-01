@@ -59,7 +59,7 @@ export function DemoBanner() {
       style={{
         borderColor: "color-mix(in srgb, var(--demo-accent) 22%, white)",
         backgroundColor: "color-mix(in srgb, var(--demo-accent) 7%, white)",
-        color: "var(--demo-accent)",
+        color: "var(--demo-accent-readable)",
       }}
     >
       <p className="col-span-2 min-w-0 text-xs font-medium leading-5 sm:flex-1">
@@ -87,7 +87,7 @@ export function DemoBanner() {
         size="sm"
         onClick={resetDemo}
         className="col-start-2 row-start-2 h-11 shrink-0 justify-self-end gap-1.5 border-white/80 bg-white/80 px-2.5 text-xs transition-colors hover:bg-white sm:col-auto sm:row-auto"
-        style={{ color: "var(--demo-accent)" }}
+        style={{ color: "var(--demo-accent-readable)" }}
       >
         <RotateCcw aria-hidden="true" className="h-3.5 w-3.5" />
         Reset demo
@@ -104,7 +104,7 @@ export function DemoBanner() {
           if (soundMuted) playDemoSound("click");
         }}
         className="col-start-1 row-start-2 h-11 shrink-0 justify-self-start gap-1.5 border-white/80 bg-white/80 px-2.5 text-xs transition-colors hover:bg-white sm:col-auto sm:row-auto"
-        style={{ color: "var(--demo-accent)" }}
+        style={{ color: "var(--demo-accent-readable)" }}
       >
         {soundMuted ? <VolumeX aria-hidden="true" className="h-3.5 w-3.5" /> : <Volume2 aria-hidden="true" className="h-3.5 w-3.5" />}
         <span className="hidden sm:inline">{soundMuted ? "Sound off" : "Sound on"}</span>

@@ -37,6 +37,54 @@ import { modules as discoveredModules } from "./.generated/mockup-components";
 
 type ModuleMap = Record<string, () => Promise<Record<string, unknown>>>;
 
+function relativeLuminance(hex: string): number | null {
+  const match = hex.match(/^#?([\da-f]{6})$/i);
+  if (!match) return null;
+
+  const channels = [0, 2, 4].map((offset) => parseInt(match[1].slice(offset, offset + 2), 16) / 255);
+  const linear = channels.map((channel) => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4);
+  return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
+}
+
+function contrastRatio(first: number, second: number): number {
+  const lighter = Math.max(first, second);
+  const darker = Math.min(first, second);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+function mixHexWithBlack(hex: string, amount: number): string {
+  const match = hex.match(/^#?([\da-f]{6})$/i);
+  if (!match) return hex;
+  const channels = [0, 2, 4].map((offset) => Math.round(parseInt(match[1].slice(offset, offset + 2), 16) * (1 - amount)));
+  return `#${channels.map((channel) => channel.toString(16).padStart(2, "0")).join("")}`;
+}
+
+function getDemoAccentTextColors(accent: string) {
+  const accentLuminance = relativeLuminance(accent);
+  if (accentLuminance === null) return { readable: "#0f766e", foreground: "#ffffff" };
+
+  const whiteLuminance = 1;
+  const inkLuminance = relativeLuminance("#0f172a")!;
+  let readable = accent;
+  if (contrastRatio(accentLuminance, whiteLuminance) < 4.5) {
+    for (let amount = 0.02; amount <= 0.9; amount += 0.02) {
+      const candidate = mixHexWithBlack(accent, amount);
+      const candidateLuminance = relativeLuminance(candidate);
+      if (candidateLuminance !== null && contrastRatio(candidateLuminance, whiteLuminance) >= 4.5) {
+        readable = candidate;
+        break;
+      }
+    }
+  }
+
+  return {
+    readable,
+    foreground: contrastRatio(accentLuminance, whiteLuminance) >= contrastRatio(accentLuminance, inkLuminance)
+      ? "#ffffff"
+      : "#0f172a",
+  };
+}
+
 function _resolveComponent(
   mod: Record<string, unknown>,
   name: string,
@@ -164,10 +212,16 @@ function App() {
   useEffect(() => {
     const root = document.documentElement;
     if (currentUser?.isDemoMode) {
-      root.style.setProperty("--demo-accent", getDemoDepartmentProfile(currentUser.departmentId).accent);
+      const accent = getDemoDepartmentProfile(currentUser.departmentId).accent;
+      const { readable, foreground } = getDemoAccentTextColors(accent);
+      root.style.setProperty("--demo-accent", accent);
+      root.style.setProperty("--demo-accent-readable", readable);
+      root.style.setProperty("--demo-accent-foreground", foreground);
       root.setAttribute("data-demo-mode", "true");
     } else {
       root.style.removeProperty("--demo-accent");
+      root.style.removeProperty("--demo-accent-readable");
+      root.style.removeProperty("--demo-accent-foreground");
       root.removeAttribute("data-demo-mode");
     }
   }, [currentUser?.departmentId, currentUser?.isDemoMode]);

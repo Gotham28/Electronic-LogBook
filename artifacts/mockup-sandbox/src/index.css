@@ -675,6 +675,14 @@ html[data-demo-mode="true"] [class~="border-teal-500/40"] {
   border-color: color-mix(in srgb, var(--demo-accent) 42%, white);
 }
 
+html[data-demo-mode="true"] [class~="text-teal-600"],
+html[data-demo-mode="true"] [class~="text-teal-700"],
+html[data-demo-mode="true"] [class~="text-teal-800"],
+html[data-demo-mode="true"] [class~="text-teal-900"],
+html[data-demo-mode="true"] [class~="text-teal-950"] {
+  color: var(--demo-accent-readable);
+}
+
 @keyframes demo-item-enter {
   from { opacity: 0; transform: translateY(7px); }
   to { opacity: 1; transform: translateY(0); }
