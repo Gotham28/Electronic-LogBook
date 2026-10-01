@@ -70,3 +70,5 @@ lib/db/src/verify-allowances.ts
 student_old.ts
 
 artifacts/api-server/data/
+
+IMPLEMENTATION_PLAN_*.md
