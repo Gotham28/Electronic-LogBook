@@ -80,6 +80,9 @@ export function QuarterlyAppraisalSection() {
   React.useEffect(() => { loadStudents(); }, [loadStudents]);
   React.useEffect(() => { loadAppraisals(studentId); }, [loadAppraisals, studentId]);
 
+  const firstMissingScore = quarterlyAppraisalCategories.find(({ key }) => !scores[key]);
+  const requiredFieldsReady = Boolean(studentId && quarter && year && appraisalDate && publications && !firstMissingScore);
+
   const onStudentChange = (value: string) => {
     setStudentId(value);
     setScores(blankScores());
@@ -93,7 +96,6 @@ export function QuarterlyAppraisalSection() {
   const handleSave = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setFormError(null);
-    const firstMissingScore = quarterlyAppraisalCategories.find(({ key }) => !scores[key]);
     if (!studentId || !quarter || !year || !appraisalDate || !publications || firstMissingScore) {
       setFormError("Complete the student, quarter, year, date, publication status, and all 10 scores.");
       if (firstMissingScore) document.getElementById(`appraisal-${firstMissingScore.key}`)?.focus();
@@ -134,7 +136,15 @@ export function QuarterlyAppraisalSection() {
   };
 
   const handleDraftWithArogya = async () => {
-    if (!studentId || draftLoading) return;
+    if (draftLoading || saving) return;
+    if (!requiredFieldsReady) {
+      setFormError("Complete the student, quarter, year, date, publication status, and all 10 scores before drafting.");
+      if (!studentId) document.getElementById("appraisal-student")?.focus();
+      else if (!publications) document.getElementById("appraisal-publications")?.focus();
+      else if (firstMissingScore) document.getElementById(`appraisal-${firstMissingScore.key}`)?.focus();
+      return;
+    }
+    setFormError(null);
     setDraftLoading(true);
     setDraftError(null);
     try {
@@ -260,19 +270,25 @@ export function QuarterlyAppraisalSection() {
 
               <div className="space-y-4">
                 <div className="space-y-1.5">
-                  <div className="flex items-center justify-between gap-3">
-                    <Label htmlFor="appraisal-faculty-remarks">Faculty remarks</Label>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+                    <div className="min-w-0">
+                      <Label htmlFor="appraisal-faculty-remarks">Faculty remarks</Label>
+                      <p id="appraisal-draft-help" className="mt-1 text-xs leading-relaxed text-slate-500">
+                        Complete the required appraisal fields to draft remarks and suggestions with Arogya AI.
+                      </p>
+                    </div>
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
-                      disabled={!studentId || draftLoading}
+                      disabled={!requiredFieldsReady || draftLoading || saving}
                       onClick={handleDraftWithArogya}
-                      className="gap-1.5 text-teal-700 border-teal-200 hover:bg-teal-50"
+                      aria-describedby="appraisal-draft-help"
+                      className="min-h-11 shrink-0 gap-1.5 border-teal-200 bg-white px-3 text-teal-800 shadow-sm hover:bg-teal-50 focus-visible:ring-teal-600"
                       id="appraisal-draft-arogya"
                     >
                       <Wand2 className="h-3.5 w-3.5" aria-hidden="true" />
-                      {draftLoading ? "Drafting…" : "Draft with Arogya"}
+                      {draftLoading ? "Drafting…" : "Draft with Arogya AI"}
                     </Button>
                   </div>
                   {draftError && <p className="text-xs text-rose-700" role="alert">{draftError}</p>}

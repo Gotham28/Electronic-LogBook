@@ -60,7 +60,6 @@ import {
 } from "lucide-react";
 
 import { LegalDisclaimerModal } from "@/components/LegalDisclaimerModal";
-import { ArogyaCharacter } from "@/components/arogya/ArogyaCharacter";
 import { ArogyaPanel } from "@/components/arogya/ArogyaPanel";
 import { MaintenanceNoticeBubble } from "@/components/arogya/MaintenanceNoticeBubble";
 import { useDepartment } from "@/lib/department-context";
@@ -528,7 +527,7 @@ export function AppLayout({
           <Sidebar collapsible="icon" className="print-hidden border-r border-slate-200/80 bg-white/95 shadow-[0_24px_80px_rgba(15,23,42,0.06)] backdrop-blur-xl">
             <SidebarHeader className="h-[74px] overflow-hidden border-b border-slate-100 p-4 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-2">
               <div className="relative flex h-full w-full items-center overflow-hidden group-data-[collapsible=icon]:justify-center">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-600 text-white shadow-[0_12px_28px_rgba(13,148,136,0.2)] transition-colors duration-200" style={demoMode ? { backgroundColor: "var(--demo-accent)" } : undefined}>
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-600 text-white shadow-[0_12px_28px_rgba(13,148,136,0.2)] transition-colors duration-200" style={demoMode ? { backgroundColor: "var(--demo-accent)", color: "var(--demo-accent-foreground)" } : undefined}>
                   <BookOpenCheck className="h-6 w-6" />
                 </div>
                 <div className="absolute left-[52px] top-1/2 w-[180px] -translate-y-1/2 whitespace-nowrap transition-opacity duration-150 group-data-[collapsible=icon]:pointer-events-none group-data-[collapsible=icon]:opacity-0">
@@ -540,7 +539,7 @@ export function AppLayout({
 
             <SidebarContent className="p-2">
               <SidebarGroup>
-                <SidebarGroupLabel className="mb-2 h-8! px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-teal-900/45 group-data-[collapsible=icon]:mt-0! group-data-[collapsible=icon]:opacity-0">
+                <SidebarGroupLabel className="mb-2 h-8! px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-teal-900/45 group-data-[collapsible=icon]:mt-0! group-data-[collapsible=icon]:opacity-0" style={demoMode ? { color: "var(--demo-accent-readable)" } : undefined}>
                   {activeRole} workspace
                 </SidebarGroupLabel>
                 <SidebarGroupContent>
@@ -562,10 +561,10 @@ export function AppLayout({
                               ? `border border-white/60 font-semibold text-white shadow-[0_16px_36px_rgba(13,148,136,0.22)] hover:text-white ${demoMode ? "" : "bg-gradient-to-r from-teal-600 to-cyan-500"}`
                               : "text-slate-600 hover:border hover:border-white/70 hover:bg-white/80 hover:text-teal-900"
                           }`}
-                          style={demoMode && isActive ? { backgroundColor: "var(--demo-accent)" } : undefined}
+                          style={demoMode && isActive ? { backgroundColor: "var(--demo-accent)", color: "var(--demo-accent-foreground)" } : undefined}
                         >
                           <Link href={item.href} className="flex w-full items-center gap-3 group-data-[collapsible=icon]:justify-center">
-                            <Icon className={`h-4 w-4 ${isActive ? "text-white" : demoMode ? "text-[var(--demo-accent)]" : "text-teal-600"}`} />
+                            <Icon className={`h-4 w-4 ${isActive ? (demoMode ? "text-[var(--demo-accent-foreground)]" : "text-white") : demoMode ? "text-[var(--demo-accent-readable)]" : "text-teal-600"}`} />
                             <span className="flex-1 truncate text-[13px] group-data-[collapsible=icon]:hidden">{item.title}</span>
 
                             {item.badgeLoading ? (
@@ -575,7 +574,7 @@ export function AppLayout({
                                 variant="outline"
                                 className={`rounded-full px-1.5 py-0 text-[9px] group-data-[collapsible=icon]:hidden ${
                                   isActive
-                                    ? "border-white/25 bg-white/15 text-white"
+                                    ? demoMode ? "border-white/25 bg-white/15 text-[var(--demo-accent-foreground)]" : "border-white/25 bg-white/15 text-white"
                                     : item.badgeColor || "border-teal-100 bg-teal-50 text-teal-700"
                                 }`}
                               >
@@ -767,17 +766,6 @@ export function AppLayout({
           {maintenanceLoadError && !arogyaOpen && !bubbleNotice && <div role="alert" className="print:hidden fixed bottom-[calc(144px+env(safe-area-inset-bottom))] right-4 z-40 max-w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-amber-200 bg-white p-3 text-xs text-amber-950 shadow-lg sm:bottom-24 sm:right-6">
             {maintenanceLoadError} <button type="button" className="ml-1 font-semibold underline" onClick={() => setMaintenanceRefreshToken((value) => value + 1)}>Retry</button>
           </div>}
-
-          {!arogyaOpen && (
-            <button
-              type="button"
-              aria-label="Open Arogya assistant"
-              onClick={() => setArogyaOpen(true)}
-              className="print:hidden fixed z-40 bottom-[calc(76px+env(safe-area-inset-bottom))] right-4 sm:bottom-6 sm:right-6 flex h-14 w-14 items-center justify-center rounded-full bg-white border border-teal-100 shadow-[0_12px_24px_rgba(15,23,42,0.12)] transition-transform hover:scale-105"
-            >
-              <ArogyaCharacter state="idle" size={36} />
-            </button>
-          )}
 
           <Dialog open={isChangePasswordOpen} onOpenChange={setIsChangePasswordOpen}>
             <DialogContent className="sm:max-w-md rounded-[20px]">

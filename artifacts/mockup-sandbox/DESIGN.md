@@ -63,7 +63,7 @@ The interface should feel like a well-ordered clinical record desk: familiar log
 - **Memorable signature:** A soft teal active state inside pale, translucent application surfaces.
 - **Restraint:** Keep text, record status, dates, units, and primary actions more prominent than decoration.
 - **Anti-references:** Avoid dense miniature labels, oversized dashboard tiles, and competing accent colors that make records harder to scan.
-- **Token ownership/runtime mapping:** The existing runtime CSS in `src/index.css` is canonical (Tailwind CSS v4 `@theme inline` and CSS variables). This file records its accepted visual language and mobile scale. Shared primitives in `src/components/ui/` consume those runtime styles; CSS mobile rules normalize their rendered sizes. No generated token export is used.
+- **Token ownership/runtime mapping:** The existing runtime CSS in `src/index.css` is canonical (Tailwind CSS v4 `@theme inline` and CSS variables). This file records its accepted visual language and mobile scale. Shared primitives in `src/components/ui/` consume those runtime styles; CSS mobile rules normalize their rendered sizes. Demo department accents are sourced from `src/lib/demoDepartments.ts` and mapped by `src/App.tsx` to `--demo-accent`, `--demo-accent-readable` (contrast-safe accent text on light surfaces), and `--demo-accent-foreground` (white or dark text on accent fills, selected by contrast). Demo teal text utilities use the readable accent token. No generated token export is used.
 
 ## Colors
 
