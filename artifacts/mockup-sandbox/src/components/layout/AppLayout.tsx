@@ -65,6 +65,7 @@ import { MaintenanceNoticeBubble } from "@/components/arogya/MaintenanceNoticeBu
 import { useDepartment } from "@/lib/department-context";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { DemoBanner } from "@/components/layout/DemoBanner";
+import { DemoMovie } from "@/components/demo-movie/DemoMovie";
 
 export type RoleType = "Student" | "Faculty" | "HOD";
 
@@ -748,6 +749,7 @@ export function AppLayout({
           <Toaster position="top-right" richColors />
 
           <ArogyaPanel 
+            key={demoMode ? activeRole : undefined}
             open={arogyaOpen}
             onOpenChange={setArogyaOpen}
             role={activeRole}
@@ -755,6 +757,16 @@ export function AppLayout({
             maintenanceNotice={panelMaintenanceNotice}
             onNavigate={(href) => setLocation(href)}
           />
+
+          {demoMode && (
+            <DemoMovie 
+              activeRole={activeRole} 
+              navigate={setLocation} 
+              blocked={disclaimerBlocksNotice} 
+              arogyaOpen={arogyaOpen} 
+              setArogyaOpen={setArogyaOpen} 
+            />
+          )}
 
           {bubbleNotice && !arogyaOpen && !disclaimerBlocksNotice && <MaintenanceNoticeBubble
             heading={bubbleNotice.title}

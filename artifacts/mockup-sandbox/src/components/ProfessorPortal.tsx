@@ -446,7 +446,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
         )}
 
         {/* Tab 1: Sequential Fast Review Queue */}
-        <TabsContent value="review-queue" className="pt-4 space-y-6">
+        <TabsContent value="review-queue" className="pt-4 space-y-6" data-tour="review-queue">
           {reviews.length === 0 || currentIndex >= reviews.length ? (
             <Card className="p-8 text-center bg-white border border-slate-200">
               <CheckCircle2 className="h-12 w-12 text-emerald-500 mx-auto mb-3" />
@@ -457,7 +457,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Submission Detail View */}
               <div className="lg:col-span-2 space-y-4">
-                <Card className="border border-slate-200 shadow-xs bg-white">
+                <Card className="border border-slate-200 shadow-xs bg-white" data-tour="review-first-item">
                   <CardHeader className="border-b border-slate-100 pb-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
@@ -610,6 +610,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                       <Button
                         onClick={handleApprove}
                         disabled={isSubmitting}
+                        data-tour="review-approve"
                         className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold gap-1"
                       >
                         <CheckCircle2 className="h-4 w-4" /> Verify &amp; Next

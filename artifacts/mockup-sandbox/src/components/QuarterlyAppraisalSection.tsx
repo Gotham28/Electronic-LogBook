@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { QuarterlyAppraisalRecord } from "@/components/QuarterlyAppraisalRecord";
 import { apiGet, apiPost } from "@/lib/apiClient";
-import { getCurrentUser } from "@/lib/session";
+import { getCurrentUser, isDemoMode } from "@/lib/session";
 import { toast } from "sonner";
 import {
   appraisalScoreBand,
@@ -18,6 +18,10 @@ import {
   type AppraisalStudent,
   type QuarterlyAppraisal,
 } from "@/lib/quarterly-appraisal";
+import { ARO_DEMO_COMMAND_EVENT, type AroDemoCommand } from "./demo-movie/movieBridge";
+import { useDemoTypedValue } from "./demo-movie/DemoTypedText";
+import { useDemoMotionEnabled } from "@/components/DemoMotion";
+import { DEMO_MOVIE_CHANGED_EVENT, isDemoMovieActive } from "@/lib/demoSession";
 
 function blankScores(): Record<AppraisalScoreKey, string> {
   return Object.fromEntries(quarterlyAppraisalCategories.map(({ key }) => [key, ""])) as Record<AppraisalScoreKey, string>;
@@ -44,6 +48,97 @@ export function QuarterlyAppraisalSection() {
   const [saving, setSaving] = React.useState(false);
   const [draftLoading, setDraftLoading] = React.useState(false);
   const [draftError, setDraftError] = React.useState<string | null>(null);
+
+  const [facultyRemarksTarget, setFacultyRemarksTarget] = React.useState("");
+  const [remediationTarget, setRemediationTarget] = React.useState("");
+  const [hasDrafted, setHasDrafted] = React.useState(false);
+  
+  const [userEditedRemarks, setUserEditedRemarks] = React.useState(false);
+  const [userEditedRemediation, setUserEditedRemediation] = React.useState(false);
+
+  const demoMotionEnabled = useDemoMotionEnabled();
+  const { revealedText: revealedRemarks } = useDemoTypedValue(facultyRemarksTarget, isDemoMode() && demoMotionEnabled);
+  const { revealedText: revealedRemediation } = useDemoTypedValue(remediationTarget, isDemoMode() && demoMotionEnabled);
+
+  React.useEffect(() => {
+    if (isDemoMode() && facultyRemarksTarget && !userEditedRemarks) {
+      setFacultyRemarks(revealedRemarks);
+    }
+  }, [revealedRemarks, facultyRemarksTarget, userEditedRemarks]);
+
+  React.useEffect(() => {
+    if (isDemoMode() && remediationTarget && !userEditedRemediation) {
+      setRemediationSuggestions(revealedRemediation);
+    }
+  }, [revealedRemediation, remediationTarget, userEditedRemediation]);
+
+  // Expose state to ref for the demo command listener
+  const studentsRef = React.useRef(students);
+  studentsRef.current = students;
+  const setStudentIdRef = React.useRef(setStudentId);
+  setStudentIdRef.current = setStudentId;
+
+  React.useEffect(() => {
+    if (!isDemoMode()) return undefined;
+    let unmounted = false;
+    let runIdCounter = 0;
+    let clickTimeout: number | undefined;
+    let pollTimeout: number | undefined;
+
+    const handler = (e: Event) => {
+      const event = e as CustomEvent<AroDemoCommand>;
+      if (event.detail.type === "appraisal-prefill-and-draft") {
+        runIdCounter++;
+        const currentRunId = runIdCounter;
+
+        const doPrefillAndDraft = async () => {
+          let targetStudentId = "";
+          let attempt = 0;
+          while (attempt < 30 && !unmounted && currentRunId === runIdCounter) { // 3 seconds max
+            if (studentsRef.current.length > 0) {
+              targetStudentId = String(studentsRef.current[0].id);
+              break;
+            }
+            await new Promise((r) => { pollTimeout = window.setTimeout(r, 100); });
+            attempt++;
+          }
+          if (!targetStudentId || unmounted || currentRunId !== runIdCounter) return; // give up quietly
+
+          setStudentIdRef.current(targetStudentId);
+          setQuarter(String(Math.floor(new Date().getMonth() / 3) + 1));
+          setYear(String(new Date().getFullYear()));
+          setAppraisalDate(localDateValue(new Date()));
+          setPublications("yes"); // first allowed option
+          
+          const newScores = blankScores();
+          quarterlyAppraisalCategories.forEach(({ key }) => {
+            newScores[key] = "5"; // mid-range score
+          });
+          setScores(newScores);
+          
+          clickTimeout = window.setTimeout(() => {
+            if (!unmounted && currentRunId === runIdCounter) {
+              document.getElementById("appraisal-draft-arogya")?.click();
+            }
+          }, 100);
+        };
+        doPrefillAndDraft();
+      }
+    };
+    
+    const movieChangeHandler = () => {
+      if (!isDemoMovieActive()) runIdCounter++;
+    };
+    window.addEventListener(DEMO_MOVIE_CHANGED_EVENT, movieChangeHandler);
+    window.addEventListener(ARO_DEMO_COMMAND_EVENT, handler);
+    return () => {
+      unmounted = true;
+      window.clearTimeout(pollTimeout);
+      window.clearTimeout(clickTimeout);
+      window.removeEventListener(ARO_DEMO_COMMAND_EVENT, handler);
+      window.removeEventListener(DEMO_MOVIE_CHANGED_EVENT, movieChangeHandler);
+    };
+  }, []);
 
   const loadStudents = React.useCallback(async () => {
     setStudentsLoading(true);
@@ -91,6 +186,9 @@ export function QuarterlyAppraisalSection() {
     setPublications("");
     setFormError(null);
     setDraftError(null);
+    setHasDrafted(false);
+    setFacultyRemarksTarget("");
+    setRemediationTarget("");
   };
 
   const handleSave = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -127,6 +225,9 @@ export function QuarterlyAppraisalSection() {
       setFacultyRemarks("");
       setRemediationSuggestions("");
       setPublications("");
+      setHasDrafted(false);
+      setFacultyRemarksTarget("");
+      setRemediationTarget("");
       await loadAppraisals(studentId);
     } catch (error: any) {
       setFormError(error?.message || "Could not save this quarterly appraisal. Check the entries and try again.");
@@ -149,8 +250,20 @@ export function QuarterlyAppraisalSection() {
     setDraftError(null);
     try {
       const result = await apiPost(`/api/arogya/appraisal-draft/${studentId}`, {});
-      setFacultyRemarks(result.facultyRemarks ?? "");
-      setRemediationSuggestions(result.remediationSuggestions ?? "");
+      if (isDemoMode()) {
+        setHasDrafted(true);
+        setUserEditedRemarks(false);
+        setUserEditedRemediation(false);
+        setFacultyRemarksTarget("");
+        setRemediationTarget("");
+        setTimeout(() => {
+          setFacultyRemarksTarget(result.facultyRemarks ?? "");
+          setRemediationTarget(result.remediationSuggestions ?? "");
+        }, 10);
+      } else {
+        setFacultyRemarks(result.facultyRemarks ?? "");
+        setRemediationSuggestions(result.remediationSuggestions ?? "");
+      }
     } catch (err: any) {
       // apiPost throws ApiError; the Arogya routes return { error: "..." } not { message: "..." }
       // so we read err.data.error first, then fall back to err.message
@@ -269,7 +382,7 @@ export function QuarterlyAppraisalSection() {
               </div>
 
               <div className="space-y-4">
-                <div className="space-y-1.5">
+                <div className="space-y-1.5" data-tour="appraisal-remarks">
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                     <div className="min-w-0">
                       <Label htmlFor="appraisal-faculty-remarks">Faculty remarks</Label>
@@ -281,6 +394,7 @@ export function QuarterlyAppraisalSection() {
                       type="button"
                       variant="outline"
                       size="sm"
+                      data-tour="appraisal-draft"
                       disabled={!requiredFieldsReady || draftLoading || saving}
                       onClick={handleDraftWithArogya}
                       aria-describedby="appraisal-draft-help"
@@ -297,9 +411,13 @@ export function QuarterlyAppraisalSection() {
                     className="min-h-24 resize-none"
                     maxLength={5000}
                     value={facultyRemarks}
-                    onChange={(event) => setFacultyRemarks(event.target.value)}
+                    onChange={(event) => {
+                      setFacultyRemarks(event.target.value);
+                      if (isDemoMode()) setUserEditedRemarks(true);
+                    }}
                     placeholder="Faculty remarks on this student's progress"
                   />
+                  {isDemoMode() && hasDrafted && <p className="text-[10px] text-slate-400 font-medium text-right">Sample AI output</p>}
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="appraisal-remediation">Remediation suggestions</Label>
@@ -311,7 +429,10 @@ export function QuarterlyAppraisalSection() {
                     className="min-h-24 resize-none"
                     maxLength={5000}
                     value={remediationSuggestions}
-                    onChange={(event) => setRemediationSuggestions(event.target.value)}
+                    onChange={(event) => {
+                      setRemediationSuggestions(event.target.value);
+                      if (isDemoMode()) setUserEditedRemediation(true);
+                    }}
                     placeholder="Add the suggested remediation when a score is below 4"
                   />
                 </div>

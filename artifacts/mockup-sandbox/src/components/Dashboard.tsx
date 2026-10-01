@@ -164,7 +164,7 @@ export function Dashboard() {
         </CardContent>
       </Card>
 
-      <Card className="overflow-hidden border-white/70 bg-white/78 layer-2">
+      <Card data-tour="dashboard-progress" className="overflow-hidden border-white/70 bg-white/78 layer-2">
         <CardContent className="p-4 sm:p-6 md:p-8">
           <div className="grid gap-8 lg:grid-cols-[1fr_.9fr] lg:items-center">
             <div className="flex flex-col items-start gap-5 sm:flex-row sm:items-center sm:gap-6">

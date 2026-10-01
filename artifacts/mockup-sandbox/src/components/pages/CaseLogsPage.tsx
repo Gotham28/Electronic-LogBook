@@ -215,7 +215,7 @@ export function CaseLogsPage() {
           if (!val) { setForm({ ...emptyForm, date: todayForInput() }); setEditLogId(null); } 
         }}>
           <DialogTrigger asChild>
-            <Button><PlusCircle className="h-4 w-4" /> Log clinical case</Button>
+            <Button data-tour="caselog-add"><PlusCircle className="h-4 w-4" /> Log clinical case</Button>
           </DialogTrigger>
           <DialogContent className="max-h-[90vh] overflow-y-auto rounded-2xl bg-white sm:max-w-3xl">
             <DialogHeader>
@@ -319,7 +319,7 @@ export function CaseLogsPage() {
         </div>
       )}
 
-      <Card>
+      <Card data-tour="caselog-list">
         <CardHeader className="flex flex-col justify-between gap-4 border-b border-teal-100 md:flex-row md:items-center">
           <div className="relative w-full max-w-md">
             <Search className="absolute left-3 top-3 h-4 w-4 text-teal-600" />

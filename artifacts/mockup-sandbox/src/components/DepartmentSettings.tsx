@@ -206,7 +206,7 @@ export function DepartmentSettings() {
   const visibleItems = useSearch<{ id: number; name: string; required: number }>(activeSection.items, searchQuery);
 
   return (
-    <div className="space-y-6">
+    <div data-tour="hod-requirements" className="space-y-6">
       <div className="flex flex-col gap-1 border-b border-slate-200 pb-4">
         <h2 className="text-2xl font-semibold tracking-tight text-slate-900">Training requirements</h2>
         <p className="text-sm text-slate-500">Department of {data.department.name}</p>
