@@ -37,11 +37,11 @@ export function DepartmentSettings() {
     if (procedureTypesEnabled) list.push({ id: "procedures", label: "Procedures", items: data.procedures, kind: "procedure", addLabel: "+ Add procedure", desc: "Procedure groups and types, with the required count for each." });
     if (features.clinicalWorks) list.push({ id: "clinical", label: "Clinical work", items: data.clinicalWorkCategories, kind: "clinical_work_category", addLabel: "+ Add category", desc: "Categories residents log under, the minimum for each (0 means optional), and the sub-types offered. A category with no sub-types is logged without one." });
     list.push({ id: "postings", label: isRadiology ? "Postings" : "Wards / postings", items: data.postings, kind: "posting", addLabel: "+ Add posting", desc: `${isRadiology ? "Postings" : "Wards"}, academic activities and the other lists residents choose from.` });
-    list.push({ id: "academic", label: "Academic activities", items: data.academics, kind: "academic", addLabel: "+ Add activity", desc: `${isRadiology ? "Postings" : "Wards"}, academic activities and the other lists residents choose from.` });
-    if (!features.hideCaseLogs) list.push({ id: "cases", label: "Case categories", items: data.caseCategories ?? [], kind: "case_category", addLabel: "+ Add case category", desc: `${isRadiology ? "Postings" : "Wards"}, academic activities and the other lists residents choose from.` });
-    if (!features.hideProcedureLogs) list.push({ id: "competency", label: "Competency levels", items: data.competencyLevels ?? [], kind: "competency_level", addLabel: "+ Add competency level", desc: `${isRadiology ? "Postings" : "Wards"}, academic activities and the other lists residents choose from.` });
-    if (features.conferenceLevels) list.push({ id: "conference", label: "Conference levels", items: data.conferenceLevels ?? [], kind: "conference_level", addLabel: "+ Add conference level", desc: `${isRadiology ? "Postings" : "Wards"}, academic activities and the other lists residents choose from.` });
-    list.push({ id: "leaves", label: "Leave types", items: data.leaveTypes ?? [], kind: "leave_type", addLabel: "+ Add leave type", desc: `${isRadiology ? "Postings" : "Wards"}, academic activities and the other lists residents choose from.` });
+    list.push({ id: "academic", label: "Academic activities", items: data.academics, kind: "academic", addLabel: "+ Add activity" });
+    if (!features.hideCaseLogs) list.push({ id: "cases", label: "Case categories", items: data.caseCategories ?? [], kind: "case_category", addLabel: "+ Add case category" });
+    if (!features.hideProcedureLogs) list.push({ id: "competency", label: "Competency levels", items: data.competencyLevels ?? [], kind: "competency_level", addLabel: "+ Add competency level" });
+    if (features.conferenceLevels) list.push({ id: "conference", label: "Conference levels", items: data.conferenceLevels ?? [], kind: "conference_level", addLabel: "+ Add conference level" });
+    list.push({ id: "leaves", label: "Leave types", items: data.leaveTypes ?? [], kind: "leave_type", addLabel: "+ Add leave type" });
     return list;
   }, [procedureTypesEnabled, features, data, isRadiology]);
 
@@ -87,10 +87,16 @@ export function DepartmentSettings() {
   }, [fetchGroups, data.department.id]);
 
   const [deleteTarget, setDeleteTarget] = React.useState<{id: number | string, type: "procedure" | "posting" | "academic" | "case_category" | "competency_level" | "leave_type" | "procedure_group" | "conference_level" | "clinical_work_category" | "clinical_work_subtype", name: string, count: number | null} | null>(null);
+  const deleteRequestRef = React.useRef(0);
+  const lastDeleteTarget = React.useRef<{id: number | string, type: any, name: string, count: number | null} | null>(null);
+  React.useEffect(() => {
+    if (deleteTarget) lastDeleteTarget.current = deleteTarget;
+  }, [deleteTarget]);
   const [deleting, setDeleting] = React.useState(false);
   const [deleteError, setDeleteError] = React.useState<string | null>(null);
 
   const confirmDelete = async (id: number | string, type: any, name: string) => {
+    const requestId = ++deleteRequestRef.current;
     setDeleteTarget({ id, type, name, count: null });
     setDeleteError(null);
     try {
@@ -98,9 +104,13 @@ export function DepartmentSettings() {
         : type === "procedure_group" ? `/api/admin/department/procedure-groups/${encodeURIComponent(id as string)}/usage-count` 
         : `/api/admin/department/catalog/${id}/usage-count`;
       const res = await apiGet<{ count: number }>(endpoint);
-      setDeleteTarget({ id, type, name, count: res.count });
+      if (requestId === deleteRequestRef.current) {
+        setDeleteTarget({ id, type, name, count: res.count });
+      }
     } catch (err: any) {
-      setDeleteError(err.message || "Failed to get usage count");
+      if (requestId === deleteRequestRef.current) {
+        setDeleteError(err.message || "Failed to get usage count");
+      }
     }
   };
 
@@ -119,6 +129,7 @@ export function DepartmentSettings() {
       } catch (err: any) {
         toast.warning("Deleted, but the list may be out of date \u2014 refresh the page");
       }
+      fetchGroups();
       setDeleteTarget(null);
     } catch (err: any) {
       if (err?.message?.includes("cannot be removed")) {
@@ -139,12 +150,12 @@ export function DepartmentSettings() {
     finally { setBusy(false); }
   }
 
-  const patchItem = (id: number | string, kind: string, currentVal: number, period?: string, successMsg?: string) => {
+  const patchItem = (id: number | string, kind: string, currentVal: number, period: string | undefined, successMsg: string) => {
     if (!isDraftDifferent(kind, id, currentVal)) return;
     void save(() => apiPatch(`/api/admin/department/${kind === 'procedure' ? 'procedures' : 'catalog'}/${id}`, { 
       required: Number(drafts[`${kind}:${id}`]),
       ...(kind !== 'procedure' ? { period } : {})
-    }), successMsg || "Target updated");
+    }), successMsg);
   };
 
   const [isAdding, setIsAdding] = React.useState(false);
@@ -154,6 +165,15 @@ export function DepartmentSettings() {
   const [procedureGroup, setProcedureGroup] = React.useState("");
   const [isAddingNewGroup, setIsAddingNewGroup] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState("");
+
+  const resetAddForm = () => {
+    setEntryName("");
+    setEntryRequired("");
+    setEntryPeriod("total");
+    setProcedureGroup("");
+    setIsAddingNewGroup(false);
+    setIsAdding(false);
+  };
 
   React.useEffect(() => {
     setIsAdding(false);
@@ -170,8 +190,6 @@ export function DepartmentSettings() {
     void save(async () => {
       if (activeSection.kind === "procedure") {
         await apiPost("/api/admin/department/procedures", { name: entryName, group: procedureGroup, required: Number(entryRequired) });
-        setProcedureGroup("");
-        setIsAddingNewGroup(false);
       } else {
         await apiPost("/api/admin/department/catalog", { 
           kind: activeSection.kind, 
@@ -181,9 +199,7 @@ export function DepartmentSettings() {
           value: entryName.trim()
         });
       }
-      setEntryName("");
-      setEntryRequired("");
-      setIsAdding(false);
+      resetAddForm();
     }, activeSection.kind === "procedure" ? "Procedure type added" : "Log option added");
   };
 
@@ -264,7 +280,7 @@ export function DepartmentSettings() {
                 {activeSection.addLabel}
               </Button>
             </div>
-            <p className="text-sm text-slate-500">{activeSection.desc}</p>
+            {activeSection.desc && <p className="text-sm text-slate-500">{activeSection.desc}</p>}
           </div>
 
           {isAdding && (
@@ -281,13 +297,21 @@ export function DepartmentSettings() {
                     {isAddingNewGroup ? (
                       <Input id="add-group" required maxLength={160} value={procedureGroup} onChange={(e) => setProcedureGroup(e.target.value)} placeholder="Enter new group name" />
                     ) : (
-                      <Select value={procedureGroup} onValueChange={(v) => { if (v === "NEW_GROUP") { setIsAddingNewGroup(true); setProcedureGroup(""); } else { setProcedureGroup(v); } }}>
-                        <SelectTrigger id="add-group"><SelectValue placeholder="Select a group" /></SelectTrigger>
-                        <SelectContent>
-                          {procedureGroups.map(g => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}
-                          <SelectItem value="NEW_GROUP" className="font-semibold text-teal-700">+ Add new group</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <>
+                        <Select value={procedureGroup} onValueChange={(v) => { if (v === "NEW_GROUP") { setIsAddingNewGroup(true); setProcedureGroup(""); } else { setProcedureGroup(v); } }}>
+                          <SelectTrigger id="add-group"><SelectValue placeholder="Select a group" /></SelectTrigger>
+                          <SelectContent>
+                            {procedureGroups.map(g => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}
+                            <SelectItem value="NEW_GROUP" className="font-semibold text-teal-700">+ Add new group</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {groupsError && (
+                          <div className="flex items-center gap-3 mt-1">
+                            <p className="text-sm text-rose-600">Could not load procedure groups.</p>
+                            <Button type="button" variant="outline" size="sm" onClick={fetchGroups} disabled={busy}>Retry</Button>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 )}
@@ -312,7 +336,7 @@ export function DepartmentSettings() {
                 )}
 
                 <div className="flex gap-2 w-full justify-end mt-2">
-                  <Button type="button" variant="outline" onClick={() => setIsAdding(false)}>Cancel</Button>
+                  <Button type="button" variant="outline" onClick={resetAddForm}>Cancel</Button>
                   <Button type="submit" disabled={busy}>Add log option</Button>
                 </div>
               </form>
@@ -408,13 +432,25 @@ export function DepartmentSettings() {
                         <div key={item.id} className="flex items-center justify-between py-3">
                           <div className="flex flex-col">
                             <span className="text-sm font-medium text-slate-900">{item.name}</span>
-                            {(item as any).period && (
+                            {TARGET_KINDS.includes(activeSection.kind) && (item as any).period && (
                               <span className="text-xs text-slate-500">{(item as any).period === "month" ? "per month" : "overall"}</span>
                             )}
                           </div>
                           <div className="flex items-center gap-3">
                             {hasCount && (
-                              <div className="flex items-center gap-2">
+                              <form onSubmit={(e) => {
+                                e.preventDefault();
+                                patchItem(
+                                  item.id, 
+                                  activeSection.kind, 
+                                  (item as any).required, 
+                                  (item as any).period,
+                                  activeSection.kind === "academic" ? "Academic target updated" :
+                                  activeSection.kind === "case_category" ? "Case target updated" :
+                                  activeSection.kind === "conference_level" ? "Conference level target updated" :
+                                  "Leave allowance updated"
+                                );
+                              }} className="flex items-center gap-2">
                                 <Label htmlFor={`target-${item.id}`} className="text-xs text-slate-500">
                                   {isLeave ? "Days" : "Minimum"}
                                 </Label>
@@ -433,23 +469,14 @@ export function DepartmentSettings() {
                                   onChange={(e) => setDraft(activeSection.kind, item.id, e.target.value)}
                                 />
                                 <Button 
+                                  type="submit"
                                   size="sm" 
                                   variant="outline"
-                                  disabled={busy || !isDraftDifferent(activeSection.kind, item.id, (item as any).required)}
-                                  onClick={() => patchItem(
-                                    item.id, 
-                                    activeSection.kind, 
-                                    (item as any).required, 
-                                    (item as any).period,
-                                    activeSection.kind === "academic" ? "Academic target updated" :
-                                    activeSection.kind === "case_category" ? "Case target updated" :
-                                    activeSection.kind === "conference_level" ? "Conference level target updated" :
-                                    "Leave allowance updated"
-                                  )}
+                                  disabled={busy || !isDraftDifferent(activeSection.kind, item.id, (item as any).required) || getDraft(activeSection.kind, item.id, (item as any).required).trim() === ""}
                                 >
                                   Save
                                 </Button>
-                              </div>
+                              </form>
                             )}
                             <Button 
                               variant="ghost" 
@@ -474,60 +501,67 @@ export function DepartmentSettings() {
         </div>
       </div>
 
-      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open && !deleting) { setDeleteTarget(null); setDeleteError(null); } }}>
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open && !deleting) { ++deleteRequestRef.current; setDeleteTarget(null); setDeleteError(null); } }}>
         <AlertDialogContent>
-          <AlertDialogHeader>
-            <div className="flex items-start gap-3">
-              <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-rose-100">
-                <AlertTriangle className="h-4 w-4 text-rose-700" />
-              </div>
-              <div className="flex-1 space-y-3">
-                <AlertDialogTitle className="text-rose-900">Delete {deleteTarget?.name}?</AlertDialogTitle>
-                <AlertDialogDescription asChild>
-                  <div>
-                    {deleteTarget?.count === null ? (
-                      deleteError ? (
-                        <p className="text-sm text-rose-800 mt-1 leading-relaxed">Checking usage failed.</p>
-                      ) : (
-                        <p className="text-sm text-rose-800 mt-1 leading-relaxed animate-pulse">Checking usage...</p>
-                      )
-                    ) : deleteTarget && deleteTarget.count !== null && deleteTarget.count > 0 ? (
-                      <p className="text-sm text-rose-800 mt-1 leading-relaxed">
-                        {deleteTarget.count} student {deleteTarget.count === 1 ? 'record currently uses' : 'records currently use'} &apos;{deleteTarget.name}&apos;. Deleting it will not affect those existing records, but it will be removed from the dropdown for future entries. Delete anyway?
-                      </p>
-                    ) : (
-                      <p className="text-sm text-rose-800 mt-1 leading-relaxed">
-                        No student records currently use this option. Delete?
-                      </p>
-                    )}
-                    {deleteError && deleteTarget && deleteTarget.count !== null && (
-                      <div className="mt-3 p-3 bg-rose-100 border border-rose-300 rounded-md text-sm text-rose-900 font-medium">
-                        {deleteError}
-                      </div>
-                    )}
+          {(() => {
+            const shownTarget = deleteTarget ?? lastDeleteTarget.current;
+            return (
+              <>
+                <AlertDialogHeader>
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-rose-100">
+                      <AlertTriangle className="h-4 w-4 text-rose-700" />
+                    </div>
+                    <div className="flex-1 space-y-3">
+                      <AlertDialogTitle className="text-rose-900">Delete {shownTarget?.name}?</AlertDialogTitle>
+                      <AlertDialogDescription asChild>
+                        <div>
+                          {shownTarget?.count === null ? (
+                            deleteError ? (
+                              <p className="text-sm text-rose-800 mt-1 leading-relaxed">Checking usage failed.</p>
+                            ) : (
+                              <p className="text-sm text-rose-800 mt-1 leading-relaxed animate-pulse">Checking usage...</p>
+                            )
+                          ) : shownTarget && shownTarget.count !== null && shownTarget.count > 0 ? (
+                            <p className="text-sm text-rose-800 mt-1 leading-relaxed">
+                              {shownTarget.count} student {shownTarget.count === 1 ? 'record currently uses' : 'records currently use'} &apos;{shownTarget.name}&apos;. Deleting it will not affect those existing records, but it will be removed from the dropdown for future entries. Delete anyway?
+                            </p>
+                          ) : (
+                            <p className="text-sm text-rose-800 mt-1 leading-relaxed">
+                              No student records currently use this option. Delete?
+                            </p>
+                          )}
+                          {deleteError && shownTarget && shownTarget.count !== null && (
+                            <div className="mt-3 p-3 bg-rose-100 border border-rose-300 rounded-md text-sm text-rose-900 font-medium">
+                              {deleteError}
+                            </div>
+                          )}
+                        </div>
+                      </AlertDialogDescription>
+                    </div>
                   </div>
-                </AlertDialogDescription>
-              </div>
-            </div>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="mt-4">
-            <Button type="button" variant="outline" onClick={() => { setDeleteTarget(null); setDeleteError(null); }}>
-              Cancel
-            </Button>
-            {deleteTarget && deleteTarget.count === null && deleteError ? (
-              <Button type="button" onClick={() => confirmDelete(deleteTarget.id, deleteTarget.type, deleteTarget.name)} className="bg-rose-600 hover:bg-rose-700 text-white">
-                Try again
-              </Button>
-            ) : (
-              <Button
-                onClick={handleDelete}
-                disabled={deleting || !deleteTarget || deleteTarget.count === null}
-                className="bg-rose-600 hover:bg-rose-700 text-white"
-              >
-                {deleting ? "Deleting..." : "Delete"}
-              </Button>
-            )}
-          </AlertDialogFooter>
+                </AlertDialogHeader>
+                <AlertDialogFooter className="mt-4">
+                  <Button type="button" variant="outline" disabled={deleting} onClick={() => { ++deleteRequestRef.current; setDeleteTarget(null); setDeleteError(null); }}>
+                    Cancel
+                  </Button>
+                  {shownTarget && shownTarget.count === null && deleteError ? (
+                    <Button type="button" onClick={() => { if (deleteTarget) confirmDelete(deleteTarget.id, deleteTarget.type, deleteTarget.name); }} className="bg-rose-600 hover:bg-rose-700 text-white">
+                      Try again
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={handleDelete}
+                      disabled={deleting || !deleteTarget || deleteTarget.count === null}
+                      className="bg-rose-600 hover:bg-rose-700 text-white"
+                    >
+                      {deleting ? "Deleting..." : "Delete"}
+                    </Button>
+                  )}
+                </AlertDialogFooter>
+              </>
+            );
+          })()}
         </AlertDialogContent>
       </AlertDialog>
     </div>
@@ -537,15 +571,6 @@ export function DepartmentSettings() {
 function ProceduresList({
   query, procedureGroups, procedures, getDraft, setDraft, isDraftDifferent, patchItem, confirmDelete, busy, deleting, groupsError, fetchGroups
 }: any) {
-  if (groupsError) {
-    return (
-      <div className="py-4 flex items-center gap-3">
-        <p className="text-sm text-rose-600">Could not load procedure groups.</p>
-        <Button variant="outline" size="sm" onClick={fetchGroups} disabled={busy}>Retry</Button>
-      </div>
-    );
-  }
-
   const groupsMap = new Map();
   procedureGroups.forEach((g: any) => {
     groupsMap.set(g.id, { id: g.id, name: g.name, count: g.count, isOfficial: true, types: [] });
@@ -560,29 +585,52 @@ function ProceduresList({
   });
 
   const allGroups = Array.from(groupsMap.values()).sort((a, b) => a.name.localeCompare(b.name));
-  
-  if (allGroups.length === 0 && !query.trim()) {
-    return <p className="py-4 text-sm text-slate-500">No procedure types configured.</p>;
-  }
+
+  const renderedBlocks: any[] = [];
+  let shown = 0;
+
+  allGroups.forEach(g => {
+    const matchingTypes = query.trim() 
+      ? g.types.filter((t: any) => t.name.toLowerCase().includes(query.trim().toLowerCase()))
+      : g.types;
+    
+    const groupMatches = g.name.toLowerCase().includes(query.trim().toLowerCase());
+    if (query.trim() && matchingTypes.length === 0 && !groupMatches) return;
+    
+    const finalTypes = query.trim() && !groupMatches ? matchingTypes : g.types;
+    shown += finalTypes.length;
+
+    renderedBlocks.push(
+      <ProcedureGroupBlock 
+        key={g.id} 
+        group={g} 
+        types={finalTypes}
+        forceExpand={query.trim().length > 0 && matchingTypes.length > 0}
+        {...{ getDraft, setDraft, isDraftDifferent, patchItem, confirmDelete, busy, deleting }}
+      />
+    );
+  });
 
   return (
     <div className="flex flex-col space-y-3">
-      {allGroups.map(g => {
-        const matchingTypes = query.trim() 
-          ? g.types.filter((t: any) => t.name.toLowerCase().includes(query.trim().toLowerCase()))
-          : g.types;
-        
-        const groupMatches = g.name.toLowerCase().includes(query.trim().toLowerCase());
-        if (query.trim() && matchingTypes.length === 0 && !groupMatches) return null;
-
-        return <ProcedureGroupBlock 
-          key={g.id} 
-          group={g} 
-          types={query.trim() && !groupMatches ? matchingTypes : g.types}
-          forceExpand={query.trim().length > 0 && matchingTypes.length > 0}
-          {...{ getDraft, setDraft, isDraftDifferent, patchItem, confirmDelete, busy, deleting }}
-        />;
-      })}
+      {groupsError && (
+        <div className="py-4 flex items-center gap-3">
+          <p className="text-sm text-rose-600">Could not load procedure groups.</p>
+          <Button type="button" variant="outline" size="sm" onClick={fetchGroups} disabled={busy}>Retry</Button>
+        </div>
+      )}
+      {allGroups.length === 0 && !query.trim() ? (
+        <p className="py-4 text-sm text-slate-500">No procedure types configured.</p>
+      ) : renderedBlocks.length === 0 ? (
+        <p className="py-2 text-sm text-slate-500">No matches for &ldquo;{query.trim()}&rdquo;.</p>
+      ) : (
+        <>
+          {query.trim() && (
+            <p className="text-xs text-slate-500">Showing {shown} of {procedures.length}</p>
+          )}
+          {renderedBlocks}
+        </>
+      )}
     </div>
   );
 }
@@ -596,13 +644,14 @@ function ProcedureGroupBlock({ group, types, forceExpand, getDraft, setDraft, is
       <div className="flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100/50 transition-colors">
         <button 
           type="button" 
+          aria-expanded={isExpanded}
           onClick={() => setExpanded(!expanded)}
           className="flex flex-1 items-center gap-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 rounded"
         >
           <ChevronDown className={`h-4 w-4 shrink-0 text-slate-500 transition-transform ${isExpanded ? "" : "-rotate-90"}`} />
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-slate-900">{group.name}</span>
-            <span className="text-xs text-slate-500">({group.isOfficial ? group.count : types.length} types)</span>
+            <span className="text-xs text-slate-500">({group.isOfficial ? group.count : types.length} procedure types)</span>
           </div>
         </button>
         {group.isOfficial && (
@@ -625,7 +674,10 @@ function ProcedureGroupBlock({ group, types, forceExpand, getDraft, setDraft, is
                 <span className="text-xs text-slate-500">{p.group}</span>
               </div>
               <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2">
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  patchItem(p.id, "procedure", p.required, undefined, "Procedure target updated");
+                }} className="flex items-center gap-2">
                   <Label htmlFor={`target-proc-${p.id}`} className="text-xs text-slate-500">Minimum</Label>
                   <Input 
                     id={`target-proc-${p.id}`}
@@ -635,13 +687,13 @@ function ProcedureGroupBlock({ group, types, forceExpand, getDraft, setDraft, is
                     onChange={(e) => setDraft("procedure", p.id, e.target.value)}
                   />
                   <Button 
+                    type="submit"
                     size="sm" variant="outline"
-                    disabled={busy || !isDraftDifferent("procedure", p.id, p.required)}
-                    onClick={() => patchItem(p.id, "procedure", p.required, undefined, "Procedure target updated")}
+                    disabled={busy || !isDraftDifferent("procedure", p.id, p.required) || getDraft("procedure", p.id, p.required).trim() === ""}
                   >
                     Save
                   </Button>
-                </div>
+                </form>
                 <Button 
                   variant="ghost" size="icon" className="h-8 w-8 text-rose-600 hover:bg-rose-50"
                   aria-label={`Delete ${p.name}`}
@@ -685,6 +737,7 @@ function ClinicalWorkRow({
       <div className="flex flex-wrap items-center justify-between p-3 bg-slate-50 gap-2">
         <button 
           type="button" 
+          aria-expanded={expanded}
           onClick={() => setExpanded(!expanded)}
           className="flex flex-1 items-center gap-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 rounded min-w-[200px]"
         >
@@ -695,7 +748,10 @@ function ClinicalWorkRow({
           </div>
         </button>
         <div className="flex items-center gap-3 md:pl-4 md:border-l border-slate-200">
-          <div className="flex items-center gap-2">
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            patchItem(category.id, "clinical_work_category", category.required, category.period, "Clinical work minimum updated");
+          }} className="flex items-center gap-2">
             <Label htmlFor={`target-${category.id}`} className="text-xs text-slate-500">Minimum</Label>
             <Input 
               id={`target-${category.id}`}
@@ -705,13 +761,13 @@ function ClinicalWorkRow({
               onChange={(e) => setDraft("clinical_work_category", category.id, e.target.value)}
             />
             <Button 
+              type="submit"
               size="sm" variant="outline"
-              disabled={busy || !isDraftDifferent("clinical_work_category", category.id, category.required)}
-              onClick={() => patchItem(category.id, "clinical_work_category", category.required, category.period, "Clinical work minimum updated")}
+              disabled={busy || !isDraftDifferent("clinical_work_category", category.id, category.required) || getDraft("clinical_work_category", category.id, category.required).trim() === ""}
             >
               Save
             </Button>
-          </div>
+          </form>
           <Button 
             variant="ghost" size="icon" className="h-8 w-8 text-rose-600 hover:bg-rose-50"
             aria-label={`Delete ${category.name}`}
@@ -748,11 +804,11 @@ function ClinicalWorkRow({
               <Label htmlFor={`add-subtype-${category.id}`} className="text-xs font-semibold">Add sub-type</Label>
               <Input 
                 id={`add-subtype-${category.id}`}
-                placeholder="Sub-type name" required maxLength={160}
+                required maxLength={160}
                 value={newSubTypeName} onChange={e => setNewSubTypeName(e.target.value)}
               />
             </div>
-            <Button type="submit" variant="secondary" disabled={busy}>Add</Button>
+            <Button type="submit" variant="secondary" disabled={busy}>Add log option</Button>
           </form>
         </div>
       )}
