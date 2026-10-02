@@ -61,6 +61,7 @@ import {
 
 import { LegalDisclaimerModal } from "@/components/LegalDisclaimerModal";
 import { ArogyaPanel } from "@/components/arogya/ArogyaPanel";
+import { AROGYA_OPEN_EVENT } from "@/lib/arogya-context";
 import { MaintenanceNoticeBubble } from "@/components/arogya/MaintenanceNoticeBubble";
 import { useDepartment } from "@/lib/department-context";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
@@ -218,6 +219,21 @@ function navigationForRole(role: RoleType, dashboardData?: any, loadingBadges?: 
   return items;
 }
 
+function assistantWorkflowForPath(path: string, role: RoleType): string | undefined {
+  const page = path.split("?")[0];
+  if (page === "/" || page === "/dashboard") return role === "Faculty" ? "evaluation-queue" : role === "HOD" ? "department-dashboard" : "dashboard";
+  const map: Record<string, string> = {
+    "/cases": "cases", "/procedures": "procedures", "/clinical-works": "clinical-work",
+    "/academics": "academics", "/conferences": "conferences", "/postings": "postings",
+    "/attendance": "leave", "/assessments": role === "Student" ? "assessments" : "quarterly-appraisal",
+    "/milestones": "milestones", "/thesis": "thesis", "/certifications": "certifications",
+    "/awards": "awards", "/mentees": role === "Faculty" ? "student-progress" : "department-dashboard",
+    "/review-queue": "review-queue", "/roster": "department-dashboard", "/student-access": "student-approval",
+    "/professors": "faculty-management", "/leave-approvals": "leave-approvals", "/requirements": "requirements",
+  };
+  return map[page];
+}
+
 export function AppLayout({
   children,
   activeRole,
@@ -259,6 +275,12 @@ export function AppLayout({
     const onDepartmentChange = () => setIsDepartmentSwitching(true);
     window.addEventListener(DEMO_DEPARTMENT_CHANGED_EVENT, onDepartmentChange);
     return () => window.removeEventListener(DEMO_DEPARTMENT_CHANGED_EVENT, onDepartmentChange);
+  }, []);
+
+  React.useEffect(() => {
+    const onOpenArogya = () => setArogyaOpen(true);
+    window.addEventListener(AROGYA_OPEN_EVENT, onOpenArogya);
+    return () => window.removeEventListener(AROGYA_OPEN_EVENT, onOpenArogya);
   }, []);
 
   // Fix: Get actual user from session for the sidebar profile
@@ -749,10 +771,13 @@ export function AppLayout({
           <Toaster position="top-right" richColors />
 
           <ArogyaPanel 
-            key={demoMode ? activeRole : undefined}
+            key={`${currentUser?.id ?? "signed-out"}:${currentUser?.departmentId ?? department.id}:${activeRole}:${demoMode ? "demo" : "live"}`}
             open={arogyaOpen}
             onOpenChange={setArogyaOpen}
             role={activeRole}
+            actorKey={`${currentUser?.id ?? "signed-out"}:${currentUser?.departmentId ?? department.id}:${activeRole}:${demoMode ? "demo" : "live"}`}
+            workflowId={assistantWorkflowForPath(location, activeRole)}
+            studentProfileId={currentUser?.studentProfileId ?? undefined}
             notifItems={allNotifItems}
             maintenanceNotice={panelMaintenanceNotice}
             onNavigate={(href) => setLocation(href)}

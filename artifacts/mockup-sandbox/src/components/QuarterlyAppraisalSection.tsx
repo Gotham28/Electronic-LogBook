@@ -22,6 +22,7 @@ import { ARO_DEMO_COMMAND_EVENT, type AroDemoCommand } from "./demo-movie/movieB
 import { useDemoTypedValue } from "./demo-movie/DemoTypedText";
 import { useDemoMotionEnabled } from "@/components/DemoMotion";
 import { DEMO_MOVIE_CHANGED_EVENT, isDemoMovieActive } from "@/lib/demoSession";
+import { openArogya, publishArogyaContext } from "@/lib/arogya-context";
 
 function blankScores(): Record<AppraisalScoreKey, string> {
   return Object.fromEntries(quarterlyAppraisalCategories.map(({ key }) => [key, ""])) as Record<AppraisalScoreKey, string>;
@@ -55,6 +56,23 @@ export function QuarterlyAppraisalSection() {
   
   const [userEditedRemarks, setUserEditedRemarks] = React.useState(false);
   const [userEditedRemediation, setUserEditedRemediation] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!studentId) { publishArogyaContext(null); return; }
+    const validationCodes: string[] = [];
+    const issueText = formError ?? draftError ?? "";
+    if (/already exists|already been/i.test(issueText)) validationCodes.push("appraisal_exists");
+    if (/remediation/i.test(issueText)) validationCodes.push("remediation_required");
+    if (/publication/i.test(issueText)) validationCodes.push("publication_required");
+    if (/date/i.test(issueText)) validationCodes.push("date_required");
+    if (/score|10 scores/i.test(issueText)) validationCodes.push("score_required");
+    publishArogyaContext({
+      studentId: Number(studentId),
+      ...(Number(quarter) >= 1 && Number(quarter) <= 4 && Number(year) >= 2000 && Number(year) <= 2200
+        ? { appraisalPeriod: { quarter: Number(quarter), year: Number(year) } } : {}),
+      ...(validationCodes.length ? { validationCodes } : {}),
+    });
+  }, [studentId, quarter, year, formError, draftError]);
 
   const demoMotionEnabled = useDemoMotionEnabled();
   const { revealedText: revealedRemarks } = useDemoTypedValue(facultyRemarksTarget, isDemoMode() && demoMotionEnabled);
@@ -273,8 +291,6 @@ export function QuarterlyAppraisalSection() {
     }
   };
 
-  const isHod = currentUser?.role === "hod";
-
   return (
     <section data-tour="quarterly-appraisal" className="space-y-5" aria-labelledby="quarterly-appraisal-heading">
       <Card className="border-slate-200 bg-white">
@@ -284,7 +300,7 @@ export function QuarterlyAppraisalSection() {
             <div>
               <CardTitle id="quarterly-appraisal-heading" className="text-base font-bold text-slate-900">Postgraduate students quarterly appraisal</CardTitle>
               <CardDescription className="mt-1 text-sm text-slate-600">
-                {isHod ? "Record and review appraisals for students in your department." : "Record and review appraisals for students assigned to you."}
+                "Record and review appraisals for approved students in your department."
                 {" "}Scores use the form guide: 1–3 Not Satisfactory, 4–6 Satisfactory, 7–9 More Than Satisfactory.
               </CardDescription>
             </div>
@@ -300,7 +316,7 @@ export function QuarterlyAppraisalSection() {
             </div>
           ) : students.length === 0 ? (
             <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600">
-              {isHod ? "There are no approved students in your department to appraise." : "No approved students are currently assigned to you for appraisal."}
+              There are no approved students in your department to appraise.
             </div>
           ) : (
             <form noValidate onSubmit={handleSave} className="space-y-6" aria-busy={saving}>
@@ -387,7 +403,7 @@ export function QuarterlyAppraisalSection() {
                     <div className="min-w-0">
                       <Label htmlFor="appraisal-faculty-remarks">Faculty remarks</Label>
                       <p id="appraisal-draft-help" className="mt-1 text-xs leading-relaxed text-slate-500">
-                        Complete the required appraisal fields to draft remarks and suggestions with Arogya AI.
+                        Arogya drafts from training progress and posting data; it does not use the selected quarter or entered scores.
                       </p>
                     </div>
                     <Button
@@ -405,7 +421,10 @@ export function QuarterlyAppraisalSection() {
                       {draftLoading ? "Drafting…" : "Draft with Arogya AI"}
                     </Button>
                   </div>
-                  {draftError && <p className="text-xs text-rose-700" role="alert">{draftError}</p>}
+                  {draftError && <div className="flex flex-wrap items-center justify-between gap-2" role="alert">
+                    <p className="text-xs text-rose-700">{draftError}</p>
+                    <Button type="button" variant="outline" size="sm" className="min-h-10" onClick={openArogya}>Explain this issue</Button>
+                  </div>}
                   <Textarea
                     id="appraisal-faculty-remarks"
                     className="min-h-24 resize-none"
@@ -438,7 +457,10 @@ export function QuarterlyAppraisalSection() {
                 </div>
               </div>
 
-              {formError && <p className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800" role="alert">{formError}</p>}
+              {formError && <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2" role="alert">
+                <p className="text-sm text-rose-800">{formError}</p>
+                <Button type="button" variant="outline" size="sm" className="min-h-10" onClick={openArogya}>Explain this issue</Button>
+              </div>}
               <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
                 <p className="text-xs text-slate-500">The saved form will be visible to the student and can be printed.</p>
                 <Button type="submit" disabled={saving} className="min-w-44 gap-2">

@@ -2,6 +2,7 @@ import * as React from "react";
 import { AlertCircle, CheckCircle2, Clock, PlusCircle, Stethoscope, Loader2, Trash2, Edit3 } from "lucide-react";
 import { toast } from "sonner";
 import { apiGet, apiPost, apiDelete, apiPatch } from "@/lib/apiClient";
+import { publishArogyaContext } from "@/lib/arogya-context";
 import { getCurrentUser, isDemoMode } from "@/lib/session";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -189,7 +190,7 @@ export function ProcedureLogsPage() {
         </div>
         <Dialog open={open} onOpenChange={(val) => { 
           setOpen(val); 
-          if (!val) { setForm({ date: todayForInput(), group: initialGroup, procedureName: "", patientUhid: "", diagnosis: "", sex: "", age: "", experience: competencyLevels[0]?.value ?? "", supervisorId: "" }); setEditLogId(null); } 
+          if (!val) { publishArogyaContext(null); setForm({ date: todayForInput(), group: initialGroup, procedureName: "", patientUhid: "", diagnosis: "", sex: "", age: "", experience: competencyLevels[0]?.value ?? "", supervisorId: "" }); setEditLogId(null); }
         }}>
           <DialogTrigger asChild><Button><PlusCircle className="h-4 w-4" /> Log procedure</Button></DialogTrigger>
           <DialogContent className="rounded-2xl bg-white sm:max-w-xl">
@@ -373,6 +374,7 @@ export function ProcedureLogsPage() {
                         <>
                           <Button variant="ghost" size="sm" className="text-teal-600 hover:text-teal-800 hover:bg-teal-50" onClick={() => {
                             setEditLogId(log.id);
+                            publishArogyaContext({ log: { type: "procedure", id: Number(log.id) } });
                             setForm({
                               date: log.date, group: log.procedureGroup, procedureName: log.procedureName,
                               patientUhid: log.patientUhid === "N/A" ? "" : log.patientUhid, age: log.patientAge || log.age,

@@ -2,6 +2,7 @@ import * as React from "react";
 import { CheckCircle2, Clock, MapPin, PlusCircle, Loader2, Presentation, Edit3 } from "lucide-react";
 import { toast } from "sonner";
 import { apiGet, apiPost, apiPatch } from "@/lib/apiClient";
+import { publishArogyaContext } from "@/lib/arogya-context";
 import { getCurrentUser } from "@/lib/session";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -121,7 +122,7 @@ export function ConferencesPage() {
         </div>
         <Dialog open={open} onOpenChange={(val) => { 
           setOpen(val); 
-          if (!val) { setForm({ date: todayForInput(), conferenceName: "", conferenceType: "conference", level: "", category: "", role: "attended", location: "", certificateUrl: "", supervisorId: "" }); setEditLogId(null); } 
+          if (!val) { publishArogyaContext(null); setForm({ date: todayForInput(), conferenceName: "", conferenceType: "conference", level: "", category: "", role: "attended", location: "", certificateUrl: "", supervisorId: "" }); setEditLogId(null); }
         }}>
           <DialogTrigger asChild><Button><PlusCircle className="h-4 w-4" /> Log conference</Button></DialogTrigger>
           <DialogContent className="rounded-2xl bg-white sm:max-w-lg">
@@ -246,6 +247,7 @@ export function ConferencesPage() {
                       {log.status === "pending" && (
                         <Button variant="ghost" size="sm" className="text-teal-600 hover:text-teal-800 hover:bg-teal-50" onClick={() => {
                           setEditLogId(log.id);
+                          publishArogyaContext({ log: { type: "conference", id: Number(log.id) } });
                           setForm({
                             date: log.date, conferenceName: log.conferenceName || "", conferenceType: log.conferenceType || "conference", level: log.level || "", category: log.category || "", role: log.role || "attended",
                             location: log.location || "", certificateUrl: log.certificateUrl || "", supervisorId: log.supervisorId ? String(log.supervisorId) : "none",

@@ -2,6 +2,7 @@ import * as React from "react";
 import { AlertCircle, CheckCircle2, Clock, Edit3, Loader2, PlusCircle, Search, Stethoscope, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/apiClient";
+import { publishArogyaContext } from "@/lib/arogya-context";
 import { getCurrentUser, isDemoMode } from "@/lib/session";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -92,7 +93,7 @@ export function ClinicalWorksPage() {
 
   const closeDialog = (value: boolean) => {
     setOpen(value);
-    if (!value) { setForm(emptyForm()); setEditId(null); }
+    if (!value) { publishArogyaContext(null); setForm(emptyForm()); setEditId(null); }
   };
 
   const submit = async (event: React.FormEvent) => {
@@ -139,6 +140,7 @@ export function ClinicalWorksPage() {
   };
 
   const startEdit = (log: ClinicalWorkLog) => {
+    publishArogyaContext({ log: { type: "clinical-work", id: Number(log.id) } });
     setEditId(log.id);
     setForm({ date: log.date, category: log.category, subType: log.subType || "", patientAge: log.patientAge, patientSex: log.patientSex,
       caseNumber: log.caseNumber, supervisorId: log.supervisorId ? String(log.supervisorId) : "",
