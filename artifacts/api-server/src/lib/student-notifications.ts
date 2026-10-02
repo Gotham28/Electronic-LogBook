@@ -3,7 +3,7 @@ import { db, departmentsTable, studentsTable, usersTable } from "@workspace/db";
 import { sendHODApprovalRequestEmail } from "./mailer.js";
 
 /** Send the pending-access notice to the department's current approved HOD. */
-export async function notifyCurrentHodOfPaidStudent(studentUserId: number): Promise<void> {
+export async function notifyCurrentHodOfPendingStudent(studentUserId: number): Promise<void> {
   const [student] = await db.select({
     id: usersTable.id,
     fullName: usersTable.fullName,
@@ -35,3 +35,6 @@ export async function notifyCurrentHodOfPaidStudent(studentUserId: number): Prom
     student.departmentName,
   );
 }
+
+// Keep the existing payment-flow name available to its current callers.
+export const notifyCurrentHodOfPaidStudent = notifyCurrentHodOfPendingStudent;

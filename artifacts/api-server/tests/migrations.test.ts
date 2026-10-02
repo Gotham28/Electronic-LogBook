@@ -13,10 +13,12 @@ test("fresh installation and rerunning migrations are safe and checksum-tracked"
   try {
     await applyMigrations(migrationConnection(database));
     await applyMigrations(migrationConnection(database));
-    assert.equal((await database.query("SELECT * FROM elogbook_migrations")).rows.length, 22);
+    assert.equal((await database.query("SELECT * FROM elogbook_migrations")).rows.length, 23);
     assert.equal((await database.query("SELECT to_regclass('maintenance_announcements') AS table_name")).rows[0].table_name, "maintenance_announcements");
     assert.equal((await database.query("SELECT * FROM departments")).rows.length, 0);
     assert.equal((await database.query("SELECT * FROM assignment_recipients")).rows.length, 0);
+    assert.equal((await database.query<any>("SELECT column_default, is_nullable FROM information_schema.columns WHERE table_name = 'students' AND column_name = 'admin_provisioned'")).rows[0].column_default, "false");
+    assert.equal((await database.query<any>("SELECT is_nullable FROM information_schema.columns WHERE table_name = 'students' AND column_name = 'admin_provisioned'")).rows[0].is_nullable, "NO");
     await database.query("UPDATE elogbook_migrations SET checksum = 'tampered' WHERE name = '0002_departments_assignments.sql'");
     await assert.rejects(applyMigrations(migrationConnection(database)), /checksum differs/);
   } finally { await database.close(); }
@@ -45,6 +47,8 @@ test("legacy migration preserves users, requirements and logs and backfills cata
     await applyMigrations(migrationConnection(database), true);
     assert.equal((await database.query("SELECT * FROM users")).rows.length, 3);
     assert.equal((await database.query<any>("SELECT * FROM users WHERE id=1")).rows[0].email, "hod@example.test");
+    assert.equal((await database.query<any>("SELECT admin_provisioned FROM students WHERE user_id=3")).rows[0].admin_provisioned, false);
+    assert.equal((await database.query<any>("SELECT status FROM users WHERE id=3")).rows[0].status, "approved");
     assert.equal((await database.query<any>("SELECT * FROM department_configs")).rows[0].required_cases, 99);
     // 0008_leave_allowance_restructure.sql drops program_duration_months.
     assert.ok(!("program_duration_months" in (await database.query<any>("SELECT * FROM department_configs")).rows[0]));

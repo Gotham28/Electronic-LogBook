@@ -464,17 +464,20 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [addFormType, setAddFormType] = useState<"faculty" | "resident">("faculty");
+  const [addTarget, setAddTarget] = useState<{ id: number; name: string; isTest: boolean } | null>(null);
+  const [approvalMode, setApprovalMode] = useState<"hod" | "automatic">("automatic");
   const [addForm, setAddForm] = useState(() => generateDefaultResidentForm());
   const [addingUser, setAddingUser] = useState(false);
   
-  const [activeTab, setActiveTab] = useState("faculty");
+  const [activeTab, setActiveTab] = useState<"faculty" | "residents" | "test-accounts">("faculty");
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  const [userToDelete, setUserToDelete] = useState<{ id: number; name: string; role: string } | null>(null);
+  const [userToDelete, setUserToDelete] = useState<{ id: number; name: string; role: string; isTest: boolean; departmentName: string } | null>(null);
   const [deletingUser, setDeletingUser] = useState(false);
+  const [changingUserId, setChangingUserId] = useState<number | null>(null);
   const [deleteUserError, setDeleteUserError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -483,6 +486,7 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
     setShowReplaceHod(false);
     setReplaceHodError(null);
     setShowAddForm(false);
+    setAddTarget(null);
     setShowDeleteConfirm(false);
     setDeleteError(null);
     setUserToDelete(null);
@@ -548,9 +552,28 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
     }
   };
 
+  const openAddForm = () => {
+    if (activeTab === "faculty") {
+      setAddFormType("faculty");
+      setAddTarget({ id: department.id, name: department.name, isTest: false });
+    } else if (activeTab === "residents") {
+      setAddFormType("resident");
+      setAddTarget({ id: department.id, name: department.name, isTest: false });
+    } else if (department.mirrorDepartmentId && department.mirrorDepartmentName) {
+      setAddFormType("resident");
+      setAddTarget({ id: department.mirrorDepartmentId, name: department.mirrorDepartmentName, isTest: true });
+    } else {
+      toast.error("Test department details are unavailable. Reload departments and try again.");
+      return;
+    }
+    setApprovalMode("automatic");
+    setAddForm(generateDefaultResidentForm());
+    setShowAddForm(true);
+  };
+
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!addForm.fullName || !addForm.email || !addForm.password) return;
+    if (!addTarget || !addForm.fullName || !addForm.email || !addForm.password) return;
     
     if (addFormType === "resident") {
       if (!addForm.batch || !addForm.dateOfJoining || !addForm.kuhsId) {
@@ -562,7 +585,7 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
     setAddingUser(true);
     try {
       if (addFormType === "faculty") {
-        const result = await createAdminFaculty(department.id, {
+        const result = await createAdminFaculty(addTarget.id, {
           fullName: addForm.fullName,
           email: addForm.email,
           password: addForm.password
@@ -575,21 +598,32 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
           toast.warning(`Faculty account created. ${detail}; check the server log and Resend Events.`);
         }
       } else {
-        await createAdminStudent(department.id, {
+        const result = await createAdminStudent(addTarget.id, {
           fullName: addForm.fullName,
           email: addForm.email,
           password: addForm.password,
           registrationNumber: addForm.registrationNumber,
           batch: addForm.batch,
           dateOfJoining: addForm.dateOfJoining,
-          kuhsId: addForm.kuhsId
+          kuhsId: addForm.kuhsId,
+          approvalMode,
         });
-        toast.success("Resident account created and approved");
+        if (result.student.status === "pending") {
+          toast.success(`Resident account created and is awaiting the ${addTarget.name} HOD's approval`);
+          if (!result.hodEmailAccepted) toast.warning("The resident is awaiting HOD approval, but the notification email could not be accepted by the email provider.");
+        } else if (result.approvalFallback === "no_active_hod") {
+          toast.success(`Resident account approved automatically because no active HOD is assigned to ${addTarget.name}`);
+        } else {
+          toast.success("Resident account created and approved");
+        }
       }
       setAddForm(generateDefaultResidentForm());
       setShowAddForm(false);
+      const createdInTestDepartment = addTarget.isTest;
+      setAddTarget(null);
       onRefresh(); // Refresh counts
-      fetchRoster();
+      if (createdInTestDepartment) await fetchMirrorRoster();
+      else await fetchRoster();
     } catch (err: any) {
       toast.error(err.message || `Failed to create ${addFormType} account`);
     } finally {
@@ -597,27 +631,37 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
     }
   };
 
-  const handleDeactivate = async (userId: number, role: string) => {
-    if (!window.confirm("Are you sure you want to deactivate this account?")) return;
+  const handleDeactivate = async (userId: number, role: string, isTest = false) => {
+    const targetDepartmentName = isTest ? department.mirrorDepartmentName || "test department" : department.name;
+    if (!window.confirm(`Deactivate this ${role === "student" ? "resident" : "faculty"} account in ${targetDepartmentName}? Their records will be retained.`)) return;
+    setChangingUserId(userId);
     try {
       await deactivateAdminUser(userId);
       toast.success("User deactivated");
       onRefresh();
-      fetchRoster();
+      if (isTest) await fetchMirrorRoster();
+      else await fetchRoster();
     } catch (err: any) {
       toast.error(err.message || "Failed to deactivate user");
+    } finally {
+      setChangingUserId(null);
     }
   };
 
-  const handleReactivate = async (userId: number, name: string) => {
-    if (!window.confirm(`Reactivate ${name}? They will be able to sign in again.`)) return;
+  const handleReactivate = async (userId: number, name: string, isTest = false) => {
+    const targetDepartmentName = isTest ? department.mirrorDepartmentName || "test department" : department.name;
+    if (!window.confirm(`Reactivate ${name} in ${targetDepartmentName}? They will be able to sign in again.`)) return;
+    setChangingUserId(userId);
     try {
       await reactivateAdminUser(userId);
       toast.success(`${name} reactivated`);
       onRefresh();
-      fetchRoster();
+      if (isTest) await fetchMirrorRoster();
+      else await fetchRoster();
     } catch (err: any) {
       toast.error(err.message || "Failed to reactivate user");
+    } finally {
+      setChangingUserId(null);
     }
   };
 
@@ -629,10 +673,12 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
       const res = await hardDeleteAdminUser(userToDelete.id);
       const deletedCount = Object.values(res?.deletedRecords ?? {}).reduce((acc, val) => acc + (typeof val === "number" ? val : 0), 0);
       const summary = deletedCount > 0 ? ` (${deletedCount} related records removed)` : "";
-      toast.success(`${userToDelete.name} permanently deleted${summary}`);
+      toast.success(`${userToDelete.name} permanently deleted from ${userToDelete.departmentName}${summary}`);
+      const deletedInTestDepartment = userToDelete.isTest;
       setUserToDelete(null);
       onRefresh();
-      fetchRoster();
+      if (deletedInTestDepartment) await fetchMirrorRoster();
+      else await fetchRoster();
     } catch (err: any) {
       setDeleteUserError(err.message || "Failed to permanently delete user");
     } finally {
@@ -794,7 +840,7 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
       )}
 
       {/* Permanently delete a faculty member or resident: confirmation panel */}
-      {userToDelete && (
+                    {userToDelete && (
         <Card className="border-rose-200 bg-rose-50/30 shadow-sm">
           <CardContent className="p-4">
             <div className="flex items-start gap-3">
@@ -803,7 +849,7 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
               </div>
               <div className="flex-1 space-y-3">
                 <div>
-                  <h4 className="font-semibold text-rose-900">Permanently delete {userToDelete.name}?</h4>
+                          <h4 className="font-semibold text-rose-900">Permanently delete {userToDelete.name} from {userToDelete.departmentName}?</h4>
                   <p className="text-sm text-rose-800 mt-1 leading-relaxed">
                     This will <strong>permanently delete</strong> the {userToDelete.role === "student" ? "resident" : "faculty member"} and <strong>all</strong> of their associated data. This action is <strong>irreversible</strong>.
                   </p>
@@ -818,7 +864,9 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
                   ) : (
                     <ul className="text-sm text-rose-800 mt-1 ml-4 list-disc space-y-0.5">
                       <li>Their account and profile</li>
-                      <li>Any assignments they created (assignment types they created pass to the {department.name} HOD)</li>
+                      <li>Any assignments they created (assignment types pass to {userToDelete.isTest
+                        ? department.mirrorHod?.fullName ? `${department.mirrorHod.fullName}, the ${userToDelete.departmentName} HOD` : "the acting admin because the test department has no active HOD"
+                        : department.hod?.fullName ? `${department.hod.fullName}, the ${userToDelete.departmentName} HOD` : "the acting admin because the department has no active HOD"})</li>
                       <li><strong>Every clinical and academic record belonging to residents</strong> where this faculty member appears as reviewer, verifier, or supervisor</li>
                       <li>Their assessments and appraisals of residents</li>
                     </ul>
@@ -861,7 +909,7 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
         <div className="flex h-40 items-center justify-center border border-slate-100 rounded-xl bg-white"><div className="animate-spin rounded-full border-4 border-slate-300 border-t-teal-600 h-8 w-8" /></div>
       ) : (
         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as typeof activeTab)}>
             <div className="border-b border-slate-100 px-3 pt-3 flex flex-wrap justify-between items-center gap-2 bg-slate-50/50">
               <TabsList className="h-auto flex-wrap bg-slate-200/50">
                 <TabsTrigger value="faculty" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
@@ -874,7 +922,9 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
                   Test accounts
                 </TabsTrigger>
               </TabsList>
-              <Button variant="ghost" size="sm" onClick={() => { setShowAddForm(!showAddForm); setAddFormType(activeTab as any); }} className="text-teal-700 hover:text-teal-800 hover:bg-teal-50">
+              <Button variant="ghost" size="sm" onClick={() => showAddForm ? (setShowAddForm(false), setAddTarget(null)) : openAddForm()}
+                disabled={activeTab === "test-accounts" && (!department.mirrorDepartmentId || !department.mirrorDepartmentName)}
+                className="text-teal-700 hover:text-teal-800 hover:bg-teal-50">
                 <Plus className="h-4 w-4 mr-1" /> Add
               </Button>
             </div>
@@ -901,6 +951,25 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
                     </div>
                   </div>
                   {addFormType === "resident" && (
+                    <>
+                    <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900" role="status">
+                      Adding this resident to <strong>{addTarget?.name}</strong>{addTarget?.isTest ? " (test department)" : ""}.
+                    </div>
+                    <fieldset className="space-y-2">
+                      <legend className="text-sm font-medium text-slate-800">Approval</legend>
+                      <div className="flex flex-col sm:flex-row gap-3">
+                        <label className="flex items-start gap-2 rounded-md border bg-white p-3 text-sm">
+                          <input type="radio" name="resident-approval" value="hod" checked={approvalMode === "hod"} onChange={() => setApprovalMode("hod")} />
+                          <span><strong>Approve by HOD</strong><br />{(addTarget?.isTest ? department.mirrorHod : department.hod)?.fullName
+                            ? `The ${addTarget?.name} HOD will review this resident.`
+                            : "If there is no active HOD in this department, the resident will be approved automatically."}</span>
+                        </label>
+                        <label className="flex items-start gap-2 rounded-md border bg-white p-3 text-sm">
+                          <input type="radio" name="resident-approval" value="automatic" checked={approvalMode === "automatic"} onChange={() => setApprovalMode("automatic")} />
+                          <span><strong>Automatic</strong><br />The resident is approved immediately.</span>
+                        </label>
+                      </div>
+                    </fieldset>
                     <div className="flex flex-col sm:flex-row gap-4 items-end">
                       <div className="space-y-2 flex-1 w-full">
                         <Label>Registration Number</Label>
@@ -919,9 +988,10 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
                         <Input placeholder="KUHS ID" value={addForm.kuhsId} onChange={e => setAddForm({...addForm, kuhsId: e.target.value})} required />
                       </div>
                     </div>
+                    </>
                   )}
                   <div className="flex gap-2 justify-end mt-2">
-                    <Button type="button" variant="outline" onClick={() => setShowAddForm(false)}>Cancel</Button>
+                    <Button type="button" variant="outline" onClick={() => { setShowAddForm(false); setAddTarget(null); }}>Cancel</Button>
                     <Button type="submit" disabled={addingUser} className="bg-teal-600 hover:bg-teal-700">{addingUser ? "Creating..." : "Create account"}</Button>
                   </div>
                 </form>
@@ -970,7 +1040,7 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
                                     Deactivate
                                   </Button>
                                 )}
-                                <Button size="sm" variant="outline" onClick={() => { setUserToDelete({ id: u.id, name: u.fullName, role: u.role }); setDeleteUserError(null); }} className="text-rose-700 border-rose-200 hover:bg-rose-50 h-8 px-3">
+                                <Button size="sm" variant="outline" onClick={() => { setUserToDelete({ id: u.id, name: u.fullName, role: u.role, isTest: false, departmentName: department.name }); setDeleteUserError(null); }} className="text-rose-700 border-rose-200 hover:bg-rose-50 h-8 px-3">
                                   <Trash2 className="h-4 w-4 mr-1" /> Delete
                                 </Button>
                               </>
@@ -1030,7 +1100,7 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
                                 Deactivate
                               </Button>
                             )}
-                            <Button size="sm" variant="outline" onClick={() => { setUserToDelete({ id: u.id, name: u.fullName, role: u.role }); setDeleteUserError(null); }} className="text-rose-700 border-rose-200 hover:bg-rose-50 h-8 px-3">
+                            <Button size="sm" variant="outline" onClick={() => { setUserToDelete({ id: u.id, name: u.fullName, role: u.role, isTest: false, departmentName: department.name }); setDeleteUserError(null); }} className="text-rose-700 border-rose-200 hover:bg-rose-50 h-8 px-3">
                               <Trash2 className="h-4 w-4 mr-1" /> Delete
                             </Button>
                           </div>
@@ -1089,22 +1159,40 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
                     <TableBody>
                       {mirrorRoster.map(u => (
                         <TableRow key={u.id}>
-                          <TableCell className="font-semibold text-slate-900">{u.fullName}</TableCell>
+                          <TableCell>
+                            <div className="font-semibold text-slate-900">{u.fullName}</div>
+                            {u.status === "pending" && <div className="text-xs text-amber-600 mt-0.5">Awaiting the {department.mirrorDepartmentName || "test department"} HOD's approval</div>}
+                          </TableCell>
                           <TableCell className="text-slate-500 text-sm font-mono">{u.email}</TableCell>
                           <TableCell>
                             <Badge variant="outline" className="capitalize">{u.role}</Badge>
                           </TableCell>
                           <TableCell>
-                            <Badge variant={u.status === "approved" ? "default" : "secondary"} className={`rounded-full ${u.status === 'approved' ? 'bg-slate-900' : ''}`}>
+                            <Badge variant={u.status === "approved" ? "default" : "secondary"} className={`rounded-full ${u.status === 'approved' ? 'bg-slate-900' : u.status === 'pending' ? 'bg-amber-100 text-amber-800 border-none' : ''}`}>
                               {u.status === "rejected" ? "Deactivated" : u.status}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
-                              {u.status === "approved" && (
-                                <Button size="sm" variant="outline" onClick={() => handleImpersonate(u.id)} className="h-8 px-3">
-                                  Log in as
-                                </Button>
+                            <div className="flex flex-wrap justify-end gap-2">
+                              {u.role === "hod" ? (
+                                u.status === "approved" && <Button size="sm" variant="outline" onClick={() => handleImpersonate(u.id)} className="h-8 px-3">Log in as</Button>
+                              ) : (
+                                <>
+                                  {u.status === "approved" && (
+                                    <Button size="sm" variant="outline" onClick={() => handleImpersonate(u.id)} className="h-8 px-3">Log in as</Button>
+                                  )}
+                                  {u.status === "rejected" ? (
+                                    <Button size="sm" variant="outline" onClick={() => handleReactivate(u.id, u.fullName, true)} disabled={changingUserId === u.id} className="h-8 px-3">Reactivate</Button>
+                                  ) : (
+                                    <Button size="sm" variant="outline" onClick={() => handleDeactivate(u.id, u.role, true)} disabled={changingUserId === u.id} className="text-rose-700 border-rose-200 hover:bg-rose-50 h-8 px-3">Deactivate</Button>
+                                  )}
+                                  <Button size="sm" variant="outline" onClick={() => { setUserToDelete({
+                                    id: u.id, name: u.fullName, role: u.role, isTest: true,
+                                    departmentName: department.mirrorDepartmentName || "test department",
+                                  }); setDeleteUserError(null); }} className="text-rose-700 border-rose-200 hover:bg-rose-50 h-8 px-3">
+                                    <Trash2 className="h-4 w-4 mr-1" /> Delete
+                                  </Button>
+                                </>
                               )}
                             </div>
                           </TableCell>
