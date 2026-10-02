@@ -220,11 +220,10 @@ export function ProcedureLogsPage() {
                 )}
               </Field>
               <div className={`grid gap-4 ${hideUhid ? "sm:grid-cols-1" : "sm:grid-cols-2"}`}>
-                {!hideUhid && <Field label="Case ID"><Input value={form.patientUhid} onChange={(e) => setForm({ ...form, patientUhid: e.target.value })} required /></Field>}
                 {isFreeTextProcedures && (
                   <>
-                    <Field label="Diagnosis (optional)"><Input value={form.diagnosis} onChange={(e) => setForm({ ...form, diagnosis: e.target.value })} placeholder="e.g. Tinea Corporis" /></Field>
-                    <Field label="Sex (optional)"><Input value={form.sex} onChange={(e) => setForm({ ...form, sex: e.target.value })} placeholder="e.g. Male" /></Field>
+                    <Field label="Diagnosis"><Input value={form.diagnosis} onChange={(e) => setForm({ ...form, diagnosis: e.target.value })} placeholder="e.g. Tinea Corporis" required /></Field>
+                    <Field label="Sex"><Input value={form.sex} onChange={(e) => setForm({ ...form, sex: e.target.value })} placeholder="e.g. Male" required /></Field>
                   </>
                 )}
                 <Field label="Age"><Input value={form.age} onChange={(e) => setForm({ ...form, age: e.target.value })} placeholder="e.g. 4 months" required /></Field>
@@ -346,7 +345,7 @@ export function ProcedureLogsPage() {
             </Empty>
           ) : (
             <Table>
-              <TableHeader><TableRow><TableHead>Number</TableHead><TableHead>Date</TableHead>{!isFreeTextProcedures && <TableHead>Group</TableHead>}<TableHead>Procedure</TableHead>{!hideUhid && <TableHead>Case ID</TableHead>}<TableHead>Age</TableHead>{config?.enabledFeatures?.procedureExperience && <TableHead>Competency level</TableHead>}{config?.enabledFeatures?.procedureExperience && <TableHead>Verified competency</TableHead>}<TableHead>Remarks</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Number</TableHead><TableHead>Date</TableHead>{!isFreeTextProcedures && <TableHead>Group</TableHead>}<TableHead>Procedure</TableHead><TableHead>Age</TableHead>{config?.enabledFeatures?.procedureExperience && <TableHead>Competency level</TableHead>}{config?.enabledFeatures?.procedureExperience && <TableHead>Verified competency</TableHead>}<TableHead>Remarks</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
               <TableBody>
                 {logs.map((log) => (
                   <TableRow key={log.id}>
@@ -354,7 +353,6 @@ export function ProcedureLogsPage() {
                     <TableCell>{formatLogbookDate(log.date)}</TableCell>
                     {!isFreeTextProcedures && <TableCell><Badge variant="outline" className="border-teal-100 bg-teal-50 text-teal-800">{groupNames[log.procedureGroup as ProcedureGroup] || log.procedureGroup}</Badge></TableCell>}
                     <TableCell className="font-semibold">{log.procedureName}</TableCell>
-                    {!hideUhid && <TableCell className="font-semibold text-teal-800">{log.patientUhid}</TableCell>}
                     <TableCell>{log.patientAge || log.age}</TableCell>
                     {config?.enabledFeatures?.procedureExperience && <TableCell className="text-xs">{log.competencyLevel}</TableCell>}
                     {config?.enabledFeatures?.procedureExperience && <TableCell className="text-xs">{log.facultyVerifiedLevel ? (competencyLevels.find(c => c.value === log.facultyVerifiedLevel)?.name || log.facultyVerifiedLevel) : 'Pending verification'}</TableCell>}

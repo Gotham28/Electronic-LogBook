@@ -1,0 +1,103 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e5]:
+      - generic [ref=e10]:
+        - heading "Clinical training, clearly organised." [level=1] [ref=e15]
+        - paragraph [ref=e16]: Keep cases, procedures, academic work, assessments and milestones together.
+        - img "Looping preview of a resident using the E-Logbook dashboard" [ref=e17]:
+          - generic [ref=e18]:
+            - generic [ref=e19]: elogbook.local/dashboard
+            - generic [ref=e25]:
+              - complementary [ref=e26]:
+                - generic [ref=e27]: E-Logbook
+                - paragraph [ref=e33]: Student workspace
+                - generic [ref=e34]: Dashboard
+                - generic [ref=e41]: Postings
+                - generic [ref=e45]: Case Logs
+                - generic [ref=e50]: Procedures
+                - generic [ref=e56]: Academics
+              - main [ref=e61]:
+                - generic [ref=e63]:
+                  - paragraph [ref=e64]: Your department
+                  - paragraph [ref=e65]: Student workspace
+                - generic [ref=e70]:
+                  - generic [ref=e71]:
+                    - generic [ref=e72]:
+                      - paragraph [ref=e73]: Resident dashboard
+                      - paragraph [ref=e74]: Welcome back!
+                      - paragraph [ref=e75]: Your clinical record and verification status are summarised here.
+                    - generic [ref=e76]:
+                      - paragraph [ref=e77]: Resident profile
+                      - generic [ref=e78]:
+                        - generic [ref=e79]:
+                          - paragraph [ref=e80]: Registration
+                          - paragraph [ref=e81]: —
+                        - generic [ref=e82]:
+                          - paragraph [ref=e83]: Department
+                          - paragraph [ref=e84]: —
+                        - generic [ref=e85]:
+                          - paragraph [ref=e86]: Joined
+                          - paragraph [ref=e87]: —
+                        - generic [ref=e88]:
+                          - paragraph [ref=e89]: Completion
+                          - paragraph [ref=e90]: —
+                  - generic [ref=e91]:
+                    - generic [ref=e92]:
+                      - paragraph [ref=e93]: Dashboard insights
+                      - paragraph [ref=e94]: 194 entries remain to complete core targets.
+                      - generic [ref=e95]: Getting started
+                    - generic [ref=e96]:
+                      - generic [ref=e98]:
+                        - generic [ref=e99]: Clinical cases
+                        - generic [ref=e100]: 2%
+                      - generic [ref=e103]:
+                        - generic [ref=e104]: Procedures
+                        - generic [ref=e105]: 3%
+                      - generic [ref=e108]:
+                        - generic [ref=e109]: Academic activities
+                        - generic [ref=e110]: 6%
+                  - generic [ref=e112]:
+                    - generic [ref=e114]:
+                      - paragraph [ref=e115]: Student activity
+                      - paragraph [ref=e116]: Recent entries
+                    - generic [ref=e120]:
+                      - generic [ref=e121]: Academic
+                      - generic [ref=e122]: Cerebral palsy
+                      - generic [ref=e123]: Pending
+                    - generic [ref=e124]:
+                      - generic [ref=e125]: Procedure
+                      - generic [ref=e126]: Arterial blood gas
+                      - generic [ref=e127]: Verified
+                    - generic [ref=e128]:
+                      - generic [ref=e129]: Procedure
+                      - generic [ref=e130]: Intubation
+                      - generic [ref=e131]: Verified
+          - paragraph [ref=e133]: Opening the resident dashboard
+      - generic [ref=e141]:
+        - paragraph [ref=e142]: Arogya E-LogBook
+        - heading "Welcome" [level=2] [ref=e143]
+        - paragraph [ref=e144]: Already have an account? Sign in. New here? Explore the demo first.
+        - generic [ref=e145]:
+          - button [ref=e146]:
+            - generic [ref=e151]:
+              - paragraph [ref=e152]: Sign In to my account
+              - paragraph [ref=e153]: For registered residents, faculty and HOD
+          - button [ref=e154]:
+            - generic [ref=e159]:
+              - paragraph [ref=e160]: Explore the Demo
+              - paragraph [ref=e161]: Try all three portals — no account needed
+    - contentinfo [ref=e162]:
+      - generic [ref=e163]:
+        - link "Privacy Policy" [ref=e164] [cursor=pointer]:
+          - /url: /privacy-policy
+        - link "Grievance Officer" [ref=e165] [cursor=pointer]:
+          - /url: /grievance-officer
+        - link "Data Rights" [ref=e166] [cursor=pointer]:
+          - /url: /data-rights
+        - button "Cookie Preferences" [ref=e167] [cursor=pointer]
+  - region "Notifications alt+T"
+  - generic [ref=e169]:
+    - paragraph [ref=e170]: We use cookies to improve your experience. Currently, this site does not use any tracking or analytics cookies - only essential functionality.
+    - generic [ref=e171]:
+      - button "Reject All" [ref=e172]
+      - button "Accept All" [ref=e173]

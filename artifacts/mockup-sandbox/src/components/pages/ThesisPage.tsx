@@ -76,7 +76,7 @@ export function ThesisPage() {
               </div>
             )}
           </div>
-          <Button variant="outline" size="sm" onClick={() => { setDraft(thesis || emptyThesis); setThesisOpen(true); }}><Edit3 className="h-4 w-4" /> {isPubOnly ? (thesis ? "Edit" : "Add") : (thesis ? "Edit thesis" : "Add thesis")}</Button>
+          <Button variant="outline" size="sm" onClick={() => { setDraft(thesis || emptyThesis); setThesisOpen(true); }}><Edit3 className="h-4 w-4" /> {thesis ? "Edit" : "Add"}</Button>
         </CardHeader>
         {!isPubOnly && (
           <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">

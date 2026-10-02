@@ -225,7 +225,6 @@ export function CaseLogsPage() {
             <form onSubmit={handleAddCase} className="space-y-5">
               <div className={`grid gap-4 ${hideUhid ? "sm:grid-cols-3" : "sm:grid-cols-4"}`}>
                 <Field label="Date"><Input type="date" value={form.date} onChange={(e) => setField("date", e.target.value)} required /></Field>
-                {!hideUhid && <Field label="Case ID"><Input value={form.patientUhid} onChange={(e) => setField("patientUhid", e.target.value)} placeholder="ID-2026-…" /></Field>}
                 <Field label="Age"><Input value={form.age} onChange={(e) => setField("age", e.target.value)} placeholder="e.g. 7 years" required /></Field>
                 <Field label="Gender">
                   <Select value={form.gender} onValueChange={(value) => setField("gender", value)}>
@@ -356,7 +355,6 @@ export function CaseLogsPage() {
                 <TableRow>
                   <TableHead>Number</TableHead>
                   <TableHead>Date</TableHead>
-                  {!hideUhid && <TableHead>Case ID</TableHead>}
                   <TableHead>Age</TableHead>
                   <TableHead>{deptConfig?.enabledFeatures?.useCaseTypeLabel ? "Type" : "Category"}</TableHead>
                   <TableHead>Diagnosis</TableHead>
@@ -372,7 +370,6 @@ export function CaseLogsPage() {
                   <TableRow key={log.id}>
                     <TableCell className="font-bold">{log.number}</TableCell>
                     <TableCell>{formatLogbookDate(log.date)}</TableCell>
-                    {!hideUhid && <TableCell className="font-semibold text-teal-800">{log.patientUhid}</TableCell>}
                     <TableCell>{log.patientAge || log.age}</TableCell>
                     <TableCell>
                       {catName
