@@ -80,6 +80,10 @@ function getSpotlightSectionTitle(targetKey: string) {
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
+function chapterLabelForScene(chapter: DemoScene["chapter"]) {
+  return chapter === "resident" ? "Student" : chapter === "faculty" ? "Faculty" : "HOD";
+}
+
 function DemoSpotlight({ rect, targetKey, reduceMotion }: { rect: SpotlightRect | null; targetKey: string; reduceMotion: boolean }) {
   const maskId = React.useId().replace(/:/g, "");
   const [displayRect, setDisplayRect] = React.useState<SpotlightRect | null>(null);
@@ -668,6 +672,8 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
     };
   }, [isActive, blocked, phase, sceneIndex, runToken, advanceScene]);
 
+  const explanationOnLeft = Boolean(targetRect && targetRect.x + targetRect.w / 2 > window.innerWidth / 2);
+
   if (!isActive || blocked) return null;
 
   return createPortal(
@@ -755,27 +761,32 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
 
             <AnimatePresence mode="wait" initial={false}>
               {!currentScene.transition && (
-                <motion.div
+                <motion.aside
                   key={currentScene.id}
                   role="status"
                   aria-live="polite"
+                  layout
                   initial={{ opacity: 0, y: reduceMotion ? 0 : 6 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: reduceMotion ? 0 : -4 }}
-                  transition={{ duration: reduceMotion ? 0 : 0.22, ease: [0.22, 1, 0.36, 1] }}
-                  className="pointer-events-none absolute bottom-[calc(76px+env(safe-area-inset-bottom))] left-3 right-3 z-[60] rounded-[20px] border border-slate-200/90 bg-white/95 px-4 py-3.5 text-left shadow-[0_18px_48px_rgba(15,36,39,0.18)] backdrop-blur-xl sm:bottom-8 sm:left-1/2 sm:right-auto sm:w-[min(520px,calc(100vw-48px))] sm:-translate-x-1/2 sm:px-5 sm:py-4"
-                  style={bannerHeight > 0 ? { bottom: `max(${bannerHeight + 16}px, calc(76px + env(safe-area-inset-bottom)))` } : undefined}
+                  transition={{ duration: reduceMotion ? 0 : 0.24, ease: [0.22, 1, 0.36, 1], layout: { duration: reduceMotion ? 0 : 0.24, ease: [0.22, 1, 0.36, 1] } }}
+                  className={`pointer-events-none absolute bottom-[var(--demo-explanation-bottom)] left-3 right-3 z-[60] overflow-hidden rounded-[22px] border border-teal-100 bg-white text-left shadow-[0_20px_56px_rgba(15,36,39,0.22)] md:bottom-auto md:top-1/2 md:w-[min(340px,calc(100vw-48px))] md:-translate-y-1/2 ${explanationOnLeft ? "md:left-6 md:right-auto" : "md:right-6 md:left-auto"}`}
+                  style={{ "--demo-explanation-bottom": `max(${Math.max(bannerHeight + 16, 76)}px, calc(76px + env(safe-area-inset-bottom)))` } as React.CSSProperties}
                 >
-                  <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-teal-700">
-                    {currentScene.chapter === "resident" ? "Student" : currentScene.chapter === "faculty" ? "Faculty" : "HOD"} · {sceneIndex + 1} of {DEMO_SCENES.length}
-                  </p>
-                  <p className="mt-1 text-sm font-semibold leading-5 tracking-tight text-slate-950">
-                    {getSpotlightSectionTitle(spotlightTargetKey)}
-                  </p>
-                  <p className="mt-1 text-[13px] leading-5 text-slate-600">
+                  <div className="flex items-start gap-3 bg-gradient-to-r from-teal-50 to-white px-4 py-3.5">
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-teal-100 bg-white text-teal-700 shadow-sm" aria-hidden="true">
+                      <BookOpenCheck className="h-[17px] w-[17px]" strokeWidth={1.8} />
+                    </span>
+                    <div className="min-w-0 pt-0.5">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-teal-700">{chapterLabelForScene(currentScene.chapter)} · {sceneIndex + 1} / {DEMO_SCENES.length}</p>
+                      <h2 className="mt-1 text-sm font-semibold leading-5 tracking-tight text-slate-950">{getSpotlightSectionTitle(spotlightTargetKey)}</h2>
+                    </div>
+                  </div>
+                  <p className="px-4 pb-4 pl-[3.95rem] pr-4 text-[13px] leading-5 text-slate-600">
                     {displayedCaption}
                   </p>
-                </motion.div>
+                  <div className="h-1 bg-gradient-to-r from-teal-500 via-cyan-400 to-transparent" aria-hidden="true" />
+                </motion.aside>
               )}
             </AnimatePresence>
           </motion.div>
