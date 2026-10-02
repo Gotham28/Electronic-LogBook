@@ -17,7 +17,7 @@ export function GrievanceOfficerPage() {
           </p>
 
           <div className="my-8 p-6 bg-slate-50 rounded-2xl border border-slate-200">
-            <h2 className="text-lg font-bold text-slate-900 mb-2">Grievance Officer: Gautam P</h2>
+            <h2 className="text-lg font-bold text-slate-900 mb-2">Grievance Officer: CEO</h2>
             <p><strong>Email:</strong> <a href="mailto:gothoslabs@gmail.com" className="text-teal-600 hover:underline">gothoslabs@gmail.com</a></p>
           </div>
 
