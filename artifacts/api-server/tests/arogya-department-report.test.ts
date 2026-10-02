@@ -1,7 +1,7 @@
 import { before, after, test } from "node:test";
 import assert from "node:assert/strict";
 import { setup, accounts as a } from "./support.js";
-import { engine, db, caseLogsTable, studentsTable, usersTable } from "./database.js";
+import { engine, db, caseLogsTable, studentsTable, usersTable, departmentConfigsTable } from "./database.js";
 import { buildDepartmentReportFacts } from "../src/lib/department-report.js";
 import { eq, and } from "drizzle-orm";
 
@@ -85,6 +85,8 @@ test("buildDepartmentReportFacts returns correct shape, counts and anonymised na
   const packString = JSON.stringify(facts);
   assert.ok(!packString.includes("Dr. Real Professor"));
   assert.ok(!packString.includes("Real Resident"));
+  assert.ok(!packString.includes("Test Diagnosis"));
+  assert.ok(!packString.includes("Log A"));
   assert.ok(packString.includes("Professor 1"));
   assert.ok(packString.includes("Resident 1"));
 
@@ -101,4 +103,20 @@ test("buildDepartmentReportFacts returns correct shape, counts and anonymised na
   // d. totalVerifiedLogs equals seeded verified logs count, totalStudents equals dept approved residents count
   assert.equal(facts.department.totalVerifiedLogs, 2);
   assert.equal(facts.department.totalStudents, deptApprovedStudents.length);
+});
+
+test("department report leaves residents unclassified when no positive targets are configured", async () => {
+  const deptId = a.student0.departmentId;
+  await db.update(departmentConfigsTable).set({ requiredCases: null, requiredProcedures: null, requiredAcademic: null })
+    .where(eq(departmentConfigsTable.departmentId, deptId));
+
+  const { facts } = await buildDepartmentReportFacts(deptId, db);
+  assert.ok(facts.students.length > 0);
+  for (const resident of facts.students) {
+    assert.equal(resident.overallPct, null);
+    assert.equal(resident.belowTarget, null);
+    assert.ok(resident.untrackedCategories.includes("cases"));
+    assert.ok(resident.untrackedCategories.includes("procedures"));
+    assert.ok(resident.untrackedCategories.includes("academics"));
+  }
 });

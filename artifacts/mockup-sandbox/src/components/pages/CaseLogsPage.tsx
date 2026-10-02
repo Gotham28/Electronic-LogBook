@@ -2,6 +2,7 @@ import * as React from "react";
 import { AlertCircle, CheckCircle2, Clock, Eye, FileText, PlusCircle, Search, Loader2, Trash2, Edit3 } from "lucide-react";
 import { toast } from "sonner";
 import { apiGet, apiPost, apiDelete, apiPatch } from "@/lib/apiClient";
+import { publishArogyaContext } from "@/lib/arogya-context";
 import { getCurrentUser, isDemoMode } from "@/lib/session";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -68,6 +69,10 @@ export function CaseLogsPage() {
   const [searchTerm, setSearchTerm] = React.useState("");
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [selectedLog, setSelectedLog] = React.useState<any | null>(null);
+  React.useEffect(() => {
+    if (selectedLog?.id) publishArogyaContext({ log: { type: "case", id: Number(selectedLog.id) } });
+    else publishArogyaContext(null);
+  }, [selectedLog?.id]);
   const [caseLogs, setCaseLogs] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);

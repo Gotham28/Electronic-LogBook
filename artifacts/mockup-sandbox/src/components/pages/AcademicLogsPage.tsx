@@ -2,6 +2,7 @@ import * as React from "react";
 import { AlertCircle, CheckCircle2, Clock, GraduationCap, PlusCircle, Loader2, Edit3 } from "lucide-react";
 import { toast } from "sonner";
 import { apiGet, apiPost, apiPatch } from "@/lib/apiClient";
+import { publishArogyaContext } from "@/lib/arogya-context";
 import { getCurrentUser } from "@/lib/session";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -140,7 +141,7 @@ export function AcademicLogsPage() {
         </div>
         <Dialog open={open} onOpenChange={(val) => { 
           setOpen(val); 
-          if (!val) { setForm({ date: todayForInput(), type: "", presentationType: "", topic: "", description: "", supervisorId: "" }); setEditLogId(null); } 
+          if (!val) { publishArogyaContext(null); setForm({ date: todayForInput(), type: "", presentationType: "", topic: "", description: "", supervisorId: "" }); setEditLogId(null); }
         }}>
           <DialogTrigger asChild><Button><PlusCircle className="h-4 w-4" /> Log academic activity</Button></DialogTrigger>
           <DialogContent className="rounded-2xl bg-white sm:max-w-lg">
@@ -282,6 +283,7 @@ export function AcademicLogsPage() {
                       {(log.status === "pending" || log.status === "rejected") && (
                         <Button variant="ghost" size="sm" className="text-teal-600 hover:text-teal-800 hover:bg-teal-50" onClick={() => {
                           setEditLogId(log.id);
+                          publishArogyaContext({ log: { type: "academic", id: Number(log.id) } });
                           setForm({
                             date: log.date, type: log.activityType || log.type, presentationType: log.presentationType === "—" ? "" : (log.presentationType || ""),
                             topic: log.topic || "", supervisorId: String(log.supervisorId || ""),

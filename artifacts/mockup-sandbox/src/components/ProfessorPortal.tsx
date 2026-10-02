@@ -66,6 +66,7 @@ import { apiGet, apiPatch, apiPost, apiDelete } from "@/lib/apiClient";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { getCurrentUser, isDemoMode } from "@/lib/session";
 import { QuarterlyAppraisalSection } from "@/components/QuarterlyAppraisalSection";
+import { publishArogyaContext } from "@/lib/arogya-context";
 import { useDepartment } from "@/lib/department-context";
 import {
   ChartContainer,
@@ -235,10 +236,29 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
   }, [fetchProfessorData]);
 
   const reviews = data?.pendingReviews || [];
+  const currentQueueItem = reviews[currentIndex];
   const allStudents = data?.assignedMentees || [];
   const mentees = departmentFilter === "all"
     ? allStudents
     : allStudents.filter((student: any) => student.department === departmentFilter);
+
+  React.useEffect(() => {
+    if (selectedMentee?.id) {
+      publishArogyaContext({ studentId: Number(selectedMentee.id) });
+      return;
+    }
+    if (currentTab === "review-queue" && currentQueueItem?.dbId) {
+      const logTypes: Record<string, "case" | "procedure" | "academic" | "clinical-work" | "conference"> = {
+        case: "case", procedure: "procedure", academic: "academic", clinical_work: "clinical-work", conference: "conference",
+      };
+      const type = logTypes[currentQueueItem.logType];
+      if (type) {
+        publishArogyaContext({ studentId: Number(currentQueueItem.studentId), log: { type, id: Number(currentQueueItem.dbId) } });
+        return;
+      }
+    }
+    publishArogyaContext(null);
+  }, [selectedMentee?.id, currentTab, currentQueueItem?.dbId, currentQueueItem?.logType, currentQueueItem?.studentId]);
 
   // Auto-clamp currentIndex if the review queue shrinks after an action
   React.useEffect(() => {

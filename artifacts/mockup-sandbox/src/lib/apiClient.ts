@@ -18,6 +18,29 @@ export class ApiError extends Error {
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "";
 
+export interface ArogyaAction { id: string; label: string; href: string }
+export interface ArogyaAnswer {
+  reply: string;
+  kind: "help" | "diagnostic" | "clarification" | "unsupported";
+  steps: string[];
+  sources: Array<{ id: string; title: string }>;
+  facts: Array<{ id: string; label: string; value: string | number | null }>;
+  actions: ArogyaAction[];
+  clarification?: { type: "workflow" | "student" | "appraisal_period" | "log"; choices?: Array<{ id: string; label: string }> };
+  checkedAt?: string;
+  knowledgeVersion: string;
+  capabilitySignature: string;
+}
+export interface ArogyaContextResponse {
+  mode: "legacy" | "v2";
+  role: "student" | "professor" | "hod";
+  departmentLabel: string;
+  workflows: Array<{ id: string; title: string; available: boolean }>;
+  actions: ArogyaAction[];
+  knowledgeVersion: string;
+  capabilitySignature: string;
+}
+
 if (!import.meta.env.VITE_API_URL && import.meta.env.PROD) {
   console.error("VITE_API_URL is not set — API requests will fail in production");
 }

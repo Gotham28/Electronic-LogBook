@@ -1,16 +1,66 @@
 import { Router } from "express";
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
+import { z } from "zod";
 import { requireAuth } from "../middlewares/auth.js";
 import { _arogya, checkAndIncrementLimit, buildProgressFacts, buildAppraisalFacts } from "../lib/arogya.js";
-import { findStudent } from "../lib/appraisals.js";
+import { callerCanAccessStudent, findStudent } from "../lib/appraisals.js";
 import { buildDepartmentReportFacts } from "../lib/department-report.js";
-import { db, studentsTable, usersTable } from "@workspace/db";
+import { db, departmentsTable, studentsTable, usersTable } from "@workspace/db";
 import { getDepartmentFeatures } from "../lib/department-features.js";
 import { resolveConfigDepartmentId } from "../lib/department-config-source.js";
 import { AROGYA_HELP_GUIDE } from "../lib/arogya-help.js";
 import { idSchema } from "../lib/validation.js";
+import { capabilitySignature, knowledgeVersion, roleWorkflows } from "../lib/arogya/knowledge/index.js";
+import { canonicalArogyaRole } from "../lib/arogya/policy.js";
+import { normalizeHistory, scrubAccountNames, containsSensitiveClinicalInput } from "../lib/arogya/input-privacy.js";
+import { answerArogya, ArogyaProviderError, validateV2Enabled } from "../lib/arogya/provider.js";
+import type { ArogyaLogType } from "../lib/arogya/facts.js";
 
 const router = Router();
+
+const validationCode = z.enum([
+  "student_required", "period_required", "appraisal_exists", "date_required", "publication_required",
+  "score_required", "remediation_required", "record_not_pending", "record_not_assigned",
+]);
+const contextSchema = z.object({
+  workflowId: z.string().max(80).optional(),
+  studentId: z.number().int().positive().optional(),
+  log: z.object({ type: z.enum(["case", "procedure", "academic", "clinical-work", "conference"]), id: z.number().int().positive() }).strict().optional(),
+  appraisalPeriod: z.object({ quarter: z.number().int().min(1).max(4), year: z.number().int().min(2000).max(2200) }).strict().optional(),
+  validationCodes: z.array(validationCode).max(8).optional(),
+}).strict();
+const askV2Schema = z.object({
+  question: z.string().trim().min(1).max(1200),
+  history: z.unknown().optional(),
+  context: contextSchema.optional(),
+}).strict();
+
+router.get("/context", requireAuth, async (req, res) => {
+  const role = canonicalArogyaRole(req.user!.role);
+  if (!role || !Number.isSafeInteger(req.user!.departmentId) || req.user!.departmentId! <= 0) {
+    res.status(403).json({ error: "Arogya is not available for this account type." });
+    return;
+  }
+  try {
+    const { features, configSourceId } = await getDepartmentFeatures(req.user!.departmentId!);
+    const [department] = await db.select({ name: departmentsTable.name }).from(departmentsTable)
+      .where(eq(departmentsTable.id, req.user!.departmentId!)).limit(1);
+    if (!department) { res.status(403).json({ error: "A department assignment is required." }); return; }
+    const workflows = roleWorkflows(role, features);
+    res.json({
+      mode: validateV2Enabled() ? "v2" : "legacy",
+      role,
+      departmentLabel: department.name,
+      workflows: workflows.map((workflow) => ({ id: workflow.id, title: workflow.title, available: workflow.available })),
+      actions: workflows.filter((workflow) => workflow.available && workflow.href)
+        .map((workflow) => ({ id: workflow.id, label: workflow.title, href: workflow.href })),
+      knowledgeVersion,
+      capabilitySignature: capabilitySignature(role, configSourceId, features),
+    });
+  } catch {
+    res.status(500).json({ error: "Arogya context could not be loaded." });
+  }
+});
 
 router.post("/ask", requireAuth, async (req, res) => {
   const userId = String(req.user!.id);
@@ -18,6 +68,127 @@ router.post("/ask", requireAuth, async (req, res) => {
   // Arogya is for residents, professors, and HODs only.
   if (!req.user!.departmentId) {
     res.status(403).json({ error: "Arogya is not available for this account type." });
+    return;
+  }
+
+  if (validateV2Enabled()) {
+    const parsed = askV2Schema.safeParse(req.body);
+    if (!parsed.success) { res.status(400).json({ error: "Invalid Arogya request." }); return; }
+    const history = normalizeHistory(parsed.data.history);
+    if (!history) { res.status(400).json({ error: "Conversation history is invalid or too long." }); return; }
+    const question = parsed.data.question;
+    if (containsSensitiveClinicalInput(question)) {
+      res.status(400).json({ error: "Please remove patient details and ask about the ELogbook workflow only." });
+      return;
+    }
+
+    const role = canonicalArogyaRole(req.user!.role);
+    if (!role) { res.status(403).json({ error: "Arogya is not available for this account type." }); return; }
+    const context = parsed.data.context ?? {};
+    try {
+      const { features, configSourceId } = await getDepartmentFeatures(req.user!.departmentId!);
+      const [department] = await db.select({ name: departmentsTable.name }).from(departmentsTable)
+        .where(eq(departmentsTable.id, req.user!.departmentId!)).limit(1);
+      if (!department) { res.status(403).json({ error: "A department assignment is required." }); return; }
+      if (context.workflowId && !roleWorkflows(role, features).some((item) => item.id === context.workflowId)) {
+        res.status(400).json({ error: "That workflow is not available to your role." }); return;
+      }
+      if (context.log?.type === "clinical-work" && !features.clinicalWorks ||
+        context.log?.type === "conference" && !features.attendedConferences ||
+        context.log?.type === "case" && features.hideCaseLogs ||
+        context.log?.type === "procedure" && features.hideProcedureLogs) {
+        res.status(403).json({ error: "That workflow is unavailable for your department." }); return;
+      }
+      let accountNames: string[] = [];
+      const residentMention = /\b(?:student|resident)\s+(?:named\s+)?([\p{Lu}][\p{L}'-]+(?:\s+[\p{Lu}][\p{L}'-]+)?)/u.exec(question)?.[1];
+      if (role === "student") {
+        const own = await db.select({ name: usersTable.fullName }).from(usersTable)
+          .where(and(eq(usersTable.id, req.user!.id), eq(usersTable.role, "student"), eq(usersTable.departmentId, req.user!.departmentId!))).limit(1);
+        accountNames = own.map((item) => item.name);
+        if (context.studentId !== undefined) {
+          const [ownProfile] = await db.select({ id: studentsTable.id }).from(studentsTable)
+            .where(eq(studentsTable.userId, req.user!.id)).limit(1);
+          if (!ownProfile) { res.status(404).json({ error: "Student profile not found." }); return; }
+          if (ownProfile.id !== context.studentId) { res.status(403).json({ error: "The selected record is outside your access scope." }); return; }
+        }
+      } else {
+        const members = await db.select({ id: usersTable.id, name: usersTable.fullName, role: usersTable.role }).from(usersTable)
+          .where(and(eq(usersTable.departmentId, req.user!.departmentId!), eq(usersTable.status, "approved"),
+            inArray(usersTable.role, ["student", "professor", "hod"])));
+        accountNames = members.map((item) => item.name);
+        const scrubbedQuestion = scrubAccountNames(question, accountNames);
+        if ((scrubbedQuestion !== question || residentMention) && context.studentId === undefined && /\b(?:student|resident|appraisal|progress|case|log)\b/i.test(question)) {
+          res.json({ reply: "Select the resident in Arogya or on the appraisal page, then ask again so I can check the right record.",
+            kind: "clarification", steps: [], sources: [], facts: [], actions: [], clarification: { type: "student" },
+            knowledgeVersion, capabilitySignature: capabilitySignature(role, req.user!.departmentId!, features) });
+          return;
+        }
+        if (context.studentId !== undefined) {
+          const selectedStudent = await findStudent(context.studentId);
+          if (!selectedStudent) { res.status(404).json({ error: "Student not found." }); return; }
+          if (!callerCanAccessStudent(req.user!, selectedStudent) || selectedStudent.departmentId !== req.user!.departmentId) {
+            res.status(403).json({ error: "Student is outside your department." }); return;
+          }
+          if (scrubbedQuestion !== question && !new RegExp(selectedStudent.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i").test(question)) {
+            res.json({ reply: "The resident mentioned in the question does not match the selected resident. Select the intended resident and ask again.",
+              kind: "clarification", steps: [], sources: [], facts: [], actions: [], clarification: { type: "student" },
+              knowledgeVersion, capabilitySignature: capabilitySignature(role, req.user!.departmentId!, features) });
+            return;
+          }
+          if (residentMention && residentMention.length > 1) {
+            const mentioned = residentMention.toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+            const selectedName = selectedStudent.name.toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+            if (!selectedName.includes(mentioned)) {
+              res.json({ reply: "The resident mentioned in the question does not match the selected resident. Select the intended resident and ask again.",
+                kind: "clarification", steps: [], sources: [], facts: [], actions: [], clarification: { type: "student" },
+                knowledgeVersion, capabilitySignature: capabilitySignature(role, req.user!.departmentId!, features) });
+              return;
+            }
+          }
+        }
+      }
+
+      checkAndIncrementLimit(userId);
+      const answer = await answerArogya({
+        question,
+        history,
+        context: { ...context, log: context.log ? { ...context.log, type: context.log.type as ArogyaLogType } : undefined },
+        studentId: context.studentId,
+        actor: { id: req.user!.id, role, departmentId: req.user!.departmentId },
+        features,
+        configSourceId,
+        departmentLabel: department.name,
+      }, accountNames);
+      console.log(JSON.stringify({ userId, feature: "ask-v2", httpStatus: 200, toolCount: answer.facts.length ? 1 : 0 }));
+      res.json(answer);
+    } catch (err: any) {
+      if (err instanceof ArogyaProviderError && err.code === "AROGYA_UNAVAILABLE") {
+        console.log(JSON.stringify({ userId, feature: "ask-v2", httpStatus: 503 }));
+        res.status(503).json({ error: "Arogya is not available right now." }); return;
+      }
+      if (err instanceof ArogyaProviderError && err.code === "AROGYA_LIMIT_REACHED" || err?.message === "AROGYA_LIMIT_REACHED") {
+        console.log(JSON.stringify({ userId, feature: "ask-v2", httpStatus: 429 }));
+        res.status(429).json({ error: "You've reached today's Arogya limit. Try again tomorrow." }); return;
+      }
+      if (err?.message === "AROGYA_SCOPE_403" || err?.message === "AROGYA_SCOPE") {
+        console.log(JSON.stringify({ userId, feature: "ask-v2", httpStatus: 403 }));
+        res.status(403).json({ error: "The selected record is outside your access scope." }); return;
+      }
+      if (err?.message === "AROGYA_SCOPE_404") {
+        console.log(JSON.stringify({ userId, feature: "ask-v2", httpStatus: 404 }));
+        res.status(404).json({ error: "The selected record was not found." }); return;
+      }
+      if (err?.status === 404 || err?.status === 403) {
+        console.log(JSON.stringify({ userId, feature: "ask-v2", httpStatus: err.status }));
+        res.status(err.status).json({ error: err.status === 404 ? "The selected record was not found." : "The selected record is outside your access scope." }); return;
+      }
+      if (err instanceof ArogyaProviderError && err.code === "AROGYA_INVALID_OUTPUT") {
+        console.log(JSON.stringify({ userId, feature: "ask-v2", httpStatus: 502 }));
+        res.status(502).json({ error: "Arogya returned an invalid response. Please try again." }); return;
+      }
+      console.log(JSON.stringify({ userId, feature: "ask-v2", httpStatus: 500 }));
+      res.status(500).json({ error: "Arogya couldn't check that right now." });
+    }
     return;
   }
 
