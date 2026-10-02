@@ -120,6 +120,7 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
   const [isActive, setIsActive] = React.useState(() => isDemoMode() && isDemoMovieActive());
   const [phase, setPhase] = React.useState<"splash" | "playing" | "ended">("splash");
   const [sceneIndex, setSceneIndex] = React.useState(0);
+  const [sceneClock, setSceneClock] = React.useState<{ sceneIndex: number; startedAt: number } | null>(null);
   const [targetRect, setTargetRect] = React.useState<SpotlightRect | null>(null);
   const [spotlightTargetKey, setSpotlightTargetKey] = React.useState("initial");
   const [captionState, setCaptionState] = React.useState<{ sceneId: string; caption: string } | null>(null);
@@ -128,6 +129,7 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
   
   const reduceMotion = useReducedMotion();
   const currentScene: DemoScene | undefined = DEMO_SCENES[sceneIndex];
+  const sceneStartedAt = sceneClock?.sceneIndex === sceneIndex ? sceneClock.startedAt : null;
   const displayedCaption = captionState?.sceneId === currentScene?.id ? captionState.caption : currentScene?.caption;
 
   const activeRoleRef = React.useRef(activeRole);
@@ -189,6 +191,7 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
       advancedSceneRef.current = null;
       setPhase("splash");
       setSceneIndex(0);
+      setSceneClock(null);
       setTargetRect(null);
       setSpotlightTargetKey("initial");
       setRunToken(t => t + 1);
@@ -293,6 +296,19 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
 
   // Main engine
   const firedBeatsRef = React.useRef<Record<number, Set<number>>>({});
+
+  const rewindScene = React.useCallback((fromSceneIndex: number) => {
+    if (phaseRef.current !== "playing" || fromSceneIndex <= 0) return;
+
+    const previousSceneIndex = fromSceneIndex - 1;
+    // A back action restarts both the scene being left and the scene being replayed.
+    firedBeatsRef.current[fromSceneIndex] = new Set<number>();
+    firedBeatsRef.current[previousSceneIndex] = new Set<number>();
+    advancedSceneRef.current = null;
+    setArogyaOpen(false);
+    setTargetRect(null);
+    setSceneIndex(previousSceneIndex);
+  }, [setArogyaOpen]);
   
   React.useEffect(() => {
     if (!isActive || phase !== "playing" || blocked || !currentScene) return;
@@ -512,6 +528,7 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
         
         currentStage = "play";
         clockStart = performance.now();
+        setSceneClock({ sceneIndex, startedAt: clockStart });
         playDemoSound("pop");
         
         if (currentScene.action && currentScene.action !== "none") {
@@ -617,8 +634,13 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
             <MovieControls
               currentSceneIndex={sceneIndex}
               onSkip={handleSkip}
+              onBack={() => rewindScene(sceneIndex)}
               onNext={() => advanceScene(sceneIndex)}
               isLastScene={sceneIndex === DEMO_SCENES.length - 1}
+              isFirstScene={sceneIndex === 0}
+              sceneStartedAt={sceneStartedAt}
+              sceneDurationMs={currentScene?.durationMs ?? 0}
+              reduceMotion={!!reduceMotion}
             />
 
             <DemoSpotlight rect={targetRect} targetKey={spotlightTargetKey} reduceMotion={!!reduceMotion} />

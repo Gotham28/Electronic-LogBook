@@ -1,14 +1,21 @@
 import * as React from "react";
+import { motion } from "framer-motion";
+import { ArrowLeft, ArrowRight, Clock3 } from "lucide-react";
 import { DEMO_SCENES, CHAPTERS, getChapterShares } from "./scenes";
 
 type MovieControlsProps = {
   currentSceneIndex: number;
   onSkip: () => void;
+  onBack: () => void;
   onNext: () => void;
   isLastScene: boolean;
+  isFirstScene: boolean;
+  sceneStartedAt: number | null;
+  sceneDurationMs: number;
+  reduceMotion: boolean;
 };
 
-export function MovieControls({ currentSceneIndex, onSkip, onNext, isLastScene }: MovieControlsProps) {
+export function MovieControls({ currentSceneIndex, onSkip, onBack, onNext, isLastScene, isFirstScene, sceneStartedAt, sceneDurationMs, reduceMotion }: MovieControlsProps) {
   const shares = React.useMemo(() => getChapterShares(), []);
   const currentChapter = DEMO_SCENES[currentSceneIndex]?.chapter;
   
@@ -33,13 +40,51 @@ export function MovieControls({ currentSceneIndex, onSkip, onNext, isLastScene }
           <div className="flex shrink-0 items-center gap-2">
             <button
               type="button"
+              onClick={onBack}
+              disabled={isFirstScene}
+              data-testid="demo-movie-back"
+              aria-label="Previous demo stage"
+              title="Previous part"
+              className="grid h-10 w-10 place-items-center rounded-xl border border-[#D9EAE7] bg-white text-[#16323A] transition-colors duration-150 hover:bg-[#F2F8F7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0F766E] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <ArrowLeft className="h-[18px] w-[18px]" strokeWidth={1.9} aria-hidden="true" />
+            </button>
+            {sceneStartedAt !== null && (
+              <div
+                role="img"
+                aria-label="Progress until the next demo part"
+                title="Progress until the next demo part"
+                className="relative grid h-9 w-9 shrink-0 place-items-center"
+              >
+                <svg viewBox="0 0 36 36" className="h-9 w-9 -rotate-90" aria-hidden="true">
+                  <circle cx="18" cy="18" r="14" fill="none" stroke="#D9EAE7" strokeWidth="3" />
+                  <motion.circle
+                    key={`${currentSceneIndex}-${sceneStartedAt}`}
+                    cx="18"
+                    cy="18"
+                    r="14"
+                    fill="none"
+                    stroke="#0F766E"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeDasharray="88 88"
+                    initial={{ strokeDashoffset: 88 }}
+                    animate={{ strokeDashoffset: 0 }}
+                    transition={{ duration: reduceMotion ? 0 : sceneDurationMs / 1000, ease: "linear" }}
+                  />
+                </svg>
+                <Clock3 className="absolute h-3.5 w-3.5 text-[#0F766E]" strokeWidth={1.8} aria-hidden="true" />
+              </div>
+            )}
+            <button
+              type="button"
               onClick={onNext}
               data-testid="demo-movie-next"
               aria-label={isLastScene ? "Finish demo" : "Next demo stage"}
               className="flex h-10 min-w-[72px] items-center justify-center gap-1.5 rounded-xl bg-[#0F766E] px-3 text-sm font-semibold text-white transition-colors duration-150 hover:bg-[#0B665F] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0F766E] focus-visible:ring-offset-2"
             >
               {isLastScene ? "Finish" : "Next"}
-              {!isLastScene && <span aria-hidden="true">→</span>}
+              {!isLastScene && <ArrowRight className="h-4 w-4" strokeWidth={2} aria-hidden="true" />}
             </button>
             <button
               type="button"
