@@ -51,6 +51,8 @@ function StatusPill({ status }: { status: string }) {
   );
 }
 
+const HARDCODED_COLLEGE = "Government Medical College Kannur";
+
 function CoverPage({ profile, name }: { profile: any; name: string }) {
   if (!profile) return null;
   const mentorRole = profile.mentorRole === "hod" ? "Head of Department" : profile.mentorRole === "professor" ? "Professor" : "Supervisor";
@@ -59,7 +61,10 @@ function CoverPage({ profile, name }: { profile: any; name: string }) {
     : "Present";
   const printedDate = new Date().toLocaleString("en-IN", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" });
 
-  const [college, setCollege] = React.useState(() => localStorage.getItem("logbook_college") || "Medical College");
+  const [college, setCollege] = React.useState(() => {
+    const saved = localStorage.getItem("logbook_college");
+    return saved && saved !== "Medical College" ? saved : HARDCODED_COLLEGE;
+  });
   const [course, setCourse] = React.useState(() => localStorage.getItem("logbook_course") || profile.course || "MD/MS Program");
 
   React.useEffect(() => {
@@ -82,7 +87,7 @@ function CoverPage({ profile, name }: { profile: any; name: string }) {
           value={college} 
           onChange={(e) => setCollege(e.target.value)}
           className="text-3xl font-extrabold text-slate-900 bg-transparent text-center border-b border-transparent hover:border-slate-300 focus:border-teal-500 focus:outline-none w-full placeholder:text-slate-300 transition-colors"
-          placeholder="Enter College Name"
+          placeholder={HARDCODED_COLLEGE}
         />
         <p className="text-sm font-bold uppercase tracking-[0.25em] text-teal-700">Electronic Logbook</p>
       </div>
@@ -375,7 +380,7 @@ export function PrintableLogbook() {
                     <div>
                       <p style={{ fontSize: 11, fontWeight: 800, color: "#0f172a", margin: 0, lineHeight: 1.2 }}>{user?.name ?? "—"}</p>
                       <p style={{ fontSize: 9, color: "#64748b", margin: 0, marginTop: 1 }}>
-                        Dept. of {department}&nbsp;&nbsp;|&nbsp;&nbsp;Reg. No:&nbsp;<span style={{ fontWeight: 700, color: "#0f172a" }}>{regNumber}</span>
+                        {HARDCODED_COLLEGE} &nbsp;·&nbsp; Dept. of {department}&nbsp;&nbsp;|&nbsp;&nbsp;Reg. No:&nbsp;<span style={{ fontWeight: 700, color: "#0f172a" }}>{regNumber}</span>
                       </p>
                     </div>
                   </div>
@@ -393,7 +398,7 @@ export function PrintableLogbook() {
                 {/* Document identity bar */}
         <div className="flex flex-wrap items-start justify-between gap-4 mb-10 pb-6 border-b border-slate-200">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-teal-600 mb-1">Complete Training Record</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-teal-600 mb-1">{HARDCODED_COLLEGE}</p>
             <h1 className="text-2xl font-extrabold text-slate-900">{user?.name ?? "—"}</h1>
             <p className="text-sm text-slate-500 mt-0.5">Department of {department}</p>
           </div>
@@ -691,7 +696,7 @@ export function PrintableLogbook() {
              <h2 className="text-3xl font-bold text-slate-900">Final Verification</h2>
           </div>
           <div className="bg-slate-50 border border-slate-200 rounded-xl p-8 text-sm text-slate-700 leading-loose space-y-5">
-             <p>This is to certify that <strong>{user?.name ?? "the resident"}</strong> (Registration No: <strong>{regNumber}</strong>) has satisfactorily fulfilled all the mandatory requirements for the <strong>{localStorage.getItem("logbook_course") || data.profile?.course || "MD/MS Program"}</strong> training program in the Department of <strong>{department}</strong> at <strong>{localStorage.getItem("logbook_college") || "the institution"}</strong>.</p>
+             <p>This is to certify that <strong>{user?.name ?? "the resident"}</strong> (Registration No: <strong>{regNumber}</strong>) has satisfactorily fulfilled all the mandatory requirements for the <strong>{localStorage.getItem("logbook_course") || data.profile?.course || "MD/MS Program"}</strong> training program in the Department of <strong>{department}</strong> at <strong>{localStorage.getItem("logbook_college") && localStorage.getItem("logbook_college") !== "Medical College" ? localStorage.getItem("logbook_college") : HARDCODED_COLLEGE}</strong>.</p>
              <p>All clinical cases, procedures, and academic activities recorded in this logbook have been personally performed or attended by the resident. The entries have been periodically evaluated, verified, and authenticated by the respective unit supervisors and the Head of Department.</p>
              <p>The resident has demonstrated the necessary clinical competencies, professionalism, and ethical conduct required for the successful completion of the training period.</p>
           </div>
