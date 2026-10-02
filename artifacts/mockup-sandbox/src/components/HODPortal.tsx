@@ -450,7 +450,7 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
                 <SummaryCard label="Faculty" value={roster?.professors.length ?? 0} />
                 <SummaryCard label="Awaiting approval" value={pendingStudents.length} error={studentsError} />
               </div>
-              <Card>
+              <Card data-tour="hod-student-roster">
                 <CardHeader className="border-b border-teal-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <CardTitle className="text-lg flex items-center gap-2">
                     <GraduationCap className="h-5 w-5 text-teal-600" />
@@ -592,7 +592,7 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
         </TabsContent>
 
         <TabsContent value="student-access" className="space-y-4 pt-4">
-          <Card>
+          <Card data-tour="hod-student-approvals">
             <CardHeader className="border-b border-teal-100">
               <CardTitle className="text-xl">Pending Student Approvals</CardTitle>
             </CardHeader>
@@ -625,7 +625,7 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
                         <TableCell className="font-mono text-xs">{student.kuhsId}</TableCell>
                         <TableCell className="text-right">
                             <div className="flex justify-end gap-2">
-                              <Button size="sm" onClick={() => approveStudent(student.id)}>
+                              <Button data-tour="hod-approve-student" size="sm" onClick={() => approveStudent(student.id)}>
                                 <CheckCircle2 className="h-4 w-4 mr-2" /> Approve
                               </Button>
                               <Button size="sm" variant="outline" onClick={() => rejectStudent(student.id)} className="text-rose-700 border-rose-200 hover:bg-rose-50">
@@ -643,7 +643,7 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
         </TabsContent>
 
         <TabsContent value="professors" className="space-y-4 pt-4">
-          <Card className="max-w-xl">
+          <Card data-tour="hod-add-faculty" className="max-w-xl">
             <CardHeader className="border-b border-teal-100">
               <CardTitle className="text-xl">Add Faculty</CardTitle>
             </CardHeader>
@@ -754,7 +754,7 @@ function DemoLogStatsChart({ logStats }: { logStats: AnalyticsData["logStats"] }
     { name: "Returned", value: logStats.rejected, color: "#e11d48" },
   ];
   return (
-    <Card className="mb-6 border-teal-100 bg-white shadow-sm">
+    <Card data-tour="hod-log-activity" className="mb-6 border-teal-100 bg-white shadow-sm">
       <CardHeader className="pb-2">
         <CardTitle className="text-base">Department log activity</CardTitle>
         <p className="text-sm text-slate-600">Sample records across the active department.</p>

@@ -222,8 +222,8 @@ export function CaseLogsPage() {
               <DialogTitle className="flex items-center gap-2 text-xl"><FileText className="h-5 w-5 text-teal-600" /> {editLogId ? "Edit clinical case" : "New clinical case"}</DialogTitle>
               <DialogDescription>Complete the clinical record before sending it to a faculty member.</DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleAddCase} className="space-y-5">
-              <div className={`grid gap-4 ${hideUhid ? "sm:grid-cols-3" : "sm:grid-cols-4"}`}>
+            <form data-tour="caselog-form" onSubmit={handleAddCase} className="space-y-5">
+              <div data-tour="caselog-patient-info" className={`grid gap-4 ${hideUhid ? "sm:grid-cols-3" : "sm:grid-cols-4"}`}>
                 <Field label="Date"><Input type="date" value={form.date} onChange={(e) => setField("date", e.target.value)} required /></Field>
                 <Field label="Age"><Input value={form.age} onChange={(e) => setField("age", e.target.value)} placeholder="e.g. 7 years" required /></Field>
                 <Field label="Gender">
@@ -233,6 +233,7 @@ export function CaseLogsPage() {
                   </Select>
                 </Field>
               </div>
+              <div data-tour="caselog-clinical-details" className="space-y-5">
               <Field label={deptConfig?.enabledFeatures?.useCaseTypeLabel ? "Case type" : "Case category"}>
                 <Select value={form.category} onValueChange={(value) => setField("category", value)}>
                   <SelectTrigger><SelectValue placeholder={deptConfig?.enabledFeatures?.useCaseTypeLabel ? "Select a case type" : "Select a case category"} /></SelectTrigger>
@@ -249,6 +250,8 @@ export function CaseLogsPage() {
               <Field label="Relevant history"><Textarea rows={3} value={form.history} onChange={(e) => setField("history", e.target.value)} /></Field>
               <Field label="Clinical examination"><Textarea rows={3} value={form.examination} onChange={(e) => setField("examination", e.target.value)} /></Field>
               <Field label="Investigations"><Textarea rows={2} value={form.investigations} onChange={(e) => setField("investigations", e.target.value)} /></Field>
+              </div>
+              <div data-tour="caselog-diagnosis-details" className="space-y-5">
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Final diagnosis"><Input value={form.diagnosis} onChange={(e) => setField("diagnosis", e.target.value)} required /></Field>
                 <Field label="Differential diagnosis"><Input value={form.differentialDiagnosis} onChange={(e) => setField("differentialDiagnosis", e.target.value)} /></Field>
@@ -256,6 +259,8 @@ export function CaseLogsPage() {
               <Field label="Management and interventions"><Textarea rows={3} value={form.management} onChange={(e) => setField("management", e.target.value)} /></Field>
               <Field label="Outcome / follow-up"><Textarea rows={2} value={form.outcome} onChange={(e) => setField("outcome", e.target.value)} /></Field>
               <Field label="Learning points"><Textarea rows={2} value={form.learningPoints} onChange={(e) => setField("learningPoints", e.target.value)} /></Field>
+              </div>
+              <div data-tour="caselog-reviewer">
               <Field label="Reviewing faculty member">
                 <Select value={form.supervisorId} onValueChange={(value) => setField("supervisorId", value)}>
                   <SelectTrigger><SelectValue placeholder="Select a faculty member" /></SelectTrigger>
@@ -264,7 +269,8 @@ export function CaseLogsPage() {
                   </SelectContent>
                 </Select>
               </Field>
-              <DialogFooter>
+              </div>
+              <DialogFooter data-tour="caselog-submit-actions">
                 <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)} disabled={isSubmitting}>Save draft</Button>
                 <Button type="submit" disabled={isSubmitting}>
                   {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

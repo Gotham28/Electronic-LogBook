@@ -206,9 +206,9 @@ export function DepartmentSettings() {
   const visibleItems = useSearch<{ id: number; name: string; required: number }>(activeSection.items, searchQuery);
 
   return (
-    <div data-tour="hod-requirements" className="space-y-6">
+    <div className="space-y-6">
       <div className="flex flex-col gap-1 border-b border-slate-200 pb-4">
-        <h2 className="text-2xl font-semibold tracking-tight text-slate-900">Training requirements</h2>
+        <h2 data-tour="hod-requirements" className="text-2xl font-semibold tracking-tight text-slate-900">Training requirements</h2>
         <p className="text-sm text-slate-500">Department of {data.department.name}</p>
       </div>
 
@@ -276,7 +276,7 @@ export function DepartmentSettings() {
           <div className="flex flex-col gap-2 border-b border-slate-200 pb-4">
             <div className="flex items-center justify-between gap-4">
               <h3 className="text-lg font-semibold text-slate-900">{activeSection.label}</h3>
-              <Button size="sm" onClick={() => setIsAdding(!isAdding)}>
+              <Button data-tour="hod-requirements-add" size="sm" onClick={() => setIsAdding(!isAdding)}>
                 {activeSection.addLabel}
               </Button>
             </div>
@@ -284,7 +284,7 @@ export function DepartmentSettings() {
           </div>
 
           {isAdding && (
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 mb-2">
+            <div data-tour="hod-requirements-add-form" className="rounded-xl border border-slate-200 bg-slate-50 p-4 mb-2">
               <form onSubmit={handleAddSubmit} className="flex flex-wrap items-end gap-4">
                 <div className="space-y-2 flex-1 min-w-[200px]">
                   <Label htmlFor="add-name">Name</Label>

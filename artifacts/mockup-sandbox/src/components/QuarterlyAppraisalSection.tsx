@@ -276,7 +276,7 @@ export function QuarterlyAppraisalSection() {
   const isHod = currentUser?.role === "hod";
 
   return (
-    <section className="space-y-5" aria-labelledby="quarterly-appraisal-heading">
+    <section data-tour="quarterly-appraisal" className="space-y-5" aria-labelledby="quarterly-appraisal-heading">
       <Card className="border-slate-200 bg-white">
         <CardHeader className="border-b border-slate-100 pb-4">
           <div className="flex items-start gap-3">
