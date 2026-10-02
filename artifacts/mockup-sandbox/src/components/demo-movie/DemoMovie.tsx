@@ -1,6 +1,7 @@
 import * as React from "react";
 import { createPortal } from "react-dom";
 import { motion, useReducedMotion, AnimatePresence } from "framer-motion";
+import { BookOpenCheck, Loader2 } from "lucide-react";
 import { 
   isDemoMovieActive, 
   DEMO_MOVIE_CHANGED_EVENT, 
@@ -17,6 +18,79 @@ import { sendAroDemoCommand } from "./movieBridge";
 import { playDemoSound } from "@/lib/demoSounds";
 import { DEMO_MOVIE_ASK_QUESTION } from "@/lib/demoData";
 
+type SpotlightRect = { x: number; y: number; w: number; h: number };
+
+function DemoSpotlight({ rect, targetKey, reduceMotion }: { rect: SpotlightRect | null; targetKey: string; reduceMotion: boolean }) {
+  const maskId = React.useId().replace(/:/g, "");
+  const [displayRect, setDisplayRect] = React.useState<SpotlightRect | null>(null);
+  const [holeOpen, setHoleOpen] = React.useState(false);
+  const [viewport, setViewport] = React.useState(() => ({ width: window.innerWidth, height: window.innerHeight }));
+
+  React.useEffect(() => {
+    const updateViewport = () => setViewport({ width: window.innerWidth, height: window.innerHeight });
+    window.addEventListener("resize", updateViewport);
+    return () => window.removeEventListener("resize", updateViewport);
+  }, []);
+
+  React.useEffect(() => {
+    if (rect) {
+      setDisplayRect(rect);
+      const frame = window.requestAnimationFrame(() => setHoleOpen(true));
+      return () => window.cancelAnimationFrame(frame);
+    }
+
+    setHoleOpen(false);
+    const timer = window.setTimeout(() => setDisplayRect(null), reduceMotion ? 0 : 140);
+    return () => window.clearTimeout(timer);
+  }, [rect, reduceMotion]);
+
+  return (
+    <div aria-hidden="true" data-target-key={targetKey} className="pointer-events-none absolute inset-0 z-[40]">
+      <svg
+        className="absolute inset-0 h-full w-full"
+        width={viewport.width}
+        height={viewport.height}
+        viewBox={`0 0 ${viewport.width} ${viewport.height}`}
+        preserveAspectRatio="none"
+      >
+        <defs>
+          <mask id={maskId} maskUnits="userSpaceOnUse" x="0" y="0" width={viewport.width} height={viewport.height}>
+            <rect x="0" y="0" width={viewport.width} height={viewport.height} fill="white" />
+            {displayRect && (
+              <motion.rect
+                x={displayRect.x}
+                y={displayRect.y}
+                width={displayRect.w}
+                height={displayRect.h}
+                rx="16"
+                fill="black"
+                initial={false}
+                animate={{ fillOpacity: holeOpen ? 1 : 0 }}
+                transition={{ duration: reduceMotion ? 0 : 0.14, ease: "easeOut" }}
+              />
+            )}
+          </mask>
+        </defs>
+        <rect x="0" y="0" width={viewport.width} height={viewport.height} fill="#102427" fillOpacity="0.48" mask={`url(#${maskId})`} />
+      </svg>
+      {displayRect && (
+        <motion.div
+          className="absolute z-[41] rounded-2xl border-2 border-white/90 shadow-[0_0_0_1px_rgba(15,118,110,0.4)]"
+          initial={false}
+          animate={{
+            opacity: holeOpen ? 1 : 0,
+            left: displayRect.x - 2,
+            top: displayRect.y - 2,
+            width: displayRect.w + 4,
+            height: displayRect.h + 4,
+          }}
+          transition={{ duration: reduceMotion ? 0 : 0.14, ease: "easeOut" }}
+        />
+      )}
+    </div>
+  );
+}
+
 type DemoMovieProps = {
   activeRole: "Student" | "Faculty" | "HOD";
   navigate: (path: string) => void;
@@ -27,11 +101,12 @@ type DemoMovieProps = {
 
 export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogyaOpen }: DemoMovieProps) {
   const [isActive, setIsActive] = React.useState(() => isDemoMode() && isDemoMovieActive());
-  const [phase, setPhase] = React.useState<"playing" | "ended">("playing");
+  const [phase, setPhase] = React.useState<"splash" | "playing" | "ended">("splash");
   const [sceneIndex, setSceneIndex] = React.useState(0);
-  const [elapsedMs, setElapsedMs] = React.useState(0);
-  const [targetRect, setTargetRect] = React.useState<{ x: number, y: number, w: number, h: number } | null>(null);
+  const [targetRect, setTargetRect] = React.useState<SpotlightRect | null>(null);
+  const [spotlightTargetKey, setSpotlightTargetKey] = React.useState("initial");
   const [runToken, setRunToken] = React.useState(0);
+  const advancedSceneRef = React.useRef<number | null>(null);
   
   const reduceMotion = useReducedMotion();
   const currentScene: DemoScene | undefined = DEMO_SCENES[sceneIndex];
@@ -41,6 +116,12 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
   const navigateRef = React.useRef(navigate);
   navigateRef.current = navigate;
   const [bannerHeight, setBannerHeight] = React.useState(0);
+
+  React.useEffect(() => {
+    if (!isActive || phase !== "splash" || blocked) return;
+    const timer = window.setTimeout(() => setPhase("playing"), 1350);
+    return () => window.clearTimeout(timer);
+  }, [isActive, phase, blocked]);
 
   React.useEffect(() => {
     if (!isActive || phase !== "playing") return;
@@ -86,10 +167,11 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
     };
     const handleReplay = () => {
       firedBeatsRef.current = {};
-      setPhase("playing");
+      advancedSceneRef.current = null;
+      setPhase("splash");
       setSceneIndex(0);
-      setElapsedMs(0);
       setTargetRect(null);
+      setSpotlightTargetKey("initial");
       setRunToken(t => t + 1);
       if (isDemoMode()) setIsActive(true);
     };
@@ -107,13 +189,28 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
     phaseRef.current = "ended";
     setPhase("ended");
     setArogyaOpen(false);
-    setElapsedMs(0);
     setTargetRect(null);
     clearDemoMovie();
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
   }, [setArogyaOpen]);
 
-  // Handle Tab during scene 2 (or any playing state) to close modal and reach Skip
+  const advanceScene = React.useCallback((fromSceneIndex: number) => {
+    if (phaseRef.current !== "playing" || advancedSceneRef.current === fromSceneIndex) return;
+    advancedSceneRef.current = fromSceneIndex;
+    setArogyaOpen(false);
+    setTargetRect(null);
+
+    if (fromSceneIndex + 1 < DEMO_SCENES.length) {
+      setSceneIndex(fromSceneIndex + 1);
+      return;
+    }
+
+    phaseRef.current = "ended";
+    setPhase("ended");
+    clearDemoMovie();
+  }, [setArogyaOpen]);
+
+  // Handle Tab during a guided scene to close blocking dialogs and reach Next.
   React.useEffect(() => {
     if (!isActive || blocked || phase !== "playing") return;
 
@@ -149,13 +246,13 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
              }
 
              if (!stillOpen) {
-               const skipBtn = document.querySelector('[data-testid="demo-movie-skip"]') as HTMLElement | null;
-               if (skipBtn) {
-                 skipBtn.focus();
+               const nextBtn = document.querySelector('[data-testid="demo-movie-next"]') as HTMLElement | null;
+               if (nextBtn) {
+                 nextBtn.focus();
                  timeouts.push(window.setTimeout(() => {
                    if (cancelPolling) return;
-                   if (document.activeElement !== skipBtn) {
-                     skipBtn.focus();
+                   if (document.activeElement !== nextBtn) {
+                     nextBtn.focus();
                    }
                  }, 150));
                }
@@ -182,7 +279,6 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
     if (!isActive || phase !== "playing" || blocked || !currentScene) return;
 
     setTargetRect(null);
-    setElapsedMs(0);
     let cancelled = false;
     let clockStart = 0;
     
@@ -194,10 +290,11 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
     let currentStage = "role";
     let stageStart = performance.now();
     let actionFired = false;
-    
-    let lastRect: { x: number, y: number, w: number, h: number } | null = null;
+
+    let lastRect: SpotlightRect | null = null;
+    let lastTargetKey: string | null = null;
+    let targetChangedAt = 0;
     let activeTargetElement: HTMLElement | null = null;
-    let lastElapsedReport = -1;
 
     const executeAction = (action: string, target?: string, clickTarget?: string) => {
       if (action === "openArogya") {
@@ -223,7 +320,23 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
       }
     };
 
-    const updateTargetRect = (targetSelector?: string, rawSelector?: string) => {
+    const updateTargetRect = (targetSelector: string | undefined, rawSelector: string | undefined, now: number) => {
+      const nextTargetKey = rawSelector
+        ? `selector:${rawSelector}`
+        : targetSelector
+          ? `tour:${targetSelector}`
+          : `scene:${currentScene.id}:none`;
+
+      if (nextTargetKey !== lastTargetKey) {
+        lastTargetKey = nextTargetKey;
+        lastRect = null;
+        targetChangedAt = now;
+        setSpotlightTargetKey(nextTargetKey);
+        setTargetRect(null);
+      }
+
+      if (lastRect && activeTargetElement?.isConnected) return activeTargetElement;
+
       let el: Element | null = null;
       if (rawSelector) {
         el = document.querySelector(rawSelector);
@@ -232,6 +345,15 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
       }
       
       if (el) {
+        if (el !== activeTargetElement) {
+          if (activeTargetElement && lastRect) {
+            lastRect = null;
+            targetChangedAt = now;
+            setTargetRect(null);
+          }
+          activeTargetElement = el as HTMLElement;
+          activeTargetElement.scrollIntoView({ block: "center", inline: "nearest", behavior: "instant" });
+        }
         const rect = el.getBoundingClientRect();
         if (rect.width > 0 && rect.height > 0) {
           const newRect = {
@@ -240,7 +362,7 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
             w: Math.round(rect.width),
             h: Math.round(rect.height),
           };
-          if (!lastRect || Math.abs(lastRect.x - newRect.x) > 2 || Math.abs(lastRect.y - newRect.y) > 2 || Math.abs(lastRect.w - newRect.w) > 2 || Math.abs(lastRect.h - newRect.h) > 2) {
+          if (!lastRect && now - targetChangedAt >= (reduceMotionRef.current ? 0 : 150)) {
             lastRect = newRect;
             setTargetRect(newRect);
           }
@@ -315,12 +437,6 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
       if (currentStage === "play") {
         const elapsed = now - clockStart;
         
-        // Update state roughly every 100ms
-        if (elapsed - lastElapsedReport > 100 || elapsed >= currentScene.durationMs) {
-          setElapsedMs(elapsed);
-          lastElapsedReport = elapsed;
-        }
-        
         let currentTarget = currentScene.target;
         let currentSelector: string | undefined = undefined;
         
@@ -341,21 +457,11 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
           }
         }
         
-        const el = updateTargetRect(currentTarget, currentSelector);
-        if (el && el !== activeTargetElement) {
-          activeTargetElement = el;
-          el.scrollIntoView({ block: "center", behavior: reduceMotionRef.current ? "auto" : "smooth" });
-        }
-        
+        updateTargetRect(currentTarget, currentSelector, now);
+
         if (elapsed >= currentScene.durationMs) {
           cancelled = true;
-          if (sceneIndex + 1 < DEMO_SCENES.length) {
-            setSceneIndex(sceneIndex + 1);
-          } else {
-            phaseRef.current = "ended";
-            setPhase("ended");
-            clearDemoMovie();
-          }
+          advanceScene(sceneIndex);
         }
       }
     }, 50);
@@ -364,7 +470,7 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
       cancelled = true;
       clearInterval(intervalId);
     };
-  }, [isActive, blocked, phase, sceneIndex, runToken]);
+  }, [isActive, blocked, phase, sceneIndex, runToken, advanceScene]);
 
   if (!isActive || blocked) return null;
 
@@ -375,50 +481,50 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
       data-phase={phase}
       data-scene-id={currentScene?.id || "none"}
     >
-      {phase === "playing" && (
-        <>
-          {/* Input blocking layer */}
-          <div className="absolute inset-0 z-10 pointer-events-auto bg-transparent" />
-          
-          <MovieControls 
-            currentSceneIndex={sceneIndex}
-            elapsedMs={elapsedMs}
-            onSkip={handleSkip}
-          />
-          
-          {/* Spotlight overlay using a huge shadow trick */}
-          <AnimatePresence>
-            {targetRect && (
-              <motion.div
-                key="spotlight"
-                initial={reduceMotion ? { opacity: 0 } : { opacity: 0 }}
-                animate={{
-                  opacity: 1,
-                  left: targetRect.x - 8,
-                  top: targetRect.y - 8,
-                  width: targetRect.w + 16,
-                  height: targetRect.h + 16,
-                  boxShadow: "0 0 0 9999px rgba(16, 36, 39, 0.48)",
-                }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: reduceMotion ? 0 : 0.12, ease: "easeOut" }}
-                className="pointer-events-none absolute z-[40] rounded-2xl border-2 border-white/90"
-              />
-            )}
-            {!targetRect && (
-              <motion.div 
-                key="spotlight-none"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="pointer-events-none absolute inset-0 z-[40] bg-[#102427]/45" 
-              />
-            )}
-          </AnimatePresence>
+      <AnimatePresence mode="wait" initial={false}>
+        {phase === "splash" ? (
+          <motion.div
+            key="demo-splash"
+            className="pointer-events-auto absolute inset-0 z-[80] flex items-center justify-center bg-[#0F766E] px-6 text-center text-white"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: reduceMotion ? 0 : 0.2, ease: "easeOut" }}
+          >
+            <div className="flex flex-col items-center">
+              <div className="grid h-20 w-20 place-items-center rounded-[26px] border border-white/25 bg-white/12 shadow-[0_16px_40px_rgba(5,26,29,0.16)]">
+                <BookOpenCheck className="h-11 w-11" strokeWidth={1.6} />
+              </div>
+              <h1 className="mt-6 font-display text-3xl font-bold tracking-tight">Arogya</h1>
+              <p className="mt-1 text-base text-white/85">Electronic LogBook</p>
+              <div className="mt-8 flex items-center gap-2.5 text-sm font-medium text-white/85" role="status" aria-live="polite">
+                <Loader2 className={`h-4 w-4 ${reduceMotion ? "" : "animate-spin"}`} strokeWidth={1.8} />
+                <span>Preparing your guided demo</span>
+              </div>
+            </div>
+          </motion.div>
+        ) : phase === "playing" && currentScene ? (
+          <motion.div
+            key="demo-playing"
+            className="pointer-events-none absolute inset-0"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: reduceMotion ? 0 : 0.16, ease: "easeOut" }}
+          >
+            {/* Input blocking layer */}
+            <div className="pointer-events-auto absolute inset-0 z-10 bg-transparent" />
 
-          {/* Caption */}
-          <AnimatePresence mode="wait">
-            {currentScene && (
+            <MovieControls
+              currentSceneIndex={sceneIndex}
+              onSkip={handleSkip}
+              onNext={() => advanceScene(sceneIndex)}
+              isLastScene={sceneIndex === DEMO_SCENES.length - 1}
+            />
+
+            <DemoSpotlight rect={targetRect} targetKey={spotlightTargetKey} reduceMotion={!!reduceMotion} />
+
+            <AnimatePresence mode="wait" initial={false}>
               <motion.div
                 key={currentScene.id}
                 role="status"
@@ -427,7 +533,7 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: reduceMotion ? 0 : -4 }}
                 transition={{ duration: reduceMotion ? 0 : 0.16, ease: "easeOut" }}
-                className="absolute bottom-[calc(76px+env(safe-area-inset-bottom))] left-3 right-3 z-[60] rounded-[20px] border border-white/15 bg-[#102427]/92 px-4 py-3.5 text-left shadow-[0_18px_48px_rgba(5,26,29,0.3)] backdrop-blur-xl sm:bottom-8 sm:left-1/2 sm:right-auto sm:w-[min(520px,calc(100vw-48px))] sm:-translate-x-1/2 sm:px-5 sm:py-4"
+                className="pointer-events-none absolute bottom-[calc(76px+env(safe-area-inset-bottom))] left-3 right-3 z-[60] rounded-[20px] border border-white/15 bg-[#102427]/92 px-4 py-3.5 text-left shadow-[0_18px_48px_rgba(5,26,29,0.3)] backdrop-blur-xl sm:bottom-8 sm:left-1/2 sm:right-auto sm:w-[min(520px,calc(100vw-48px))] sm:-translate-x-1/2 sm:px-5 sm:py-4"
                 style={bannerHeight > 0 ? { bottom: `max(${bannerHeight + 16}px, calc(76px + env(safe-area-inset-bottom)))` } : undefined}
               >
                 <p className="mb-1 text-xs font-semibold uppercase tracking-[0.12em] text-teal-100">
@@ -437,18 +543,18 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
                   {currentScene.caption}
                 </p>
               </motion.div>
-            )}
-          </AnimatePresence>
-        </>
-      )}
-
-      {phase === "ended" && (
-        <EndCard onExplore={() => {
-          setIsActive(false);
-          navigate(demoPortalHome("student"));
-          setArogyaOpen(false);
-        }} />
-      )}
+            </AnimatePresence>
+          </motion.div>
+        ) : (
+          <motion.div key="demo-ended" className="pointer-events-auto absolute inset-0">
+            <EndCard onExplore={() => {
+              setIsActive(false);
+              navigate(demoPortalHome("student"));
+              setArogyaOpen(false);
+            }} />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>,
     document.body
   );
