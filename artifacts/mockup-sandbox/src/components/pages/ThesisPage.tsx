@@ -64,7 +64,7 @@ export function ThesisPage() {
       <p className="mt-2 text-sm text-slate-500">{isPubOnly ? "Record your publications." : "Record your research timeline and milestones."}</p></div>
     {error && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-rose-700">{error} <Button variant="outline" onClick={load}>Try again</Button></div>}
     {loading ? <p role="status">Loading?</p> : !error && <>
-      <Card className="overflow-hidden border-white/70 bg-white/80">
+      <Card data-tour="thesis-card" className="overflow-hidden border-white/70 bg-white/80">
         <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-4">
           <div><p className="page-eyebrow">{isPubOnly ? "Publication details" : "Thesis milestone tracker"}</p>
             <CardTitle className="mt-2 max-w-3xl text-xl">{thesis?.thesisTitle || (isPubOnly ? "No publications recorded yet" : "No thesis recorded yet")}</CardTitle>

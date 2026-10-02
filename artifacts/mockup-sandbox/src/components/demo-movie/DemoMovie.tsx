@@ -13,8 +13,11 @@ import { isDemoMode } from "@/lib/session";
 import { DEMO_SCENES, DemoScene } from "./scenes";
 import { MovieControls } from "./MovieControls";
 import { EndCard } from "./EndCard";
+import { MovieInterstitial } from "./MovieInterstitial";
+import { DemoCursor } from "./DemoCursor";
 import { sendAroDemoCommand } from "./movieBridge";
 import { playDemoSound } from "@/lib/demoSounds";
+import { startDemoMusic, stopDemoMusic, unlockDemoAudio } from "@/lib/demoMusic";
 import { DEMO_MOVIE_ASK_QUESTION } from "@/lib/demoData";
 
 type DemoMovieProps = {
@@ -25,22 +28,78 @@ type DemoMovieProps = {
   setArogyaOpen: (open: boolean) => void;
 };
 
+// Smooth cinematic scrolling helper
+function smoothScrollContainer(targetTop: number, durationMs = 1200) {
+  const container = document.querySelector('main')?.parentElement || document.querySelector('main') || document.documentElement;
+  if (!container) return;
+  const startTop = container.scrollTop;
+  const distance = targetTop - startTop;
+  if (Math.abs(distance) < 4) return;
+  const start = performance.now();
+
+  const step = (now: number) => {
+    const elapsed = now - start;
+    const progress = Math.min(elapsed / durationMs, 1);
+    // Smooth cubic ease in out
+    const ease = progress < 0.5 
+      ? 4 * progress * progress * progress 
+      : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+    container.scrollTop = startTop + distance * ease;
+    if (progress < 1) {
+      requestAnimationFrame(step);
+    }
+  };
+  requestAnimationFrame(step);
+}
+
 export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogyaOpen }: DemoMovieProps) {
   const [isActive, setIsActive] = React.useState(() => isDemoMode() && isDemoMovieActive());
   const [phase, setPhase] = React.useState<"playing" | "ended">("playing");
   const [sceneIndex, setSceneIndex] = React.useState(0);
   const [elapsedMs, setElapsedMs] = React.useState(0);
   const [targetRect, setTargetRect] = React.useState<{ x: number, y: number, w: number, h: number } | null>(null);
+  const [spotlightCoords, setSpotlightCoords] = React.useState<{ x: number, y: number, w: number, h: number }>(() => ({
+    x: typeof window !== "undefined" ? window.innerWidth / 2 - 160 : 100,
+    y: typeof window !== "undefined" ? window.innerHeight / 2 - 100 : 100,
+    w: 320,
+    h: 200,
+  }));
+  const [spotlightVisible, setSpotlightVisible] = React.useState(false);
+
+  const [cursorTarget, setCursorTarget] = React.useState<{ x: number, y: number, w: number, h: number } | null>(null);
+  const [isClicking, setIsClicking] = React.useState(false);
+  const [cursorLabel, setCursorLabel] = React.useState<string | undefined>(undefined);
   const [runToken, setRunToken] = React.useState(0);
   
   const reduceMotion = useReducedMotion();
   const currentScene: DemoScene | undefined = DEMO_SCENES[sceneIndex];
+
+  React.useEffect(() => {
+    if (targetRect) {
+      setSpotlightCoords(targetRect);
+      setSpotlightVisible(true);
+    } else {
+      setSpotlightVisible(false);
+    }
+  }, [targetRect]);
 
   const activeRoleRef = React.useRef(activeRole);
   activeRoleRef.current = activeRole;
   const navigateRef = React.useRef(navigate);
   navigateRef.current = navigate;
   const [bannerHeight, setBannerHeight] = React.useState(0);
+
+  // Background music management
+  React.useEffect(() => {
+    if (isActive && phase === "playing") {
+      startDemoMusic();
+    } else {
+      stopDemoMusic();
+    }
+    return () => {
+      stopDemoMusic();
+    };
+  }, [isActive, phase]);
 
   React.useEffect(() => {
     if (!isActive || phase !== "playing") return;
@@ -72,6 +131,7 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
       if (observer) observer.disconnect();
     };
   }, [isActive, phase]);
+
   const setArogyaOpenRef = React.useRef(setArogyaOpen);
   setArogyaOpenRef.current = setArogyaOpen;
   const reduceMotionRef = React.useRef(reduceMotion);
@@ -90,8 +150,14 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
       setSceneIndex(0);
       setElapsedMs(0);
       setTargetRect(null);
+      setCursorTarget(null);
+      setIsClicking(false);
       setRunToken(t => t + 1);
-      if (isDemoMode()) setIsActive(true);
+      if (isDemoMode()) {
+        setIsActive(true);
+        unlockDemoAudio();
+        startDemoMusic();
+      }
     };
     
     window.addEventListener(DEMO_MOVIE_CHANGED_EVENT, handleChanged);
@@ -109,11 +175,14 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
     setArogyaOpen(false);
     setElapsedMs(0);
     setTargetRect(null);
+    setCursorTarget(null);
+    setIsClicking(false);
+    stopDemoMusic();
     clearDemoMovie();
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
   }, [setArogyaOpen]);
 
-  // Handle Tab during scene 2 (or any playing state) to close modal and reach Skip
+  // Handle Tab during any modal state to close modal and reach Skip
   React.useEffect(() => {
     if (!isActive || blocked || phase !== "playing") return;
 
@@ -175,7 +244,7 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
     };
   }, [isActive, blocked, phase]);
 
-  // Main engine
+  // Main scene & beat engine
   const firedBeatsRef = React.useRef<Record<number, Set<number>>>({});
   
   React.useEffect(() => {
@@ -194,10 +263,16 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
     let actionFired = false;
     
     let lastRect: { x: number, y: number, w: number, h: number } | null = null;
-    let activeTargetElement: HTMLElement | null = null;
     let lastElapsedReport = -1;
 
-    const executeAction = (action: string, target?: string, clickTarget?: string) => {
+    const executeAction = (
+      action: string, 
+      target?: string, 
+      clickTarget?: string, 
+      scrollOffset?: number, 
+      route?: string,
+      cursorLabel?: string
+    ) => {
       if (action === "openArogya") {
         setArogyaOpenRef.current(true);
       } else if (action === "closeArogya") {
@@ -206,22 +281,82 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
         document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
       } else if (action === "ask") {
         sendAroDemoCommand({ type: "ask", question: DEMO_MOVIE_ASK_QUESTION });
+      } else if (action === "whatsDue") {
+        sendAroDemoCommand({ type: "whats-due" });
       } else if (action === "progressCoach") {
         sendAroDemoCommand({ type: "progress-coach" });
       } else if (action === "departmentReport") {
         sendAroDemoCommand({ type: "department-report", reportType: "report" });
       } else if (action === "appraisalDraft") {
         sendAroDemoCommand({ type: "appraisal-prefill-and-draft" });
+      } else if (action === "scrollSlowly") {
+        if (typeof scrollOffset === "number") {
+          smoothScrollContainer(scrollOffset, reduceMotionRef.current ? 300 : 1300);
+        }
+      } else if (action === "navigate") {
+        if (route) {
+          navigateRef.current(route);
+        }
       } else if (action === "clickTarget") {
         const targetStr = clickTarget || target;
         if (targetStr) {
           const el = document.querySelector(`[data-tour="${targetStr}"]`) || document.querySelector(`[data-tour-id="${targetStr}"]`);
           if (el) (el as HTMLElement).click();
         }
+      } else if (action === "clickWithCursor") {
+        const targetStr = clickTarget || target;
+        if (targetStr) {
+          const el = document.querySelector(`[data-tour="${targetStr}"]`) || document.querySelector(`[data-tour-id="${targetStr}"]`);
+          if (el) {
+            const rect = el.getBoundingClientRect();
+            if (rect.width > 0 && rect.height > 0) {
+              const r = { x: rect.left, y: rect.top, w: rect.width, h: rect.height };
+              setCursorLabel(cursorLabel);
+              setCursorTarget(r);
+              setTargetRect(r);
+              (el as HTMLElement).scrollIntoView({ block: "nearest", behavior: reduceMotionRef.current ? "auto" : "smooth" });
+
+              // 1. Dwell for 460ms so the viewer sees the cursor arrive and sees the label
+              window.setTimeout(() => {
+                if (cancelled) return;
+                setIsClicking(true);
+                playDemoSound("click");
+
+                // 2. Trigger the click after 220ms while ripple waves are actively expanding
+                window.setTimeout(() => {
+                  if (cancelled) return;
+                  (el as HTMLElement).click();
+
+                  // 3. Keep click active for another 200ms
+                  window.setTimeout(() => {
+                    if (cancelled) return;
+                    setIsClicking(false);
+                    // 4. Fade cursor out smoothly after 350ms
+                    window.setTimeout(() => {
+                      if (cancelled) return;
+                      setCursorTarget(null);
+                      setCursorLabel(undefined);
+                    }, 350);
+                  }, 200);
+                }, 220);
+              }, 460);
+            } else {
+              (el as HTMLElement).click();
+            }
+          }
+        }
       }
     };
 
     const updateTargetRect = (targetSelector?: string, rawSelector?: string) => {
+      if (currentScene.interstitial) {
+        if (lastRect !== null) {
+          lastRect = null;
+          setTargetRect(null);
+        }
+        return null;
+      }
+
       let el: Element | null = null;
       if (rawSelector) {
         el = document.querySelector(rawSelector);
@@ -233,7 +368,7 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
         const rect = el.getBoundingClientRect();
         if (rect.width > 0 && rect.height > 0) {
           const newRect = { x: rect.left, y: rect.top, w: rect.width, h: rect.height };
-          if (!lastRect || Math.abs(lastRect.x - newRect.x) > 0.5 || Math.abs(lastRect.y - newRect.y) > 0.5 || Math.abs(lastRect.w - newRect.w) > 0.5 || Math.abs(lastRect.h - newRect.h) > 0.5) {
+          if (!lastRect || Math.abs(lastRect.x - newRect.x) > 1 || Math.abs(lastRect.y - newRect.y) > 1 || Math.abs(lastRect.w - newRect.w) > 1 || Math.abs(lastRect.h - newRect.h) > 1) {
             lastRect = newRect;
             setTargetRect(newRect);
           }
@@ -259,7 +394,7 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
             startDemoSession(currentScene.role, { skipLoginSummary: true });
             actionFired = true;
           }
-          if (now - stageStart < 3000) return; // wait
+          if (now - stageStart < 3000) return;
         }
         currentStage = "route";
         stageStart = now;
@@ -274,7 +409,7 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
             navigateRef.current(currentScene.route);
             actionFired = true;
           }
-          if (now - stageStart < 3000) return; // wait
+          if (now - stageStart < 3000) return;
         }
         currentStage = "target";
         stageStart = now;
@@ -294,22 +429,29 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
           targetFound = true;
         }
         
-        if (!targetFound && now - stageStart < 3500) return; // wait
+        if (!targetFound && now - stageStart < 3000) return;
         
         currentStage = "play";
         clockStart = performance.now();
         playDemoSound("pop");
+
+        // Reset scroll position smoothly to top if not an interstitial and no scroll beat at atMs 0
+        if (!currentScene.interstitial && !currentScene.beats?.some(b => b.atMs === 0 && typeof b.scrollOffset === "number")) {
+          const scrollContainer = document.querySelector('main')?.parentElement || document.querySelector('main');
+          if (scrollContainer) {
+            scrollContainer.scrollTo({ top: 0, behavior: reduceMotionRef.current ? "auto" : "smooth" });
+          }
+        }
         
         if (currentScene.action && currentScene.action !== "none") {
-          executeAction(currentScene.action, currentScene.target);
+          executeAction(currentScene.action, currentScene.target, undefined, undefined, undefined, currentScene.cursorLabel);
         }
       }
       
       if (currentStage === "play") {
         const elapsed = now - clockStart;
         
-        // Update state roughly every 100ms
-        if (elapsed - lastElapsedReport > 100 || elapsed >= currentScene.durationMs) {
+        if (elapsed - lastElapsedReport > 80 || elapsed >= currentScene.durationMs) {
           setElapsedMs(elapsed);
           lastElapsedReport = elapsed;
         }
@@ -327,18 +469,14 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
               if (!activeBeats.has(i)) {
                 activeBeats.add(i);
                 if (beat.action) {
-                  executeAction(beat.action, beat.target, beat.clickTarget);
+                  executeAction(beat.action, beat.target, beat.clickTarget, beat.scrollOffset, beat.route, beat.cursorLabel);
                 }
               }
             }
           }
         }
         
-        const el = updateTargetRect(currentTarget, currentSelector);
-        if (el && el !== activeTargetElement) {
-          activeTargetElement = el;
-          el.scrollIntoView({ block: "center", behavior: reduceMotionRef.current ? "auto" : "smooth" });
-        }
+        updateTargetRect(currentTarget, currentSelector);
         
         if (elapsed >= currentScene.durationMs) {
           cancelled = true;
@@ -347,11 +485,12 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
           } else {
             phaseRef.current = "ended";
             setPhase("ended");
+            stopDemoMusic();
             clearDemoMovie();
           }
         }
       }
-    }, 50);
+    }, 40);
 
     return () => {
       cancelled = true;
@@ -370,8 +509,14 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
     >
       {phase === "playing" && (
         <>
-          {/* Input blocking layer */}
-          <div className="absolute inset-0 z-10 pointer-events-auto bg-transparent" />
+          {/* Input blocking layer - tap anywhere to resume sound if blocked by autoplay */}
+          <div 
+            className="absolute inset-0 z-10 pointer-events-auto bg-transparent cursor-pointer"
+            onClick={() => {
+              unlockDemoAudio();
+              startDemoMusic();
+            }}
+          />
           
           <MovieControls 
             currentSceneIndex={sceneIndex}
@@ -379,59 +524,66 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
             onSkip={handleSkip}
           />
           
-          {/* Spotlight overlay using a huge shadow trick */}
-          <AnimatePresence>
-            {targetRect && (
-              <motion.div
-                key="spotlight"
-                initial={reduceMotion ? { opacity: 0 } : { opacity: 0 }}
-                animate={{
-                  opacity: 1,
-                  left: targetRect.x - 8,
-                  top: targetRect.y - 8,
-                  width: targetRect.w + 16,
-                  height: targetRect.h + 16,
-                  boxShadow: "0 0 0 9999px rgba(15, 23, 42, 0.4)",
-                  transition: reduceMotion 
-                    ? { duration: 0.15 } 
-                    : { 
-                        opacity: { duration: 0.2 }, 
-                        left: { type: "spring", stiffness: 150, damping: 25 },
-                        top: { type: "spring", stiffness: 150, damping: 25 },
-                        width: { type: "spring", stiffness: 150, damping: 25 },
-                        height: { type: "spring", stiffness: 150, damping: 25 },
-                      }
-                }}
-                exit={{ opacity: 0 }}
-                className="absolute z-[40] rounded-2xl border-2 border-white/20 mix-blend-hard-light pointer-events-none"
-              />
-            )}
-            {!targetRect && (
-              <motion.div 
-                key="spotlight-none"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="absolute inset-0 z-[40] bg-slate-900/40 pointer-events-none" 
-              />
+          {/* Interstitial overlay when present */}
+          <AnimatePresence mode="wait">
+            {currentScene?.interstitial && (
+              <MovieInterstitial key={currentScene.id} info={currentScene.interstitial} />
             )}
           </AnimatePresence>
 
-          {/* Caption */}
+          {/* Hardware-accelerated Persistent Spotlight overlay */}
+          {!currentScene?.interstitial && (
+            <div
+              key="persistent-spotlight"
+              className="fixed z-[40] rounded-2xl border-2 border-teal-400/80 pointer-events-none shadow-[0_0_32px_rgba(45,212,191,0.45)]"
+              style={{
+                transform: `translate3d(${spotlightCoords.x - 8}px, ${spotlightCoords.y - 8}px, 0)`,
+                width: `${Math.max(24, spotlightCoords.w + 16)}px`,
+                height: `${Math.max(24, spotlightCoords.h + 16)}px`,
+                opacity: spotlightVisible ? 1 : 0,
+                boxShadow: "0 0 0 9999px rgba(15, 23, 42, 0.60), 0 0 32px rgba(45, 212, 191, 0.40)",
+                transition: reduceMotion
+                  ? "opacity 0.15s ease"
+                  : "transform 0.65s cubic-bezier(0.16, 1, 0.3, 1), width 0.65s cubic-bezier(0.16, 1, 0.3, 1), height 0.65s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.38s ease",
+                willChange: "transform, width, height, opacity",
+              }}
+            >
+              {/* Inner glowing accent ring */}
+              <div className="absolute inset-0 rounded-2xl ring-2 ring-teal-300/40 animate-pulse pointer-events-none" />
+            </div>
+          )}
+
+          {/* Fullscreen soft dim when spotlight is not active and not interstitial */}
+          {!currentScene?.interstitial && !spotlightVisible && (
+            <div className="fixed inset-0 z-[39] bg-slate-950/45 pointer-events-none transition-opacity duration-300" />
+          )}
+
+          {/* Animated Interactive Cursor & Tap Indicator */}
+          <DemoCursor
+            targetRect={cursorTarget}
+            isClicking={isClicking}
+            label={cursorLabel}
+          />
+
+          {/* Centered Caption - perfectly centered on mobile & desktop */}
           <AnimatePresence mode="wait">
-            {currentScene && (
+            {currentScene && !currentScene.interstitial && (
               <motion.div
                 key={currentScene.id}
                 role="status"
                 aria-live="polite"
-                initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 12, scale: 0.98 }}
+                initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 14, scale: 0.96 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -12 }}
-                transition={{ duration: 0.3 }}
-                className="absolute z-[60] left-2 right-[80px] bottom-[calc(76px+env(safe-area-inset-bottom))] sm:bottom-12 sm:left-1/2 sm:right-auto sm:w-[480px] sm:-translate-x-1/2 rounded-2xl bg-slate-900/85 p-5 text-center shadow-2xl backdrop-blur-xl border border-white/10"
-                style={bannerHeight > 0 ? { bottom: `max(${bannerHeight + 16}px, calc(76px + env(safe-area-inset-bottom)))` } : undefined}
+                exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -10, scale: 0.98 }}
+                transition={{ duration: 0.28, ease: "easeOut" }}
+                className="fixed z-[75] left-4 right-4 mx-auto max-w-md sm:max-w-xl sm:left-1/2 sm:right-auto sm:-translate-x-1/2 rounded-2xl bg-slate-900/92 px-5 py-4 text-center shadow-[0_20px_50px_rgba(0,0,0,0.5)] backdrop-blur-2xl border border-white/15"
+                style={
+                  arogyaOpen
+                    ? { top: "calc(74px + env(safe-area-inset-top))", bottom: "auto" }
+                    : { bottom: bannerHeight > 0 ? `max(${bannerHeight + 16}px, calc(140px + env(safe-area-inset-bottom)))` : "calc(140px + env(safe-area-inset-bottom))" }
+                }
               >
-                <p className="text-[17px] font-medium tracking-tight text-white/95">
+                <p className="text-[14px] sm:text-[16px] font-medium tracking-tight text-white/95 leading-snug">
                   {currentScene.caption}
                 </p>
               </motion.div>
@@ -443,6 +595,7 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
       {phase === "ended" && (
         <EndCard onExplore={() => {
           setIsActive(false);
+          stopDemoMusic();
           navigate(demoPortalHome("student"));
           setArogyaOpen(false);
         }} />

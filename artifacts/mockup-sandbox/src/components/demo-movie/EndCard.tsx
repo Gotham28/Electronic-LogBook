@@ -1,6 +1,7 @@
 import * as React from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { clearDemoMovie, demoPortalHome, requestDemoMovieReplay, startDemoSession } from "@/lib/demoSession";
+import { unlockDemoAudio, startDemoMusic } from "@/lib/demoMusic";
 import { getCurrentUser } from "@/lib/session";
 
 export function EndCard({ onExplore }: { onExplore: () => void }) {
@@ -72,7 +73,11 @@ export function EndCard({ onExplore }: { onExplore: () => void }) {
           <button
             ref={firstButtonRef}
             type="button"
-            onClick={requestDemoMovieReplay}
+            onClick={() => {
+              unlockDemoAudio();
+              startDemoMusic();
+              requestDemoMovieReplay();
+            }}
             data-testid="demo-movie-replay"
             className="flex h-12 w-full items-center justify-center rounded-xl bg-slate-100 font-semibold text-slate-900 transition-colors hover:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
           >

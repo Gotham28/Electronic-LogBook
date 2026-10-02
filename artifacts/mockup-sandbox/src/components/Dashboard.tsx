@@ -206,7 +206,11 @@ export function Dashboard() {
           const percent = item.required > 0 ? Math.min(Math.round(item.verified / item.required * 100), 100) : 0;
           const remaining = Math.max(item.required - item.verified, 0);
           return (
-            <Link key={item.label} href={item.href}>
+            <Link 
+              key={item.label} 
+              href={item.href}
+              data-tour={item.href === "/cases" ? "dashboard-card-cases" : item.href === "/procedures" ? "dashboard-card-procedures" : item.href === "/academics" ? "dashboard-card-academics" : undefined}
+            >
               <Card className={`h-full cursor-pointer border-white/70 bg-white/76 shadow-[0_18px_48px_rgba(15,23,42,0.05)] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_24px_70px_rgba(15,23,42,0.08)] ${isDemoMode() ? "demo-lift-card" : ""}`}>
                 <CardContent className="p-5">
                   <div className="flex items-start justify-between gap-4">
@@ -243,7 +247,7 @@ export function Dashboard() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1.4fr_.6fr]">
-        <Card className="border-white/70 bg-white/76">
+        <Card data-tour="dashboard-recent-entries" className="border-white/70 bg-white/76">
           <CardHeader className="flex flex-row items-center justify-between border-b border-white/70">
             <div>
               <p className="page-eyebrow">Student activity</p>

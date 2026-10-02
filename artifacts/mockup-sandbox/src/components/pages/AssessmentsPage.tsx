@@ -81,7 +81,7 @@ export function AssessmentsPage() {
         </div>
       </div>
 
-      <Card className="border-white/70 bg-white/76">
+      <Card data-tour="student-assessments-card" className="border-white/70 bg-white/76">
         <CardHeader className="border-b border-white/70">
           <CardTitle className="text-lg">Assessment Records</CardTitle>
         </CardHeader>

@@ -14,6 +14,7 @@ import { clearMaintenanceNoticeSession, saveToken } from "@/lib/session";
 import { PaymentStep } from "@/components/PaymentStep";
 import { unlockDemoAudio } from "@/lib/demoSounds";
 import { startDemoSession, setDemoMovieActive } from "@/lib/demoSession";
+import { startDemoMusic } from "@/lib/demoMusic";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -59,6 +60,7 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
     setDemoLoading(true);
     try {
       unlockDemoAudio();
+      startDemoMusic();
       startDemoSession("student");
       setDemoMovieActive();
       onSignIn();

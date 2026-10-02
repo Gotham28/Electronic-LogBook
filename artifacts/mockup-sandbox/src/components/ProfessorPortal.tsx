@@ -433,13 +433,13 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
         {/* Inner tab bar — hidden when embedded in HOD portal (HOD sidebar handles navigation) */}
         {!embedded && (
           <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-white p-1 shadow-sm sm:w-auto">
-            <TabsTrigger value="review-queue" className="gap-2 text-xs font-semibold">
+            <TabsTrigger value="review-queue" data-tour="faculty-tab-review" className="gap-2 text-xs font-semibold">
               <FileCheck className="h-4 w-4" /> Sequential Review Queue (<DemoCount value={Math.max(0, reviews.length - Object.keys(evaluatedLogs).length)} />)
             </TabsTrigger>
-            <TabsTrigger value="mentees" className="gap-2 text-xs font-semibold">
+            <TabsTrigger value="mentees" data-tour="faculty-tab-mentees" className="gap-2 text-xs font-semibold">
               <UserCheck className="h-4 w-4" /> All Students (<DemoCount value={allStudents.length} />)
             </TabsTrigger>
-            <TabsTrigger value="assessments" className="gap-2 text-xs font-semibold">
+            <TabsTrigger value="assessments" data-tour="faculty-tab-assessments" className="gap-2 text-xs font-semibold">
               <Award className="h-4 w-4" /> Add Assessment
             </TabsTrigger>
           </TabsList>
@@ -679,6 +679,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                           }}
                           size="sm"
                           variant="outline"
+                          data-tour="faculty-view-logbook"
                           className="text-xs text-teal-700 border-teal-300 font-semibold gap-1.5"
                         >
                           <BookOpen className="h-3.5 w-3.5" /> View Logbook

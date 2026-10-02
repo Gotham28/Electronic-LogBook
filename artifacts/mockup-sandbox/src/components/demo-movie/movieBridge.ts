@@ -3,6 +3,7 @@ export const ARO_DEMO_COMMAND_EVENT = "arogya-demo-command";
 export type AroDemoCommand =
   | { type: "ask"; question: string }
   | { type: "progress-coach" }
+  | { type: "whats-due" }
   | { type: "department-report"; reportType: "report" | "falling_behind" }
   | { type: "appraisal-prefill-and-draft" };
 

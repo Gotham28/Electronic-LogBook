@@ -127,7 +127,7 @@ export function AttendancePage() {
         <p className="mt-2 text-sm text-slate-500">Apply for leave and maintain the complete HOD decision record.</p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div data-tour="leave-balances-grid" className="grid gap-4 md:grid-cols-3">
         {balanceError ? (
           <div className="md:col-span-2 flex flex-col items-center justify-center gap-3 rounded-2xl border border-rose-100 bg-rose-50 p-4 text-center" role="alert">
             <p className="text-sm font-medium text-rose-700">{balanceError}</p>

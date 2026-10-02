@@ -48,8 +48,10 @@ export function MobileBottomNav({ role, items, location, departmentKey, switchin
         {visibleSlots.map((item) => {
           const isActive = location === item.href || (item.href !== "/" && location.startsWith(item.href));
           const Icon = item.icon;
+          const tourKey = item.href === "/" ? "nav-home" : `nav-${item.href.replace("/", "")}`;
           const itemContent = (
             <Link href={item.href} aria-current={isActive ? "page" : undefined}
+              data-tour={tourKey}
               className={`${cell} ${isActive ? (demoMode ? "" : "text-teal-800") : "text-slate-500 hover:text-slate-800"}`}
               style={demoMode && isActive ? { color: "var(--demo-accent-readable)" } : undefined}>
               <span data-mobile-nav-icon className={`grid h-8 w-9 place-items-center rounded-full transition-colors ${isActive && !demoMode ? "bg-teal-50 text-teal-700" : "text-slate-500"}`}
@@ -75,7 +77,7 @@ export function MobileBottomNav({ role, items, location, departmentKey, switchin
         })}
         </AnimatePresence>
         <li className="flex min-w-0 flex-1">
-          <button type="button" onClick={() => setOpenMobile(true)} aria-label="More pages" className={`${cell} text-slate-500 hover:text-slate-800`}>
+          <button type="button" onClick={() => setOpenMobile(true)} aria-label="More pages" data-tour="nav-more" className={`${cell} text-slate-500 hover:text-slate-800`}>
             <span data-mobile-nav-icon className="grid h-8 w-9 place-items-center rounded-full text-slate-500 transition-colors">
               <MoreHorizontal className="h-5 w-5" aria-hidden="true" />
             </span>

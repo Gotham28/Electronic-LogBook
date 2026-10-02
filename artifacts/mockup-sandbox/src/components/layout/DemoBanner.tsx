@@ -17,6 +17,7 @@ import {
   requestDemoMovieReplay,
   demoPortalHome,
 } from "@/lib/demoSession";
+import { unlockDemoAudio, startDemoMusic } from "@/lib/demoMusic";
 
 export const DEMO_TOUR_SEEN_STORAGE_PREFIX = "arogya-demo-tour-seen-";
 
@@ -82,6 +83,8 @@ export function DemoBanner() {
 
   const replayDemo = () => {
     playDemoSound("click");
+    unlockDemoAudio();
+    startDemoMusic();
     if (window.location.pathname === "/print") {
       setLocation(demoPortalHome(role));
     }

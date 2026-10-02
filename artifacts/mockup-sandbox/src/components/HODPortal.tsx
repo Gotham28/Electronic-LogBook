@@ -592,7 +592,7 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
         </TabsContent>
 
         <TabsContent value="student-access" className="space-y-4 pt-4">
-          <Card>
+          <Card data-tour="hod-pending-students">
             <CardHeader className="border-b border-teal-100">
               <CardTitle className="text-xl">Pending Student Approvals</CardTitle>
             </CardHeader>
@@ -643,7 +643,7 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
         </TabsContent>
 
         <TabsContent value="professors" className="space-y-4 pt-4">
-          <Card className="max-w-xl">
+          <Card data-tour="hod-add-faculty" className="max-w-xl">
             <CardHeader className="border-b border-teal-100">
               <CardTitle className="text-xl">Add Faculty</CardTitle>
             </CardHeader>

@@ -551,9 +551,11 @@ export function AppLayout({
                         location === item.href ||
                         (item.href !== "/" && location.startsWith(item.href));
                       const Icon = item.icon;
+                      const tourKey = item.href === "/" ? "nav-home" : `nav-${item.href.replace("/", "")}`;
                       const menuButton = (
                         <SidebarMenuButton
                           data-tour-id={`navigation-${index}`}
+                          data-tour={tourKey}
                           asChild
                           isActive={isActive}
                           tooltip={item.title}

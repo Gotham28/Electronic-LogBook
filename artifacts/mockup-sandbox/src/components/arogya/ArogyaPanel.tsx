@@ -160,9 +160,11 @@ export function ArogyaPanel({ open, onOpenChange, role, notifItems, maintenanceN
 
   const handleAskRef = React.useRef(handleAsk);
   const handleProgressCoachRef = React.useRef(handleProgressCoach);
+  const handleWhatsDueRef = React.useRef(handleWhatsDue);
   const handleDepartmentReportRef = React.useRef(handleDepartmentReport);
   handleAskRef.current = handleAsk;
   handleProgressCoachRef.current = handleProgressCoach;
+  handleWhatsDueRef.current = handleWhatsDue;
   handleDepartmentReportRef.current = handleDepartmentReport;
 
   React.useEffect(() => {
@@ -250,6 +252,9 @@ export function ArogyaPanel({ open, onOpenChange, role, notifItems, maintenanceN
       } else if (command.type === "progress-coach" && role === "Student") {
         handleProgressCoachRef.current();
         isCommandRunning = false;
+      } else if (command.type === "whats-due" && role === "Student") {
+        handleWhatsDueRef.current();
+        isCommandRunning = false;
       } else if (command.type === "department-report" && role === "HOD") {
         handleDepartmentReportRef.current(command.reportType);
         isCommandRunning = false;
@@ -329,7 +334,7 @@ export function ArogyaPanel({ open, onOpenChange, role, notifItems, maintenanceN
                   <Button type="button" variant="outline" size="sm" data-tour="arogya-coach" className="min-h-11 rounded-full border-teal-200/90 bg-white/80 px-3 text-xs text-teal-900 shadow-sm hover:bg-teal-50" onClick={handleProgressCoach}>
                     My progress coach
                   </Button>
-                  <Button type="button" variant="outline" size="sm" className="min-h-11 rounded-full border-teal-200/90 bg-white/80 px-3 text-xs text-teal-900 shadow-sm hover:bg-teal-50" onClick={handleWhatsDue}>
+                  <Button type="button" variant="outline" size="sm" data-tour="arogya-whats-due" className="min-h-11 rounded-full border-teal-200/90 bg-white/80 px-3 text-xs text-teal-900 shadow-sm hover:bg-teal-50" onClick={handleWhatsDue}>
                     What's due?
                   </Button>
                 </>
