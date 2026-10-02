@@ -205,7 +205,7 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
                   {/* Sign In card */}
                   <button
                     onClick={() => setMode("login")}
-                    className="flex w-full items-center gap-4 rounded-2xl border-2 border-teal-500 bg-teal-500 p-5 text-left text-white shadow-md transition-all hover:bg-teal-600 hover:shadow-lg hover:-translate-y-0.5"
+                    className="flex w-full items-center gap-4 rounded-2xl border border-[#0F766E] bg-[#0F766E] p-4 text-left text-white shadow-[0_10px_24px_rgba(15,118,110,0.16)] transition-[background-color,box-shadow] duration-150 hover:bg-[#0B665F] hover:shadow-[0_14px_28px_rgba(15,118,110,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0F766E] focus-visible:ring-offset-2 sm:p-5"
                   >
                     <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white/20">
                       <LogIn className="h-6 w-6" />
@@ -220,14 +220,14 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
                   <button
                     onClick={handleMovieStart}
                     disabled={demoLoading}
-                    className="flex w-full items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition-all hover:border-teal-300 hover:bg-teal-50 hover:shadow-md hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="flex w-full items-center gap-4 rounded-2xl border border-[#D9EAE7] bg-white p-4 text-left shadow-sm transition-[border-color,background-color,box-shadow] duration-150 hover:border-[#A9D4CF] hover:bg-[#F2F8F7] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0F766E] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 sm:p-5"
                   >
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-50 ring-1 ring-amber-100">
-                      {demoLoading ? <Loader2 className="h-5 w-5 text-amber-500 animate-spin" /> : <Sparkles className="h-6 w-6 text-amber-500" />}
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#F2F8F7] text-[#0F766E] ring-1 ring-[#D9EAE7]">
+                      {demoLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Sparkles className="h-5 w-5" strokeWidth={1.8} />}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="font-semibold text-slate-800">Show demo</p>
-                      <p className="mt-0.5 text-xs text-slate-500">A guided tour of the logbook. No sign-in needed.</p>
+                      <p className="font-semibold text-[#16323A]">Show demo</p>
+                      <p className="mt-0.5 text-xs leading-5 text-[#52696C]">A guided tour of the logbook. No sign-in needed.</p>
                     </div>
                   </button>
                 </div>

@@ -1,5 +1,6 @@
 import * as React from "react";
 import { motion, useReducedMotion } from "framer-motion";
+import { ArrowRight, CheckCircle2, RotateCcw } from "lucide-react";
 import { clearDemoMovie, demoPortalHome, requestDemoMovieReplay, startDemoSession } from "@/lib/demoSession";
 import { getCurrentUser } from "@/lib/session";
 
@@ -46,25 +47,25 @@ export function EndCard({ onExplore }: { onExplore: () => void }) {
 
   return (
     <div 
-      className="pointer-events-auto fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm"
+      className="pointer-events-auto fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-[#102427]/60 p-4 backdrop-blur-[3px] sm:p-6"
       onKeyDown={handleKeyDown}
     >
       <motion.div 
         role="dialog"
         aria-modal="true"
         aria-labelledby="demo-end-title"
-        className="w-full max-w-sm rounded-3xl bg-white p-8 text-center shadow-2xl"
-        initial={{ opacity: 0, y: reduceMotion ? 0 : 20, scale: reduceMotion ? 1 : 0.95 }}
+        className="my-auto w-full max-w-md rounded-[28px] border border-white/80 bg-white/95 p-6 text-center shadow-[0_28px_80px_rgba(5,26,29,0.28)] backdrop-blur-xl sm:p-8"
+        initial={{ opacity: 0, y: reduceMotion ? 0 : 8 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.4, ease: "easeOut" }}
+        transition={{ duration: reduceMotion ? 0 : 0.18, ease: "easeOut" }}
       >
-        <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-teal-50 text-teal-600">
-          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/></svg>
+        <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#F2F8F7] text-[#0F766E] ring-1 ring-[#D9EAE7] sm:mb-6 sm:h-16 sm:w-16">
+          <CheckCircle2 className="h-7 w-7 sm:h-8 sm:w-8" strokeWidth={1.8} />
         </div>
         <h2 id="demo-end-title" className="mb-3 font-display text-2xl font-bold tracking-tight text-slate-900">
           That was Arogya in about 90 seconds
         </h2>
-        <p className="mb-8 text-sm text-slate-500">
+        <p className="mb-7 text-sm leading-6 text-slate-600 sm:mb-8">
           Replay it, or explore the demo yourself.
         </p>
         
@@ -74,17 +75,19 @@ export function EndCard({ onExplore }: { onExplore: () => void }) {
             type="button"
             onClick={requestDemoMovieReplay}
             data-testid="demo-movie-replay"
-            className="flex h-12 w-full items-center justify-center rounded-xl bg-slate-100 font-semibold text-slate-900 transition-colors hover:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
+            className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-[#D9EAE7] bg-[#F2F8F7] font-semibold text-[#16323A] transition-colors duration-150 hover:bg-[#EAF4F2] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0F766E] focus-visible:ring-offset-2"
           >
+            <RotateCcw className="h-4 w-4" strokeWidth={1.8} />
             Replay
           </button>
           <button
             type="button"
             onClick={handleExplore}
             data-testid="demo-movie-explore"
-            className="flex h-12 w-full items-center justify-center rounded-xl bg-teal-600 font-semibold text-white shadow-sm transition-colors hover:bg-teal-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2"
+            className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#0F766E] font-semibold text-white shadow-[0_8px_18px_rgba(15,118,110,0.18)] transition-colors duration-150 hover:bg-[#0B665F] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0F766E] focus-visible:ring-offset-2"
           >
             Explore the demo yourself
+            <ArrowRight className="h-4 w-4" strokeWidth={1.8} />
           </button>
         </div>
       </motion.div>

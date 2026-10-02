@@ -181,6 +181,8 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
   React.useEffect(() => {
     if (!isActive || phase !== "playing" || blocked || !currentScene) return;
 
+    setTargetRect(null);
+    setElapsedMs(0);
     let cancelled = false;
     let clockStart = 0;
     
@@ -232,8 +234,13 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
       if (el) {
         const rect = el.getBoundingClientRect();
         if (rect.width > 0 && rect.height > 0) {
-          const newRect = { x: rect.left, y: rect.top, w: rect.width, h: rect.height };
-          if (!lastRect || Math.abs(lastRect.x - newRect.x) > 0.5 || Math.abs(lastRect.y - newRect.y) > 0.5 || Math.abs(lastRect.w - newRect.w) > 0.5 || Math.abs(lastRect.h - newRect.h) > 0.5) {
+          const newRect = {
+            x: Math.round(rect.left),
+            y: Math.round(rect.top),
+            w: Math.round(rect.width),
+            h: Math.round(rect.height),
+          };
+          if (!lastRect || Math.abs(lastRect.x - newRect.x) > 2 || Math.abs(lastRect.y - newRect.y) > 2 || Math.abs(lastRect.w - newRect.w) > 2 || Math.abs(lastRect.h - newRect.h) > 2) {
             lastRect = newRect;
             setTargetRect(newRect);
           }
@@ -391,19 +398,11 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
                   top: targetRect.y - 8,
                   width: targetRect.w + 16,
                   height: targetRect.h + 16,
-                  boxShadow: "0 0 0 9999px rgba(15, 23, 42, 0.4)",
-                  transition: reduceMotion 
-                    ? { duration: 0.15 } 
-                    : { 
-                        opacity: { duration: 0.2 }, 
-                        left: { type: "spring", stiffness: 150, damping: 25 },
-                        top: { type: "spring", stiffness: 150, damping: 25 },
-                        width: { type: "spring", stiffness: 150, damping: 25 },
-                        height: { type: "spring", stiffness: 150, damping: 25 },
-                      }
+                  boxShadow: "0 0 0 9999px rgba(16, 36, 39, 0.48)",
                 }}
                 exit={{ opacity: 0 }}
-                className="absolute z-[40] rounded-2xl border-2 border-white/20 mix-blend-hard-light pointer-events-none"
+                transition={{ duration: reduceMotion ? 0 : 0.12, ease: "easeOut" }}
+                className="pointer-events-none absolute z-[40] rounded-2xl border-2 border-white/90"
               />
             )}
             {!targetRect && (
@@ -412,7 +411,7 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="absolute inset-0 z-[40] bg-slate-900/40 pointer-events-none" 
+                className="pointer-events-none absolute inset-0 z-[40] bg-[#102427]/45" 
               />
             )}
           </AnimatePresence>
@@ -424,14 +423,17 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
                 key={currentScene.id}
                 role="status"
                 aria-live="polite"
-                initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 12, scale: 0.98 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -12 }}
-                transition={{ duration: 0.3 }}
-                className="absolute z-[60] left-2 right-[80px] bottom-[calc(76px+env(safe-area-inset-bottom))] sm:bottom-12 sm:left-1/2 sm:right-auto sm:w-[480px] sm:-translate-x-1/2 rounded-2xl bg-slate-900/85 p-5 text-center shadow-2xl backdrop-blur-xl border border-white/10"
+                initial={{ opacity: 0, y: reduceMotion ? 0 : 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: reduceMotion ? 0 : -4 }}
+                transition={{ duration: reduceMotion ? 0 : 0.16, ease: "easeOut" }}
+                className="absolute bottom-[calc(76px+env(safe-area-inset-bottom))] left-3 right-3 z-[60] rounded-[20px] border border-white/15 bg-[#102427]/92 px-4 py-3.5 text-left shadow-[0_18px_48px_rgba(5,26,29,0.3)] backdrop-blur-xl sm:bottom-8 sm:left-1/2 sm:right-auto sm:w-[min(520px,calc(100vw-48px))] sm:-translate-x-1/2 sm:px-5 sm:py-4"
                 style={bannerHeight > 0 ? { bottom: `max(${bannerHeight + 16}px, calc(76px + env(safe-area-inset-bottom)))` } : undefined}
               >
-                <p className="text-[17px] font-medium tracking-tight text-white/95">
+                <p className="mb-1 text-xs font-semibold uppercase tracking-[0.12em] text-teal-100">
+                  {currentScene.chapter === "resident" ? "Resident" : currentScene.chapter === "faculty" ? "Faculty" : "HOD"} · {sceneIndex + 1} of {DEMO_SCENES.length}
+                </p>
+                <p className="text-base font-medium leading-6 tracking-tight text-white">
                   {currentScene.caption}
                 </p>
               </motion.div>
