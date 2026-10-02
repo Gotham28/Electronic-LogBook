@@ -347,12 +347,16 @@ export function PrintableLogbook() {
       )}
       <style>{`
         @media print {
-          @page { size: A4; margin: 18mm 16mm; }
+          @page { size: A4; margin: 15mm 16mm 16mm 16mm; }
           body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           .print\\:hidden { display: none !important; }
           .break-after-page { break-after: page; }
           .break-before-page { break-before: page; }
           .no-break { break-inside: avoid; }
+          thead.print-header-group {
+            display: table-header-group !important;
+            break-inside: avoid;
+          }
         }
       `}</style>
 
@@ -360,14 +364,33 @@ export function PrintableLogbook() {
 
       {/* Main document */}
       <div ref={documentRef} className="bg-white px-4 py-8 sm:px-10 sm:py-10 max-w-[900px] mx-auto text-slate-800" style={{ fontFamily: "system-ui, sans-serif" }}>
-
-        {/* Running header on every printed page */}
-        <div className="hidden print:flex items-center justify-between border-b border-slate-200 pb-2 mb-6 text-[9px] text-slate-400 font-medium uppercase tracking-wide">
-          <span>Resident Training Record — {user?.name ?? ""}</span>
-          <span>Department of {department} · {new Date().getFullYear()}</span>
-        </div>
-
-        {/* Document identity bar */}
+        <table className="w-full border-collapse m-0 p-0 border-0">
+          <thead className="print-header-group">
+            <tr>
+              <td className="p-0 border-0">
+                {/* Running header on every printed page — native repeating header at top of each page */}
+                <div className="hidden print:flex items-center justify-between border-b-2 border-teal-600 pb-2 mb-6 bg-white">
+                  <div className="flex items-center gap-3">
+                    <div style={{ width: 4, height: 26, background: "#0d9488", borderRadius: 3, flexShrink: 0 }} />
+                    <div>
+                      <p style={{ fontSize: 11, fontWeight: 800, color: "#0f172a", margin: 0, lineHeight: 1.2 }}>{user?.name ?? "—"}</p>
+                      <p style={{ fontSize: 9, color: "#64748b", margin: 0, marginTop: 1 }}>
+                        Dept. of {department}&nbsp;&nbsp;|&nbsp;&nbsp;Reg. No:&nbsp;<span style={{ fontWeight: 700, color: "#0f172a" }}>{regNumber}</span>
+                      </p>
+                    </div>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <p style={{ fontSize: 9, fontWeight: 700, color: "#0d9488", textTransform: "uppercase", letterSpacing: "0.1em", margin: 0 }}>Electronic Logbook</p>
+                    <p style={{ fontSize: 8, color: "#94a3b8", margin: 0, marginTop: 1 }}>Resident Training Record · {new Date().getFullYear()}</p>
+                  </div>
+                </div>
+              </td>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td className="p-0 border-0 align-top">
+                {/* Document identity bar */}
         <div className="flex flex-wrap items-start justify-between gap-4 mb-10 pb-6 border-b border-slate-200">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-teal-600 mb-1">Complete Training Record</p>
@@ -683,6 +706,11 @@ export function PrintableLogbook() {
             ))}
           </div>
         </div>
+
+              </td>
+            </tr>
+          </tbody>
+        </table>
 
         {/* Print controls */}
         <div className="mt-10 flex justify-center gap-3 print:hidden">

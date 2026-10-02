@@ -47,7 +47,7 @@ export function PrivacyPolicyPage() {
             <h2 className="text-xl font-bold text-slate-900 mb-3">7. Contact</h2>
             <p>For any questions or concerns about this policy, contact our Grievance Officer:</p>
             <div className="mt-4 p-4 bg-slate-50 rounded-xl border border-slate-200">
-              <p className="font-semibold text-slate-900">Gautam P</p>
+              <p className="font-semibold text-slate-900">CEO</p>
               <p>Email: <a href="mailto:gothoslabs@gmail.com" className="text-teal-600 hover:underline">gothoslabs@gmail.com</a></p>
             </div>
           </section>

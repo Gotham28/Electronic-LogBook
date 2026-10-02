@@ -45,7 +45,7 @@ export function DataRightsPage() {
 
           <div className="mt-12 p-6 bg-slate-50 rounded-2xl border border-slate-200">
             <h3 className="text-lg font-bold text-slate-900 mb-3">To exercise any of these rights, contact our Grievance Officer:</h3>
-            <p className="font-semibold text-slate-900">Gautam P</p>
+            <p className="font-semibold text-slate-900">CEO</p>
             <p className="mb-4">Email: <a href="mailto:gothoslabs@gmail.com" className="text-teal-600 hover:underline">gothoslabs@gmail.com</a></p>
             
             <p className="text-sm font-medium text-slate-600 bg-white p-3 rounded-lg border border-slate-200 inline-block">
