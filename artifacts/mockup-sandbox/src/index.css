@@ -684,32 +684,25 @@ html[data-demo-mode="true"] [class~="text-teal-950"] {
 }
 
 @keyframes demo-item-enter {
-  from { opacity: 0; transform: translateY(7px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes demo-progress-enter {
-  from { transform: scaleX(0); }
-  to { transform: scaleX(1); }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 html[data-demo-mode="true"] .demo-stagger-item {
-  animation: demo-item-enter 420ms cubic-bezier(.2, .7, .2, 1) both;
-  animation-delay: calc(var(--demo-stagger-index, 0) * 28ms);
+  animation: demo-item-enter 140ms ease-out both;
 }
 
 html[data-demo-mode="true"] .demo-progress-fill {
-  transform-origin: left center;
-  animation: demo-progress-enter 650ms cubic-bezier(.2, .7, .2, 1) both;
+  transition: width 160ms ease-out;
 }
 
 html[data-demo-mode="true"] .demo-lift-card {
-  transition: transform 180ms ease, box-shadow 180ms ease;
+  transition: transform 150ms ease, box-shadow 150ms ease;
 }
 
 html[data-demo-mode="true"] .demo-lift-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 16px 36px rgba(15, 23, 42, .09);
+  transform: translateY(-1px);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, .08);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -720,9 +713,12 @@ html[data-demo-mode="true"] .demo-lift-card:hover {
     transition-duration: 0s !important;
   }
 
-  html[data-demo-mode="true"] .demo-stagger-item,
-  html[data-demo-mode="true"] .demo-progress-fill {
+  html[data-demo-mode="true"] .demo-stagger-item {
     animation: none !important;
+  }
+
+  html[data-demo-mode="true"] .demo-progress-fill {
+    transition: none !important;
   }
 
   html[data-demo-mode="true"] .demo-lift-card:hover {
