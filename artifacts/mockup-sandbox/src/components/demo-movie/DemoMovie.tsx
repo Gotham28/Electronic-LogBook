@@ -21,7 +21,64 @@ import { DEMO_MOVIE_ASK_QUESTION } from "@/lib/demoData";
 type SpotlightRect = { x: number; y: number; w: number; h: number };
 const SPOTLIGHT_TRANSITION_MS = 220;
 const SPOTLIGHT_TARGET_REVEAL_MS = SPOTLIGHT_TRANSITION_MS + 32;
+const SPOTLIGHT_TARGET_STABLE_MS = 120;
 const SPOTLIGHT_EASE = [0.22, 1, 0.36, 1] as const;
+const SPOTLIGHT_SECTION_TITLES: Record<string, string> = {
+  "dashboard-welcome": "Your dashboard",
+  "dashboard-progress": "Training progress",
+  "dashboard-cases": "Clinical cases",
+  "dashboard-procedures": "Procedures",
+  "dashboard-academics": "Academic activities",
+  "dashboard-recent": "Recent activity",
+  "dashboard-bottom": "Dashboard resources",
+  "caselog-add": "Add a case log",
+  "caselog-patient-info": "Patient and encounter details",
+  "caselog-clinical-details": "Clinical details",
+  "caselog-diagnosis-details": "Diagnosis and follow-up",
+  "caselog-reviewer": "Reviewing faculty",
+  "student-assessments": "Assessments",
+  "student-thesis": "Thesis progress",
+  "student-leave-records": "Leave records",
+  "arogya-launcher": "Arogya assistant",
+  "arogya-coach": "Progress coach",
+  "arogya-messages": "Arogya guidance",
+  "arogya-due": "Items due",
+  "arogya-report": "Department report",
+  "arogya-falling-behind": "Residents needing attention",
+  "review-first-item": "Submitted log",
+  "review-fast-evaluation": "Fast Faculty Evaluation",
+  "review-approve": "Verify or request a revision",
+  "faculty-progress-list": "Student progress",
+  "faculty-view-logbook": "Open a student logbook",
+  "faculty-progress-summary": "Progress summary",
+  "faculty-progress-cases": "Case category progress",
+  "faculty-progress-procedures": "Procedure progress",
+  "faculty-progress-academics": "Academic activity progress",
+  "faculty-add-assessment": "Add an assessment",
+  "quarterly-appraisal": "Quarterly appraisal",
+  "appraisal-draft": "Draft with Arogya",
+  "appraisal-remarks": "Appraisal remarks",
+  "hod-overview": "Department overview",
+  "hod-log-activity": "Log activity",
+  "hod-student-roster": "Resident roster",
+  "hod-requirements": "Training requirements",
+  "hod-requirements-add": "Add a requirement",
+  "hod-requirements-add-form": "Requirement details",
+  "hod-add-faculty": "Add faculty",
+  "hod-student-approvals": "Student approvals",
+  "hod-approve-student": "Approve student access",
+};
+
+function getSpotlightSectionTitle(targetKey: string) {
+  if (targetKey.startsWith("selector:")) {
+    return targetKey.includes("dialog") ? "Student logbook" : "Selected section";
+  }
+  const targetId = targetKey.startsWith("tour:") ? targetKey.slice("tour:".length) : "";
+  if (!targetId) return "Section overview";
+  if (SPOTLIGHT_SECTION_TITLES[targetId]) return SPOTLIGHT_SECTION_TITLES[targetId];
+  const words = targetId.replace(/^(dashboard|student|faculty|hod|arogya|caselog)-/, "").replace(/-/g, " ");
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
 
 function DemoSpotlight({ rect, targetKey, reduceMotion }: { rect: SpotlightRect | null; targetKey: string; reduceMotion: boolean }) {
   const maskId = React.useId().replace(/:/g, "");
@@ -329,6 +386,8 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
     setCaptionState({ sceneId: currentScene.id, caption: currentScene.caption });
 
     let lastRect: SpotlightRect | null = null;
+    let candidateRect: SpotlightRect | null = null;
+    let candidateStableSince = 0;
     let lastTargetKey: string | null = null;
     let targetChangedAt = 0;
     let activeTargetElement: HTMLElement | null = null;
@@ -353,6 +412,8 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
 
         const rect = el.getBoundingClientRect();
         if (rect.width <= 0 || rect.height <= 0) {
+          candidateRect = null;
+          candidateStableSince = 0;
           if (lastRect) {
             lastRect = null;
             setTargetRect(null);
@@ -361,6 +422,22 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
         }
 
         const nextRect = { x: rect.left, y: rect.top, w: rect.width, h: rect.height };
+        if (!lastRect) {
+          const stable = candidateRect &&
+            Math.abs(candidateRect.x - nextRect.x) <= 1 &&
+            Math.abs(candidateRect.y - nextRect.y) <= 1 &&
+            Math.abs(candidateRect.w - nextRect.w) <= 1 &&
+            Math.abs(candidateRect.h - nextRect.h) <= 1;
+          if (!stable) {
+            candidateRect = nextRect;
+            candidateStableSince = performance.now();
+          }
+          const revealReady = reduceMotionRef.current || (
+            performance.now() - targetChangedAt >= SPOTLIGHT_TARGET_REVEAL_MS &&
+            performance.now() - candidateStableSince >= SPOTLIGHT_TARGET_STABLE_MS
+          );
+          if (!revealReady) return;
+        }
         const moved = !lastRect ||
           Math.abs(lastRect.x - nextRect.x) > 0.5 ||
           Math.abs(lastRect.y - nextRect.y) > 0.5 ||
@@ -413,6 +490,8 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
       if (nextTargetKey !== lastTargetKey) {
         lastTargetKey = nextTargetKey;
         lastRect = null;
+        candidateRect = null;
+        candidateStableSince = 0;
         targetChangedAt = now;
         activeTargetElement = null;
         disconnectTargetObserver();
@@ -436,6 +515,8 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
         if (el !== activeTargetElement) {
           if (activeTargetElement) {
             lastRect = null;
+            candidateRect = null;
+            candidateStableSince = 0;
             targetChangedAt = now;
             setTargetRect(null);
           }
@@ -682,13 +763,16 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: reduceMotion ? 0 : -4 }}
                   transition={{ duration: reduceMotion ? 0 : 0.22, ease: [0.22, 1, 0.36, 1] }}
-                  className="pointer-events-none absolute bottom-[calc(76px+env(safe-area-inset-bottom))] left-3 right-3 z-[60] rounded-[20px] border border-white/15 bg-[#102427]/92 px-4 py-3.5 text-left shadow-[0_18px_48px_rgba(5,26,29,0.3)] backdrop-blur-xl sm:bottom-8 sm:left-1/2 sm:right-auto sm:w-[min(520px,calc(100vw-48px))] sm:-translate-x-1/2 sm:px-5 sm:py-4"
+                  className="pointer-events-none absolute bottom-[calc(76px+env(safe-area-inset-bottom))] left-3 right-3 z-[60] rounded-[20px] border border-slate-200/90 bg-white/95 px-4 py-3.5 text-left shadow-[0_18px_48px_rgba(15,36,39,0.18)] backdrop-blur-xl sm:bottom-8 sm:left-1/2 sm:right-auto sm:w-[min(520px,calc(100vw-48px))] sm:-translate-x-1/2 sm:px-5 sm:py-4"
                   style={bannerHeight > 0 ? { bottom: `max(${bannerHeight + 16}px, calc(76px + env(safe-area-inset-bottom)))` } : undefined}
                 >
-                  <p className="mb-1 text-xs font-semibold uppercase tracking-[0.12em] text-teal-100">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-teal-700">
                     {currentScene.chapter === "resident" ? "Student" : currentScene.chapter === "faculty" ? "Faculty" : "HOD"} · {sceneIndex + 1} of {DEMO_SCENES.length}
                   </p>
-                  <p className="text-base font-medium leading-6 tracking-tight text-white">
+                  <p className="mt-1 text-sm font-semibold leading-5 tracking-tight text-slate-950">
+                    {getSpotlightSectionTitle(spotlightTargetKey)}
+                  </p>
+                  <p className="mt-1 text-[13px] leading-5 text-slate-600">
                     {displayedCaption}
                   </p>
                 </motion.div>

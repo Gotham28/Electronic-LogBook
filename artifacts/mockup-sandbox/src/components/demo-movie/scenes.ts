@@ -77,7 +77,7 @@ export const DEMO_SCENES: DemoScene[] = [
       { atMs: 4600, target: "caselog-clinical-details", caption: "Record the clinical history, examination and investigations." },
       { atMs: 6800, target: "caselog-diagnosis-details", caption: "Add diagnoses, management, follow-up and learning points." },
       { atMs: 8300, target: "caselog-reviewer", caption: "Choose a reviewing faculty member, then save a draft or send it for review." },
-      { atMs: 9000, action: "pressEscape", target: "caselog-list" },
+      { atMs: 9000, action: "pressEscape", target: "caselog-list", caption: "Return to the case log list after reviewing the entry fields." },
     ],
   },
   {
@@ -124,7 +124,7 @@ export const DEMO_SCENES: DemoScene[] = [
       { atMs: 5200, target: "arogya-messages", caption: "Arogya summarizes practical next steps." },
       { atMs: 7800, action: "clickTarget", target: "arogya-due", caption: "Check what needs attention next." },
       { atMs: 10400, target: "arogya-messages", caption: "Due items open from the same assistant panel." },
-      { atMs: 14300, action: "closeArogya" },
+      { atMs: 14300, action: "closeArogya", target: "arogya-launcher", caption: "Close Arogya to return to the student dashboard." },
     ],
   },
   {
@@ -229,7 +229,7 @@ export const DEMO_SCENES: DemoScene[] = [
       { atMs: 2800, target: "hod-requirements-add", caption: "Each section has its own list and add controls." },
       { atMs: 4700, action: "clickTarget", target: "hod-requirements-add", caption: "Open the form to see the fields for a new requirement." },
       { atMs: 5500, target: "hod-requirements-add-form", caption: "Add a name and any required count or period for this section." },
-      { atMs: 8200, action: "clickTarget", target: "hod-requirements-add" },
+      { atMs: 8200, action: "clickTarget", target: "hod-requirements-add", caption: "Close the form after reviewing the available fields." },
     ],
   },
   {
@@ -269,7 +269,7 @@ export const DEMO_SCENES: DemoScene[] = [
       { atMs: 4700, target: "arogya-messages", caption: "Review the department summary in the conversation." },
       { atMs: 8200, action: "clickTarget", target: "arogya-falling-behind", caption: "Ask which residents may be falling behind." },
       { atMs: 10800, target: "arogya-messages", caption: "Arogya brings the follow-up into the same panel." },
-      { atMs: 14800, action: "closeArogya" },
+      { atMs: 14800, action: "closeArogya", target: "arogya-launcher", caption: "Close Arogya to return to the department dashboard." },
     ],
   },
 ];
