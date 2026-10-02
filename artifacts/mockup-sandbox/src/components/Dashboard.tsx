@@ -128,11 +128,11 @@ export function Dashboard() {
   return (
     <div className="section-spacing pb-12">
       {!configured.length && <p className="rounded-xl bg-teal-50 p-4 text-sm text-teal-800">Your HOD has not configured completion targets yet.</p>}
-      <Card data-tour="dashboard-welcome" className="overflow-hidden border-white/70 bg-white/72 layer-2 animate-float-up">
+      <Card className="overflow-hidden border-white/70 bg-white/72 layer-2 animate-float-up">
         <div className="h-1.5 bg-gradient-to-r from-teal-500 via-cyan-400 to-emerald-400" />
         <CardContent className="p-4 sm:p-6 md:p-8">
           <div className="grid items-stretch gap-7 xl:grid-cols-[.8fr_1.2fr]">
-            <div className="flex flex-col justify-center rounded-[24px] bg-gradient-to-br from-teal-950 via-teal-800 to-cyan-700 p-6 text-white md:p-9">
+            <div data-tour="dashboard-welcome" className="flex flex-col justify-center rounded-[24px] bg-gradient-to-br from-teal-950 via-teal-800 to-cyan-700 p-6 text-white md:p-9">
               <p className="text-[10px] font-bold uppercase tracking-[.2em] text-teal-100">{logs.profile?.department || "Department Unassigned"}</p>
               <h1 className="mt-3 text-3xl font-semibold leading-tight tracking-tight md:text-4xl">Welcome back, {user?.name?.split(" ")[0] || "Student"}</h1>
               <p className="mt-4 max-w-lg text-sm leading-6 text-teal-50/85">Your clinical record, academic work, and verification status are summarised here.</p>
