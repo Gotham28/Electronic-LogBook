@@ -19,6 +19,9 @@ import { playDemoSound } from "@/lib/demoSounds";
 import { DEMO_MOVIE_ASK_QUESTION } from "@/lib/demoData";
 
 type SpotlightRect = { x: number; y: number; w: number; h: number };
+const SPOTLIGHT_TRANSITION_MS = 220;
+const SPOTLIGHT_TARGET_REVEAL_MS = SPOTLIGHT_TRANSITION_MS + 32;
+const SPOTLIGHT_EASE = [0.22, 1, 0.36, 1] as const;
 
 function DemoSpotlight({ rect, targetKey, reduceMotion }: { rect: SpotlightRect | null; targetKey: string; reduceMotion: boolean }) {
   const maskId = React.useId().replace(/:/g, "");
@@ -40,7 +43,7 @@ function DemoSpotlight({ rect, targetKey, reduceMotion }: { rect: SpotlightRect 
     }
 
     setHoleOpen(false);
-    const timer = window.setTimeout(() => setDisplayRect(null), reduceMotion ? 0 : 140);
+    const timer = window.setTimeout(() => setDisplayRect(null), reduceMotion ? 0 : SPOTLIGHT_TRANSITION_MS);
     return () => window.clearTimeout(timer);
   }, [rect, reduceMotion]);
 
@@ -58,15 +61,17 @@ function DemoSpotlight({ rect, targetKey, reduceMotion }: { rect: SpotlightRect 
             <rect x="0" y="0" width={viewport.width} height={viewport.height} fill="white" />
             {displayRect && (
               <motion.rect
-                x={displayRect.x}
-                y={displayRect.y}
-                width={displayRect.w}
-                height={displayRect.h}
                 rx="16"
                 fill="black"
                 initial={false}
-                animate={{ fillOpacity: holeOpen ? 1 : 0 }}
-                transition={{ duration: reduceMotion ? 0 : 0.14, ease: "easeOut" }}
+                animate={{
+                  x: displayRect.x,
+                  y: displayRect.y,
+                  width: displayRect.w,
+                  height: displayRect.h,
+                  fillOpacity: holeOpen ? 1 : 0,
+                }}
+                transition={{ duration: reduceMotion ? 0 : SPOTLIGHT_TRANSITION_MS / 1000, ease: SPOTLIGHT_EASE }}
               />
             )}
           </mask>
@@ -84,7 +89,7 @@ function DemoSpotlight({ rect, targetKey, reduceMotion }: { rect: SpotlightRect 
             width: displayRect.w + 4,
             height: displayRect.h + 4,
           }}
-          transition={{ duration: reduceMotion ? 0 : 0.14, ease: "easeOut" }}
+          transition={{ duration: reduceMotion ? 0 : SPOTLIGHT_TRANSITION_MS / 1000, ease: SPOTLIGHT_EASE }}
         />
       )}
     </div>
@@ -295,6 +300,52 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
     let lastTargetKey: string | null = null;
     let targetChangedAt = 0;
     let activeTargetElement: HTMLElement | null = null;
+    let measureFrame = 0;
+    let targetResizeObserver: ResizeObserver | null = null;
+    let targetMutationObserver: MutationObserver | null = null;
+
+    const disconnectTargetObserver = () => {
+      targetResizeObserver?.disconnect();
+      targetResizeObserver = null;
+      targetMutationObserver?.disconnect();
+      targetMutationObserver = null;
+    };
+
+    const scheduleTargetMeasure = () => {
+      if (cancelled || measureFrame || !activeTargetElement?.isConnected) return;
+      measureFrame = window.requestAnimationFrame(() => {
+        measureFrame = 0;
+        const el = activeTargetElement;
+        if (cancelled || !el?.isConnected) return;
+        if (!reduceMotionRef.current && performance.now() - targetChangedAt < SPOTLIGHT_TARGET_REVEAL_MS) return;
+
+        const rect = el.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) {
+          if (lastRect) {
+            lastRect = null;
+            setTargetRect(null);
+          }
+          return;
+        }
+
+        const nextRect = { x: rect.left, y: rect.top, w: rect.width, h: rect.height };
+        const moved = !lastRect ||
+          Math.abs(lastRect.x - nextRect.x) > 0.5 ||
+          Math.abs(lastRect.y - nextRect.y) > 0.5 ||
+          Math.abs(lastRect.w - nextRect.w) > 0.5 ||
+          Math.abs(lastRect.h - nextRect.h) > 0.5;
+        if (moved) {
+          lastRect = nextRect;
+          setTargetRect(nextRect);
+        }
+      });
+    };
+
+    const handleViewportChange = () => scheduleTargetMeasure();
+    window.addEventListener("scroll", handleViewportChange, true);
+    window.addEventListener("resize", handleViewportChange);
+    window.visualViewport?.addEventListener("scroll", handleViewportChange);
+    window.visualViewport?.addEventListener("resize", handleViewportChange);
 
     const executeAction = (action: string, target?: string, clickTarget?: string) => {
       if (action === "openArogya") {
@@ -331,11 +382,16 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
         lastTargetKey = nextTargetKey;
         lastRect = null;
         targetChangedAt = now;
+        activeTargetElement = null;
+        disconnectTargetObserver();
         setSpotlightTargetKey(nextTargetKey);
         setTargetRect(null);
       }
 
-      if (lastRect && activeTargetElement?.isConnected) return activeTargetElement;
+      if (activeTargetElement?.isConnected) {
+        scheduleTargetMeasure();
+        return activeTargetElement;
+      }
 
       let el: Element | null = null;
       if (rawSelector) {
@@ -346,28 +402,35 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
       
       if (el) {
         if (el !== activeTargetElement) {
-          if (activeTargetElement && lastRect) {
+          if (activeTargetElement) {
             lastRect = null;
             targetChangedAt = now;
             setTargetRect(null);
           }
           activeTargetElement = el as HTMLElement;
+          disconnectTargetObserver();
+          if (typeof ResizeObserver !== "undefined") {
+            targetResizeObserver = new ResizeObserver(scheduleTargetMeasure);
+            let ancestor: HTMLElement | null = activeTargetElement;
+            while (ancestor) {
+              targetResizeObserver.observe(ancestor);
+              if (ancestor === document.body) break;
+              ancestor = ancestor.parentElement;
+            }
+          }
+          if (typeof MutationObserver !== "undefined") {
+            targetMutationObserver = new MutationObserver(scheduleTargetMeasure);
+            targetMutationObserver.observe(activeTargetElement.parentElement ?? activeTargetElement, {
+              attributes: true,
+              childList: true,
+              characterData: true,
+              subtree: true,
+            });
+          }
           activeTargetElement.scrollIntoView({ block: "center", inline: "nearest", behavior: "instant" });
         }
-        const rect = el.getBoundingClientRect();
-        if (rect.width > 0 && rect.height > 0) {
-          const newRect = {
-            x: Math.round(rect.left),
-            y: Math.round(rect.top),
-            w: Math.round(rect.width),
-            h: Math.round(rect.height),
-          };
-          if (!lastRect && now - targetChangedAt >= (reduceMotionRef.current ? 0 : 150)) {
-            lastRect = newRect;
-            setTargetRect(newRect);
-          }
-          return el as HTMLElement;
-        }
+        scheduleTargetMeasure();
+        return el as HTMLElement;
       }
       if (lastRect !== null) {
         lastRect = null;
@@ -469,6 +532,12 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
     return () => {
       cancelled = true;
       clearInterval(intervalId);
+      window.removeEventListener("scroll", handleViewportChange, true);
+      window.removeEventListener("resize", handleViewportChange);
+      window.visualViewport?.removeEventListener("scroll", handleViewportChange);
+      window.visualViewport?.removeEventListener("resize", handleViewportChange);
+      disconnectTargetObserver();
+      if (measureFrame) window.cancelAnimationFrame(measureFrame);
     };
   }, [isActive, blocked, phase, sceneIndex, runToken, advanceScene]);
 
