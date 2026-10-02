@@ -3,11 +3,12 @@ import { DEMO_SCENES, CHAPTERS, getChapterShares } from "./scenes";
 
 type MovieControlsProps = {
   currentSceneIndex: number;
-  elapsedMs: number;
   onSkip: () => void;
+  onNext: () => void;
+  isLastScene: boolean;
 };
 
-export function MovieControls({ currentSceneIndex, elapsedMs, onSkip }: MovieControlsProps) {
+export function MovieControls({ currentSceneIndex, onSkip, onNext, isLastScene }: MovieControlsProps) {
   const shares = React.useMemo(() => getChapterShares(), []);
   const currentChapter = DEMO_SCENES[currentSceneIndex]?.chapter;
   
@@ -17,7 +18,8 @@ export function MovieControls({ currentSceneIndex, elapsedMs, onSkip }: MovieCon
     precedingMs += DEMO_SCENES[i]?.durationMs || 0;
   }
   
-  const currentTotalMs = precedingMs + elapsedMs;
+  // Progress advances at scene boundaries so the rail stays visually steady.
+  const currentTotalMs = precedingMs;
   
   return (
     <div className="pointer-events-none fixed inset-x-0 top-0 z-[100] px-3 pt-[max(12px,env(safe-area-inset-top))] sm:px-6">
@@ -28,15 +30,27 @@ export function MovieControls({ currentSceneIndex, elapsedMs, onSkip }: MovieCon
             <span className="truncate text-xs font-semibold tracking-wide text-[#16323A]">Guided demo</span>
             <span className="hidden text-xs text-[#52696C] sm:inline">Sample data</span>
           </div>
-          <button
-            type="button"
-            onClick={onSkip}
-            data-testid="demo-movie-skip"
-            aria-label="Skip demo"
-            className="flex h-10 min-w-[64px] shrink-0 items-center justify-center rounded-xl border border-[#D9EAE7] bg-white px-3 text-sm font-semibold text-[#16323A] transition-colors duration-150 hover:bg-[#F2F8F7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0F766E] focus-visible:ring-offset-2"
-          >
-            Skip
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={onNext}
+              data-testid="demo-movie-next"
+              aria-label={isLastScene ? "Finish demo" : "Next demo stage"}
+              className="flex h-10 min-w-[72px] items-center justify-center gap-1.5 rounded-xl bg-[#0F766E] px-3 text-sm font-semibold text-white transition-colors duration-150 hover:bg-[#0B665F] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0F766E] focus-visible:ring-offset-2"
+            >
+              {isLastScene ? "Finish" : "Next"}
+              {!isLastScene && <span aria-hidden="true">→</span>}
+            </button>
+            <button
+              type="button"
+              onClick={onSkip}
+              data-testid="demo-movie-skip"
+              aria-label="Skip demo"
+              className="flex h-10 min-w-[64px] items-center justify-center rounded-xl border border-[#D9EAE7] bg-white px-3 text-sm font-semibold text-[#16323A] transition-colors duration-150 hover:bg-[#F2F8F7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0F766E] focus-visible:ring-offset-2"
+            >
+              Skip
+            </button>
+          </div>
         </div>
 
         <div className="mt-3 flex w-full gap-3 sm:gap-5">

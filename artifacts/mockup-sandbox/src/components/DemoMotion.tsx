@@ -3,10 +3,12 @@ import { animate, useReducedMotion } from "framer-motion";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { isDemoMode } from "@/lib/session";
+import { isDemoMovieActive } from "@/lib/demoSession";
 
 export function useDemoMotionEnabled() {
   const reduceMotion = useReducedMotion();
-  return isDemoMode() && reduceMotion === false;
+  // Keep the guided walkthrough's underlying records steady while its spotlight is active.
+  return isDemoMode() && !isDemoMovieActive() && reduceMotion === false;
 }
 
 export function useDemoAnimatedValue(value: number, duration = 0.62) {
