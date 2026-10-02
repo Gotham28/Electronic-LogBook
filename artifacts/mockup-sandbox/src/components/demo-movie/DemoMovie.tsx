@@ -1,7 +1,7 @@
 import * as React from "react";
 import { createPortal } from "react-dom";
 import { motion, useReducedMotion, AnimatePresence } from "framer-motion";
-import { BookOpenCheck, Loader2 } from "lucide-react";
+import { ArrowRight, BookOpenCheck, Loader2 } from "lucide-react";
 import { 
   isDemoMovieActive, 
   DEMO_MOVIE_CHANGED_EVENT, 
@@ -71,7 +71,13 @@ function DemoSpotlight({ rect, targetKey, reduceMotion }: { rect: SpotlightRect 
                   height: displayRect.h,
                   fillOpacity: holeOpen ? 1 : 0,
                 }}
-                transition={{ duration: reduceMotion ? 0 : SPOTLIGHT_TRANSITION_MS / 1000, ease: SPOTLIGHT_EASE }}
+                transition={{
+                  x: { duration: 0 },
+                  y: { duration: 0 },
+                  width: { duration: 0 },
+                  height: { duration: 0 },
+                  fillOpacity: { duration: reduceMotion ? 0 : SPOTLIGHT_TRANSITION_MS / 1000, ease: SPOTLIGHT_EASE },
+                }}
               />
             )}
           </mask>
@@ -89,7 +95,13 @@ function DemoSpotlight({ rect, targetKey, reduceMotion }: { rect: SpotlightRect 
             width: displayRect.w + 4,
             height: displayRect.h + 4,
           }}
-          transition={{ duration: reduceMotion ? 0 : SPOTLIGHT_TRANSITION_MS / 1000, ease: SPOTLIGHT_EASE }}
+          transition={{
+            left: { duration: 0 },
+            top: { duration: 0 },
+            width: { duration: 0 },
+            height: { duration: 0 },
+            opacity: { duration: reduceMotion ? 0 : SPOTLIGHT_TRANSITION_MS / 1000, ease: SPOTLIGHT_EASE },
+          }}
         />
       )}
     </div>
@@ -110,11 +122,13 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
   const [sceneIndex, setSceneIndex] = React.useState(0);
   const [targetRect, setTargetRect] = React.useState<SpotlightRect | null>(null);
   const [spotlightTargetKey, setSpotlightTargetKey] = React.useState("initial");
+  const [captionState, setCaptionState] = React.useState<{ sceneId: string; caption: string } | null>(null);
   const [runToken, setRunToken] = React.useState(0);
   const advancedSceneRef = React.useRef<number | null>(null);
   
   const reduceMotion = useReducedMotion();
   const currentScene: DemoScene | undefined = DEMO_SCENES[sceneIndex];
+  const displayedCaption = captionState?.sceneId === currentScene?.id ? captionState.caption : currentScene?.caption;
 
   const activeRoleRef = React.useRef(activeRole);
   activeRoleRef.current = activeRole;
@@ -295,6 +309,8 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
     let currentStage = "role";
     let stageStart = performance.now();
     let actionFired = false;
+    let lastCaption = currentScene.caption;
+    setCaptionState({ sceneId: currentScene.id, caption: currentScene.caption });
 
     let lastRect: SpotlightRect | null = null;
     let lastTargetKey: string | null = null;
@@ -427,7 +443,13 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
               subtree: true,
             });
           }
-          activeTargetElement.scrollIntoView({ block: "center", inline: "nearest", behavior: "instant" });
+          if (window.getComputedStyle(activeTargetElement).position !== "fixed") {
+            activeTargetElement.scrollIntoView({
+              block: "center",
+              inline: "nearest",
+              behavior: reduceMotionRef.current ? "instant" : "smooth",
+            });
+          }
         }
         scheduleTargetMeasure();
         return el as HTMLElement;
@@ -502,11 +524,13 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
         
         let currentTarget = currentScene.target;
         let currentSelector: string | undefined = undefined;
+        let activeCaption = currentScene.caption;
         
         if (currentScene.beats) {
           for (let i = 0; i < currentScene.beats.length; i++) {
             const beat = currentScene.beats[i];
             if (elapsed >= beat.atMs) {
+              if (beat.caption) activeCaption = beat.caption;
               if (beat.target) { currentTarget = beat.target; currentSelector = undefined; }
               else if (beat.selector) { currentSelector = beat.selector; currentTarget = undefined; }
               
@@ -518,6 +542,11 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
               }
             }
           }
+        }
+
+        if (activeCaption !== lastCaption) {
+          lastCaption = activeCaption;
+          setCaptionState({ sceneId: currentScene.id, caption: activeCaption });
         }
         
         updateTargetRect(currentTarget, currentSelector, now);
@@ -564,11 +593,12 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
               <div className="grid h-20 w-20 place-items-center rounded-[26px] border border-white/25 bg-white/12 shadow-[0_16px_40px_rgba(5,26,29,0.16)]">
                 <BookOpenCheck className="h-11 w-11" strokeWidth={1.6} />
               </div>
-              <h1 className="mt-6 font-display text-3xl font-bold tracking-tight">Arogya</h1>
-              <p className="mt-1 text-base text-white/85">Electronic LogBook</p>
+              <h1 className="mt-6 font-display text-3xl font-bold tracking-tight">Welcome to E-LogBook</h1>
+              <p className="mt-1 text-base text-white/85">Arogya Electronic LogBook</p>
+              <p className="mt-3 max-w-sm text-sm leading-6 text-white/75">A guided look at the student, faculty and HOD experience.</p>
               <div className="mt-8 flex items-center gap-2.5 text-sm font-medium text-white/85" role="status" aria-live="polite">
                 <Loader2 className={`h-4 w-4 ${reduceMotion ? "" : "animate-spin"}`} strokeWidth={1.8} />
-                <span>Preparing your guided demo</span>
+                <span>Starting with the student dashboard</span>
               </div>
             </div>
           </motion.div>
@@ -593,25 +623,54 @@ export function DemoMovie({ activeRole, navigate, blocked, arogyaOpen, setArogya
 
             <DemoSpotlight rect={targetRect} targetKey={spotlightTargetKey} reduceMotion={!!reduceMotion} />
 
+            <AnimatePresence initial={false} mode="wait">
+              {currentScene.transition && (
+                <motion.section
+                  key={`transition-${currentScene.id}`}
+                  role="status"
+                  aria-live="polite"
+                  initial={{ opacity: 0, y: reduceMotion ? 0 : 12, scale: reduceMotion ? 1 : 0.985 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: reduceMotion ? 0 : -8, scale: reduceMotion ? 1 : 0.99 }}
+                  transition={{ duration: reduceMotion ? 0 : 0.38, ease: [0.22, 1, 0.36, 1] }}
+                  className="pointer-events-none absolute inset-0 z-[55] grid place-items-center px-5"
+                >
+                  <div className="w-full max-w-xl rounded-[28px] border border-white/20 bg-gradient-to-br from-[#123638]/95 via-[#102427]/94 to-[#0b1d20]/96 p-7 text-center text-white shadow-[0_32px_100px_rgba(4,20,22,0.42)] backdrop-blur-2xl sm:p-10">
+                    <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-white/20 bg-white/10 text-teal-100">
+                      <BookOpenCheck className="h-7 w-7" strokeWidth={1.7} />
+                    </div>
+                    <p className="mt-6 text-[11px] font-bold uppercase tracking-[0.2em] text-teal-200">{currentScene.transition.eyebrow}</p>
+                    <h2 className="mt-3 font-display text-2xl font-semibold tracking-tight sm:text-3xl">{currentScene.transition.title}</h2>
+                    <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-white/75 sm:text-base">{currentScene.transition.body}</p>
+                    <div className="mt-7 inline-flex items-center gap-2 text-xs font-semibold text-teal-100/90">
+                      Continue the guided walkthrough <ArrowRight className="h-4 w-4" />
+                    </div>
+                  </div>
+                </motion.section>
+              )}
+            </AnimatePresence>
+
             <AnimatePresence mode="wait" initial={false}>
-              <motion.div
-                key={currentScene.id}
-                role="status"
-                aria-live="polite"
-                initial={{ opacity: 0, y: reduceMotion ? 0 : 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: reduceMotion ? 0 : -4 }}
-                transition={{ duration: reduceMotion ? 0 : 0.16, ease: "easeOut" }}
-                className="pointer-events-none absolute bottom-[calc(76px+env(safe-area-inset-bottom))] left-3 right-3 z-[60] rounded-[20px] border border-white/15 bg-[#102427]/92 px-4 py-3.5 text-left shadow-[0_18px_48px_rgba(5,26,29,0.3)] backdrop-blur-xl sm:bottom-8 sm:left-1/2 sm:right-auto sm:w-[min(520px,calc(100vw-48px))] sm:-translate-x-1/2 sm:px-5 sm:py-4"
-                style={bannerHeight > 0 ? { bottom: `max(${bannerHeight + 16}px, calc(76px + env(safe-area-inset-bottom)))` } : undefined}
-              >
-                <p className="mb-1 text-xs font-semibold uppercase tracking-[0.12em] text-teal-100">
-                  {currentScene.chapter === "resident" ? "Resident" : currentScene.chapter === "faculty" ? "Faculty" : "HOD"} · {sceneIndex + 1} of {DEMO_SCENES.length}
-                </p>
-                <p className="text-base font-medium leading-6 tracking-tight text-white">
-                  {currentScene.caption}
-                </p>
-              </motion.div>
+              {!currentScene.transition && (
+                <motion.div
+                  key={currentScene.id}
+                  role="status"
+                  aria-live="polite"
+                  initial={{ opacity: 0, y: reduceMotion ? 0 : 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: reduceMotion ? 0 : -4 }}
+                  transition={{ duration: reduceMotion ? 0 : 0.22, ease: [0.22, 1, 0.36, 1] }}
+                  className="pointer-events-none absolute bottom-[calc(76px+env(safe-area-inset-bottom))] left-3 right-3 z-[60] rounded-[20px] border border-white/15 bg-[#102427]/92 px-4 py-3.5 text-left shadow-[0_18px_48px_rgba(5,26,29,0.3)] backdrop-blur-xl sm:bottom-8 sm:left-1/2 sm:right-auto sm:w-[min(520px,calc(100vw-48px))] sm:-translate-x-1/2 sm:px-5 sm:py-4"
+                  style={bannerHeight > 0 ? { bottom: `max(${bannerHeight + 16}px, calc(76px + env(safe-area-inset-bottom)))` } : undefined}
+                >
+                  <p className="mb-1 text-xs font-semibold uppercase tracking-[0.12em] text-teal-100">
+                    {currentScene.chapter === "resident" ? "Student" : currentScene.chapter === "faculty" ? "Faculty" : "HOD"} · {sceneIndex + 1} of {DEMO_SCENES.length}
+                  </p>
+                  <p className="text-base font-medium leading-6 tracking-tight text-white">
+                    {displayedCaption}
+                  </p>
+                </motion.div>
+              )}
             </AnimatePresence>
           </motion.div>
         ) : (

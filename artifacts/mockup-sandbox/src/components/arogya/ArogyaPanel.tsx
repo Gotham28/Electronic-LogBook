@@ -329,7 +329,7 @@ export function ArogyaPanel({ open, onOpenChange, role, notifItems, maintenanceN
                   <Button type="button" variant="outline" size="sm" data-tour="arogya-coach" className="min-h-11 rounded-full border-teal-200/90 bg-white/80 px-3 text-xs text-teal-900 shadow-sm hover:bg-teal-50" onClick={handleProgressCoach}>
                     My progress coach
                   </Button>
-                  <Button type="button" variant="outline" size="sm" className="min-h-11 rounded-full border-teal-200/90 bg-white/80 px-3 text-xs text-teal-900 shadow-sm hover:bg-teal-50" onClick={handleWhatsDue}>
+                  <Button type="button" variant="outline" size="sm" data-tour="arogya-due" className="min-h-11 rounded-full border-teal-200/90 bg-white/80 px-3 text-xs text-teal-900 shadow-sm hover:bg-teal-50" onClick={handleWhatsDue}>
                     What's due?
                   </Button>
                 </>
@@ -344,7 +344,7 @@ export function ArogyaPanel({ open, onOpenChange, role, notifItems, maintenanceN
                   <Button type="button" variant="outline" size="sm" data-tour="arogya-report" className="min-h-11 rounded-full border-teal-200/90 bg-white/80 px-3 text-xs text-teal-900 shadow-sm hover:bg-teal-50" onClick={() => handleDepartmentReport("report")}>
                     Department report
                   </Button>
-                  <Button type="button" variant="outline" size="sm" className="min-h-11 rounded-full border-teal-200/90 bg-white/80 px-3 text-xs text-teal-900 shadow-sm hover:bg-teal-50" onClick={() => handleDepartmentReport("falling_behind")}>
+                  <Button type="button" variant="outline" size="sm" data-tour="arogya-falling-behind" className="min-h-11 rounded-full border-teal-200/90 bg-white/80 px-3 text-xs text-teal-900 shadow-sm hover:bg-teal-50" onClick={() => handleDepartmentReport("falling_behind")}>
                     Who's falling behind?
                   </Button>
                 </>

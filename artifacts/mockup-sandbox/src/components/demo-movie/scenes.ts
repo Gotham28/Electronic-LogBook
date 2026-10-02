@@ -21,143 +21,257 @@ export type DemoScene = {
   caption: string;
   action: SceneAction;
   durationMs: number;
+  transition?: { eyebrow: string; title: string; body: string };
   beats?: {
     atMs: number;
     action?: SceneAction;
     target?: string;
     selector?: string;
     clickTarget?: string;
+    caption?: string;
   }[];
 };
 
 export const DEMO_SCENES: DemoScene[] = [
   {
-    id: "scene-01-dashboard",
+    id: "scene-01-student-dashboard",
     chapter: "resident",
     role: "student",
     route: "/",
-    target: "dashboard-progress",
-    caption: "Your training progress, always current",
+    target: "dashboard-welcome",
+    caption: "Welcome to E-LogBook. Start with a clear view of your training.",
     action: "none",
-    durationMs: 7000,
+    durationMs: 12500,
+    beats: [
+      { atMs: 2400, target: "dashboard-progress", caption: "See verified progress and the work still waiting for review." },
+      { atMs: 5100, target: "dashboard-cases", caption: "Clinical case logs count toward your department targets." },
+      { atMs: 7400, target: "dashboard-procedures", caption: "Procedure records and competency progress stay together." },
+      { atMs: 9900, target: "dashboard-academics", caption: "Academic activity is tracked alongside clinical work." },
+    ],
   },
   {
-    id: "scene-02-caselog",
+    id: "scene-02-dashboard-lower",
+    chapter: "resident",
+    role: "student",
+    route: "/",
+    target: "dashboard-recent",
+    caption: "Recent activity gives you a quick view of your latest entries.",
+    action: "none",
+    durationMs: 8000,
+    beats: [
+      { atMs: 3500, target: "dashboard-bottom", caption: "The lower dashboard keeps useful reminders and print access close by." },
+    ],
+  },
+  {
+    id: "scene-03-caselog",
     chapter: "resident",
     role: "student",
     route: "/cases",
     target: "caselog-add",
-    caption: "Log a clinical case in moments",
+    caption: "Add a case log with the details needed for faculty review.",
     action: "none",
-    durationMs: 8000,
+    durationMs: 10500,
     beats: [
-      {
-        atMs: 3000,
-        action: "clickTarget",
-        target: "caselog-add"
-      },
-      {
-        atMs: 3800,
-        selector: '[role="dialog"]'
-      },
-      {
-        atMs: 6500,
-        action: "pressEscape",
-        target: "caselog-list"
-      }
-    ]
+      { atMs: 1000, action: "clickTarget", target: "caselog-add", caption: "Open the case form." },
+      { atMs: 2200, target: "caselog-patient-info", caption: "Enter the encounter date, age, gender and case category." },
+      { atMs: 4600, target: "caselog-clinical-details", caption: "Record the clinical history, examination and investigations." },
+      { atMs: 6800, target: "caselog-diagnosis-details", caption: "Add diagnoses, management, follow-up and learning points." },
+      { atMs: 8300, target: "caselog-reviewer", caption: "Choose a reviewing faculty member, then save a draft or send it for review." },
+      { atMs: 9000, action: "pressEscape", target: "caselog-list" },
+    ],
   },
   {
-    id: "scene-03-ask",
+    id: "scene-04-assessments",
+    chapter: "resident",
+    role: "student",
+    route: "/assessments",
+    target: "student-assessments",
+    caption: "Assessment scores and quarterly appraisal records are easy to find.",
+    action: "none",
+    durationMs: 6000,
+  },
+  {
+    id: "scene-05-thesis",
+    chapter: "resident",
+    role: "student",
+    route: "/thesis",
+    target: "student-thesis",
+    caption: "Follow thesis milestones, guides and key dates from one place.",
+    action: "none",
+    durationMs: 6000,
+  },
+  {
+    id: "scene-06-leave-records",
+    chapter: "resident",
+    role: "student",
+    route: "/attendance",
+    target: "student-leave-records",
+    caption: "Leave applications and their recorded decisions stay in your logbook.",
+    action: "none",
+    durationMs: 6000,
+  },
+  {
+    id: "scene-07-student-arogya",
     chapter: "resident",
     role: "student",
     route: "/",
-    caption: "Ask Arogya about your progress",
-    action: "none",
-    durationMs: 12000,
+    target: "arogya-launcher",
+    caption: "Ask Arogya for a progress coach and see what is due.",
+    action: "openArogya",
+    durationMs: 15000,
     beats: [
-      { atMs: 500, action: "openArogya", target: "arogya-launcher" },
-      { atMs: 1500, action: "ask", target: "arogya-panel" },
-      { atMs: 4000, target: "arogya-messages" }
-    ]
+      { atMs: 1400, action: "progressCoach", target: "arogya-coach", caption: "Get coaching based on your current progress." },
+      { atMs: 5200, target: "arogya-messages", caption: "Arogya summarizes practical next steps." },
+      { atMs: 7800, action: "clickTarget", target: "arogya-due", caption: "Check what needs attention next." },
+      { atMs: 10400, target: "arogya-messages", caption: "Due items open from the same assistant panel." },
+      { atMs: 14300, action: "closeArogya" },
+    ],
   },
   {
-    id: "scene-04-coach",
-    chapter: "resident",
+    id: "scene-08-faculty-transition",
+    chapter: "faculty",
     role: "student",
     route: "/",
-    target: "arogya-coach",
-    caption: "Coaching from your own numbers",
+    caption: "Next, the Faculty workspace",
     action: "none",
-    durationMs: 8000,
-    beats: [
-      { atMs: 1500, action: "progressCoach" },
-      { atMs: 7800, action: "closeArogya" }
-    ]
+    durationMs: 3800,
+    transition: {
+      eyebrow: "Resident journey complete",
+      title: "Next, the Faculty workspace",
+      body: "Faculty and HOD access is free. See how faculty review logs, follow resident progress and complete appraisals.",
+    },
   },
   {
-    id: "scene-05-review",
+    id: "scene-09-review",
     chapter: "faculty",
     role: "faculty",
-    route: "/",
+    route: "/review-queue",
     target: "review-first-item",
-    caption: "Faculty review and approve logs from one queue",
+    caption: "Review submitted work from one queue.",
     action: "none",
-    durationMs: 12000,
+    durationMs: 10500,
     beats: [
-      { atMs: 5000, action: "clickTarget", target: "review-approve" }
-    ]
+      { atMs: 3200, target: "review-fast-evaluation", caption: "Fast Faculty Evaluation keeps the decision beside the entry." },
+      { atMs: 6900, target: "review-approve", caption: "Verify an entry or request a revision after reviewing its details." },
+    ],
   },
   {
-    id: "scene-06-appraisal",
+    id: "scene-10-faculty-progress",
+    chapter: "faculty",
+    role: "faculty",
+    route: "/mentees",
+    target: "faculty-progress-list",
+    caption: "See every assigned student's progress and open their logbook.",
+    action: "none",
+    durationMs: 19000,
+    beats: [
+      { atMs: 2600, action: "clickTarget", target: "faculty-view-logbook", caption: "Open a resident's logbook for a closer look." },
+      { atMs: 3300, selector: '[role="dialog"]', caption: "Open the resident's logbook for a closer look." },
+      { atMs: 5700, target: "faculty-progress-summary", caption: "Start with the progress summary and verified totals." },
+      { atMs: 8700, target: "faculty-progress-cases", caption: "Review case-category progress against department requirements." },
+      { atMs: 11800, target: "faculty-progress-procedures", caption: "Procedure progress includes verified and pending activity." },
+      { atMs: 15000, target: "faculty-progress-academics", caption: "Academic activities complete the resident's progress picture." },
+    ],
+  },
+  {
+    id: "scene-11-faculty-assessments",
     chapter: "faculty",
     role: "faculty",
     route: "/assessments",
-    target: "appraisal-draft",
-    caption: "Arogya drafts appraisal remarks in seconds",
+    target: "faculty-add-assessment",
+    caption: "Record an assessment, then complete a quarterly appraisal.",
     action: "none",
-    durationMs: 13000,
+    durationMs: 16000,
     beats: [
-      { atMs: 1500, action: "appraisalDraft" },
-      { atMs: 4000, target: "appraisal-remarks" }
-    ]
+      { atMs: 3300, target: "quarterly-appraisal", caption: "The quarterly appraisal brings the review fields together." },
+      { atMs: 6700, action: "appraisalDraft", target: "appraisal-draft", caption: "Draft appraisal remarks with Arogya after the required fields are ready." },
+      { atMs: 11200, target: "appraisal-remarks", caption: "Review and edit Arogya's draft before saving the appraisal." },
+    ],
   },
   {
-    id: "scene-07-hod-overview",
+    id: "scene-12-hod-transition",
+    chapter: "hod",
+    role: "faculty",
+    route: "/assessments",
+    caption: "Next, department oversight",
+    action: "none",
+    durationMs: 3800,
+    transition: {
+      eyebrow: "Faculty journey complete",
+      title: "Now, the HOD workspace",
+      body: "Move from individual review to department-wide progress, requirements and student access.",
+    },
+  },
+  {
+    id: "scene-13-hod-dashboard",
     chapter: "hod",
     role: "hod",
     route: "/roster",
     target: "hod-overview",
-    caption: "The Head of Department sees the whole department",
+    caption: "The HOD dashboard opens with a department-wide view.",
     action: "none",
-    durationMs: 8000
+    durationMs: 12500,
+    beats: [
+      { atMs: 3600, target: "hod-log-activity", caption: "Department log activity shows review status at a glance." },
+      { atMs: 7800, target: "hod-student-roster", caption: "Scroll through resident progress and roster details." },
+    ],
   },
   {
-    id: "scene-08-hod-reqs",
+    id: "scene-14-hod-requirements",
     chapter: "hod",
     role: "hod",
     route: "/requirements",
     target: "hod-requirements",
-    caption: "Training requirements, set up per department",
+    caption: "Set department requirements and the options residents can log.",
     action: "none",
-    durationMs: 8000
+    durationMs: 10000,
+    beats: [
+      { atMs: 2800, target: "hod-requirements-add", caption: "Each section has its own list and add controls." },
+      { atMs: 4700, action: "clickTarget", target: "hod-requirements-add", caption: "Open the form to see the fields for a new requirement." },
+      { atMs: 5500, target: "hod-requirements-add-form", caption: "Add a name and any required count or period for this section." },
+      { atMs: 8200, action: "clickTarget", target: "hod-requirements-add" },
+    ],
   },
   {
-    id: "scene-09-hod-report",
+    id: "scene-15-hod-add-faculty",
+    chapter: "hod",
+    role: "hod",
+    route: "/professors",
+    target: "hod-add-faculty",
+    caption: "Add faculty to the department from the HOD workspace.",
+    action: "none",
+    durationMs: 7000,
+  },
+  {
+    id: "scene-16-hod-approve-students",
+    chapter: "hod",
+    role: "hod",
+    route: "/student-access",
+    target: "hod-student-approvals",
+    caption: "Review pending student registrations and approve them here.",
+    action: "none",
+    durationMs: 7000,
+    beats: [
+      { atMs: 2600, target: "hod-approve-student", caption: "Student access decisions stay with the department HOD." },
+    ],
+  },
+  {
+    id: "scene-17-hod-arogya",
     chapter: "hod",
     role: "hod",
     route: "/roster",
-    caption: "Arogya builds a department report on request",
-    action: "none",
-    durationMs: 12000,
+    target: "arogya-launcher",
+    caption: "Arogya can summarize department progress and highlight who needs attention.",
+    action: "openArogya",
+    durationMs: 15500,
     beats: [
-      { atMs: 500, action: "openArogya", target: "arogya-launcher" },
-      { atMs: 2000, action: "departmentReport", target: "arogya-panel" },
-      { atMs: 4000, target: "arogya-report" },
-      { atMs: 7000, target: "arogya-messages" },
-      { atMs: 11800, action: "closeArogya" }
-    ]
-  }
+      { atMs: 1700, action: "departmentReport", target: "arogya-report", caption: "Generate a department report from the HOD assistant." },
+      { atMs: 4700, target: "arogya-messages", caption: "Review the department summary in the conversation." },
+      { atMs: 8200, action: "clickTarget", target: "arogya-falling-behind", caption: "Ask which residents may be falling behind." },
+      { atMs: 10800, target: "arogya-messages", caption: "Arogya brings the follow-up into the same panel." },
+      { atMs: 14800, action: "closeArogya" },
+    ],
+  },
 ];
 
 export const CHAPTERS: { id: DemoChapter; label: string }[] = [

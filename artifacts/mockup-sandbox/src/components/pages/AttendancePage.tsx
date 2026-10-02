@@ -191,7 +191,7 @@ export function AttendancePage() {
         </CardContent>
       </Card>
 
-      <Card className="border-white/70 bg-white/76">
+      <Card data-tour="student-leave-records" className="border-white/70 bg-white/76">
         <CardHeader className="border-b border-white/70 pb-3">
           <CardTitle className="text-base font-bold text-slate-950">Leave Records</CardTitle>
         </CardHeader>

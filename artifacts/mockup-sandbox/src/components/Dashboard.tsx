@@ -128,7 +128,7 @@ export function Dashboard() {
   return (
     <div className="section-spacing pb-12">
       {!configured.length && <p className="rounded-xl bg-teal-50 p-4 text-sm text-teal-800">Your HOD has not configured completion targets yet.</p>}
-      <Card className="overflow-hidden border-white/70 bg-white/72 layer-2 animate-float-up">
+      <Card data-tour="dashboard-welcome" className="overflow-hidden border-white/70 bg-white/72 layer-2 animate-float-up">
         <div className="h-1.5 bg-gradient-to-r from-teal-500 via-cyan-400 to-emerald-400" />
         <CardContent className="p-4 sm:p-6 md:p-8">
           <div className="grid items-stretch gap-7 xl:grid-cols-[.8fr_1.2fr]">
@@ -200,14 +200,14 @@ export function Dashboard() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <div data-tour="dashboard-categories" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {categories.map((item) => {
           const Icon = item.icon;
           const percent = item.required > 0 ? Math.min(Math.round(item.verified / item.required * 100), 100) : 0;
           const remaining = Math.max(item.required - item.verified, 0);
           return (
             <Link key={item.label} href={item.href}>
-              <Card className={`h-full cursor-pointer border-white/70 bg-white/76 shadow-[0_18px_48px_rgba(15,23,42,0.05)] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_24px_70px_rgba(15,23,42,0.08)] ${isDemoMode() ? "demo-lift-card" : ""}`}>
+              <Card data-tour={`dashboard-${item.href.slice(1)}`} className={`h-full cursor-pointer border-white/70 bg-white/76 shadow-[0_18px_48px_rgba(15,23,42,0.05)] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_24px_70px_rgba(15,23,42,0.08)] ${isDemoMode() ? "demo-lift-card" : ""}`}>
                 <CardContent className="p-5">
                   <div className="flex items-start justify-between gap-4">
                     <div className={`flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br ${item.tone} text-white shadow-[0_12px_28px_rgba(13,148,136,0.18)]`}><Icon className="h-5 w-5" /></div>
@@ -243,7 +243,7 @@ export function Dashboard() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1.4fr_.6fr]">
-        <Card className="border-white/70 bg-white/76">
+        <Card data-tour="dashboard-recent" className="border-white/70 bg-white/76">
           <CardHeader className="flex flex-row items-center justify-between border-b border-white/70">
             <div>
               <p className="page-eyebrow">Student activity</p>
@@ -313,7 +313,7 @@ export function Dashboard() {
         </div>
       </div>
 
-      <Card className="border-white/70 bg-white/76">
+      <Card data-tour="dashboard-bottom" className="border-white/70 bg-white/76">
         <CardContent className="flex flex-col justify-between gap-4 p-5 sm:flex-row sm:items-center">
           <div className="flex items-center gap-3">
             <CalendarDays className="h-5 w-5 text-teal-600" />

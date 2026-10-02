@@ -546,7 +546,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
 
               {/* Fast Evaluation Panel */}
               <div className="space-y-4">
-                <Card className="border border-teal-200 shadow-sm bg-white">
+                <Card data-tour="review-fast-evaluation" className="border border-teal-200 shadow-sm bg-white">
                   <CardHeader className="bg-teal-50/70 border-b border-teal-100 pb-3">
                     <CardTitle className="text-sm font-bold text-teal-900 flex items-center gap-2">
                       <FileCheck className="h-4 w-4 text-teal-700" /> Fast Faculty Evaluation
@@ -637,7 +637,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
               </div>
             </CardContent>
           </Card>
-          <Card className="border border-slate-200 shadow-xs bg-white">
+          <Card data-tour="faculty-progress-list" className="border border-slate-200 shadow-xs bg-white">
             <CardHeader className="pb-3 border-b border-slate-100">
               <CardTitle className="text-base font-bold text-slate-900">All PG Students Progress</CardTitle>
             </CardHeader>
@@ -673,6 +673,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                       <TableCell>{renderShortfallBadge(m.shortfallStatus)}</TableCell>
                       <TableCell className="text-right">
                         <Button
+                          data-tour={index === 0 ? "faculty-view-logbook" : undefined}
                           onClick={() => {
                             setSelectedMentee(m);
                             toast.info(`Opening Logbook for ${m.name}`);
@@ -694,7 +695,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
 
         {/* Tab 3: Add Assessment */}
         <TabsContent value="assessments" className="pt-4 space-y-4">
-          <Card className="border border-slate-200 bg-white">
+          <Card data-tour="faculty-add-assessment" className="border border-slate-200 bg-white">
             <CardHeader className="pb-3 border-b border-slate-100">
               <CardTitle className="text-base font-bold text-slate-900">Add Assessment Score</CardTitle>
               <CardDescription className="text-xs text-slate-500">
@@ -853,7 +854,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                 </TabsList>
 
                 {/* ── Progress Tab ─────────────────────────────────────────── */}
-                <TabsContent value="progress" className="pt-3">
+                <TabsContent value="progress" data-tour="faculty-student-progress" className="pt-3">
                   {menteeLogsLoading ? (
                     <div className="flex h-32 items-center justify-center">
                       <div className="animate-spin rounded-full border-4 border-slate-300 border-t-teal-600 h-8 w-8" />
@@ -1727,7 +1728,7 @@ function ProgressTabContent({
   return (
     <div className="space-y-6">
       {/* Summary tiles */}
-      <div className={`grid grid-cols-2 gap-2 sm:gap-4 ${tiles.length >= 3 ? "sm:grid-cols-3" : ""}`}>
+      <div data-tour="faculty-progress-summary" className={`grid grid-cols-2 gap-2 sm:gap-4 ${tiles.length >= 3 ? "sm:grid-cols-3" : ""}`}>
         {tiles.map((tile) => (
           <div key={tile.label} className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-center sm:p-4">
             <p className="metric-value">{tile.verified + tile.pending}</p>
@@ -1738,7 +1739,7 @@ function ProgressTabContent({
       </div>
 
       {/* ── Section 1: Case Categories ── */}
-      {showCases && <div className="space-y-3">
+      {showCases && <div data-tour="faculty-progress-cases" className="space-y-3">
         <h3 className="text-sm font-semibold text-slate-700">Case Categories</h3>
         {caseBarItems.length === 0 ? (
           <p className="text-xs text-slate-500 rounded-xl border border-dashed border-slate-200 p-4 text-center">
@@ -1773,7 +1774,7 @@ function ProgressTabContent({
       </div>}
 
       {/* ── Section 2: Procedures (grouped) ── */}
-      {showProcedures && <div className="space-y-3">
+      {showProcedures && <div data-tour="faculty-progress-procedures" className="space-y-3">
         <h3 className="text-sm font-semibold text-slate-700">Procedures</h3>
         {procBarItems.length === 0 ? (
           <p className="text-xs text-slate-500 rounded-xl border border-dashed border-slate-200 p-4 text-center">
@@ -1814,7 +1815,7 @@ function ProgressTabContent({
       </div>}
 
       {/* ── Section 3: Clinical Work ── */}
-      {showClinical && <div className="space-y-3">
+      {showClinical && <div data-tour="faculty-progress-clinical" className="space-y-3">
         <h3 className="text-sm font-semibold text-slate-700">Clinical Work</h3>
         {clinicalBarItems.length === 0 ? (
           <p className="text-xs text-slate-500 rounded-xl border border-dashed border-slate-200 p-4 text-center">
@@ -1843,7 +1844,7 @@ function ProgressTabContent({
       </div>}
 
       {/* ── Section 4: Academic Activities ── */}
-      <div className="space-y-3">
+      <div data-tour="faculty-progress-academics" className="space-y-3">
         <h3 className="text-sm font-semibold text-slate-700">Academic Activities</h3>
         {acadBarItems.length === 0 ? (
           <p className="text-xs text-slate-500 rounded-xl border border-dashed border-slate-200 p-4 text-center">
