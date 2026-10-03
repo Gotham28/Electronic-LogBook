@@ -9,9 +9,8 @@ import { isDemoMode } from "@/lib/session";
 import { AROGYA_CONTEXT_EVENT, type ArogyaSelectedContext } from "@/lib/arogya-context";
 import { AssistantAnswer } from "./AssistantAnswer";
 import { playDemoSound } from "@/lib/demoSounds";
-import { ARO_DEMO_COMMAND_EVENT, type AroDemoCommand } from "../demo-movie/movieBridge";
 import { DemoTypedText } from "../demo-movie/DemoTypedText";
-import { DEMO_MOVIE_CHANGED_EVENT, isDemoMovieActive } from "@/lib/demoSession";
+import { isDemoMovieActive } from "@/lib/demoSession";
 
 type RoleType = "Student" | "Faculty" | "HOD";
 type ResidentOption = { id: number; name: string; registrationNumber?: string | null; batch?: string | null };
@@ -264,11 +263,7 @@ export function ArogyaPanel({ open, onOpenChange, role, actorKey, workflowId, st
   };
 
   const handleAskRef = React.useRef(handleAsk);
-  const handleProgressCoachRef = React.useRef(handleProgressCoach);
-  const handleDepartmentReportRef = React.useRef(handleDepartmentReport);
   handleAskRef.current = handleAsk;
-  handleProgressCoachRef.current = handleProgressCoach;
-  handleDepartmentReportRef.current = handleDepartmentReport;
 
   React.useEffect(() => {
     if (!open || !isDemoMode() || !isDemoMovieActive()) return undefined;
@@ -306,72 +301,6 @@ export function ArogyaPanel({ open, onOpenChange, role, actorKey, workflowId, st
     };
   }, [open]);
 
-  React.useEffect(() => {
-    if (!isDemoMode()) return undefined;
-
-    let typingTimeout: number | undefined;
-    let isCleanedUp = false;
-    let isCommandRunning = false;
-
-    const cancelRun = () => {
-      if (typingTimeout !== undefined) window.clearTimeout(typingTimeout);
-      isCommandRunning = false;
-    };
-    const movieChangeHandler = () => {
-      if (!isDemoMovieActive()) cancelRun();
-    };
-    window.addEventListener(DEMO_MOVIE_CHANGED_EVENT, movieChangeHandler);
-
-    const handler = (e: Event) => {
-      const event = e as CustomEvent<AroDemoCommand>;
-      const command = event.detail;
-
-      if (isCommandRunning) return;
-      isCommandRunning = true;
-
-      if (command.type === "ask") {
-        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-          setQuestion(command.question);
-          typingTimeout = window.setTimeout(() => {
-            if (!isCleanedUp) handleAskRef.current(new Event("submit"), command.question);
-            isCommandRunning = false;
-          }, 0);
-        } else {
-          let i = 0;
-          setQuestion("");
-          const typeChar = () => {
-            if (isCleanedUp) return;
-            if (i < command.question.length) {
-              setQuestion(command.question.slice(0, i + 1));
-              i++;
-              typingTimeout = window.setTimeout(typeChar, 30);
-            } else {
-              handleAskRef.current(new Event("submit"), command.question);
-              isCommandRunning = false;
-            }
-          };
-          typeChar();
-        }
-      } else if (command.type === "progress-coach" && role === "Student") {
-        handleProgressCoachRef.current();
-        isCommandRunning = false;
-      } else if (command.type === "department-report" && role === "HOD") {
-        handleDepartmentReportRef.current(command.reportType);
-        isCommandRunning = false;
-      } else {
-        isCommandRunning = false;
-      }
-    };
-
-    window.addEventListener(ARO_DEMO_COMMAND_EVENT, handler);
-    return () => {
-      isCleanedUp = true;
-      cancelRun();
-      window.removeEventListener(ARO_DEMO_COMMAND_EVENT, handler);
-      window.removeEventListener(DEMO_MOVIE_CHANGED_EVENT, movieChangeHandler);
-    };
-  }, [role]);
-
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger asChild>
@@ -392,6 +321,7 @@ export function ArogyaPanel({ open, onOpenChange, role, actorKey, workflowId, st
         aria-labelledby="arogya-panel-heading"
         aria-describedby="arogya-panel-description"
         data-tour="arogya-panel"
+        data-demo-assistant-state={characterState}
         className="flex h-[min(68dvh,38rem)] min-h-[min(24rem,calc(100dvh-2rem))] w-[min(26rem,calc(100vw-1.5rem))] max-h-[calc(100dvh-1.5rem)] flex-col gap-0 overflow-hidden rounded-[1.5rem] border border-white/80 bg-white/85 p-0 text-slate-800 shadow-[0_28px_80px_rgba(15,23,42,0.2)] backdrop-blur-2xl motion-reduce:animate-none supports-[backdrop-filter]:bg-white/70"
       >
         <header className="flex shrink-0 items-center justify-between border-b border-white/80 bg-white/55 px-4 py-3 backdrop-blur-xl">
