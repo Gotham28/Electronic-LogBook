@@ -103,6 +103,7 @@ const navigationDescriptions: Record<string, string> = {
   "Academic Activities": "Document seminars, journal clubs, presentations, teaching sessions, and other academic work.",
   Assessments: "View assessment records and feedback entered during your training.",
   "Thesis & Certifications": "Keep thesis milestones, certifications, and supporting academic requirements together.",
+  "Thesis and Publications": "Keep thesis milestones, publications, and related records together.",
   Thesis: "Keep thesis milestones and related records together.",
   Certifications: "Track certifications and supporting academic requirements.",
   "Leave Records": "Check your leave balance, previous requests, and approval status.",
@@ -170,7 +171,7 @@ function navigationForRole(role: RoleType, dashboardData?: any, loadingBadges?: 
       dermItems.push({ title: "Conferences and CME", icon: Presentation, href: "/conferences" });
     }
     if (config?.enabledFeatures?.splitThesisAndCertifications) {
-      dermItems.push({ title: config?.enabledFeatures?.publicationsOnly ? "Publications" : config?.enabledFeatures?.useThesisAndPublicationsLabel ? "Thesis and Publications" : "Thesis", icon: FileText, href: "/thesis" });
+      dermItems.push({ title: (config?.enabledFeatures?.useThesisAndPublicationsLabel || config?.enabledFeatures?.publicationsOnly) ? "Thesis and Publications" : "Thesis", icon: FileText, href: "/thesis" });
     } else {
       dermItems.push({ title: "Thesis & Certifications", icon: Award, href: "/milestones" });
     }
@@ -208,7 +209,7 @@ function navigationForRole(role: RoleType, dashboardData?: any, loadingBadges?: 
   items.push({ title: "Assessments", icon: ClipboardCheck, href: "/assessments" });
 
   if (config?.enabledFeatures?.splitThesisAndCertifications) {
-    items.push({ title: config?.enabledFeatures?.publicationsOnly ? "Publications" : config?.enabledFeatures?.useThesisAndPublicationsLabel ? "Thesis and Publications" : "Thesis", icon: FileText, href: "/thesis" });
+    items.push({ title: (config?.enabledFeatures?.useThesisAndPublicationsLabel || config?.enabledFeatures?.publicationsOnly) ? "Thesis and Publications" : "Thesis", icon: FileText, href: "/thesis" });
     items.push({ title: "Certifications", icon: Award, href: "/certifications" });
   } else {
     items.push({ title: "Thesis & Certifications", icon: Award, href: "/milestones" });
