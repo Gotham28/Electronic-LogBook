@@ -90,6 +90,7 @@ export function DemoBanner() {
 
   return (
     <aside
+      data-demo-chrome
       aria-label="Demo environment"
       className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2 transition-colors duration-200 sm:justify-between"
       style={{
@@ -105,6 +106,7 @@ export function DemoBanner() {
       <label className="flex min-h-11 items-center gap-2 text-xs font-semibold">
         <span className="sr-only">Demo role</span>
         <select
+          data-demo-role-selector
           aria-label="Demo role"
           value={role}
           onChange={changeRole}

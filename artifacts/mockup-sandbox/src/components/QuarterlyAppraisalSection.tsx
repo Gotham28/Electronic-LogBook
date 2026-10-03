@@ -18,10 +18,8 @@ import {
   type AppraisalStudent,
   type QuarterlyAppraisal,
 } from "@/lib/quarterly-appraisal";
-import { ARO_DEMO_COMMAND_EVENT, type AroDemoCommand } from "./demo-movie/movieBridge";
 import { useDemoTypedValue } from "./demo-movie/DemoTypedText";
 import { useDemoMotionEnabled } from "@/components/DemoMotion";
-import { DEMO_MOVIE_CHANGED_EVENT, isDemoMovieActive } from "@/lib/demoSession";
 import { openArogya, publishArogyaContext } from "@/lib/arogya-context";
 
 function blankScores(): Record<AppraisalScoreKey, string> {
@@ -89,74 +87,6 @@ export function QuarterlyAppraisalSection() {
       setRemediationSuggestions(revealedRemediation);
     }
   }, [revealedRemediation, remediationTarget, userEditedRemediation]);
-
-  // Expose state to ref for the demo command listener
-  const studentsRef = React.useRef(students);
-  studentsRef.current = students;
-  const setStudentIdRef = React.useRef(setStudentId);
-  setStudentIdRef.current = setStudentId;
-
-  React.useEffect(() => {
-    if (!isDemoMode()) return undefined;
-    let unmounted = false;
-    let runIdCounter = 0;
-    let clickTimeout: number | undefined;
-    let pollTimeout: number | undefined;
-
-    const handler = (e: Event) => {
-      const event = e as CustomEvent<AroDemoCommand>;
-      if (event.detail.type === "appraisal-prefill-and-draft") {
-        runIdCounter++;
-        const currentRunId = runIdCounter;
-
-        const doPrefillAndDraft = async () => {
-          let targetStudentId = "";
-          let attempt = 0;
-          while (attempt < 30 && !unmounted && currentRunId === runIdCounter) { // 3 seconds max
-            if (studentsRef.current.length > 0) {
-              targetStudentId = String(studentsRef.current[0].id);
-              break;
-            }
-            await new Promise((r) => { pollTimeout = window.setTimeout(r, 100); });
-            attempt++;
-          }
-          if (!targetStudentId || unmounted || currentRunId !== runIdCounter) return; // give up quietly
-
-          setStudentIdRef.current(targetStudentId);
-          setQuarter(String(Math.floor(new Date().getMonth() / 3) + 1));
-          setYear(String(new Date().getFullYear()));
-          setAppraisalDate(localDateValue(new Date()));
-          setPublications("yes"); // first allowed option
-          
-          const newScores = blankScores();
-          quarterlyAppraisalCategories.forEach(({ key }) => {
-            newScores[key] = "5"; // mid-range score
-          });
-          setScores(newScores);
-          
-          clickTimeout = window.setTimeout(() => {
-            if (!unmounted && currentRunId === runIdCounter) {
-              document.getElementById("appraisal-draft-arogya")?.click();
-            }
-          }, 100);
-        };
-        doPrefillAndDraft();
-      }
-    };
-    
-    const movieChangeHandler = () => {
-      if (!isDemoMovieActive()) runIdCounter++;
-    };
-    window.addEventListener(DEMO_MOVIE_CHANGED_EVENT, movieChangeHandler);
-    window.addEventListener(ARO_DEMO_COMMAND_EVENT, handler);
-    return () => {
-      unmounted = true;
-      window.clearTimeout(pollTimeout);
-      window.clearTimeout(clickTimeout);
-      window.removeEventListener(ARO_DEMO_COMMAND_EVENT, handler);
-      window.removeEventListener(DEMO_MOVIE_CHANGED_EVENT, movieChangeHandler);
-    };
-  }, []);
 
   const loadStudents = React.useCallback(async () => {
     setStudentsLoading(true);

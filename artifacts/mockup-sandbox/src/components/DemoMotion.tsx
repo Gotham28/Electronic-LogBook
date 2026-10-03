@@ -7,7 +7,7 @@ import { isDemoMovieActive } from "@/lib/demoSession";
 
 export function useDemoMotionEnabled() {
   const reduceMotion = useReducedMotion();
-  // Keep the guided walkthrough's underlying records steady while its spotlight is active.
+  // Keep the guided walkthrough's underlying records steady while the cursor demonstrates the page.
   return isDemoMode() && !isDemoMovieActive() && reduceMotion === false;
 }
 

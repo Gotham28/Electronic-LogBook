@@ -67,6 +67,7 @@ import { useDepartment } from "@/lib/department-context";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { DemoBanner } from "@/components/layout/DemoBanner";
 import { DemoMovie } from "@/components/demo-movie/DemoMovie";
+import { DEMO_MOVIE_CHANGED_EVENT, isDemoMovieActive } from "@/lib/demoSession";
 
 export type RoleType = "Student" | "Faculty" | "HOD";
 
@@ -252,6 +253,7 @@ export function AppLayout({
   const [cpForm, setCpForm] = React.useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
   const [changingPassword, setChangingPassword] = React.useState(false);
   const [isTourOpen, setIsTourOpen] = React.useState(false);
+  const [movieActive, setMovieActive] = React.useState(() => demoMode && isDemoMovieActive());
   const [arogyaOpen, setArogyaOpen] = React.useState(false);
   const [disclaimerBlocksNotice, setDisclaimerBlocksNotice] = React.useState(activeRole === "Student");
   const tourButtonRef = React.useRef<HTMLButtonElement>(null);
@@ -282,6 +284,16 @@ export function AppLayout({
     const onOpenArogya = () => setArogyaOpen(true);
     window.addEventListener(AROGYA_OPEN_EVENT, onOpenArogya);
     return () => window.removeEventListener(AROGYA_OPEN_EVENT, onOpenArogya);
+  }, []);
+
+  React.useEffect(() => {
+    const syncMovieState = () => {
+      const active = isDemoMode() && isDemoMovieActive();
+      setMovieActive(active);
+      if (active) setIsTourOpen(false);
+    };
+    window.addEventListener(DEMO_MOVIE_CHANGED_EVENT, syncMovieState);
+    return () => window.removeEventListener(DEMO_MOVIE_CHANGED_EVENT, syncMovieState);
   }, []);
 
   // Fix: Get actual user from session for the sidebar profile
@@ -587,7 +599,7 @@ export function AppLayout({
                           }`}
                           style={demoMode && isActive ? { backgroundColor: "var(--demo-accent)", color: "var(--demo-accent-foreground)" } : undefined}
                         >
-                          <Link href={item.href} className="flex w-full items-center gap-3 group-data-[collapsible=icon]:justify-center">
+                          <Link href={item.href} data-demo-target={`nav:${item.href}`} data-demo-navigation-href={item.href} className="flex w-full items-center gap-3 group-data-[collapsible=icon]:justify-center">
                             <Icon className={`h-4 w-4 ${isActive ? (demoMode ? "text-[var(--demo-accent-foreground)]" : "text-white") : demoMode ? "text-[var(--demo-accent-readable)]" : "text-teal-600"}`} />
                             <span className="flex-1 truncate text-[13px] group-data-[collapsible=icon]:hidden">{item.title}</span>
 
@@ -666,7 +678,7 @@ export function AppLayout({
           <SidebarInset className="flex min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto bg-transparent">
             <header className="print-hidden sticky top-0 z-20 flex h-[72px] items-center justify-between border-b border-white/70 bg-white/62 px-4 backdrop-blur-xl md:px-6">
               <div className="flex min-w-0 items-center gap-3">
-                <SidebarTrigger className="rounded-xl text-teal-800 hover:bg-white" />
+                <SidebarTrigger data-demo-sidebar-trigger className="rounded-xl text-teal-800 hover:bg-white" />
                 <div className="hidden h-7 w-px bg-teal-100 sm:block" />
                 <div className="min-w-0">
                   <p className="truncate font-display text-base font-bold text-slate-900">
@@ -691,18 +703,20 @@ export function AppLayout({
                     <Printer className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Print</span>
                   </Button>
                 )}
-                <Button
-                  ref={tourButtonRef}
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsTourOpen(true)}
-                  aria-label="Take a guided tour"
-                  title="Take a guided tour"
-                  className="h-8 w-8 border-white/70 bg-white/75 px-0 text-sm font-bold text-teal-800 shadow-[0_12px_24px_rgba(15,23,42,0.05)]"
-                >
-                  ?
-                </Button>
+                {!movieActive && (
+                  <Button
+                    ref={tourButtonRef}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsTourOpen(true)}
+                    aria-label="Take a guided tour"
+                    title="Take a guided tour"
+                    className="h-8 w-8 border-white/70 bg-white/75 px-0 text-sm font-bold text-teal-800 shadow-[0_12px_24px_rgba(15,23,42,0.05)]"
+                  >
+                    ?
+                  </Button>
+                )}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button data-tour-id="notifications" aria-label="Open notifications" className="relative rounded-xl border border-white/70 bg-white/72 p-2 text-teal-800 shadow-[0_12px_24px_rgba(15,23,42,0.05)] transition hover:-translate-y-0.5 hover:bg-white">
@@ -744,7 +758,7 @@ export function AppLayout({
               </div>
             </header>
 
-            <main className="mx-auto w-full max-w-[1380px] flex-1 p-4 pb-28 sm:pb-4 md:p-6 lg:p-8">
+            <main data-demo-page={location} className="mx-auto w-full max-w-[1380px] flex-1 p-4 pb-28 sm:pb-4 md:p-6 lg:p-8">
               {maintenanceLoadError && <div role="alert" className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
                 {maintenanceLoadError} <button type="button" className="ml-2 font-semibold underline" onClick={() => setMaintenanceRefreshToken((value) => value + 1)}>Retry</button>
               </div>}
@@ -787,6 +801,7 @@ export function AppLayout({
           {demoMode && (
             <DemoMovie 
               activeRole={activeRole} 
+              navigationItems={navigationItems}
               navigate={setLocation} 
               blocked={disclaimerBlocksNotice} 
               arogyaOpen={arogyaOpen} 
@@ -831,7 +846,7 @@ export function AppLayout({
               </form>
             </DialogContent>
           </Dialog>
-          <GuidedTour open={isTourOpen} steps={tourSteps} onClose={closeTour} />
+          <GuidedTour open={isTourOpen && !movieActive} steps={tourSteps} onClose={closeTour} />
           <LegalDisclaimerModal activeRole={activeRole} onBlockingChange={setDisclaimerBlocksNotice} />
         </div>
       </div>

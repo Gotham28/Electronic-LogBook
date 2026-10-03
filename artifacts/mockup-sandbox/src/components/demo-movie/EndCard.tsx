@@ -1,7 +1,7 @@
 import * as React from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { ArrowRight, CheckCircle2, RotateCcw } from "lucide-react";
-import { clearDemoMovie, demoPortalHome, requestDemoMovieReplay, startDemoSession } from "@/lib/demoSession";
+import { clearDemoMovie, requestDemoMovieReplay, startDemoSession } from "@/lib/demoSession";
 import { getCurrentUser } from "@/lib/session";
 
 export function EndCard({ onExplore }: { onExplore: () => void }) {
@@ -47,7 +47,7 @@ export function EndCard({ onExplore }: { onExplore: () => void }) {
 
   return (
     <div 
-      className="pointer-events-auto fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-[#102427]/60 p-4 backdrop-blur-[3px] sm:p-6"
+      className="pointer-events-auto fixed inset-0 z-[2100] flex items-center justify-center overflow-y-auto bg-[#102427]/60 p-4 backdrop-blur-[3px] sm:p-6"
       onKeyDown={handleKeyDown}
     >
       <motion.div 
@@ -63,10 +63,10 @@ export function EndCard({ onExplore }: { onExplore: () => void }) {
           <CheckCircle2 className="h-7 w-7 sm:h-8 sm:w-8" strokeWidth={1.8} />
         </div>
         <h2 id="demo-end-title" className="mb-3 font-display text-2xl font-bold tracking-tight text-slate-900">
-          That was Arogya in about 90 seconds
+          You’ve seen the three workspaces
         </h2>
         <p className="mb-7 text-sm leading-6 text-slate-600 sm:mb-8">
-          Replay it, or explore the demo yourself.
+          Replay the walkthrough or explore the sample workspace at your own pace.
         </p>
         
         <div className="flex flex-col gap-3">
