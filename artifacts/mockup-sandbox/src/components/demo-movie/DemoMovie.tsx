@@ -213,6 +213,68 @@ async function settleTarget(target: HTMLElement, token: number, currentToken: ()
   return false;
 }
 
+function movePlayerClearOfTarget(player: HTMLElement, target: HTMLElement) {
+  const playerRect = player.getBoundingClientRect();
+  const targetRect = target.getBoundingClientRect();
+  const caption = document.querySelector<HTMLElement>("[data-demo-caption]");
+  const captionRect = caption?.getBoundingClientRect();
+  const margin = 8;
+  const safeTop = Math.max(margin, Number(player.dataset.safeTop) || playerRect.top || margin);
+  player.dataset.safeTop = String(safeTop);
+
+  const expandedTarget = new DOMRect(targetRect.left - margin, targetRect.top - margin, targetRect.width + margin * 2, targetRect.height + margin * 2);
+  const outsideViewport = playerRect.left < margin || playerRect.top < safeTop || playerRect.right > window.innerWidth - margin || playerRect.bottom > window.innerHeight - margin;
+  if (!rectsOverlap(playerRect, expandedTarget) && !outsideViewport) return;
+
+  const width = playerRect.width;
+  const height = playerRect.height;
+  const minLeft = margin;
+  const maxLeft = Math.max(minLeft, window.innerWidth - width - margin);
+  const minTop = safeTop;
+  const maxTop = Math.max(minTop, window.innerHeight - height - margin);
+  const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+  const targetCenterX = targetRect.left + targetRect.width / 2;
+  const targetCenterY = targetRect.top + targetRect.height / 2;
+  const candidates = [
+    [minLeft, minTop], [maxLeft, minTop], [minLeft, maxTop], [maxLeft, maxTop],
+    [clamp((window.innerWidth - width) / 2, minLeft, maxLeft), minTop],
+    [clamp((window.innerWidth - width) / 2, minLeft, maxLeft), maxTop],
+    [minLeft, clamp((window.innerHeight - height) / 2, minTop, maxTop)],
+    [maxLeft, clamp((window.innerHeight - height) / 2, minTop, maxTop)],
+    [clamp(targetCenterX - width / 2, minLeft, maxLeft), clamp(targetRect.top - height - margin * 2, minTop, maxTop)],
+    [clamp(targetCenterX - width / 2, minLeft, maxLeft), clamp(targetRect.bottom + margin * 2, minTop, maxTop)],
+    [clamp(targetRect.left - width - margin * 2, minLeft, maxLeft), clamp(targetCenterY - height / 2, minTop, maxTop)],
+    [clamp(targetRect.right + margin * 2, minLeft, maxLeft), clamp(targetCenterY - height / 2, minTop, maxTop)],
+  ].map(([left, top]) => ({ left, top, rect: new DOMRect(left, top, width, height) }));
+
+  const areaOverlap = (a: DOMRect, b: DOMRect) => {
+    const overlapWidth = Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left));
+    const overlapHeight = Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+    return overlapWidth * overlapHeight;
+  };
+  const currentX = playerRect.left;
+  const currentY = playerRect.top;
+  candidates.sort((a, b) => {
+    const targetOverlap = areaOverlap(a.rect, expandedTarget) - areaOverlap(b.rect, expandedTarget);
+    if (targetOverlap) return targetOverlap;
+    const captionOverlap = captionRect ? areaOverlap(a.rect, captionRect) - areaOverlap(b.rect, captionRect) : 0;
+    if (captionOverlap) return captionOverlap;
+    return Math.hypot(a.left - currentX, a.top - currentY) - Math.hypot(b.left - currentX, b.top - currentY);
+  });
+
+  const placement = candidates[0];
+  if (placement && (Math.abs(placement.left - playerRect.left) > 1 || Math.abs(placement.top - playerRect.top) > 1)) {
+    player.style.left = `${placement.left}px`;
+    player.style.top = `${placement.top}px`;
+    player.style.transform = "none";
+    player.dataset.placed = "true";
+  }
+}
+
+function rectsOverlap(a: DOMRect, b: DOMRect) {
+  return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+}
+
 function activatePointerTarget(target: HTMLElement, point: Point) {
   target.focus({ preventScroll: true });
   if (target instanceof HTMLSelectElement) {
@@ -245,6 +307,7 @@ export function DemoMovie({ activeRole, navigationItems, navigate, blocked, arog
   const [runRequest, setRunRequest] = React.useState(0);
   const reduceMotion = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const cursorRef = React.useRef<HTMLDivElement>(null);
+  const playerRef = React.useRef<HTMLElement>(null);
   const tokenRef = React.useRef(0);
   const runnerRef = React.useRef(false);
   const speedRef = React.useRef(speed / 2);
@@ -323,8 +386,9 @@ export function DemoMovie({ activeRole, navigationItems, navigate, blocked, arog
       if (expectedToken !== tokenNow()) return false;
       const settled = await settleTarget(element, expectedToken, tokenNow);
       if (!settled || expectedToken !== tokenNow()) return false;
-      const rect = element.getBoundingClientRect();
       setCaption(text);
+      if (playerRef.current) movePlayerClearOfTarget(playerRef.current, element);
+      const rect = element.getBoundingClientRect();
       setPoint({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
       if (cursorRef.current) {
         const moved = await movePointer(element, cursorRef.current, reduceMotion ? 0 : speedRef.current, expectedToken, tokenNow);
@@ -441,6 +505,7 @@ export function DemoMovie({ activeRole, navigationItems, navigate, blocked, arog
             return false;
           }
           if (!valid()) return false;
+          if (playerRef.current) movePlayerClearOfTarget(playerRef.current, visibleAnchor);
           await movePointer(visibleAnchor, cursorRef.current, reduceMotion ? 0 : speedRef.current, token, tokenNow);
           if (!valid()) return false;
         }
@@ -631,28 +696,25 @@ export function DemoMovie({ activeRole, navigationItems, navigate, blocked, arog
         <MousePointer2 className="h-8 w-8 -translate-x-[2px] -translate-y-[2px] fill-white text-slate-950 drop-shadow-[0_2px_3px_rgba(0,0,0,0.55)]" strokeWidth={1.8} />
       </div>
       {point && <div key={clickCount} aria-hidden="true" className="pointer-events-none fixed z-[1998] h-7 w-7 -translate-x-1/2 -translate-y-1/2 animate-ping rounded-full border-2 border-teal-600/70 motion-reduce:animate-none" style={{ left: point.x, top: point.y }} />}
-      <div className="pointer-events-none fixed inset-x-0 top-0 z-[2000] px-2 pt-[max(8px,env(safe-area-inset-top))] sm:px-5" data-demo-player>
-        <section aria-label="Guided demonstration controls" className="pointer-events-auto mx-auto max-w-5xl rounded-2xl border border-white/15 bg-[#102B2D]/95 px-2.5 py-2 text-white shadow-[0_18px_56px_rgba(6,25,27,0.3)] backdrop-blur-xl sm:px-4">
-          <div className="flex items-center justify-between gap-2">
-            <div className="min-w-0">
-              <p className="truncate text-xs font-semibold sm:text-sm">Guided demo · {roleName(ROLES[sectionIndex])}</p>
-              <p className="truncate text-[10px] text-white/65">{completedCount} actions visited</p>
-            </div>
-            <div className="flex shrink-0 items-center gap-1.5">
-              <button type="button" onClick={goBack} disabled={completedCount === 0} aria-label="Previous walkthrough step" className="grid h-9 w-9 place-items-center rounded-full border border-white/15 disabled:opacity-40"><ArrowLeft className="h-4 w-4" /></button>
-              {stage === "playing"
-                ? <button type="button" onClick={pause} aria-label="Pause walkthrough" className="flex h-9 min-w-20 items-center justify-center gap-1 rounded-full bg-white px-3 text-xs font-semibold text-[#102B2D]"><Pause className="h-3.5 w-3.5" />Pause</button>
-                : <button type="button" onClick={resume} aria-label="Resume walkthrough" className="flex h-9 min-w-20 items-center justify-center gap-1 rounded-full bg-teal-200 px-3 text-xs font-semibold text-[#102B2D]"><Play className="h-3.5 w-3.5" />Resume</button>}
-              <button type="button" onClick={goNext} aria-label="Next walkthrough step" className="grid h-9 w-9 place-items-center rounded-full border border-white/15"><ArrowRight className="h-4 w-4" /></button>
-              <label className="hidden items-center gap-1 text-[10px] sm:flex"><span className="sr-only">Walkthrough speed</span><select aria-label="Walkthrough speed" value={speed} onChange={(event) => changeSpeed(event.target.value)} className="h-9 rounded-full border border-white/15 bg-[#19383A] px-2 text-xs text-white"><option value={0.5}>0.5×</option><option value={0.75}>0.75×</option><option value={1}>1×</option><option value={1.5}>1.5×</option><option value={2}>2×</option></select></label>
-              <button type="button" onClick={exit} aria-label="Exit walkthrough" className="grid h-9 w-9 place-items-center rounded-full text-white/75"><X className="h-4 w-4" /></button>
-            </div>
+      <div className="pointer-events-none fixed inset-0 z-[2000]" data-demo-player>
+        <section ref={playerRef} aria-label={`Guided demonstration controls; ${completedCount} actions visited`} title={`${completedCount} actions visited`} className="pointer-events-auto fixed left-1/2 top-[max(8px,env(safe-area-inset-top))] flex w-fit max-w-[calc(100vw-1rem)] items-center gap-1 overflow-hidden rounded-full border border-white/15 bg-[#102B2D]/95 px-2 py-1.5 text-white shadow-[0_12px_36px_rgba(6,25,27,0.3)] backdrop-blur-xl transition-[left,top,transform] duration-150 ease-out motion-reduce:transition-none">
+          <span className="hidden whitespace-nowrap px-1 text-[10px] font-semibold text-white/65 md:inline">Guided demo</span>
+          <div className="hidden items-center gap-0.5 rounded-full bg-white/5 p-0.5 sm:flex" role="group" aria-label="Walkthrough sections">
+            {ROLES.map((role, index) => <button key={role} type="button" onClick={() => goSection(index)} aria-current={sectionIndex === index ? "step" : undefined} className={`min-h-7 rounded-full px-2.5 text-[11px] font-medium ${sectionIndex === index ? "bg-teal-200 text-slate-900" : "text-white/75 hover:bg-white/10"}`}>{roleName(role)}</button>)}
           </div>
-          <div className="mt-2 flex gap-1" role="group" aria-label="Walkthrough sections">
-            {ROLES.map((role, index) => <button key={role} type="button" onClick={() => goSection(index)} aria-current={sectionIndex === index ? "step" : undefined} className={`min-h-6 flex-1 rounded-full text-[10px] font-medium ${sectionIndex === index ? "bg-teal-200 text-slate-900" : "bg-white/10 text-white/70"}`}>{roleName(role)}</button>)}
-          </div>
-          <div className="mt-1.5 flex gap-1" role="progressbar" aria-label="Role walkthrough progress" aria-valuemin={0} aria-valuemax={ROLES.length} aria-valuenow={sectionIndex + 1}>
-            {ROLES.map((role, index) => <span key={role} className={`h-1 flex-1 rounded-full ${index <= sectionIndex ? "bg-teal-300" : "bg-white/15"}`} />)}
+          <select aria-label="Walkthrough role" value={sectionIndex} onChange={(event) => goSection(Number(event.target.value))} className="h-7 max-w-[6.5rem] rounded-full border border-white/15 bg-[#19383A] px-2 text-[11px] text-white sm:hidden">
+            {ROLES.map((role, index) => <option key={role} value={index}>{roleName(role)}</option>)}
+          </select>
+          <span className="mx-0.5 h-5 w-px shrink-0 bg-white/15" aria-hidden="true" />
+          <button type="button" onClick={goBack} disabled={completedCount === 0} aria-label="Previous walkthrough step" className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-white/15 disabled:opacity-40"><ArrowLeft className="h-4 w-4" /></button>
+          {stage === "playing"
+            ? <button type="button" onClick={pause} aria-label="Pause walkthrough" className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white text-[#102B2D]"><Pause className="h-4 w-4" /></button>
+            : <button type="button" onClick={resume} aria-label="Resume walkthrough" className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-teal-200 text-[#102B2D]"><Play className="h-4 w-4" /></button>}
+          <button type="button" onClick={goNext} aria-label="Next walkthrough step" className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-white/15"><ArrowRight className="h-4 w-4" /></button>
+          <label className="hidden items-center text-[10px] sm:flex"><span className="sr-only">Walkthrough speed</span><select aria-label="Walkthrough speed" value={speed} onChange={(event) => changeSpeed(event.target.value)} className="h-8 rounded-full border border-white/15 bg-[#19383A] px-2 text-xs text-white"><option value={0.5}>0.5×</option><option value={0.75}>0.75×</option><option value={1}>1×</option><option value={1.5}>1.5×</option><option value={2}>2×</option></select></label>
+          <button type="button" onClick={exit} aria-label="Exit walkthrough" className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-white/75 hover:bg-white/10"><X className="h-4 w-4" /></button>
+          <div className="absolute inset-x-2 bottom-0 flex gap-0.5" role="progressbar" aria-label="Role walkthrough progress" aria-valuemin={0} aria-valuemax={ROLES.length} aria-valuenow={sectionIndex + 1}>
+            {ROLES.map((role, index) => <span key={role} className={`h-0.5 flex-1 rounded-full ${index <= sectionIndex ? "bg-teal-300" : "bg-white/20"}`} />)}
           </div>
         </section>
       </div>
