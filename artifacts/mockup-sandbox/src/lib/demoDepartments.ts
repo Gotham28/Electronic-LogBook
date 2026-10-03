@@ -316,6 +316,7 @@ const dermatologyProfile = createEmptyDepartmentProfile({
   enabledFeatures: {
     useCaseTypeLabel: true,
     useThesisAndPublicationsLabel: true,
+    splitThesisAndCertifications: true,
     awards: true,
     hideConferenceLocation: true,
     conferenceLevels: true,

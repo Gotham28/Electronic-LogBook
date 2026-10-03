@@ -26,7 +26,7 @@ export function ThesisPage() {
   const user = getCurrentUser()!;
   const { config } = useDepartment();
   const isPubOnly = config?.enabledFeatures?.publicationsOnly;
-  const label = isPubOnly ? "Publications" : config?.enabledFeatures?.useThesisAndPublicationsLabel ? "Thesis and Publications" : "Thesis";
+  const label = (config?.enabledFeatures?.useThesisAndPublicationsLabel || isPubOnly) ? "Thesis and Publications" : "Thesis";
   const base = `/api/students/${user.studentProfileId}`;
   const [thesis, setThesis] = React.useState<Thesis | null>(null);
   const [draft, setDraft] = React.useState<Thesis>(emptyThesis);
@@ -60,8 +60,8 @@ export function ThesisPage() {
   }
   const guideName = (id: number | null) => faculty.find((person) => person.id === id)?.fullName || (id ? "Inactive faculty member" : "Not selected");
   return <div className="space-y-6 pb-12">
-    <div><p className="page-eyebrow">{isPubOnly ? "Publications" : "Research"}</p><h2 className="page-title mt-1">{label}</h2>
-      <p className="mt-2 text-sm text-slate-500">{isPubOnly ? "Record your publications." : "Record your research timeline and milestones."}</p></div>
+    <div><p className="page-eyebrow">Research</p><h2 className="page-title mt-1">{label}</h2>
+      <p className="mt-2 text-sm text-slate-500">{isPubOnly ? "Record your thesis and publications." : "Record your research timeline and milestones."}</p></div>
     {error && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-rose-700">{error} <Button variant="outline" onClick={load}>Try again</Button></div>}
     {loading ? <p role="status">Loading?</p> : !error && <>
       <Card data-tour="student-thesis" className="overflow-hidden border-white/70 bg-white/80">
