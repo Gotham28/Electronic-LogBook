@@ -1,7 +1,7 @@
 import * as React from "react";
 import {
   BookOpenCheck, KeyRound, ShieldCheck, UserPlus, Loader2,
-  Sparkles, LogIn, ChevronLeft,
+  Sparkles, LogIn, ChevronLeft, ArrowRight, VolumeX, Play,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +26,10 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
 
   // Demo state
   const [demoLoading, setDemoLoading] = React.useState(false);
+  const [showIntroVideo, setShowIntroVideo] = React.useState(false);
+  const [mutedByBrowser, setMutedByBrowser] = React.useState(false);
+  const [needsManualPlay, setNeedsManualPlay] = React.useState(false);
+  const introVideoRef = React.useRef<HTMLVideoElement | null>(null);
   // Login credentials
   const [username, setUsername] = React.useState("");
   const [password, setPassword] = React.useState("");
@@ -54,10 +58,14 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
 
   // ── Demo Movie Startup ────────────────────────────────────────────────────
 
-  const handleMovieStart = async () => {
+  const proceedToActualDemo = React.useCallback(() => {
     if (demoLoading) return;
     setDemoLoading(true);
     try {
+      if (introVideoRef.current) {
+        introVideoRef.current.pause();
+      }
+      setShowIntroVideo(false);
       unlockDemoAudio();
       startDemoSession("student");
       setDemoMovieActive();
@@ -67,6 +75,41 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
     } finally {
       setDemoLoading(false);
     }
+  }, [demoLoading, onSignIn]);
+
+  const startIntroPlayback = React.useCallback(async () => {
+    const video = introVideoRef.current;
+    if (!video) return;
+    setNeedsManualPlay(false);
+    try {
+      video.muted = false;
+      setMutedByBrowser(false);
+      await video.play();
+    } catch {
+      try {
+        video.muted = true;
+        setMutedByBrowser(true);
+        await video.play();
+      } catch {
+        setNeedsManualPlay(true);
+      }
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (!showIntroVideo) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    void startIntroPlayback();
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [showIntroVideo, startIntroPlayback]);
+
+  const handleMovieStart = () => {
+    if (demoLoading) return;
+    unlockDemoAudio();
+    setShowIntroVideo(true);
   };
 
   // ── Real sign-in ─────────────────────────────────────────────────────────
@@ -230,6 +273,7 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
                       <p className="mt-0.5 text-xs leading-5 text-[#52696C]">A guided tour of the logbook. No sign-in needed.</p>
                     </div>
                   </button>
+                  <video src="/demo-video.mp4" preload="auto" className="hidden" aria-hidden="true" muted />
                 </div>
               </div>
             )}
@@ -401,6 +445,84 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
           </button>
         </div>
       </footer>
+
+      {showIntroVideo && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Arogya E-LogBook Demo Video"
+          className="fixed inset-0 z-[10000] flex flex-col bg-slate-950 text-white select-none animate-in fade-in duration-200"
+        >
+          {/* Top bar with branding and Skip to Demo button */}
+          <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center justify-between bg-gradient-to-b from-slate-950/90 via-slate-950/50 to-transparent px-4 py-4 sm:px-8 sm:py-5">
+            <div className="pointer-events-auto flex items-center gap-3">
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-slate-900/80 px-3.5 py-1.5 text-xs font-semibold tracking-wide text-teal-300 backdrop-blur-md">
+                <span className="h-2 w-2 rounded-full bg-teal-400 animate-pulse" />
+                Arogya E-LogBook · Product Walkthrough
+              </span>
+
+              {mutedByBrowser && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const video = introVideoRef.current;
+                    if (!video) return;
+                    video.muted = false;
+                    setMutedByBrowser(false);
+                    void video.play().catch(() => {});
+                  }}
+                  className="inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-amber-500/20 px-3.5 py-1.5 text-xs font-semibold text-amber-200 backdrop-blur-md transition hover:bg-amber-500/30 cursor-pointer"
+                >
+                  <VolumeX className="h-3.5 w-3.5" />
+                  Click to unmute audio
+                </button>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={proceedToActualDemo}
+              data-testid="demo-video-skip"
+              className="pointer-events-auto inline-flex items-center gap-2 rounded-xl bg-teal-600 px-4 py-2.5 text-xs font-bold text-white shadow-[0_10px_28px_rgba(13,148,136,0.45)] ring-1 ring-teal-400/40 transition-all duration-150 hover:bg-teal-500 hover:scale-[1.02] active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-300 sm:px-5 sm:py-2.5 sm:text-sm cursor-pointer"
+            >
+              Skip to Demo
+              <ArrowRight className="h-4 w-4" />
+            </button>
+          </div>
+
+          {/* Main video container */}
+          <div className="relative flex flex-1 items-center justify-center overflow-hidden bg-black">
+            <video
+              ref={introVideoRef}
+              src="/demo-video.mp4"
+              className="h-full w-full max-h-screen object-contain"
+              playsInline
+              autoPlay
+              controls
+              preload="auto"
+              onEnded={proceedToActualDemo}
+              onVolumeChange={() => {
+                if (introVideoRef.current && !introVideoRef.current.muted) {
+                  setMutedByBrowser(false);
+                }
+              }}
+            />
+
+            {needsManualPlay && (
+              <button
+                type="button"
+                onClick={() => void startIntroPlayback()}
+                className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-slate-950/70 backdrop-blur-sm transition hover:bg-slate-950/60 cursor-pointer"
+              >
+                <div className="flex h-20 w-20 items-center justify-center rounded-full bg-teal-600 text-white shadow-2xl ring-4 ring-teal-400/30">
+                  <Play className="h-9 w-9 fill-current ml-1" />
+                </div>
+                <span className="text-sm font-semibold text-white">Click to Play Demo Video</span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
