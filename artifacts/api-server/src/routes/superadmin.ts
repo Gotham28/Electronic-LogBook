@@ -852,7 +852,7 @@ const announcementSchema = z.object({
   expectedImpact: z.string().max(2000).optional().nullable(),
   startAt: z.string().datetime(),
   endAt: z.string().datetime(),
-  audienceRoles: z.array(z.enum(["student", "professor", "hod"])).min(1)
+  audienceRoles: z.array(z.enum(["student", "professor", "hod", "public"])).min(1)
     .refine((roles) => new Set(roles).size === roles.length, "Audience roles must be unique"),
 }).refine(data => new Date(data.endAt) > new Date(data.startAt), {
   message: "End time must be after start time",

@@ -119,3 +119,73 @@ test("maintenance schedule uses fixed copy, IST-safe dates and audience, without
   });
   assert.equal(reversed.status, 400);
 });
+
+test("public maintenance status is unauthenticated, active-only, and limited to public audience", async () => {
+  const publicSchedule = await request(runtime.base, "/superadmin/announcements", admin, "POST", {
+    startAt: futureIso(15),
+    endAt: futureIso(75),
+    audienceRoles: ["public"],
+  });
+  assert.equal(publicSchedule.status, 201);
+  assert.deepEqual(publicSchedule.body.audienceRoles, ["public"]);
+
+  const now = new Date();
+  const entries = await db.insert(maintenanceAnnouncementsTable).values([
+    {
+      title: "Public active",
+      description: "Stored copy is not returned",
+      startAt: new Date(now.getTime() - 60_000),
+      endAt: new Date(now.getTime() + 60_000),
+      audienceRoles: ["public", "student"],
+      createdBy: admin.id,
+    },
+    {
+      title: "Public scheduled",
+      description: "Scheduled",
+      startAt: new Date(now.getTime() + 60_000),
+      endAt: new Date(now.getTime() + 120_000),
+      audienceRoles: ["public"],
+      createdBy: admin.id,
+    },
+    {
+      title: "Public completed",
+      description: "Completed",
+      startAt: new Date(now.getTime() - 120_000),
+      endAt: new Date(now.getTime() - 60_000),
+      audienceRoles: ["public"],
+      createdBy: admin.id,
+    },
+    {
+      title: "Public cancelled",
+      description: "Cancelled",
+      startAt: new Date(now.getTime() - 60_000),
+      endAt: new Date(now.getTime() + 60_000),
+      cancelledAt: now,
+      audienceRoles: ["public"],
+      createdBy: admin.id,
+    },
+    {
+      title: "Role-only active",
+      description: "Private to a selected role",
+      startAt: new Date(now.getTime() - 60_000),
+      endAt: new Date(now.getTime() + 60_000),
+      audienceRoles: ["student"],
+      createdBy: admin.id,
+    },
+  ]).returning({ id: maintenanceAnnouncementsTable.id });
+
+  const publicResponse = await request(runtime.base, "/announcements/public-current");
+  assert.equal(publicResponse.status, 200);
+  const publicItems = publicResponse.body as any[];
+  assert.deepEqual(publicItems.map((item) => item.id), [entries[0].id]);
+  assert.equal(publicItems[0].title, "ELogbook service notice");
+  assert.match(publicItems[0].message, /^ELogbook maintenance is in progress until /);
+  assert.equal(publicItems[0].audienceRoles, undefined);
+  assert.equal(publicItems[0].description, undefined);
+
+  const authenticatedResponse = await request(runtime.base, "/announcements/current", a.student0);
+  assert.equal(authenticatedResponse.status, 200);
+  const authenticatedItems = authenticatedResponse.body as any[];
+  assert.equal(authenticatedItems.some((item) => item.id === entries[0].id), false);
+  assert.equal(authenticatedItems.some((item) => item.id === entries[4].id), true);
+});

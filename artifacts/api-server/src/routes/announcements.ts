@@ -1,10 +1,48 @@
 import { Router } from "express";
 import { db, maintenanceAnnouncementsTable } from "@workspace/db";
-import { and, gt, isNull } from "drizzle-orm";
+import { and, gt, isNull, lte } from "drizzle-orm";
 import { requireAuth } from "../middlewares/auth.js";
 import { buildMaintenanceNotice } from "../lib/maintenance-messages.js";
 
 const router = Router();
+
+// Public, active maintenance status for signed-out application visitors.
+// The response is intentionally limited to generic maintenance notice fields.
+router.get("/public-current", async (_req, res) => {
+  try {
+    const now = new Date();
+    const announcements = await db.select({
+      id: maintenanceAnnouncementsTable.id,
+      startAt: maintenanceAnnouncementsTable.startAt,
+      endAt: maintenanceAnnouncementsTable.endAt,
+      updatedAt: maintenanceAnnouncementsTable.updatedAt,
+      audienceRoles: maintenanceAnnouncementsTable.audienceRoles,
+    })
+      .from(maintenanceAnnouncementsTable)
+      .where(and(
+        lte(maintenanceAnnouncementsTable.startAt, now),
+        gt(maintenanceAnnouncementsTable.endAt, now),
+        isNull(maintenanceAnnouncementsTable.cancelledAt)
+      ))
+      .orderBy(maintenanceAnnouncementsTable.startAt);
+
+    return res.json(announcements
+      .filter((announcement) => Array.isArray(announcement.audienceRoles) && announcement.audienceRoles.includes("public"))
+      .map((announcement) => {
+        const notice = buildMaintenanceNotice(announcement.startAt, announcement.endAt, "active");
+        return {
+          id: announcement.id,
+          title: notice.heading,
+          message: notice.message,
+          startAt: announcement.startAt,
+          endAt: announcement.endAt,
+          updatedAt: announcement.updatedAt,
+        };
+      }));
+  } catch {
+    return res.status(500).json({ message: "Failed to fetch maintenance status" });
+  }
+});
 
 // Used by the global AppLayout to fetch upcoming and active announcements
 router.get("/current", requireAuth, async (req, res) => {
@@ -22,7 +60,9 @@ router.get("/current", requireAuth, async (req, res) => {
       .orderBy(maintenanceAnnouncementsTable.startAt);
       
     // Filter by audience role in memory (simpler than querying jsonb array directly for now)
-    const relevant = announcements.filter((a: any) => Array.isArray(a.audienceRoles) && a.audienceRoles.includes(userRole));
+    const relevant = announcements.filter((a: any) => Array.isArray(a.audienceRoles)
+      && a.audienceRoles.includes(userRole)
+      && !a.audienceRoles.includes("public"));
     
     // Compute statuses
     const mapped = relevant.map((a: any) => {
