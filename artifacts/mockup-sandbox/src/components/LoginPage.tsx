@@ -13,7 +13,7 @@ import { LoginProductPreview } from "@/components/LoginProductPreview";
 import { clearMaintenanceNoticeSession, saveToken } from "@/lib/session";
 import { PaymentStep } from "@/components/PaymentStep";
 import { unlockDemoAudio } from "@/lib/demoSounds";
-import { startDemoSession, setDemoMovieActive } from "@/lib/demoSession";
+import { startDemoSession } from "@/lib/demoSession";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -23,6 +23,10 @@ type Mode = "picker" | "login";
 
 export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRegister: () => void }) {
   const [mode, setMode] = React.useState<Mode>("picker");
+  const [isMobileViewport, setIsMobileViewport] = React.useState(() =>
+    typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches
+  );
+  const introVideoSrc = isMobileViewport ? "/demo-video-mobile.mp4" : "/demo-video.mp4";
 
   // Demo state
   const [demoLoading, setDemoLoading] = React.useState(false);
@@ -36,6 +40,14 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
   const [error, setError] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
   const [pendingPaymentToken, setPendingPaymentToken] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    const mobileQuery = window.matchMedia("(max-width: 767px)");
+    const updateViewport = (event: MediaQueryListEvent) => setIsMobileViewport(event.matches);
+    setIsMobileViewport(mobileQuery.matches);
+    mobileQuery.addEventListener("change", updateViewport);
+    return () => mobileQuery.removeEventListener("change", updateViewport);
+  }, []);
 
   // Forgot-password flow (logic unchanged)
   const [forgotStep, setForgotStep] = React.useState<0 | 1 | 2 | 3>(0);
@@ -58,7 +70,7 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
 
   // ── Demo Movie Startup ────────────────────────────────────────────────────
 
-  const proceedToActualDemo = React.useCallback(() => {
+  const enterDemoWorkspace = React.useCallback(() => {
     if (demoLoading) return;
     setDemoLoading(true);
     try {
@@ -68,7 +80,6 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
       setShowIntroVideo(false);
       unlockDemoAudio();
       startDemoSession("student");
-      setDemoMovieActive();
       onSignIn();
     } catch (err: any) {
       toast.error(err.message || "Failed to start demo. Please try again.");
@@ -104,7 +115,7 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
     return () => {
       document.body.style.overflow = prevOverflow;
     };
-  }, [showIntroVideo, startIntroPlayback]);
+  }, [showIntroVideo, introVideoSrc, startIntroPlayback]);
 
   const handleMovieStart = () => {
     if (demoLoading) return;
@@ -270,10 +281,10 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="font-semibold text-[#16323A]">Show demo</p>
-                      <p className="mt-0.5 text-xs leading-5 text-[#52696C]">A guided tour of the logbook. No sign-in needed.</p>
+                      <p className="mt-0.5 text-xs leading-5 text-[#52696C]">Watch the intro, then explore freely. Start a guided tour anytime. No sign-in needed.</p>
                     </div>
                   </button>
-                  <video src="/demo-video.mp4" preload="auto" className="hidden" aria-hidden="true" muted />
+                  <video src={introVideoSrc} preload="auto" className="hidden" aria-hidden="true" muted />
                 </div>
               </div>
             )}
@@ -481,11 +492,11 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
 
             <button
               type="button"
-              onClick={proceedToActualDemo}
+              onClick={enterDemoWorkspace}
               data-testid="demo-video-skip"
               className="pointer-events-auto inline-flex items-center gap-2 rounded-xl bg-teal-600 px-4 py-2.5 text-xs font-bold text-white shadow-[0_10px_28px_rgba(13,148,136,0.45)] ring-1 ring-teal-400/40 transition-all duration-150 hover:bg-teal-500 hover:scale-[1.02] active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-300 sm:px-5 sm:py-2.5 sm:text-sm cursor-pointer"
             >
-              Skip to Demo
+              Skip to Explore
               <ArrowRight className="h-4 w-4" />
             </button>
           </div>
@@ -494,13 +505,13 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
           <div className="relative flex flex-1 items-center justify-center overflow-hidden bg-black">
             <video
               ref={introVideoRef}
-              src="/demo-video.mp4"
+              src={introVideoSrc}
               className="h-full w-full max-h-screen object-contain"
               playsInline
               autoPlay
               controls
               preload="auto"
-              onEnded={proceedToActualDemo}
+              onEnded={enterDemoWorkspace}
               onVolumeChange={() => {
                 if (introVideoRef.current && !introVideoRef.current.muted) {
                   setMutedByBrowser(false);

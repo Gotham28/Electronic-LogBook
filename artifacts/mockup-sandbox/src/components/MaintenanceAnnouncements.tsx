@@ -20,8 +20,15 @@ type Announcement = {
   audienceRoles: string[];
   status: "scheduled" | "active" | "completed" | "cancelled";
 };
-const ROLES = ["student", "professor", "hod"] as const;
+const ROLES = ["public", "student", "professor", "hod"] as const;
 const defaultForm = { id: null as number | null, startAt: "", endAt: "", audienceRoles: [...ROLES] as string[] };
+
+function audienceLabel(role: string) {
+  if (role === "public") return "Everyone, including signed-out visitors";
+  if (role === "hod") return "HOD";
+  if (role === "professor") return "Professors";
+  return "Students";
+}
 
 function formatIst(value: string) {
   return new Date(value).toLocaleString("en-IN", {
@@ -153,7 +160,7 @@ export function MaintenanceAnnouncements() {
                   <TableCell><span className={`inline-flex rounded-md px-2 py-1 text-xs font-medium ${announcement.status === "scheduled" ? "bg-amber-100 text-amber-700" : announcement.status === "active" ? "bg-emerald-100 text-emerald-700" : announcement.status === "cancelled" ? "bg-slate-100 text-slate-700" : "bg-blue-100 text-blue-700"}`}>{announcement.status}</span></TableCell>
                   <TableCell className="font-medium">ELogbook maintenance</TableCell>
                   <TableCell className="text-xs">{formatIst(announcement.startAt)}<br />to {formatIst(announcement.endAt)}</TableCell>
-                  <TableCell className="text-xs text-slate-500">{announcement.audienceRoles.join(", ")}</TableCell>
+                  <TableCell className="text-xs text-slate-500">{announcement.audienceRoles.map(audienceLabel).join(", ")}</TableCell>
                   <TableCell className="text-right">{isScheduledOrActive && <div className="flex justify-end gap-2">
                     <Button variant="outline" size="sm" onClick={() => openEdit(announcement)}>Edit</Button>
                     <Button variant="outline" size="sm" className="text-rose-600 hover:text-rose-700" onClick={() => void handleCancel(announcement)}>Cancel</Button>
@@ -190,7 +197,7 @@ export function MaintenanceAnnouncements() {
               <div className="flex flex-wrap gap-4">
                 {ROLES.map((role) => <label key={role} className="flex items-center gap-2 text-sm">
                   <Checkbox checked={form.audienceRoles.includes(role)} onCheckedChange={() => toggleRole(role)} />
-                  {role === "hod" ? "HOD" : role === "professor" ? "Professors" : "Students"}
+                  {audienceLabel(role)}
                 </label>)}
               </div>
             </div>

@@ -80,7 +80,7 @@ export function DemoBanner() {
     setLocation(demoPortalHome(newRole));
   };
 
-  const replayDemo = () => {
+  const startGuidedDemo = () => {
     playDemoSound("click");
     if (window.location.pathname === "/print") {
       setLocation(demoPortalHome(role));
@@ -140,12 +140,12 @@ export function DemoBanner() {
         type="button"
         variant="outline"
         size="sm"
-        onClick={replayDemo}
+        onClick={startGuidedDemo}
         className="h-11 shrink-0 gap-1.5 border-white/80 bg-white/80 px-2.5 text-xs transition-colors hover:bg-white"
         style={{ color: "var(--demo-accent-readable)" }}
       >
         <Play aria-hidden="true" className="h-3.5 w-3.5" />
-        Replay demo
+        Start guided demo
       </Button>
 
       <Button

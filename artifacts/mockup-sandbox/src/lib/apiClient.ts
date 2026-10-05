@@ -61,7 +61,7 @@ async function fetchWithAuth(
 ): Promise<any> {
   // --- DEMO MODE INTERCEPTION ---
   const userStr = window.sessionStorage.getItem("elogbook-user");
-  if (userStr) {
+  if (userStr && endpoint !== "/api/announcements/public-current") {
     try {
       const user = JSON.parse(userStr);
       if (user.isDemoMode) {

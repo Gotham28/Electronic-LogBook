@@ -8,10 +8,12 @@ import "@fontsource/roboto/latin-600.css";
 import "@fontsource/roboto/latin-700.css";
 import App from "./App";
 import { CookieConsentBanner } from "./components/CookieConsentBanner";
+import { PublicMaintenanceNotice } from "./components/PublicMaintenanceNotice";
 import "./index.css";
 
 createRoot(document.getElementById("root")!).render(
   <>
+    <PublicMaintenanceNotice />
     <App />
     <CookieConsentBanner />
   </>
