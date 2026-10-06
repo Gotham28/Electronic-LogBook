@@ -26,6 +26,10 @@ router.param("id", (req, res, next, value) => {
   if (!Number.isSafeInteger(Number(value)) || Number(value) <= 0) { res.status(400).json({ message: "Invalid record ID" }); return; }
   next();
 });
+router.param("userId", (req, res, next, value) => {
+  if (!Number.isSafeInteger(Number(value)) || Number(value) <= 0) { res.status(400).json({ message: "Invalid record ID" }); return; }
+  next();
+});
 
 // ---------------------------------------------------------------------------
 // GET /api/superadmin/departments — list all departments with current HOD
@@ -521,6 +525,43 @@ router.get("/departments/:id/roster", async (req, res) => {
     res.json(users);
   } catch (error) {
     req.log.error({ departmentId, userId: req.user!.id, status: 500 }, "Error fetching roster");
+    return res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// PATCH /api/superadmin/departments/:id/users/:userId/name — rename a roster account
+// Only HOD, faculty, and student accounts within the requested department can be changed.
+// ---------------------------------------------------------------------------
+const updateDepartmentUserNameBody = z.object({ fullName: nameSchema }).strict();
+
+router.patch("/departments/:id/users/:userId/name", validate(updateDepartmentUserNameBody), async (req, res) => {
+  const departmentId = Number(req.params.id);
+  const targetUserId = Number(req.params.userId);
+  try {
+    const [department] = await db.select({ id: departmentsTable.id }).from(departmentsTable)
+      .where(eq(departmentsTable.id, departmentId)).limit(1);
+    if (!department) { return res.status(404).json({ message: "Department not found" }); }
+
+    const [updatedUser] = await db.update(usersTable)
+      .set({ fullName: req.body.fullName })
+      .where(and(
+        eq(usersTable.id, targetUserId),
+        eq(usersTable.departmentId, departmentId),
+        inArray(usersTable.role, ["hod", "professor", "student"]),
+      ))
+      .returning({
+        id: usersTable.id,
+        fullName: usersTable.fullName,
+        email: usersTable.email,
+        role: usersTable.role,
+        status: usersTable.status,
+      });
+
+    if (!updatedUser) { return res.status(404).json({ message: "Department user not found" }); }
+    return res.json(updatedUser);
+  } catch (error) {
+    req.log.error({ departmentId, targetUserId, userId: req.user!.id, status: 500 }, "Error updating department user name");
     return res.status(500).json({ message: "Internal server error" });
   }
 });

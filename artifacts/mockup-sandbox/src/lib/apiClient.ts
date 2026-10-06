@@ -185,6 +185,10 @@ export function getAdminDepartmentRoster(id: number): Promise<AdminUserRow[]> {
   return apiGet(`/api/superadmin/departments/${id}/roster`);
 }
 
+export function updateAdminDepartmentUserName(departmentId: number, userId: number, fullName: string): Promise<AdminUserRow> {
+  return apiPatch(`/api/superadmin/departments/${departmentId}/users/${userId}/name`, { fullName });
+}
+
 export function replaceAdminHod(departmentId: number, incomingUserId: number) {
   return apiPost(`/api/superadmin/departments/${departmentId}/replace-hod`, { incomingUserId });
 }

@@ -72,3 +72,5 @@ student_old.ts
 artifacts/api-server/data/
 
 IMPLEMENTATION_PLAN_*.md
+
+*.md
