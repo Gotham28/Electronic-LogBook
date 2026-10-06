@@ -3,6 +3,7 @@ import { db, usersTable, departmentsTable, studentsTable, departmentConfigsTable
 import { eq, and, sql, inArray, or, gt, isNull } from "drizzle-orm";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
+import { randomBytes } from "node:crypto";
 import { requireAuth, requireRole } from "../middlewares/auth.js";
 import { emailSchema, nameSchema, passwordSchema, idSchema, validate } from "../lib/validation.js";
 import { getEmailFailure, sendAccountCreatedEmail, sendHODAppointmentEmail } from "../lib/mailer.js";
@@ -84,15 +85,15 @@ const createDepartmentBody = z.object({
     description: z.string().max(1000).optional(),
     hod: z.object({ fullName: nameSchema, email: emailSchema }).strict(),
   }).strict(),
-  hodPassword: passwordSchema,
 }).strict();
 
 router.post("/departments", validate(createDepartmentBody), async (req, res) => {
   try {
-    const { setup, hodPassword } = req.body;
-    const result = await provisionDepartment(setup, hodPassword);
+    const { setup } = req.body;
+    const initialPassword = randomBytes(24).toString("base64url");
+    const result = await provisionDepartment(setup, initialPassword);
     req.log.info({ departmentId: result.departmentId, hodId: result.hodId, status: 201 }, "Department provisioned");
-    res.status(201).json(result);
+    return res.status(201).json(result);
   } catch (error: any) {
     // provisionDepartment throws descriptive errors for constraint violations.
     // Surface the message but never the full error object (§8).
@@ -530,7 +531,6 @@ router.get("/departments/:id/roster", async (req, res) => {
 const createFacultyBody = z.object({
   fullName: nameSchema,
   email: emailSchema,
-  password: passwordSchema,
 }).strict();
 
 router.post("/departments/:id/faculty", validate(createFacultyBody), async (req, res) => {
@@ -540,12 +540,13 @@ router.post("/departments/:id/faculty", validate(createFacultyBody), async (req,
       .where(eq(departmentsTable.id, departmentId)).limit(1);
     if (!dept) { res.status(404).json({ message: "Department not found" }); return; }
 
-    const { fullName, email, password } = req.body;
+    const { fullName, email } = req.body;
     const [existing] = await db.select({ id: usersTable.id }).from(usersTable)
       .where(eq(usersTable.email, email)).limit(1);
     if (existing) { res.status(400).json({ message: "Email already registered" }); return; }
 
-    const passwordHash = await bcrypt.hash(password, 12);
+    const initialPassword = randomBytes(24).toString("base64url");
+    const passwordHash = await bcrypt.hash(initialPassword, 12);
     const [created] = await db.insert(usersTable).values({
       fullName, email, passwordHash,
       role: "professor", status: "approved", departmentId: dept.id,
@@ -554,7 +555,7 @@ router.post("/departments/:id/faculty", validate(createFacultyBody), async (req,
     let emailAccepted = false;
     let emailFailure: ReturnType<typeof getEmailFailure> | undefined;
     try {
-      await sendAccountCreatedEmail(email, fullName, password, "professor", dept.name);
+      await sendAccountCreatedEmail(email, fullName, initialPassword, "professor", dept.name);
       emailAccepted = true;
     } catch (error) {
       // Account created successfully; email failure is non-fatal.
@@ -563,7 +564,7 @@ router.post("/departments/:id/faculty", validate(createFacultyBody), async (req,
     }
 
     req.log.info({ createdId: created.id, departmentId, status: 201 }, "Faculty created by admin");
-    res.status(201).json({ message: "Faculty account created", faculty: { id: created.id, fullName, email, departmentId }, emailAccepted, ...(emailFailure ? { emailFailure } : {}) });
+    return res.status(201).json({ message: "Faculty account created", faculty: { id: created.id, fullName, email, departmentId }, emailAccepted, ...(emailFailure ? { emailFailure } : {}) });
   } catch (error) {
     req.log.error({ departmentId, userId: req.user!.id, status: 500 }, "Error creating faculty");
     return res.status(500).json({ message: "Internal server error" });

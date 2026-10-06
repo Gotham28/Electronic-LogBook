@@ -57,7 +57,6 @@ test("the database refuses a zero-month or year-zero row and duplicate year/post
 test("deleting a department removes its schedule rows", async () => {
   const created = await request(runtime.base, "/superadmin/departments", { token: admin.token } as any, "POST", {
     setup: { name: "Schedule Delete Dept", code: "SCHEDDEL", hod: { fullName: "Schedule HOD", email: "sched-hod@example.test" } },
-    hodPassword: password,
   });
   assert.equal(created.status, 201, JSON.stringify(created.body));
   const departmentId = created.body.departmentId;

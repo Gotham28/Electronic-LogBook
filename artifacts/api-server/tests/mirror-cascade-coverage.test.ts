@@ -47,7 +47,6 @@ test("mirror department with rows in all 12 checked tables deletes cleanly via i
       name: "Full Cascade Dept", code: "FULL-CASC",
       hod: { fullName: "Full Cascade HOD", email: "full-casc-hod@example.test" },
     },
-    hodPassword: password,
   });
   assert.equal(createRes.status, 201, `Create dept failed: ${JSON.stringify(createRes.body)}`);
   const realDeptId = createRes.body.departmentId;
@@ -181,7 +180,6 @@ test("non-mirror department with clinical data returns 409 and deletes nothing",
       name: "Non-Mirror Conflict Dept", code: "NM-CONFLICT",
       hod: { fullName: "NM HOD", email: "nm-conflict-hod@example.test" },
     },
-    hodPassword: password,
   });
   assert.equal(createRes.status, 201);
   const deptId = createRes.body.departmentId;
@@ -235,7 +233,6 @@ test("fixture rows are created, land only in a mirror, and carry catalog-derived
       name: "Fixture Taxonomy Dept", code: "FIX-TAXO",
       hod: { fullName: "Fixture HOD", email: "fix-taxo-hod@example.test" },
     },
-    hodPassword: password,
   });
   assert.equal(createRes.status, 201);
   const realDeptId = createRes.body.departmentId;
@@ -336,7 +333,6 @@ test("department with configSourceDepartmentId set but isTest=false is refused r
       name: "IsTest Guard Dept", code: "ISTEST-GRD",
       hod: { fullName: "Guard HOD", email: "istest-guard-hod@example.test" },
     },
-    hodPassword: password,
   });
   assert.equal(createRes.status, 201);
   const realDeptId = createRes.body.departmentId;
@@ -372,7 +368,6 @@ test("department with configSourceDepartmentId set but isTest=false is refused r
       name: "Guard Target Dept", code: "GRD-TARGET",
       hod: { fullName: "Guard Target HOD", email: "guard-target-hod@example.test" },
     },
-    hodPassword: password,
   });
   assert.equal(guardDeptRes.status, 201);
   const guardDeptId = guardDeptRes.body.departmentId;
@@ -406,7 +401,6 @@ test("department with configSourceDepartmentId set but isTest=false is refused r
 test("mirror department with conference, award and certification rows deletes cleanly via its real parent", async () => {
   const createRes = await call("/superadmin/departments", "POST", {
     setup: { name: "Later Tables Dept", code: "LATER-TBL", hod: { fullName: "Later HOD", email: "later-tbl-hod@example.test" } },
-    hodPassword: password,
   });
   assert.equal(createRes.status, 201);
   const realDeptId = createRes.body.departmentId;
@@ -430,7 +424,6 @@ test("mirror department with conference, award and certification rows deletes cl
 test("non-mirror department whose only records are conferences returns 409 naming them", async () => {
   const createRes = await call("/superadmin/departments", "POST", {
     setup: { name: "Conference Only Dept", code: "CONF-ONLY", hod: { fullName: "Conf HOD", email: "conf-only-hod@example.test" } },
-    hodPassword: password,
   });
   assert.equal(createRes.status, 201);
   const deptId = createRes.body.departmentId;

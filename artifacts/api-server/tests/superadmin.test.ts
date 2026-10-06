@@ -1,6 +1,6 @@
 import { before, after, test } from "node:test";
 import assert from "node:assert/strict";
-import { setup, request, accounts as a, departmentIds, password, sentEmails } from "./support.js";
+import { setup, request, accounts as a, departmentIds, password, sentEmails, simulateFailure } from "./support.js";
 import { engine, db, usersTable, studentsTable, caseLogsTable, departmentsTable, departmentConfigsTable, departmentCatalogTable, procedureTypesTable, assignmentTypesTable, assignmentsTable, assignmentRecipientsTable } from "./database.js";
 import { eq, and, sql } from "drizzle-orm";
 import jwt from "jsonwebtoken";
@@ -99,7 +99,6 @@ test("admin can list all departments with their current HOD and mirror test depa
   // Create a new department and confirm it gets a mirror automatically, per Task A's auto-provisioning
   const createRes = await call("/superadmin/departments", "admin", "POST", {
     setup: { name: "No Mirror Dept", code: "NO-MIRROR", hod: { fullName: "No Mirror", email: "nomirror@example.test" } },
-    hodPassword: password,
   });
   assert.equal(createRes.status, 201);
   
@@ -113,27 +112,72 @@ test("admin can list all departments with their current HOD and mirror test depa
 // 4. Admin can create a department via provisionDepartment
 // =========================================================================
 test("admin can create a department with HOD via the API", async () => {
+  const emailStart = sentEmails.length;
   const res = await call("/superadmin/departments", "admin", "POST", {
     setup: { name: "Superadmin Created Dept", code: "SADMIN-TEST", hod: { fullName: "New HOD", email: "newhod@example.test" } },
-    hodPassword: password,
   });
   assert.equal(res.status, 201);
   assert.ok(res.body.departmentId);
   assert.ok(res.body.hodId);
+  const welcome = sentEmails.slice(emailStart).find((email) => email.to === "newhod@example.test");
+  const generatedPassword = welcome?.text.match(/^Password:\s*(\S+)$/m)?.[1];
+  assert.ok(generatedPassword, "the HOD welcome email must contain the generated initial password");
+  assert.equal(/^[A-Za-z0-9_-]{32}$/.test(generatedPassword!), true, "the HOD password must be 32 URL-safe characters");
+  assert.ok(!JSON.stringify(res.body).includes(generatedPassword!), "the API response must not disclose the generated password");
 
   // Verify the HOD was created correctly
   const [hod] = await db.select().from(usersTable).where(eq(usersTable.id, res.body.hodId));
   assert.equal(hod.role, "hod");
   assert.equal(hod.status, "approved");
   assert.equal(hod.departmentId, res.body.departmentId);
+  assert.ok(await bcrypt.compare(generatedPassword!, hod.passwordHash), "the emailed password must match the stored bcrypt hash");
+  const login = await call("/auth/login", undefined, "POST", { username: "newhod@example.test", password: generatedPassword });
+  assert.equal(login.status, 200, "the emailed password must authenticate");
+
+  const secondStart = sentEmails.length;
+  const second = await call("/superadmin/departments", "admin", "POST", {
+    setup: { name: "Second HOD Password Dept", code: "SADMIN-TEST2", hod: { fullName: "Second HOD", email: "second-hod@example.test" } },
+  });
+  assert.equal(second.status, 201);
+  const secondWelcome = sentEmails.slice(secondStart).find((email) => email.to === "second-hod@example.test");
+  const secondPassword = secondWelcome?.text.match(/^Password:\s*(\S+)$/m)?.[1];
+  assert.ok(secondPassword);
+  assert.equal(secondPassword !== generatedPassword, true, "each HOD account must receive a fresh password");
 
   // Duplicate HOD for same department is rejected
   const dup = await call("/superadmin/departments", "admin", "POST", {
     setup: { name: "Superadmin Created Dept", code: "SADMIN-TEST", hod: { fullName: "Another HOD", email: "anotherhod@example.test" } },
-    hodPassword: password,
   });
   assert.equal(dup.status, 400);
   assert.ok(dup.body.message.match(/active HOD already exists/i));
+
+  const legacyPassword = await call("/superadmin/departments", "admin", "POST", {
+    setup: { name: "Legacy Password Dept", code: "LEGACY-HOD-PASS", hod: { fullName: "Legacy HOD", email: "legacy-hod@example.test" } },
+    hodPassword: password,
+  });
+  assert.equal(legacyPassword.status, 400, "the endpoint must reject client-supplied HOD passwords");
+  assert.equal((await db.select().from(departmentsTable).where(eq(departmentsTable.code, "LEGACY-HOD-PASS"))).length, 0,
+    "a legacy password request must not create the department");
+
+  assert.equal((await call("/superadmin/departments", undefined, "POST", {
+    setup: { name: "Unauthenticated Department", code: "UNAUTH-HOD", hod: { fullName: "Unauth HOD", email: "unauth-hod@example.test" } },
+  })).status, 401);
+  assert.equal((await call("/superadmin/departments", "hod0", "POST", {
+    setup: { name: "HOD Created Department", code: "HOD-CREATED", hod: { fullName: "Other HOD", email: "other-hod@example.test" } },
+  })).status, 403);
+
+  simulateFailure.enabled = true;
+  try {
+    const failedEmail = await call("/superadmin/departments", "admin", "POST", {
+      setup: { name: "Failed Email Department", code: "HOD-EMAIL-FAIL", hod: { fullName: "Mail Failure HOD", email: "mail-failure-hod@example.test" } },
+    });
+    assert.equal(failedEmail.status, 201);
+    assert.equal(failedEmail.body.emailAccepted, false);
+    assert.ok(!JSON.stringify(failedEmail.body).includes("password"));
+    assert.ok(!JSON.stringify(failedEmail.body).includes("Password"));
+  } finally {
+    simulateFailure.enabled = false;
+  }
 });
 
 // =========================================================================
@@ -164,24 +208,70 @@ test("admin can view any department roster (plain user rows only)", async () => 
 test("admin can create faculty in any department", async () => {
   const emailStart = sentEmails.length;
   const res = await call("/superadmin/departments/" + departmentIds[1] + "/faculty", "admin", "POST", {
-    fullName: "Admin-Created Faculty", email: "admin-fac@example.test", password,
+    fullName: "Admin-Created Faculty", email: "admin-fac@example.test",
   });
   assert.equal(res.status, 201);
   assert.equal(res.body.faculty.departmentId, departmentIds[1]);
   assert.equal(res.body.emailAccepted, true);
   const welcome = sentEmails.slice(emailStart).find((email) => email.to === "admin-fac@example.test");
   assert.equal(welcome?.subject, "Your E-LogBook Account Has Been Created");
+  const generatedPassword = welcome?.text.match(/^Password:\s*(\S+)$/m)?.[1];
+  assert.ok(generatedPassword, "the welcome email must contain the generated initial password");
+  assert.equal(/^[A-Za-z0-9_-]{32}$/.test(generatedPassword!), true, "the faculty password must be 32 URL-safe characters");
+  assert.ok(!JSON.stringify(res.body).includes(generatedPassword!), "the API response must not disclose the generated password");
+  const [createdUser] = await db.select().from(usersTable).where(eq(usersTable.id, res.body.faculty.id));
+  assert.ok(await bcrypt.compare(generatedPassword!, createdUser.passwordHash), "the emailed password must match the stored bcrypt hash");
+  const login = await call("/auth/login", undefined, "POST", { username: "admin-fac@example.test", password: generatedPassword });
+  assert.equal(login.status, 200, "the emailed password must authenticate");
+
+  const secondEmailStart = sentEmails.length;
+  const second = await call("/superadmin/departments/" + departmentIds[1] + "/faculty", "admin", "POST", {
+    fullName: "Second Admin-Created Faculty", email: "admin-fac-second@example.test",
+  });
+  assert.equal(second.status, 201);
+  const secondWelcome = sentEmails.slice(secondEmailStart).find((email) => email.to === "admin-fac-second@example.test");
+  const secondPassword = secondWelcome?.text.match(/^Password:\s*(\S+)$/m)?.[1];
+  assert.ok(secondPassword);
+  assert.equal(secondPassword !== generatedPassword, true, "each faculty account must receive a fresh password");
 
   // Duplicate email rejected
   const dup = await call("/superadmin/departments/" + departmentIds[1] + "/faculty", "admin", "POST", {
-    fullName: "Duplicate", email: "admin-fac@example.test", password,
+    fullName: "Duplicate", email: "admin-fac@example.test",
   });
   assert.equal(dup.status, 400);
 
+  // Legacy client-supplied credentials are rejected by the strict request schema.
+  const suppliedPassword = await call("/superadmin/departments/" + departmentIds[1] + "/faculty", "admin", "POST", {
+    fullName: "Client Password Faculty", email: "client-password-fac@example.test", password,
+  });
+  assert.equal(suppliedPassword.status, 400);
+
+  // The route remains admin-only and requires authentication.
+  assert.equal((await call("/superadmin/departments/" + departmentIds[1] + "/faculty", undefined, "POST", {
+    fullName: "Unauthenticated Faculty", email: "unauth-fac@example.test",
+  })).status, 401);
+  assert.equal((await call("/superadmin/departments/" + departmentIds[1] + "/faculty", "hod0", "POST", {
+    fullName: "HOD Faculty", email: "hod-fac@example.test",
+  })).status, 403);
+
   // Nonexistent department rejected
   assert.equal((await call("/superadmin/departments/999999/faculty", "admin", "POST", {
-    fullName: "Nobody", email: "nobody@example.test", password,
+    fullName: "Nobody", email: "nobody@example.test",
   })).status, 404);
+
+  // A failed email submission keeps the account but never discloses the password.
+  simulateFailure.enabled = true;
+  try {
+    const failedEmail = await call("/superadmin/departments/" + departmentIds[1] + "/faculty", "admin", "POST", {
+      fullName: "Email Failure Faculty", email: "admin-fac-failed@example.test",
+    });
+    assert.equal(failedEmail.status, 201);
+    assert.equal(failedEmail.body.emailAccepted, false);
+    assert.ok(!JSON.stringify(failedEmail.body).includes("password"));
+    assert.ok(!JSON.stringify(failedEmail.body).includes("Password"));
+  } finally {
+    simulateFailure.enabled = false;
+  }
 });
 
 // =========================================================================
@@ -213,7 +303,6 @@ test("HOD swap: success, sessionVersion bump, wrong-role/wrong-dept/nonexistent-
   // Create a department with a known HOD and a professor for the swap
   const setupRes = await call("/superadmin/departments", "admin", "POST", {
     setup: { name: "Swap Test Dept", code: "SWAP-TEST", hod: { fullName: "Original HOD", email: "swap-hod@example.test" } },
-    hodPassword: password,
   });
   assert.equal(setupRes.status, 201);
   const deptId = setupRes.body.departmentId;
@@ -221,7 +310,7 @@ test("HOD swap: success, sessionVersion bump, wrong-role/wrong-dept/nonexistent-
 
   // Create a professor in that department for the swap
   const profRes = await call("/superadmin/departments/" + deptId + "/faculty", "admin", "POST", {
-    fullName: "Swap Professor", email: "swap-prof@example.test", password,
+    fullName: "Swap Professor", email: "swap-prof@example.test",
   });
   assert.equal(profRes.status, 201);
   const profId = profRes.body.faculty.id;
@@ -286,14 +375,13 @@ test("HOD swap: genuine mid-transaction failure rolls back the demotion write", 
   // Set up a fresh department with a known HOD and professor
   const setupRes = await call("/superadmin/departments", "admin", "POST", {
     setup: { name: "Rollback Test Dept", code: "ROLLBACK-T", hod: { fullName: "Rollback HOD", email: "rb-hod@example.test" } },
-    hodPassword: password,
   });
   assert.equal(setupRes.status, 201);
   const deptId = setupRes.body.departmentId;
   const hodId = setupRes.body.hodId;
 
   const profRes = await call("/superadmin/departments/" + deptId + "/faculty", "admin", "POST", {
-    fullName: "Rollback Professor", email: "rb-prof@example.test", password,
+    fullName: "Rollback Professor", email: "rb-prof@example.test",
   });
   assert.equal(profRes.status, 201);
   const profId = profRes.body.faculty.id;
@@ -422,7 +510,7 @@ test("unauthenticated requests to superadmin routes get 401", async () => {
 test("admin can deactivate faculty and their session is invalidated", async () => {
   // Create a fresh faculty to deactivate
   const fac = await call("/superadmin/departments/" + departmentIds[0] + "/faculty", "admin", "POST", {
-    fullName: "Deactivate Target", email: "deac-target@example.test", password,
+    fullName: "Deactivate Target", email: "deac-target@example.test",
   });
   assert.equal(fac.status, 201);
   const facId = fac.body.faculty.id;
@@ -447,7 +535,6 @@ test("admin can delete an empty department, cascading to users/config/catalog/pr
   // created by the API call, so we insert them directly)
   const createRes = await call("/superadmin/departments", "admin", "POST", {
     setup: { name: "Delete Test Dept", code: "DEL-TEST", hod: { fullName: "Delete HOD", email: "del-hod@example.test" } },
-    hodPassword: password,
   });
   assert.equal(createRes.status, 201);
   const deptId = createRes.body.departmentId;
@@ -516,7 +603,6 @@ test("delete department returns 409 when clinical data blocks the delete, and no
   // 1. Create a department with an HOD
   const createRes = await call("/superadmin/departments", "admin", "POST", {
     setup: { name: "FK Block Dept", code: "FK-BLOCK", hod: { fullName: "FK HOD", email: "fk-hod@example.test" } },
-    hodPassword: password,
   });
   assert.equal(createRes.status, 201);
   const deptId = createRes.body.departmentId;
@@ -572,7 +658,6 @@ test("delete department returns 409 when clinical data blocks the delete, and no
 test("admin can delete a department that has assignments (delete-order fix)", async () => {
   const createRes = await call("/superadmin/departments", "admin", "POST", {
     setup: { name: "Assignment Delete Dept", code: "ASG-DEL", hod: { fullName: "Asg HOD", email: "asghod@example.test" } },
-    hodPassword: password,
   });
   assert.equal(createRes.status, 201);
   const deptId = createRes.body.departmentId;
@@ -624,7 +709,6 @@ test("delete department cleans up cross-department assignment recipients correct
   // Create Dept A
   const createA = await call("/superadmin/departments", "admin", "POST", {
     setup: { name: "Dept A", code: "DEPT-A", hod: { fullName: "HOD A", email: "hoda@example.test" } },
-    hodPassword: password,
   });
   assert.equal(createA.status, 201);
   const deptAId = createA.body.departmentId;
@@ -633,7 +717,6 @@ test("delete department cleans up cross-department assignment recipients correct
   // Create Dept B
   const createB = await call("/superadmin/departments", "admin", "POST", {
     setup: { name: "Dept B", code: "DEPT-B", hod: { fullName: "HOD B", email: "hodb@example.test" } },
-    hodPassword: password,
   });
   assert.equal(createB.status, 201);
   const deptBId = createB.body.departmentId;
