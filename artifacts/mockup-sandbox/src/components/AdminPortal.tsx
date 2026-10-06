@@ -1,7 +1,7 @@
 import { MaintenanceAnnouncements } from './MaintenanceAnnouncements';
 import { useEffect, useState, useMemo } from "react";
 import { toast } from "sonner";
-import { Building2, Users, UserCheck, UserX, Plus, GraduationCap, ArrowRight, XCircle, ChevronDown, ChevronRight, Info, UserPlus, Trash2, AlertTriangle } from "lucide-react";
+import { Building2, Users, UserCheck, UserX, Plus, GraduationCap, ArrowRight, XCircle, ChevronDown, ChevronRight, Info, UserPlus, Trash2, AlertTriangle, Pencil } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,7 @@ import {
   deactivateAdminUser,
   reactivateAdminUser,
   hardDeleteAdminUser,
+  updateAdminDepartmentUserName,
   type AdminDepartment,
   type AdminUserRow
 } from "@/lib/apiClient";
@@ -475,6 +476,9 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
   const [deletingUser, setDeletingUser] = useState(false);
   const [changingUserId, setChangingUserId] = useState<number | null>(null);
   const [deleteUserError, setDeleteUserError] = useState<string | null>(null);
+  const [editingUserId, setEditingUserId] = useState<number | null>(null);
+  const [editingName, setEditingName] = useState("");
+  const [savingUserName, setSavingUserName] = useState(false);
 
   useEffect(() => {
     fetchRoster();
@@ -487,6 +491,8 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
     setDeleteError(null);
     setUserToDelete(null);
     setDeleteUserError(null);
+    setEditingUserId(null);
+    setEditingName("");
   }, [department.id, department.mirrorDepartmentId]);
 
   const fetchRoster = async () => {
@@ -516,6 +522,38 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
       setMirrorError(err.message || "Failed to load test accounts");
     } finally {
       setMirrorLoading(false);
+    }
+  };
+
+  const startNameEdit = (user: AdminUserRow) => {
+    setEditingUserId(user.id);
+    setEditingName(user.fullName);
+  };
+
+  const cancelNameEdit = () => {
+    setEditingUserId(null);
+    setEditingName("");
+  };
+
+  const handleSaveName = async (userId: number) => {
+    if (savingUserName) return;
+    const fullName = editingName.trim();
+    if (!fullName) {
+      toast.error("Enter a name before saving");
+      return;
+    }
+
+    setSavingUserName(true);
+    try {
+      const updatedUser = await updateAdminDepartmentUserName(department.id, userId, fullName);
+      setRoster(current => current.map(user => user.id === updatedUser.id ? updatedUser : user));
+      toast.success("Name updated");
+      cancelNameEdit();
+      onRefresh();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update name");
+    } finally {
+      setSavingUserName(false);
     }
   };
 
@@ -1013,7 +1051,21 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
                   <TableBody>
                     {faculty.map(u => (
                       <TableRow key={u.id}>
-                        <TableCell className="font-semibold text-slate-900">{u.fullName}</TableCell>
+                        <TableCell className="font-semibold text-slate-900">
+                          {editingUserId === u.id ? (
+                            <div>
+                              <Input
+                                autoFocus
+                                required
+                                maxLength={160}
+                                aria-label={`Name for ${u.fullName}`}
+                                value={editingName}
+                                onChange={(e) => setEditingName(e.target.value)}
+                                className="h-9 min-w-40"
+                              />
+                            </div>
+                          ) : u.fullName}
+                        </TableCell>
                         <TableCell className="text-slate-500 text-sm">{u.email}</TableCell>
                         <TableCell>
                           {u.role === "hod" ? (
@@ -1026,22 +1078,38 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
-                            {u.role === "hod" ? (
-                              <span className="text-xs text-slate-400 font-medium self-center">Use 'Replace HOD' above</span>
+                            {editingUserId === u.id ? (
+                              <>
+                                <Button type="button" onClick={() => handleSaveName(u.id)} size="sm" disabled={savingUserName || !editingName.trim()} className="h-8 px-3">
+                                  {savingUserName ? "Saving..." : "Save"}
+                                </Button>
+                                <Button type="button" size="sm" variant="outline" disabled={savingUserName} onClick={cancelNameEdit} className="h-8 px-3">
+                                  Cancel
+                                </Button>
+                              </>
                             ) : (
                               <>
-                                {u.status === "rejected" ? (
-                                  <Button size="sm" variant="outline" onClick={() => handleReactivate(u.id, u.fullName)} className="h-8 px-3">
-                                    Reactivate
-                                  </Button>
-                                ) : (
-                                  <Button size="sm" variant="outline" onClick={() => handleDeactivate(u.id, u.role)} className="text-rose-700 border-rose-200 hover:bg-rose-50 h-8 px-3">
-                                    Deactivate
-                                  </Button>
-                                )}
-                                <Button size="sm" variant="outline" onClick={() => { setUserToDelete({ id: u.id, name: u.fullName, role: u.role, isTest: false, departmentName: department.name }); setDeleteUserError(null); }} className="text-rose-700 border-rose-200 hover:bg-rose-50 h-8 px-3">
-                                  <Trash2 className="h-4 w-4 mr-1" /> Delete
+                                <Button type="button" size="sm" variant="outline" title={`Edit ${u.fullName}'s name`} aria-label={`Edit ${u.fullName}'s name`} onClick={() => startNameEdit(u)} className="h-8 px-3">
+                                  <Pencil className="h-4 w-4" /> Edit name
                                 </Button>
+                                {u.role === "hod" ? (
+                                  <span className="text-xs text-slate-400 font-medium self-center">Use 'Replace HOD' above</span>
+                                ) : (
+                                  <>
+                                    {u.status === "rejected" ? (
+                                      <Button size="sm" variant="outline" onClick={() => handleReactivate(u.id, u.fullName)} className="h-8 px-3">
+                                        Reactivate
+                                      </Button>
+                                    ) : (
+                                      <Button size="sm" variant="outline" onClick={() => handleDeactivate(u.id, u.role)} className="text-rose-700 border-rose-200 hover:bg-rose-50 h-8 px-3">
+                                        Deactivate
+                                      </Button>
+                                    )}
+                                    <Button size="sm" variant="outline" onClick={() => { setUserToDelete({ id: u.id, name: u.fullName, role: u.role, isTest: false, departmentName: department.name }); setDeleteUserError(null); }} className="text-rose-700 border-rose-200 hover:bg-rose-50 h-8 px-3">
+                                      <Trash2 className="h-4 w-4 mr-1" /> Delete
+                                    </Button>
+                                  </>
+                                )}
                               </>
                             )}
                           </div>
@@ -1077,7 +1145,21 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
                     {residents.map(u => (
                       <TableRow key={u.id}>
                         <TableCell>
-                          <div className="font-semibold text-slate-900">{u.fullName}</div>
+                          {editingUserId === u.id ? (
+                            <div>
+                              <Input
+                                autoFocus
+                                required
+                                maxLength={160}
+                                aria-label={`Name for ${u.fullName}`}
+                                value={editingName}
+                                onChange={(e) => setEditingName(e.target.value)}
+                                className="h-9 min-w-40"
+                              />
+                            </div>
+                          ) : (
+                            <div className="font-semibold text-slate-900">{u.fullName}</div>
+                          )}
                           {u.status === "pending" && (
                             <div className="text-xs text-amber-600 mt-0.5">Awaiting the {department.name} HOD's approval</div>
                           )}
@@ -1090,18 +1172,34 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
-                            {u.status === "rejected" ? (
-                              <Button size="sm" variant="outline" onClick={() => handleReactivate(u.id, u.fullName)} className="h-8 px-3">
-                                Reactivate
-                              </Button>
+                            {editingUserId === u.id ? (
+                              <>
+                                <Button type="button" onClick={() => handleSaveName(u.id)} size="sm" disabled={savingUserName || !editingName.trim()} className="h-8 px-3">
+                                  {savingUserName ? "Saving..." : "Save"}
+                                </Button>
+                                <Button type="button" size="sm" variant="outline" disabled={savingUserName} onClick={cancelNameEdit} className="h-8 px-3">
+                                  Cancel
+                                </Button>
+                              </>
                             ) : (
-                              <Button size="sm" variant="outline" onClick={() => handleDeactivate(u.id, u.role)} className="text-rose-700 border-rose-200 hover:bg-rose-50 h-8 px-3">
-                                Deactivate
-                              </Button>
+                              <>
+                                <Button type="button" size="sm" variant="outline" title={`Edit ${u.fullName}'s name`} aria-label={`Edit ${u.fullName}'s name`} onClick={() => startNameEdit(u)} className="h-8 px-3">
+                                  <Pencil className="h-4 w-4" /> Edit name
+                                </Button>
+                                {u.status === "rejected" ? (
+                                  <Button size="sm" variant="outline" onClick={() => handleReactivate(u.id, u.fullName)} className="h-8 px-3">
+                                    Reactivate
+                                  </Button>
+                                ) : (
+                                  <Button size="sm" variant="outline" onClick={() => handleDeactivate(u.id, u.role)} className="text-rose-700 border-rose-200 hover:bg-rose-50 h-8 px-3">
+                                    Deactivate
+                                  </Button>
+                                )}
+                                <Button size="sm" variant="outline" onClick={() => { setUserToDelete({ id: u.id, name: u.fullName, role: u.role, isTest: false, departmentName: department.name }); setDeleteUserError(null); }} className="text-rose-700 border-rose-200 hover:bg-rose-50 h-8 px-3">
+                                  <Trash2 className="h-4 w-4 mr-1" /> Delete
+                                </Button>
+                              </>
                             )}
-                            <Button size="sm" variant="outline" onClick={() => { setUserToDelete({ id: u.id, name: u.fullName, role: u.role, isTest: false, departmentName: department.name }); setDeleteUserError(null); }} className="text-rose-700 border-rose-200 hover:bg-rose-50 h-8 px-3">
-                              <Trash2 className="h-4 w-4 mr-1" /> Delete
-                            </Button>
                           </div>
                         </TableCell>
                       </TableRow>

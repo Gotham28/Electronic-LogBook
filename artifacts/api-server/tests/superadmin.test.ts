@@ -40,6 +40,7 @@ test("HOD, professor, and student accounts get 403 on every superadmin route", a
     ["/superadmin/departments", "POST"],
     ["/superadmin/departments/" + departmentIds[0] + "/replace-hod", "POST"],
     ["/superadmin/departments/" + departmentIds[0] + "/roster", "GET"],
+    ["/superadmin/departments/" + departmentIds[0] + "/users/" + a.faculty0.id + "/name", "PATCH"],
     ["/superadmin/departments/" + departmentIds[0] + "/faculty", "POST"],
     ["/superadmin/departments/" + departmentIds[0] + "/students", "POST"],
     ["/superadmin/users/" + a.student0.id + "/deactivate", "POST"],
@@ -47,7 +48,7 @@ test("HOD, professor, and student accounts get 403 on every superadmin route", a
   ];
   for (const role of ["hod0", "faculty0", "student0"] as const) {
     for (const [path, method] of routes) {
-      const res = await call(path, role, method, method === "POST" ? {} : undefined);
+      const res = await call(path, role, method, method !== "GET" ? {} : undefined);
       assert.equal(res.status, 403, `${role} on ${method} ${path} should be 403, got ${res.status}`);
     }
   }
@@ -200,6 +201,69 @@ test("admin can view any department roster (plain user rows only)", async () => 
   }
   // Nonexistent department returns 404
   assert.equal((await call("/superadmin/departments/999999/roster", "admin")).status, 404);
+});
+
+// =========================================================================
+// 5a. Admin can rename a faculty, HOD, or student in the selected department
+// =========================================================================
+test("admin can rename department faculty and students; route is authenticated and department-scoped", async (t) => {
+  const departmentId = departmentIds[0];
+  const targets = [a.hod0, a.faculty0, a.student0];
+  const originalNames = new Map<number, string>();
+  for (const target of targets) {
+    const [user] = await db.select({ id: usersTable.id, fullName: usersTable.fullName })
+      .from(usersTable).where(eq(usersTable.id, target.id)).limit(1);
+    assert.ok(user);
+    originalNames.set(user.id, user.fullName);
+  }
+
+  const describe = (label: string, path: string, actor: string, body: unknown, response: { status: number; body: any }) => {
+    t.diagnostic(`${label}: PATCH ${path} as ${actor} with ${JSON.stringify(body)} -> ${response.status} ${JSON.stringify(response.body)}`);
+  };
+
+  try {
+    const facultyPath = `/superadmin/departments/${departmentId}/users/${a.faculty0.id}/name`;
+    const unauthenticated = await call(facultyPath, undefined, "PATCH", { fullName: "Renamed Test Faculty" });
+    describe("Unauthenticated request", facultyPath, "anonymous", { fullName: "Renamed Test Faculty" }, unauthenticated);
+    assert.equal(unauthenticated.status, 401);
+
+    const wrongRole = await call(facultyPath, "hod1", "PATCH", { fullName: "Renamed Test Faculty" });
+    describe("Authenticated non-admin request", facultyPath, "HOD", { fullName: "Renamed Test Faculty" }, wrongRole);
+    assert.equal(wrongRole.status, 403);
+
+    const renamedFaculty = await call(facultyPath, "admin", "PATCH", { fullName: "Renamed Test Faculty" });
+    describe("Admin edits faculty in selected department", facultyPath, "admin", { fullName: "Renamed Test Faculty" }, renamedFaculty);
+    assert.equal(renamedFaculty.status, 200);
+    assert.equal(renamedFaculty.body.fullName, "Renamed Test Faculty");
+    assert.equal(renamedFaculty.body.role, "professor");
+
+    const hodPath = `/superadmin/departments/${departmentId}/users/${a.hod0.id}/name`;
+    const renamedHod = await call(hodPath, "admin", "PATCH", { fullName: "Renamed Test HOD" });
+    assert.equal(renamedHod.status, 200);
+    assert.equal(renamedHod.body.role, "hod");
+
+    const studentPath = `/superadmin/departments/${departmentId}/users/${a.student0.id}/name`;
+    const renamedStudent = await call(studentPath, "admin", "PATCH", { fullName: "Renamed Test Student" });
+    assert.equal(renamedStudent.status, 200);
+    assert.equal(renamedStudent.body.role, "student");
+
+    const crossDepartmentPath = `/superadmin/departments/${departmentId}/users/${a.faculty1.id}/name`;
+    const crossDepartment = await call(crossDepartmentPath, "admin", "PATCH", { fullName: "Must Not Change" });
+    describe("Admin targets a user from another department", crossDepartmentPath, "admin", { fullName: "Must Not Change" }, crossDepartment);
+    assert.equal(crossDepartment.status, 404);
+
+    const nonexistentPath = `/superadmin/departments/${departmentId}/users/999999/name`;
+    const nonexistent = await call(nonexistentPath, "admin", "PATCH", { fullName: "No Such User" });
+    describe("Admin targets a nonexistent user", nonexistentPath, "admin", { fullName: "No Such User" }, nonexistent);
+    assert.equal(nonexistent.status, 404);
+
+    const invalidName = await call(facultyPath, "admin", "PATCH", { fullName: "   " });
+    assert.equal(invalidName.status, 400);
+  } finally {
+    for (const [id, fullName] of originalNames) {
+      await db.update(usersTable).set({ fullName }).where(eq(usersTable.id, id));
+    }
+  }
 });
 
 // =========================================================================
