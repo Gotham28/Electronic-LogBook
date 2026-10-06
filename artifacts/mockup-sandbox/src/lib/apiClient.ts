@@ -177,7 +177,7 @@ export function getAdminDepartments(): Promise<AdminDepartment[]> {
   return apiGet("/api/superadmin/departments");
 }
 
-export function createAdminDepartment(data: { setup: { name: string; code: string; description?: string; hod: { fullName: string; email: string } }; hodPassword: string }) {
+export function createAdminDepartment(data: { setup: { name: string; code: string; description?: string; hod: { fullName: string; email: string } } }) {
   return apiPost("/api/superadmin/departments", data);
 }
 
@@ -189,7 +189,7 @@ export function replaceAdminHod(departmentId: number, incomingUserId: number) {
   return apiPost(`/api/superadmin/departments/${departmentId}/replace-hod`, { incomingUserId });
 }
 
-export function createAdminFaculty(departmentId: number, data: { fullName: string; email: string; password: string }) {
+export function createAdminFaculty(departmentId: number, data: { fullName: string; email: string }) {
   return apiPost(`/api/superadmin/departments/${departmentId}/faculty`, data);
 }
 

@@ -53,7 +53,7 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
   const [loadingCounts, setLoadingCounts] = useState(true);
 
   // New department form state
-  const [newDeptForm, setNewDeptForm] = useState({ name: "", code: "", hodFullName: "", hodEmail: "", hodPassword: "" });
+  const [newDeptForm, setNewDeptForm] = useState({ name: "", code: "", hodFullName: "", hodEmail: "" });
   const [creatingDept, setCreatingDept] = useState(false);
 
   useEffect(() => {
@@ -121,7 +121,7 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
 
   const handleCreateDepartment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newDeptForm.name || !newDeptForm.code || !newDeptForm.hodFullName || !newDeptForm.hodEmail || !newDeptForm.hodPassword) {
+    if (!newDeptForm.name || !newDeptForm.code || !newDeptForm.hodFullName || !newDeptForm.hodEmail) {
       toast.error("Please fill in all fields.");
       return;
     }
@@ -135,13 +135,12 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
             fullName: newDeptForm.hodFullName,
             email: newDeptForm.hodEmail
           }
-        },
-        hodPassword: newDeptForm.hodPassword
+        }
       });
       toast.success("Department and HOD created successfully");
-      if (!result.emailAccepted) toast.warning("The HOD account was created, but the onboarding email could not be accepted by the email provider.");
+      if (!result.emailAccepted) toast.warning("The HOD account was created, but the onboarding email could not be accepted by the email provider. Ask the HOD to use Forgot password if needed.");
       setShowNewDeptPanel(false);
-      setNewDeptForm({ name: "", code: "", hodFullName: "", hodEmail: "", hodPassword: "" });
+      setNewDeptForm({ name: "", code: "", hodFullName: "", hodEmail: "" });
       fetchDepartments();
     } catch (err: any) {
       toast.error(err.message || "Failed to create department");
@@ -367,10 +366,7 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
                   <Label htmlFor="hod-email">HOD Email</Label>
                   <Input id="hod-email" type="email" placeholder="sarah.smith@example.com" value={newDeptForm.hodEmail} onChange={e => setNewDeptForm({...newDeptForm, hodEmail: e.target.value})} required />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="hod-password">HOD Initial Password</Label>
-                  <Input id="hod-password" type="password" placeholder="At least 8 characters" value={newDeptForm.hodPassword} onChange={e => setNewDeptForm({...newDeptForm, hodPassword: e.target.value})} required minLength={8} maxLength={72} />
-                </div>
+                <p className="text-sm text-slate-600 md:col-span-2">A secure initial password will be generated and emailed to the HOD. They can change it after signing in.</p>
               </div>
               <div className="flex justify-end gap-2 pt-2">
                 <Button type="button" variant="outline" onClick={() => setShowNewDeptPanel(false)}>Cancel</Button>
@@ -573,7 +569,7 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!addTarget || !addForm.fullName || !addForm.email || !addForm.password) return;
+    if (!addTarget || !addForm.fullName || !addForm.email || (addFormType === "resident" && !addForm.password)) return;
     
     if (addFormType === "resident") {
       if (!addForm.batch || !addForm.dateOfJoining || !addForm.kuhsId) {
@@ -587,15 +583,14 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
       if (addFormType === "faculty") {
         const result = await createAdminFaculty(addTarget.id, {
           fullName: addForm.fullName,
-          email: addForm.email,
-          password: addForm.password
+          email: addForm.email
         });
         toast.success("Faculty account created");
         if (!result.emailAccepted) {
           const detail = result.emailFailure?.failure === "missing_configuration" ? "Email service configuration is missing"
             : result.emailFailure?.failure === "provider_rejected" ? `Email provider rejected it${result.emailFailure.providerStatus ? ` (HTTP ${result.emailFailure.providerStatus})` : ""}`
               : "Email provider could not be reached";
-          toast.warning(`Faculty account created. ${detail}; check the server log and Resend Events.`);
+          toast.warning(`Faculty account created. ${detail}; ask the faculty member to use Forgot password if needed.`);
         }
       } else {
         const result = await createAdminStudent(addTarget.id, {
@@ -945,10 +940,14 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
                       <Label>Email</Label>
                       <Input type="email" placeholder="john@example.com" value={addForm.email} onChange={e => setAddForm({...addForm, email: e.target.value})} required />
                     </div>
-                    <div className="space-y-2 flex-1 w-full">
-                      <Label>Password</Label>
-                      <Input type="password" placeholder="At least 8 characters" value={addForm.password} onChange={e => setAddForm({...addForm, password: e.target.value})} required minLength={8} maxLength={72} />
-                    </div>
+                    {addFormType === "resident" ? (
+                      <div className="space-y-2 flex-1 w-full">
+                        <Label>Password</Label>
+                        <Input type="password" placeholder="At least 8 characters" value={addForm.password} onChange={e => setAddForm({...addForm, password: e.target.value})} required minLength={8} maxLength={72} />
+                      </div>
+                    ) : (
+                      <p className="flex-1 text-sm text-slate-600">A secure initial password will be generated and emailed to the faculty member. They can change it after signing in.</p>
+                    )}
                   </div>
                   {addFormType === "resident" && (
                     <>

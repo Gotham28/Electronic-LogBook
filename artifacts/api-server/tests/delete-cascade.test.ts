@@ -36,7 +36,6 @@ describe("Delete cascade for mirror test department", () => {
     // 1. Create a real department via API (auto-provisions mirror)
     const createRes = await request(runtime.base, "/superadmin/departments", adminAccount, "POST", {
       setup: { name: "Cascade Test Dept", code: "CASCADETEST1", hod: { fullName: "Cascade HOD", email: "cascade-hod@example.test" } },
-      hodPassword: password,
     });
     assert.equal(createRes.status, 201);
     const realDeptId = createRes.body.departmentId;
@@ -78,7 +77,6 @@ describe("Delete cascade for mirror test department", () => {
     // 1. Create a real department (auto-provisions mirror)
     const createRes = await request(runtime.base, "/superadmin/departments", adminAccount, "POST", {
       setup: { name: "Conflict Test Dept", code: "CONFLICTTEST1", hod: { fullName: "Conflict HOD", email: "conflict-hod@example.test" } },
-      hodPassword: password,
     });
     assert.equal(createRes.status, 201);
     const realDeptId = createRes.body.departmentId;
