@@ -145,7 +145,7 @@ for (const flow of [
 }
 
 const registrationBody = z.object({ fullName: nameSchema, email: emailSchema, password: passwordSchema,
-  registrationNumber: z.string().trim().max(100).optional().nullable(), batch: z.string().trim().min(1).max(40), dateOfJoining: dateSchema,
+  registrationNumber: z.string().trim().max(100).optional().nullable().transform((value) => value === "" ? null : value), batch: z.string().trim().min(1).max(40), dateOfJoining: dateSchema,
   kuhsId: nameSchema, departmentId: idSchema, verificationToken: z.string().min(1).max(2048) }).strict();
 
 router.post("/register", validate(registrationBody), async (req, res) => {
