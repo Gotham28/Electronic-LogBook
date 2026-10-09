@@ -297,6 +297,44 @@ test("student self-registration needs possession of a verified single-use proof 
   assert.ok(login.body.studentProfileId);
 });
 
+test("student self-registration with blank or omitted registrationNumber stores NULL and allows multiple blank registrations", async () => {
+  const cases = [
+    { email: "blankreg1@example.test", kuhsId: "UNIV-BLANK-1", registrationNumber: "" },
+    { email: "blankreg2@example.test", kuhsId: "UNIV-BLANK-2", registrationNumber: "   " },
+    { email: "omittedreg@example.test", kuhsId: "UNIV-OMITTED-1", registrationNumber: undefined },
+  ] as const;
+
+  for (const entry of cases) {
+    assert.equal((await call("/auth/send-otp", undefined, "POST", { email: entry.email })).status, 200);
+    const proof = await call("/auth/verify-otp", undefined, "POST", { email: entry.email, otp: mail.get(entry.email) });
+    assert.equal(proof.status, 200);
+
+    const payload: Record<string, unknown> = {
+      fullName: "Optional Reg Student",
+      email: entry.email,
+      password,
+      batch: "2026",
+      dateOfJoining: "2026-09-01",
+      kuhsId: entry.kuhsId,
+      departmentId: departmentIds[1],
+      verificationToken: proof.body.verificationToken,
+    };
+    if (entry.registrationNumber !== undefined) {
+      payload.registrationNumber = entry.registrationNumber;
+    }
+
+    const res = await call("/auth/register", undefined, "POST", payload);
+    assert.equal(res.status, 201);
+
+    const [row] = await db.select({ registrationNumber: studentsTable.registrationNumber })
+      .from(studentsTable)
+      .innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
+      .where(eq(usersTable.email, entry.email));
+    assert.ok(row);
+    assert.equal(row.registrationNumber, null);
+  }
+});
+
 test("student approval email failure is reported while the approved status remains saved", async () => {
   const pending = a.pending2;
   const [plan] = await db.insert(subscriptionPlansTable).values({
