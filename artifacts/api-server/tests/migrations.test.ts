@@ -13,12 +13,13 @@ test("fresh installation and rerunning migrations are safe and checksum-tracked"
   try {
     await applyMigrations(migrationConnection(database));
     await applyMigrations(migrationConnection(database));
-    assert.equal((await database.query("SELECT * FROM elogbook_migrations")).rows.length, 23);
+    assert.equal((await database.query("SELECT * FROM elogbook_migrations")).rows.length, 24);
     assert.equal((await database.query("SELECT to_regclass('maintenance_announcements') AS table_name")).rows[0].table_name, "maintenance_announcements");
     assert.equal((await database.query("SELECT * FROM departments")).rows.length, 0);
     assert.equal((await database.query("SELECT * FROM assignment_recipients")).rows.length, 0);
     assert.equal((await database.query<any>("SELECT column_default, is_nullable FROM information_schema.columns WHERE table_name = 'students' AND column_name = 'admin_provisioned'")).rows[0].column_default, "false");
     assert.equal((await database.query<any>("SELECT is_nullable FROM information_schema.columns WHERE table_name = 'students' AND column_name = 'admin_provisioned'")).rows[0].is_nullable, "NO");
+    assert.equal((await database.query<any>("SELECT is_nullable FROM information_schema.columns WHERE table_name = 'students' AND column_name = 'registration_number'")).rows[0].is_nullable, "YES");
     await database.query("UPDATE elogbook_migrations SET checksum = 'tampered' WHERE name = '0002_departments_assignments.sql'");
     await assert.rejects(applyMigrations(migrationConnection(database)), /checksum differs/);
   } finally { await database.close(); }

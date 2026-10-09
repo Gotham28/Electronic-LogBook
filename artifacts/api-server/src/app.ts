@@ -99,11 +99,17 @@ app.use((_req, res) => { res.status(404).json({ message: "Route not found" }); }
 const errors: ErrorRequestHandler = (error, req, res, _next) => {
   if (error.type === "entity.too.large") { res.status(413).json({ message: "Request is too large" }); return; }
   if (error.type === "entity.parse.failed") { res.status(400).json({ message: "Invalid JSON" }); return; }
-  const code = error.code || error.cause?.code;
+  const pgError = error?.cause?.code ? error.cause : error;
+  const code = pgError?.code;
   if (code === "23505") { res.status(409).json({ message: "This record already exists" }); return; }
   if (["23503", "23514"].includes(code)) { res.status(400).json({ message: "Invalid record relationship or value" }); return; }
   // Drizzle errors can contain SQL parameters, including credentials and clinical records.
-  req.log.error({ code: typeof code === "string" && /^[A-Z0-9]{5}$/.test(code) ? code : "UNEXPECTED" }, "Request failed");
+  req.log.error({
+    code: typeof code === "string" && /^[A-Z0-9]{5}$/.test(code) ? code : "UNEXPECTED",
+    ...(typeof pgError?.table === "string" ? { table: pgError.table } : {}),
+    ...(typeof pgError?.column === "string" ? { column: pgError.column } : {}),
+    ...(typeof pgError?.constraint === "string" ? { constraint: pgError.constraint } : {}),
+  }, "Request failed");
   res.status(500).json({ message: "Internal server error" });
 };
 app.use(errors);
