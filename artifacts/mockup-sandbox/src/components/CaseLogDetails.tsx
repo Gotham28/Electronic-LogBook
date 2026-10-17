@@ -1,5 +1,6 @@
 import * as React from "react";
 import { formatLogbookDate } from "@/lib/logbook-config";
+import { getCaseMedicalSummary } from "@/lib/case-medical-summary";
 
 export type CaseLogDetailRecord = {
   date: string;
@@ -56,11 +57,8 @@ export function CaseLogDetails({ caseLog, hideUhid = false, showReview = false, 
       </section>
       {medicalSummaryCaseFields && (
         <section aria-label="Medical Summary">
-          <h4 className="mb-3 text-xs font-bold uppercase tracking-wide text-teal-800">Medical Summary</h4>
-          <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <DetailField label="Chief complaints" value={caseLog.chiefComplaints} />
-            <DetailField label="Relevant history" value={caseLog.history} />
-            <DetailField label="Clinical examination" value={caseLog.examination} />
+          <dl>
+            <DetailField label="Medical Summary" value={getCaseMedicalSummary(caseLog)} />
           </dl>
         </section>
       )}
