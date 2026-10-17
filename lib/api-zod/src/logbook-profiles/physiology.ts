@@ -36,7 +36,7 @@ export const physiologyLogbook: AcademicLogbookProfile = {
   id: "physiology",
   title: "Physiology logbook",
   departmentNames: ["Physiology"],
-  departmentCodes: ["PHYS", "PHYSIO", "PHY", "PHYSIOLOGY"],
+  departmentCodes: ["PSI", "PHYS", "PHYSIO", "PHY", "PHYSIOLOGY"],
   sections: [
     section("Lectures attended in the department"),
     section("Practical procedures / classes in the department", allYears, { topicLabel: "Practical procedure / class", participation: ["Attended", "Performed"] }),
