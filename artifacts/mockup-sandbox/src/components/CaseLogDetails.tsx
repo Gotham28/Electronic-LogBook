@@ -35,10 +35,11 @@ function DetailField({ label, value }: { label: string; value?: string | number 
   );
 }
 
-export function CaseLogDetails({ caseLog, hideUhid = false, showReview = false }: {
+export function CaseLogDetails({ caseLog, hideUhid = false, showReview = false, medicalSummaryCaseFields = false }: {
   caseLog: CaseLogDetailRecord;
   hideUhid?: boolean;
   showReview?: boolean;
+  medicalSummaryCaseFields?: boolean;
 }) {
   return (
     <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
@@ -53,12 +54,22 @@ export function CaseLogDetails({ caseLog, hideUhid = false, showReview = false }
           {!hideUhid && <DetailField label="UHID" value={caseLog.patientUhid} />}
         </dl>
       </section>
+      {medicalSummaryCaseFields && (
+        <section aria-label="Medical Summary">
+          <h4 className="mb-3 text-xs font-bold uppercase tracking-wide text-teal-800">Medical Summary</h4>
+          <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <DetailField label="Chief complaints" value={caseLog.chiefComplaints} />
+            <DetailField label="Relevant history" value={caseLog.history} />
+            <DetailField label="Clinical examination" value={caseLog.examination} />
+          </dl>
+        </section>
+      )}
       <section aria-labelledby="case-clinical-heading">
         <h4 id="case-clinical-heading" className="mb-3 text-xs font-bold uppercase tracking-wide text-teal-800">Clinical details</h4>
         <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <DetailField label="Chief complaints" value={caseLog.chiefComplaints} />
-          <DetailField label="History" value={caseLog.history} />
-          <DetailField label="Examination" value={caseLog.examination} />
+          {!medicalSummaryCaseFields && <DetailField label="Chief complaints" value={caseLog.chiefComplaints} />}
+          {!medicalSummaryCaseFields && <DetailField label="History" value={caseLog.history} />}
+          {!medicalSummaryCaseFields && <DetailField label="Examination" value={caseLog.examination} />}
           <DetailField label="Investigations" value={caseLog.investigations} />
           <DetailField label="Provisional diagnosis" value={caseLog.diagnosisProvisional} />
           <DetailField label="Differential diagnosis" value={caseLog.differentialDiagnosis} />

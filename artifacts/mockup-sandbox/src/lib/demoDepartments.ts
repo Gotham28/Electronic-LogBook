@@ -314,6 +314,7 @@ const dermatologyProfile = createEmptyDepartmentProfile({
   code: "dermatology",
   accent: "#9d174d",
   enabledFeatures: {
+    medicalSummaryCaseFields: true,
     useCaseTypeLabel: true,
     useThesisAndPublicationsLabel: true,
     splitThesisAndCertifications: true,
