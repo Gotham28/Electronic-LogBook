@@ -24,6 +24,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Kbd } from "@/components/ui/kbd";
 import { formatLogbookDate, todayForInput } from "@/lib/logbook-config";
 import { useDepartment } from "@/lib/department-context";
+import { getCaseMedicalSummary } from "@/lib/case-medical-summary";
 
 type CaseLog = {
   number: number;
@@ -52,6 +53,7 @@ const emptyForm = {
   age: "",
   gender: "Male",
   category: "",
+  medicalSummary: "",
   chiefComplaints: "",
   history: "",
   examination: "",
@@ -85,6 +87,7 @@ export function CaseLogsPage() {
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   const { caseCategories, config: deptConfig } = useDepartment();
+  const medicalSummaryCaseFields = Boolean(deptConfig?.enabledFeatures?.medicalSummaryCaseFields);
 
   const totalRequired = React.useMemo(() => 
     caseCategories?.reduce((acc: number, c: any) => acc + c.required, 0) || 50,
@@ -143,9 +146,9 @@ export function CaseLogsPage() {
         patientAge: form.age,
         patientGender: form.gender.toLowerCase(),
         category: form.category,
-        chiefComplaints: form.chiefComplaints,
-        history: form.history,
-        examination: form.examination,
+        chiefComplaints: medicalSummaryCaseFields ? form.medicalSummary : form.chiefComplaints,
+        history: medicalSummaryCaseFields ? "" : form.history,
+        examination: medicalSummaryCaseFields ? "" : form.examination,
         investigations: form.investigations,
         diagnosisProvisional: form.diagnosis,
         diagnosisFinal: form.diagnosis, 
@@ -189,9 +192,10 @@ export function CaseLogsPage() {
   const search = searchTerm.toLowerCase();
   const filteredLogs = caseLogs.filter((log) => {
     const catName = caseCategories?.find((c: any) => c.value === log.category)?.name || log.category || "";
+    const summary = medicalSummaryCaseFields ? getCaseMedicalSummary(log) : log.chiefComplaints;
     const searchFields = hideUhid
-      ? [log.number, log.diagnosisProvisional, log.diagnosis, log.chiefComplaints, catName]
-      : [log.number, log.diagnosisProvisional, log.diagnosis, log.patientUhid, log.chiefComplaints, catName];
+      ? [log.number, log.diagnosisProvisional, log.diagnosis, summary, catName]
+      : [log.number, log.diagnosisProvisional, log.diagnosis, log.patientUhid, summary, catName];
     return searchFields.some((value) => String(value).toLowerCase().includes(search));
   });
 
@@ -251,13 +255,8 @@ export function CaseLogsPage() {
                   </SelectContent>
                 </Select>
               </Field>
-              {deptConfig?.enabledFeatures?.medicalSummaryCaseFields ? (
-                <section aria-label="Medical Summary" className="space-y-4 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
-                  <h3 className="text-xs font-bold uppercase tracking-wide text-teal-800">Medical Summary</h3>
-                  <Field label="Chief complaints"><Textarea rows={2} value={form.chiefComplaints} onChange={(e) => setField("chiefComplaints", e.target.value)} /></Field>
-                  <Field label="Relevant history"><Textarea rows={3} value={form.history} onChange={(e) => setField("history", e.target.value)} /></Field>
-                  <Field label="Clinical examination"><Textarea rows={3} value={form.examination} onChange={(e) => setField("examination", e.target.value)} /></Field>
-                </section>
+              {medicalSummaryCaseFields ? (
+                <Field label="Medical Summary"><Textarea rows={8} maxLength={8000} value={form.medicalSummary} onChange={(e) => setField("medicalSummary", e.target.value)} /></Field>
               ) : (
                 <>
                   <Field label="Chief complaints"><Textarea rows={2} value={form.chiefComplaints} onChange={(e) => setField("chiefComplaints", e.target.value)} /></Field>
@@ -420,7 +419,7 @@ export function CaseLogsPage() {
                               setForm({
                                 date: log.date, patientUhid: log.patientUhid || "", age: log.patientAge || log.age || "",
                                 gender: (log.patientGender || log.gender || "male").charAt(0).toUpperCase() + (log.patientGender || log.gender || "male").slice(1),
-                                category: log.category || "", chiefComplaints: log.chiefComplaints || "",
+                                category: log.category || "", medicalSummary: getCaseMedicalSummary(log), chiefComplaints: log.chiefComplaints || "",
                                 history: log.history || "", examination: log.examination || "", investigations: log.investigations || "",
                                 diagnosis: log.diagnosisFinal || log.diagnosisProvisional || log.diagnosis || "", differentialDiagnosis: log.differentialDiagnosis || "",
                                 management: log.managementPlan || log.management || "", outcome: log.outcome || "", learningPoints: log.learningPoints || "",
@@ -459,15 +458,8 @@ export function CaseLogsPage() {
               </DialogHeader>
               <div className="grid gap-4">
                 <Detail label={deptConfig?.enabledFeatures?.useCaseTypeLabel ? "Type" : "Category"} value={caseCategories?.find((c: any) => c.value === selectedLog.category)?.name || selectedLog.category} />
-                {deptConfig?.enabledFeatures?.medicalSummaryCaseFields ? (
-                  <section aria-label="Medical Summary" className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
-                    <h3 className="text-xs font-bold uppercase tracking-wide text-teal-800">Medical Summary</h3>
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <Detail label="Chief complaints" value={selectedLog.chiefComplaints} />
-                      <Detail label="Relevant history" value={selectedLog.history} />
-                      <Detail label="Clinical examination" value={selectedLog.examination} />
-                    </div>
-                  </section>
+                {medicalSummaryCaseFields ? (
+                  <Detail label="Medical Summary" value={getCaseMedicalSummary(selectedLog)} />
                 ) : (
                   <>
                     <Detail label="Chief complaints" value={selectedLog.chiefComplaints} />
