@@ -1,0 +1,92 @@
+# Physiology logbook (department code PSI)
+
+The Physiology department created through the admin portal uses code `PSI`.
+The API recognises that code and supplies the document-based Physiology profile
+automatically. The existing name match also recognises `Physiology`, regardless
+of capitalisation. A mirrored test department uses its real department's profile.
+
+## Deploy to the main server
+
+1. Push and merge the complete Physiology implementation through the normal release process.
+2. Build and deploy both the API and frontend from the same revision:
+
+   ```sh
+   pnpm --filter @workspace/api-server build
+   pnpm --filter @workspace/mockup-sandbox build
+   ```
+
+3. Restart the API with its normal deployment configuration and publish the new frontend build.
+4. Sign in as an approved resident in department `PSI`. Open **Physiology logbook**
+   in the sidebar. The existing `/academics` route now displays its sections and forms.
+
+This feature needs no additional table, migration, database update, template-application
+command, or feature-flag endpoint. It uses the department already created in the admin
+portal. The department needs approved faculty/HOD accounts for residents to select a
+reviewing faculty member.
+
+## Sections from the supplied document
+
+| Record section | Logbook years |
+| --- | --- |
+| Lectures attended in the department | 1, 2, 3 |
+| Practical procedures/classes in the department | 1, 2, 3 |
+| Daily activity record | 1, 2, 3 |
+| Lectures attended in allied departments | 1, 2 |
+| Biostatistics and Research Methodology lectures | 1, 2, 3 |
+| Seminars attended/presented | 1, 2, 3 |
+| Microteaching attended/presented | 1, 2, 3 |
+| Journal club attended/presented | 1, 2, 3 |
+| UG teaching programs conducted | 1, 2, 3 |
+| UG practical classes conducted | 1, 2, 3 |
+| PG teaching programs attended | 1, 2, 3 |
+| Thesis topic selection | 1 |
+| Symposium | 1, 2, 3 |
+| Conferences, workshops and webinars attended/presented | 1, 2, 3 |
+| Formative assessment | 1, 2 |
+| District Residency Programme | 2 |
+| Postings in allied departments | 3 |
+| Papers presented/published | 3 |
+| Test paper marks | 3 |
+| Internal assessment | 3 |
+| Attendance | 3 |
+| Student appraisal form for MD in Physiology | 3 |
+
+There are 22 distinct sections: 15 in the first-year book, 15 in the second-year
+book and 18 in the third-year book. The third-year attendance section records
+the percentage and period separately for each of the three attendance years.
+
+Each entry captures a date, topic/activity, logbook year and reviewing faculty.
+Section-specific forms include participation, posting department/institution and
+end date, marks with optional maximum marks, paper status/publication reference,
+and attendance percentage. Appraisal records capture the supplied form's 14
+ratings (1–9), item comments, additional comments, disposition and whether the
+assessment was discussed with the trainee, with an explanation when it was not.
+Appraisal entries transcribe completed appraisal forms for faculty verification.
+The app does not capture handwritten signatures.
+
+Entries support saving, editing pending/rejected submissions, faculty/HOD review
+and printing their details. The document specifies no numeric training quotas;
+this profile adds none.
+
+## Storage and configuration
+
+- Section definitions: `lib/api-zod/src/logbook-profiles/physiology.ts`.
+- Profile resolution: `artifacts/api-server/src/lib/academic-logbook.ts`.
+- The authenticated department catalog response contains `academicLogbook`.
+- Entries use the existing `academic_logs` table and student ownership checks.
+- The activity type, date, topic and reviewer use existing columns. The description
+  column stores versioned JSON with the logbook year, section fields and notes.
+- The resident page, faculty review and printable logbook render readable field
+  labels. Existing plain-text academic descriptions remain readable.
+
+## Focused verification
+
+```sh
+cd artifacts/api-server
+pnpm exec tsx --tsconfig tests/tsconfig.json --test tests/physiology-logbook.test.ts
+```
+
+These tests use an isolated in-memory PGlite database through the repository's
+test alias. They do not connect to the server's database. Coverage includes the
+`PSI` code, department inheritance, all 22 sections, saving/editing, field validation,
+ownership boundaries, faculty review and preserving other departments' options.

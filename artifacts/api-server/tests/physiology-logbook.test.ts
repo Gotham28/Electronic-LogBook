@@ -5,6 +5,7 @@ import { physiologyLogbook, readAcademicRecord, writeAcademicRecord, validateAca
   type AcademicLogbookSection } from "@workspace/api-zod";
 import { setup, request, accounts, departmentIds } from "./support.js";
 import { db, engine, departmentsTable } from "./database.js";
+import { academicLogbookForDepartment } from "../src/lib/academic-logbook.js";
 
 // The repository's @workspace/db alias uses an in-memory PGlite database only.
 let runtime: Awaited<ReturnType<typeof setup>>;
@@ -27,8 +28,8 @@ function payload(section: AcademicLogbookSection) {
 
 before(async () => {
   runtime = await setup();
-  await db.update(departmentsTable).set({ name: "Physiology", code: "PHYS" }).where(eq(departmentsTable.id, departmentIds[2]));
-  await db.update(departmentsTable).set({ name: "Physiology (Test)", code: "TEST-PHYS", isTest: true,
+  await db.update(departmentsTable).set({ name: "Physiology", code: "PSI" }).where(eq(departmentsTable.id, departmentIds[2]));
+  await db.update(departmentsTable).set({ name: "Physiology (Test)", code: "TEST-PSI", isTest: true,
     configSourceDepartmentId: departmentIds[2] }).where(eq(departmentsTable.id, departmentIds[0]));
   const result = await request(runtime.base, path(), owner(), "POST", payload(physiologyLogbook.sections[0]));
   assert.equal(result.status, 201);
@@ -38,6 +39,13 @@ before(async () => {
 after(async () => {
   if (runtime) await new Promise<void>((resolve) => runtime.server.close(() => resolve()));
   await engine.close();
+});
+
+test("the admin-created PSI code activates the full profile independently of the department name", () => {
+  assert.equal(academicLogbookForDepartment({ name: "New teaching department", code: "PSI" }), physiologyLogbook);
+  assert.equal(academicLogbookForDepartment({ name: "New teaching department", code: " psi " }), physiologyLogbook);
+  assert.equal(academicLogbookForDepartment({ name: "physiology", code: "OTHER" }), physiologyLogbook);
+  assert.equal(academicLogbookForDepartment({ name: "Dermatology", code: "DERM" }), null);
 });
 
 test("the document's 15, 15 and 18 sections are available in the corresponding years", () => {
