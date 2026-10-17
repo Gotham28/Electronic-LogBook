@@ -210,6 +210,7 @@ router.get("/:professorId/review-queue", async (req, res) => {
         departmentId: a.department?.id,
         type: "Academic",
         title: `${a.log.activityType}: ${a.log.topic}`,
+        activityType: a.log.activityType,
         date: a.log.date,
         detail: a.log.presentationType || a.log.activityType,
         description: a.log.description,

@@ -242,7 +242,7 @@ export function AppLayout({
   onSignOut,
 }: AppLayoutProps) {
   const [location, setLocation] = useLocation();
-  const { department, config } = useDepartment();
+  const { department, config, academicLogbook } = useDepartment();
   const demoMode = isDemoMode();
   const reduceMotion = useReducedMotion();
   const [isDepartmentSwitching, setIsDepartmentSwitching] = React.useState(false);
@@ -462,8 +462,9 @@ export function AppLayout({
 
 
   const navigationItems = React.useMemo(
-    () => navigationForRole(activeRole, dashboardData, loadingBadges, config, demoMode),
-    [activeRole, dashboardData, loadingBadges, config, demoMode],
+    () => navigationForRole(activeRole, dashboardData, loadingBadges, config, demoMode)
+      .map((item) => item.href === "/academics" && academicLogbook ? { ...item, title: academicLogbook.title } : item),
+    [activeRole, dashboardData, loadingBadges, config, demoMode, academicLogbook],
   );
   const visibleNavigationItems = isDepartmentSwitching ? [] : navigationItems;
   const closeTour = React.useCallback(() => {

@@ -1,4 +1,5 @@
 import * as React from "react";
+import { AcademicRecordDetails } from "@/components/AcademicRecordDetails";
 import {
   Card,
   CardContent,
@@ -536,11 +537,9 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                         {currentItem.type === "Conference" && currentItem.conferenceType && <p className="text-xs text-slate-600 font-medium">Type: {currentItem.conferenceType === 'cme' ? 'CME' : 'Conference'}</p>}
                         {currentItem.type === "Conference" && currentItem.level && <p className="text-xs text-slate-600 font-medium">Level: {currentItem.level}</p>}
                         {currentItem.type === "Conference" && currentItem.category && <p className="text-xs text-slate-600 font-medium">Category: {currentItem.category}</p>}
-                        {currentItem.type === "Academic" && config?.enabledFeatures?.academicActivityExtras && (
-                          <>
-                            {currentItem.presentationType && <p className="text-xs text-slate-600 font-medium">Format: {currentItem.presentationType}</p>}
-                            {currentItem.description && <div className="mt-2 pt-2 border-t border-slate-200/50"><p className="text-xs font-semibold text-slate-500 uppercase">Description</p><p className="text-sm text-slate-800 leading-relaxed whitespace-pre-wrap mt-0.5">{currentItem.description}</p></div>}
-                          </>
+                        {currentItem.type === "Academic" && (
+                          <AcademicRecordDetails activityType={currentItem.activityType || ""}
+                            description={currentItem.description} presentationType={currentItem.presentationType} />
                         )}
                         {currentItem.type === "Procedure" && config?.enabledFeatures?.freeTextProcedures && (
                           <>
@@ -1199,7 +1198,9 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                           return rows.map((log: any) => (
                             <TableRow key={log.id}>
                               <TableCell className="text-xs font-semibold">{log.activityType}</TableCell>
-                              <TableCell className="text-xs text-slate-900">{log.topic}</TableCell>
+                              <TableCell className="whitespace-pre-wrap text-xs text-slate-900">{log.topic}
+                                <AcademicRecordDetails activityType={log.activityType} description={log.description} presentationType={log.presentationType} />
+                              </TableCell>
                               <TableCell className="text-right">
                                 {renderLogStatusBadge(log.status)}
                               </TableCell>
