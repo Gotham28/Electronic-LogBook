@@ -1,4 +1,6 @@
 import * as React from "react";
+import { AcademicRecordDetails } from "@/components/AcademicRecordDetails";
+import { readAcademicRecord } from "@/lib/academic-logbook";
 import { getCurrentUser, isDemoMode } from "@/lib/session";
 import { apiGet } from "@/lib/apiClient";
 import { formatLogbookDate } from "@/lib/logbook-config";
@@ -186,7 +188,7 @@ export function PrintableLogbook() {
   const user = React.useMemo(() => getCurrentUser(), []);
   const hideUhid = isDemoMode();
   const shouldReduceMotion = useReducedMotion();
-  const { config, clinicalWorkCategories, clinicalWorkSubtypes, competencyLevels, department: dept } = useDepartment();
+  const { config, clinicalWorkCategories, clinicalWorkSubtypes, competencyLevels, department: dept, academicLogbook } = useDepartment();
   const isRadiology = dept?.name?.toLowerCase().includes("radiology");
   const features = config?.enabledFeatures ?? {};
   const [data, setData] = React.useState<any>(null);
@@ -535,7 +537,7 @@ export function PrintableLogbook() {
 
         {/* ── 4. Academic Activities ────────────────────── */}
         <div className="mb-12 break-before-page">
-          <SectionHeader number={nextSection()} title="Academic Activities" />
+          <SectionHeader number={nextSection()} title={academicLogbook?.title || "Academic Activities"} />
           {(() => { const rows = data.academics.filter((a: any) => a.status !== "rejected"); return rows.length === 0 ? <EmptySection /> : (
             <>
               <table data-mobile="cards" className="w-full border-collapse">
@@ -556,6 +558,19 @@ export function PrintableLogbook() {
                   ))}
                 </tbody>
               </table>
+              <div className="mt-6 space-y-6">
+                {rows.filter((row: any) => readAcademicRecord(row.description)).sort((a: any, b: any) =>
+                  readAcademicRecord(a.description)!.trainingYear - readAcademicRecord(b.description)!.trainingYear
+                  || a.activityType.localeCompare(b.activityType) || a.date.localeCompare(b.date)).map((row: any) => (
+                  <article key={row.id}>
+                    <h4 className="font-semibold text-slate-900">{row.activityType} · {formatLogbookDate(row.date)}</h4>
+                    <p className="mt-1 whitespace-pre-wrap text-sm">{row.topic}</p>
+                    <AcademicRecordDetails activityType={row.activityType} description={row.description} presentationType={row.presentationType} />
+                    <p className="mt-2 text-xs">Reviewing faculty: {row.supervisorName || "—"} · Status: {row.status}</p>
+                    {row.facultyRemarks && <p className="mt-1 whitespace-pre-wrap text-xs">Faculty remarks: {row.facultyRemarks}</p>}
+                  </article>
+                ))}
+              </div>
               <AggregateSummary rows={data.academics} label="Academic Activities" />
             </>
           ); })()}

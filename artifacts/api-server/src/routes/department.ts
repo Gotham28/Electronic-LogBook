@@ -5,6 +5,7 @@ import { requireAuth, requireDepartment, requireRole } from "../middlewares/auth
 import { completionPercent, idSchema } from "../lib/validation.js";
 import { resolveConfigDepartmentId } from "../lib/department-config-source.js";
 import { clinicalWorkTarget, verifiedClinicalWorkCounts } from "../lib/clinical-work-progress.js";
+import { getAcademicLogbook } from "../lib/academic-logbook.js";
 
 const router: IRouter = Router();
 
@@ -32,7 +33,7 @@ router.get("/:departmentId/catalog", async (req, res) => {
     const departmentId = req.user!.departmentId!;
     const configSourceId = await resolveConfigDepartmentId(departmentId);
     step = "load-catalog";
-    const [department, hod, config, procedures, catalog, postingSchedule] = await Promise.all([
+    const [department, hod, config, procedures, catalog, postingSchedule, academicLogbook] = await Promise.all([
       db.select({ id: departmentsTable.id, name: departmentsTable.name, code: departmentsTable.code }).from(departmentsTable).where(eq(departmentsTable.id, departmentId)).limit(1),
       db.select({ id: usersTable.id, name: usersTable.fullName }).from(usersTable)
         .where(and(eq(usersTable.departmentId, departmentId), eq(usersTable.role, "hod"), eq(usersTable.status, "approved"))).limit(1),
@@ -43,6 +44,7 @@ router.get("/:departmentId/catalog", async (req, res) => {
         months: departmentPostingScheduleTable.months }).from(departmentPostingScheduleTable)
         .where(eq(departmentPostingScheduleTable.departmentId, configSourceId))
         .orderBy(departmentPostingScheduleTable.trainingYear, departmentPostingScheduleTable.sortOrder),
+      getAcademicLogbook(configSourceId),
     ]);
     res.json({ department: department[0], hod: hod[0] || null, config: config[0] || null, procedures,
       postings: catalog.filter((item) => item.kind === "posting"), academics: catalog.filter((item) => item.kind === "academic"), caseCategories: catalog.filter((item) => item.kind === "case_category"),
@@ -50,7 +52,7 @@ router.get("/:departmentId/catalog", async (req, res) => {
       conferenceLevels: catalog.filter((item) => item.kind === "conference_level"),
       clinicalWorkCategories: catalog.filter((item) => item.kind === "clinical_work_category"),
       clinicalWorkSubtypes: catalog.filter((item) => item.kind === "clinical_work_subtype"),
-      postingSchedule });
+      postingSchedule, academicLogbook });
   } catch (error: any) {
     // The Postgres error code only (e.g. 42P01 missing table, 42703 missing column), never
     // the error text, which can carry SQL parameters (AGENTS.md §8). Same rule as app.ts.

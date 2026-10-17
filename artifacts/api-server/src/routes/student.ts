@@ -14,6 +14,8 @@ import { dateSchema, idSchema, nameSchema, validate } from "../lib/validation.js
 import { resolveConfigDepartmentId } from "../lib/department-config-source.js";
 import { getDepartmentFeatures } from "../lib/department-features.js";
 import { clinicalWorkTarget } from "../lib/clinical-work-progress.js";
+import { validateAcademicRecord } from "@workspace/api-zod";
+import { getAcademicLogbook } from "../lib/academic-logbook.js";
 
 const router: IRouter = Router();
 router.use(requireAuth, requireRole(["student", "professor", "hod"]), requireDepartment);
@@ -1223,7 +1225,7 @@ router.post("/:studentId/procedure-logs", validate(z.object({ supervisorId: idSc
 router.post("/:studentId/academic-logs", validate(z.object({ supervisorId: idSchema, activityType: nameSchema,
   topic: z.string().trim().min(1).max(4000), date: dateSchema, presenter: optionalText,
   presentationType: z.string().max(160).nullable().optional(),
-  description: optionalText }).strict()), async (req, res) => {
+  description: z.string().max(20000).optional() }).strict()), async (req, res) => {
   try {
     const studentId = parseInt(String(req.params.studentId), 10);
     const { supervisorId, activityType, topic, date, presenter, presentationType, description } = req.body;
@@ -1234,9 +1236,15 @@ router.post("/:studentId/academic-logs", validate(z.object({ supervisorId: idSch
     }
 
     const configSourceId = await resolveConfigDepartmentId(req.user!.departmentId!);
+    const logbook = await getAcademicLogbook(configSourceId);
+    const section = logbook?.sections.find((item) => item.value === activityType);
     const [option] = await db.select({ id: departmentCatalogTable.id }).from(departmentCatalogTable).where(and(
       eq(departmentCatalogTable.departmentId, configSourceId), eq(departmentCatalogTable.kind, "academic"), eq(departmentCatalogTable.value, activityType))).limit(1);
-    if (!option) { res.status(400).json({ message: "Select an academic activity from your department" }); return; }
+    if (!option && !section) { res.status(400).json({ message: "Select an academic activity from your department" }); return; }
+    if (section) {
+      const error = validateAcademicRecord(section, description, date, presentationType);
+      if (error) { res.status(400).json({ message: error }); return; }
+    }
     const [inserted] = await db.insert(academicLogsTable).values({
       studentId, supervisorId: supervisorIdNum, activityType, presentationType, description,
       topic, date, presenter: req.body.presenter, status: "pending"
@@ -1609,7 +1617,7 @@ router.patch("/:studentId/procedure-logs/:logId", requireAuth, validate(z.object
 router.patch("/:studentId/academic-logs/:logId", requireAuth, validate(z.object({ supervisorId: idSchema, activityType: nameSchema,
   topic: z.string().trim().min(1).max(4000), date: dateSchema, presenter: optionalText,
   presentationType: z.string().max(160).nullable().optional(),
-  description: optionalText }).strict().partial()), async (req, res) => {
+  description: z.string().max(20000).optional() }).strict().partial()), async (req, res) => {
   try {
     const studentId = parseInt(String(req.params.studentId), 10);
     const logId = parseInt(String(req.params.logId), 10);
@@ -1623,11 +1631,20 @@ router.patch("/:studentId/academic-logs/:logId", requireAuth, validate(z.object(
       req.body.supervisorId = parseInt(req.body.supervisorId, 10);
     }
 
-    if (req.body.activityType) {
-      const configSourceId = await resolveConfigDepartmentId(guard.caller.departmentId!);
+    const configSourceId = await resolveConfigDepartmentId(guard.caller.departmentId!);
+    const logbook = await getAcademicLogbook(configSourceId);
+    // Validate the resulting entry, including a PATCH that changes only marks or
+    // dates. The edit guard has already read the row and resolved ownership.
+    const resulting = { ...guard.log, ...req.body };
+    const section = logbook?.sections.find((item) => item.value === resulting.activityType);
+    if (req.body.activityType && !section) {
       const [option] = await db.select({ id: departmentCatalogTable.id }).from(departmentCatalogTable).where(and(
         eq(departmentCatalogTable.departmentId, configSourceId), eq(departmentCatalogTable.kind, "academic"), eq(departmentCatalogTable.value, req.body.activityType))).limit(1);
       if (!option) { res.status(400).json({ message: "Select an academic activity from your department" }); return; }
+    }
+    if (section) {
+      const error = validateAcademicRecord(section, resulting.description, resulting.date, resulting.presentationType);
+      if (error) { res.status(400).json({ message: error }); return; }
     }
 
     const updateBody = { ...req.body, status: "pending", facultyRemarks: null, facultyGrade: null };

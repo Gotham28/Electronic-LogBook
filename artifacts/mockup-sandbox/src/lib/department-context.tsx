@@ -3,6 +3,7 @@ import { apiGet } from "./apiClient";
 import { clearSession } from "./session";
 import { isDemoMode } from "./session";
 import { Button } from "@/components/ui/button";
+import type { AcademicLogbookProfile } from "./academic-logbook";
 
 export type DepartmentConfig = {
   requiredCases: number | null; requiredProcedures: number | null; requiredAcademic: number | null;
@@ -17,6 +18,7 @@ export type DepartmentData = {
   procedures: Array<{ id: number; name: string; group: string; required: number }>;
   postings: CatalogItem[]; academics: CatalogItem[]; caseCategories: CatalogItem[]; competencyLevels: CatalogItem[]; leaveTypes: CatalogItem[]; conferenceLevels: CatalogItem[];
   clinicalWorkCategories: CatalogItem[]; clinicalWorkSubtypes: CatalogItem[]; postingSchedule: PostingScheduleRow[];
+  academicLogbook?: AcademicLogbookProfile | null;
 };
 const DepartmentContext = React.createContext<(DepartmentData & { refresh: () => Promise<void> }) | null>(null);
 
