@@ -524,7 +524,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                     </div>
 
                     {currentItem.type === "Case Log" ? (
-                      <CaseLogDetails caseLog={currentItem as CaseLogDetailRecord} hideUhid={hideUhid} />
+                      <CaseLogDetails caseLog={currentItem as CaseLogDetailRecord} hideUhid={hideUhid} medicalSummaryCaseFields={Boolean(config?.enabledFeatures?.medicalSummaryCaseFields)} />
                     ) : (
                       <div className="bg-slate-50 p-4 rounded-xl space-y-2 border border-slate-200/60">
                         <h4 className="text-xs font-semibold uppercase text-slate-500">Submission Details</h4>
@@ -1024,7 +1024,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                                   </TableCell>
                                 </TableRow>
                                 {expanded && <TableRow><TableCell id={`case-details-${log.id}`} colSpan={4} className="bg-slate-50 p-3">
-                                  <CaseLogDetails caseLog={log} hideUhid={hideUhid} showReview />
+                                  <CaseLogDetails caseLog={log} hideUhid={hideUhid} showReview medicalSummaryCaseFields={Boolean(config?.enabledFeatures?.medicalSummaryCaseFields)} />
                                 </TableCell></TableRow>}
                               </React.Fragment>
                             );

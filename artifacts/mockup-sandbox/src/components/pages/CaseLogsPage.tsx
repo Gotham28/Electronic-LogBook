@@ -251,9 +251,20 @@ export function CaseLogsPage() {
                   </SelectContent>
                 </Select>
               </Field>
-              <Field label="Chief complaints"><Textarea rows={2} value={form.chiefComplaints} onChange={(e) => setField("chiefComplaints", e.target.value)} /></Field>
-              <Field label="Relevant history"><Textarea rows={3} value={form.history} onChange={(e) => setField("history", e.target.value)} /></Field>
-              <Field label="Clinical examination"><Textarea rows={3} value={form.examination} onChange={(e) => setField("examination", e.target.value)} /></Field>
+              {deptConfig?.enabledFeatures?.medicalSummaryCaseFields ? (
+                <section aria-label="Medical Summary" className="space-y-4 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                  <h3 className="text-xs font-bold uppercase tracking-wide text-teal-800">Medical Summary</h3>
+                  <Field label="Chief complaints"><Textarea rows={2} value={form.chiefComplaints} onChange={(e) => setField("chiefComplaints", e.target.value)} /></Field>
+                  <Field label="Relevant history"><Textarea rows={3} value={form.history} onChange={(e) => setField("history", e.target.value)} /></Field>
+                  <Field label="Clinical examination"><Textarea rows={3} value={form.examination} onChange={(e) => setField("examination", e.target.value)} /></Field>
+                </section>
+              ) : (
+                <>
+                  <Field label="Chief complaints"><Textarea rows={2} value={form.chiefComplaints} onChange={(e) => setField("chiefComplaints", e.target.value)} /></Field>
+                  <Field label="Relevant history"><Textarea rows={3} value={form.history} onChange={(e) => setField("history", e.target.value)} /></Field>
+                  <Field label="Clinical examination"><Textarea rows={3} value={form.examination} onChange={(e) => setField("examination", e.target.value)} /></Field>
+                </>
+              )}
               <Field label="Investigations"><Textarea rows={2} value={form.investigations} onChange={(e) => setField("investigations", e.target.value)} /></Field>
               </div>
               <div data-tour="caselog-diagnosis-details" className="space-y-5">
@@ -448,9 +459,22 @@ export function CaseLogsPage() {
               </DialogHeader>
               <div className="grid gap-4">
                 <Detail label={deptConfig?.enabledFeatures?.useCaseTypeLabel ? "Type" : "Category"} value={caseCategories?.find((c: any) => c.value === selectedLog.category)?.name || selectedLog.category} />
-                <Detail label="Chief complaints" value={selectedLog.chiefComplaints} />
-                <Detail label="Relevant history" value={selectedLog.history} />
-                <Detail label="Clinical examination" value={selectedLog.examination} />
+                {deptConfig?.enabledFeatures?.medicalSummaryCaseFields ? (
+                  <section aria-label="Medical Summary" className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                    <h3 className="text-xs font-bold uppercase tracking-wide text-teal-800">Medical Summary</h3>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <Detail label="Chief complaints" value={selectedLog.chiefComplaints} />
+                      <Detail label="Relevant history" value={selectedLog.history} />
+                      <Detail label="Clinical examination" value={selectedLog.examination} />
+                    </div>
+                  </section>
+                ) : (
+                  <>
+                    <Detail label="Chief complaints" value={selectedLog.chiefComplaints} />
+                    <Detail label="Relevant history" value={selectedLog.history} />
+                    <Detail label="Clinical examination" value={selectedLog.examination} />
+                  </>
+                )}
                 <Detail label="Investigations" value={selectedLog.investigations} />
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Detail label="Final diagnosis" value={selectedLog.diagnosisProvisional || selectedLog.diagnosis} />

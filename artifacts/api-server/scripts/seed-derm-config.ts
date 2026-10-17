@@ -52,6 +52,7 @@ async function main() {
   
   if (config) {
     const enabledFeatures = (config.enabledFeatures as Record<string, boolean>) || {};
+    enabledFeatures.medicalSummaryCaseFields = true;
     enabledFeatures.useCaseTypeLabel = true;
     enabledFeatures.useThesisAndPublicationsLabel = true;
     enabledFeatures.awards = true;
