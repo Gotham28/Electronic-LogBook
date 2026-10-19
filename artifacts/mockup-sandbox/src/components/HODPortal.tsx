@@ -31,6 +31,7 @@ import { DepartmentSettings } from "@/components/DepartmentSettings";
 import { DemoDepartmentCustomizer } from "@/components/DemoDepartmentCustomizer";
 import { apiGet, apiPost, apiDelete } from "@/lib/apiClient";
 import { getCurrentUser, isDemoMode } from "@/lib/session";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import { ProfessorPortal } from "@/components/ProfessorPortal";
 import { DemoCount, useDemoAnimatedValue, useDemoMotionEnabled } from "@/components/DemoMotion";
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis } from "recharts";
@@ -83,6 +84,7 @@ const paths: Record<string, string> = {
 };
 
 export function HODPortal({ activeTab }: { activeTab?: string }) {
+  const currentUser = useCurrentUser();
   const [location, setLocation] = useLocation();
   const { department, config } = useDepartment();
   const currentTab = React.useMemo(() => {
@@ -340,7 +342,7 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
             Head of Department Dashboard
           </Badge>
           <h2 className="text-2xl font-black">{department.name}</h2>
-          <p className="text-xs text-slate-300 mt-1">{getCurrentUser()?.name} · Department overview</p>
+          <p className="text-xs text-slate-300 mt-1">{currentUser?.name} · Department overview</p>
         </div>
         {analyticsData && (
           <div className="flex items-center gap-3 flex-wrap">

@@ -12,11 +12,15 @@ import assignmentsRouter from "./assignments.js";
 import paymentsRouter from "./payments.js";
 import paymentsWebhookRouter from "./payments-webhook.js";
 import appraisalsRouter from "./appraisals.js";
+import profileRouter from "./profile.js";
+import nameChangeNotificationsRouter from "./name-change-notifications.js";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use("/auth", authRouter);
+router.use("/profile", profileRouter);
+router.use("/notifications/name-changes", nameChangeNotificationsRouter);
 router.use("/admin", adminRouter);
 router.use("/superadmin", superadminRouter);
 router.use("/announcements", announcementsRouter);

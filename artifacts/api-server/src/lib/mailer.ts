@@ -58,9 +58,21 @@ function credentialRow(label: string, valueHtml: string, last = false) {
 }
 
 export type EmailFailure = "missing_configuration" | "network_failure" | "provider_rejected";
+export type NameChangeEmailFailure =
+  | "missing_configuration"
+  | "network_failure"
+  | "rate_limited"
+  | "transient_provider_failure"
+  | "concurrent_idempotent_request"
+  | "invalid_idempotent_request"
+  | "permanent_provider_rejection";
 
 export class EmailDeliveryError extends Error {
-  constructor(public readonly failure: EmailFailure, public readonly providerStatus?: number) {
+  constructor(
+    public readonly failure: EmailFailure,
+    public readonly providerStatus?: number,
+    public readonly providerCode?: "concurrent_idempotent_requests" | "invalid_idempotent_request" | "unknown",
+  ) {
     super(failure === "provider_rejected" && providerStatus
       ? `Email provider rejected request (${providerStatus})`
       : failure === "network_failure" ? "Email provider network failure or timeout" : "Email service is not configured");
@@ -75,7 +87,30 @@ export function getEmailFailure(error: unknown): { failure: EmailFailure; provid
   return { failure: "network_failure" };
 }
 
-async function sendEmail(email: string, subject: string, text: string, html: string): Promise<void> {
+export function getNameChangeEmailFailure(error: unknown): {
+  failure: NameChangeEmailFailure;
+  providerStatus?: number;
+} {
+  if (!(error instanceof EmailDeliveryError)) return { failure: "network_failure" };
+  if (error.failure === "missing_configuration") return { failure: "missing_configuration" };
+  if (error.failure === "network_failure") return { failure: "network_failure" };
+  if (error.providerStatus === 429) return { failure: "rate_limited", providerStatus: 429 };
+  if (error.providerStatus && error.providerStatus >= 500) {
+    return { failure: "transient_provider_failure", providerStatus: error.providerStatus };
+  }
+  if (error.providerStatus === 409 && error.providerCode === "concurrent_idempotent_requests") {
+    return { failure: "concurrent_idempotent_request", providerStatus: 409 };
+  }
+  if (error.providerStatus === 409 && error.providerCode === "invalid_idempotent_request") {
+    return { failure: "invalid_idempotent_request", providerStatus: 409 };
+  }
+  return {
+    failure: "permanent_provider_rejection",
+    ...(error.providerStatus ? { providerStatus: error.providerStatus } : {}),
+  };
+}
+
+async function sendEmailPayload(payload: string, idempotencyKey?: string): Promise<void> {
   if (!process.env.RESEND_API_KEY || !process.env.EMAIL_FROM) {
     throw new EmailDeliveryError("missing_configuration");
   }
@@ -89,14 +124,9 @@ async function sendEmail(email: string, subject: string, text: string, html: str
       headers: {
         "Authorization": `Bearer ${process.env.RESEND_API_KEY}`,
         "Content-Type": "application/json",
+        ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
       },
-      body: JSON.stringify({
-        from: `"E-LogBook" <${process.env.EMAIL_FROM}>`,
-        to: email,
-        subject,
-        text,
-        html,
-      }),
+      body: payload,
       signal: controller.signal,
     });
   } catch {
@@ -105,7 +135,91 @@ async function sendEmail(email: string, subject: string, text: string, html: str
     clearTimeout(timeoutId);
   }
 
-  if (!response.ok) throw new EmailDeliveryError("provider_rejected", response.status);
+  if (!response.ok) {
+    let providerCode: "concurrent_idempotent_requests" | "invalid_idempotent_request" | "unknown" = "unknown";
+    if (response.status === 409) {
+      try {
+        const providerError = await response.json() as { name?: unknown };
+        if (providerError.name === "concurrent_idempotent_requests" || providerError.name === "invalid_idempotent_request") {
+          providerCode = providerError.name;
+        }
+      } catch {
+        // The response body is intentionally discarded; unknown 409 responses are not retried.
+      }
+    }
+    throw new EmailDeliveryError("provider_rejected", response.status, providerCode);
+  }
+}
+
+async function sendEmail(email: string, subject: string, text: string, html: string): Promise<void> {
+  const payload = JSON.stringify({
+    from: `"E-LogBook" <${process.env.EMAIL_FROM ?? ""}>`,
+    to: email,
+    subject,
+    text,
+    html,
+  });
+  await sendEmailPayload(payload);
+}
+
+export async function sendFrozenNameChangeEmail(payload: string, idempotencyKey: string): Promise<void> {
+  await sendEmailPayload(payload, idempotencyKey);
+}
+
+export function renderNameChangeEmail(input: {
+  hodName: string;
+  previousName: string;
+  newName: string;
+  hodEmail: string;
+  registrationNumber: string | null;
+  kuhsId: string;
+  departmentName: string;
+  changedAt: Date;
+  notificationId: string;
+  appOrigin: string;
+}) {
+  if (!process.env.EMAIL_FROM) throw new EmailDeliveryError("missing_configuration");
+  const href = new URL("/notifications/name-changes/" + input.notificationId, input.appOrigin).toString();
+  const registrationLine = input.registrationNumber ? "Registration number: " + input.registrationNumber : "";
+  const text = [
+    "Dear " + input.hodName + ",",
+    "",
+    "A resident in your department has updated their profile name.",
+    "",
+    "Previous name: " + input.previousName,
+    "Updated name: " + input.newName,
+    registrationLine,
+    "KUHS ID: " + input.kuhsId,
+    "Department: " + input.departmentName,
+    "Updated on: " + input.changedAt.toISOString(),
+    "",
+    "This change was made by the resident. No action is required.",
+    "",
+    "View name change: " + href,
+  ].filter((line) => line !== "").join("\r\n");
+  const html = wrapEmail(
+    "Resident profile name updated",
+    `<p style="margin:0;font-size:22px;font-weight:bold;color:#0f172a;">Resident profile name updated</p>
+     <p style="margin:16px 0 0;font-size:15px;line-height:1.7;color:#475569;">Dear ${escapeHtml(input.hodName)},</p>
+     <p style="margin:16px 0 0;font-size:15px;line-height:1.7;color:#475569;">A resident in your department has updated their profile name.</p>
+     <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:20px 0;color:#334155;">
+       <tr><td style="padding:5px 16px 5px 0;">Previous name</td><td style="padding:5px 0;font-weight:bold;">${escapeHtml(input.previousName)}</td></tr>
+       <tr><td style="padding:5px 16px 5px 0;">Updated name</td><td style="padding:5px 0;font-weight:bold;">${escapeHtml(input.newName)}</td></tr>
+       ${input.registrationNumber ? `<tr><td style="padding:5px 16px 5px 0;">Registration number</td><td style="padding:5px 0;">${escapeHtml(input.registrationNumber)}</td></tr>` : ""}
+       <tr><td style="padding:5px 16px 5px 0;">KUHS ID</td><td style="padding:5px 0;">${escapeHtml(input.kuhsId)}</td></tr>
+       <tr><td style="padding:5px 16px 5px 0;">Department</td><td style="padding:5px 0;">${escapeHtml(input.departmentName)}</td></tr>
+       <tr><td style="padding:5px 16px 5px 0;">Updated on</td><td style="padding:5px 0;">${escapeHtml(input.changedAt.toISOString())}</td></tr>
+     </table>
+     <p style="margin:16px 0 0;font-size:15px;line-height:1.7;color:#475569;">This change was made by the resident. No action is required.</p>
+     <p style="margin:24px 0;"><a href="${escapeHtml(href)}" style="display:inline-block;padding:12px 20px;background:#0f766e;color:#fff;text-decoration:none;font-weight:bold;">View name change</a></p>`,
+  );
+  return {
+    from: `"E-LogBook" <${process.env.EMAIL_FROM}>`,
+    to: input.hodEmail,
+    subject: "Resident profile name updated",
+    text,
+    html,
+  };
 }
 
 export const sendOtpEmail = async (email: string, otp: string) => {

@@ -1,4 +1,4 @@
-import { demoData, getDemoResident } from './demoDepartments';
+import { demoData, getDemoDepartmentProfile, getDemoResident } from './demoDepartments';
 import { playDemoSound } from './demoSounds';
 import { isDemoMovieActive } from './demoSession';
 
@@ -101,6 +101,43 @@ function buildReviewQueue() {
 
 export async function handleDemoRequest(method: string, path: string, body?: any) {
   await new Promise(r => setTimeout(r, 400)); // Mock network delay for realism
+
+  const demoUser = JSON.parse(window.sessionStorage.getItem("elogbook-user") || "null");
+  const routePath = path.split("?")[0];
+  if (routePath === "/api/profile" && method === "GET") {
+    const department = getDemoDepartmentProfile(demoUser?.departmentId).data.departmentCatalog;
+    const resident = demoUser?.role === "student" ? getDemoResident(demoUser.studentProfileId) : null;
+    return {
+      user: {
+        id: demoUser?.id ?? 999,
+        fullName: demoUser?.fullName ?? demoUser?.name ?? "Demo User",
+        email: demoUser?.email ?? "",
+        role: demoUser?.role ?? "student",
+        departmentId: demoUser?.departmentId ?? null,
+        departmentName: department.department.name,
+      },
+      student: resident ? {
+        id: resident.student.id,
+        registrationNumber: resident.student.registrationNumber ?? null,
+        kuhsId: resident.student.kuhsId ?? "",
+        batch: resident.student.batch ?? null,
+        dateOfJoining: resident.student.dateOfJoining ?? null,
+      } : null,
+      capabilities: { canEditName: false, readOnlyReason: "demo" },
+    };
+  }
+  if (routePath === "/api/profile/name-history" && method === "GET") {
+    return { items: [], hasMore: false, nextCursor: null };
+  }
+  if (routePath === "/api/notifications/name-changes" && method === "GET") {
+    return { items: [], unreadCount: 0, hasMore: false, nextCursor: null };
+  }
+  if (/^\/api\/notifications\/name-changes\/[^/]+$/.test(routePath) && method === "GET") {
+    throw new Error("Name-change notice not found in the demo inbox.");
+  }
+  if ((routePath === "/api/profile" && method === "PATCH") || (routePath.endsWith("/read") && routePath.startsWith("/api/notifications/name-changes/") && method === "POST")) {
+    throw new Error("Profile editing is unavailable in the demo.");
+  }
 
   if (method === "GET") {
     // In demo mode, /auth/me should just reflect back the already-stored demo session, 

@@ -1,8 +1,11 @@
 import { before, after, test, type TestContext } from "node:test";
 import assert from "node:assert/strict";
 import { setup, request, accounts as a, departmentIds, password } from "./support.js";
-import { engine, db, usersTable, studentsTable, caseLogsTable, assignmentTypesTable } from "./database.js";
-import { eq } from "drizzle-orm";
+import {
+  engine, db, usersTable, studentsTable, caseLogsTable, assignmentTypesTable,
+  auditTable, departmentNameChangeNotificationsTable, nameChangeEmailOutboxTable,
+} from "./database.js";
+import { and, eq, sql } from "drizzle-orm";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 
@@ -77,6 +80,26 @@ test("admin hard-delete: nonexistent user gets 404", async (t) => {
 });
 
 test("admin hard-delete: admin permanently deletes a resident and their records (200)", async (t) => {
+  const [beforeRename] = await db.select({ fullName: usersTable.fullName }).from(usersTable).where(eq(usersTable.id, a.student1.id));
+  const selfRename = await call("/profile", "student1", "PATCH", {
+    fullName: "Delete Test Resident", expectedFullName: beforeRename.fullName,
+  });
+  assert.equal(selfRename.status, 200);
+  assert.equal(selfRename.body.notification.inAppSaved, true);
+  const adminRename = await call(`/superadmin/departments/${a.student1.departmentId}/users/${a.student1.id}/name`, "admin", "PATCH", {
+    fullName: "Admin Corrected Delete Resident",
+  });
+  assert.equal(adminRename.status, 200);
+  const profileEvents = await db.select({ id: auditTable.id }).from(auditTable).where(and(
+    eq(auditTable.tableName, "users"), eq(auditTable.recordId, String(a.student1.id)),
+    sql`${auditTable.afterState}->>'eventType' = 'profile_name_change'`,
+  ));
+  assert.equal(profileEvents.length, 2, "self and administrator name changes must both be recorded before deletion");
+  assert.equal((await db.select().from(departmentNameChangeNotificationsTable)
+    .where(eq(departmentNameChangeNotificationsTable.subjectUserId, a.student1.id))).length, 1);
+  assert.equal((await db.select().from(nameChangeEmailOutboxTable)
+    .where(eq(nameChangeEmailOutboxTable.notificationId, selfRename.body.notification.id))).length, 1);
+
   await db.insert(caseLogsTable).values({
     studentId: a.student1.studentId!, date: "2026-09-01", patientUhid: "TEST-UHID", patientAge: "30",
     patientGender: "male", diagnosisProvisional: "Test", diagnosisFinal: "Test", status: "pending",
@@ -93,6 +116,14 @@ test("admin hard-delete: admin permanently deletes a resident and their records 
   assert.equal((await db.select().from(caseLogsTable).where(eq(caseLogsTable.studentId, a.student1.studentId!))).length, 0);
   assert.equal((await db.select().from(studentsTable).where(eq(studentsTable.id, a.student1.studentId!))).length, 0);
   assert.equal((await db.select().from(usersTable).where(eq(usersTable.id, a.student1.id))).length, 0);
+  assert.equal((await db.select({ id: auditTable.id }).from(auditTable).where(and(
+    eq(auditTable.tableName, "users"), eq(auditTable.recordId, String(a.student1.id)),
+    sql`${auditTable.afterState}->>'eventType' = 'profile_name_change'`,
+  ))).length, 0, "deleting the resident removes their self- and admin-authored name history");
+  assert.equal((await db.select().from(departmentNameChangeNotificationsTable)
+    .where(eq(departmentNameChangeNotificationsTable.subjectUserId, a.student1.id))).length, 0);
+  assert.equal((await db.select().from(nameChangeEmailOutboxTable)
+    .where(eq(nameChangeEmailOutboxTable.notificationId, selfRename.body.notification.id))).length, 0);
 
   // The same id a second time is now a nonexistent row.
   const again = await call(path, "admin", "DELETE");

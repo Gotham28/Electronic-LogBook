@@ -5,7 +5,7 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { randomBytes } from "node:crypto";
 import { requireAuth, requireRole } from "../middlewares/auth.js";
-import { emailSchema, nameSchema, passwordSchema, idSchema, validate } from "../lib/validation.js";
+import { emailSchema, nameSchema, profileNameSchema, passwordSchema, idSchema, validate } from "../lib/validation.js";
 import { getEmailFailure, sendAccountCreatedEmail, sendHODAppointmentEmail } from "../lib/mailer.js";
 import { provisionDepartment, provisionMirrorForRealDepartment } from "../lib/department-provisioning.js";
 import jwt from "jsonwebtoken";
@@ -15,6 +15,7 @@ import { sessionProfile } from "./auth.js";
 import { hardDeleteUserCascade } from "../lib/hard-delete-user.js";
 import { buildMaintenanceNotice } from "../lib/maintenance-messages.js";
 import { notifyCurrentHodOfPendingStudent } from "../lib/student-notifications.js";
+import { changeUserName } from "../lib/profile-name-changes.js";
 
 const router = Router();
 
@@ -402,6 +403,13 @@ export async function deleteDepartmentCascade(tx: any, targetDepartmentId: numbe
   // correct position — the loop deletes it before the user-delete at the
   // bottom of this function.
   if (isMirror) {
+    if (userIds.length > 0) {
+      await tx.delete(auditTable).where(and(
+        eq(auditTable.tableName, "users"),
+        inArray(auditTable.recordId, userIds.map(String)),
+        sql`${auditTable.afterState}->>'eventType' = 'profile_name_change'`,
+      ));
+    }
     for (const entry of checkedTables) {
       const conditions = [];
       if (studentIds.length > 0) {
@@ -533,7 +541,7 @@ router.get("/departments/:id/roster", async (req, res) => {
 // PATCH /api/superadmin/departments/:id/users/:userId/name — rename a roster account
 // Only HOD, faculty, and student accounts within the requested department can be changed.
 // ---------------------------------------------------------------------------
-const updateDepartmentUserNameBody = z.object({ fullName: nameSchema }).strict();
+const updateDepartmentUserNameBody = z.object({ fullName: profileNameSchema }).strict();
 
 router.patch("/departments/:id/users/:userId/name", validate(updateDepartmentUserNameBody), async (req, res) => {
   const departmentId = Number(req.params.id);
@@ -543,20 +551,25 @@ router.patch("/departments/:id/users/:userId/name", validate(updateDepartmentUse
       .where(eq(departmentsTable.id, departmentId)).limit(1);
     if (!department) { return res.status(404).json({ message: "Department not found" }); }
 
-    const [updatedUser] = await db.update(usersTable)
-      .set({ fullName: req.body.fullName })
-      .where(and(
-        eq(usersTable.id, targetUserId),
-        eq(usersTable.departmentId, departmentId),
-        inArray(usersTable.role, ["hod", "professor", "student"]),
-      ))
-      .returning({
-        id: usersTable.id,
-        fullName: usersTable.fullName,
-        email: usersTable.email,
-        role: usersTable.role,
-        status: usersTable.status,
-      });
+    const result = await changeUserName({
+      subjectUserId: targetUserId,
+      actorUserId: req.user!.id,
+      source: "admin_roster",
+      fullName: req.body.fullName,
+      departmentId,
+    });
+    if (result.missing) { return res.status(404).json({ message: "Department user not found" }); }
+    const [updatedUser] = await db.select({
+      id: usersTable.id,
+      fullName: usersTable.fullName,
+      email: usersTable.email,
+      role: usersTable.role,
+      status: usersTable.status,
+    }).from(usersTable).where(and(
+      eq(usersTable.id, targetUserId),
+      eq(usersTable.departmentId, departmentId),
+      inArray(usersTable.role, ["hod", "professor", "student"]),
+    )).limit(1);
 
     if (!updatedUser) { return res.status(404).json({ message: "Department user not found" }); }
     return res.json(updatedUser);

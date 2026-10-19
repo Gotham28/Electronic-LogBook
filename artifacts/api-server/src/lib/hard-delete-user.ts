@@ -1,4 +1,4 @@
-import { eq, or, inArray } from "drizzle-orm";
+import { and, eq, or, inArray, sql } from "drizzle-orm";
 import { usersTable, studentsTable, caseLogsTable, procedureLogsTable, academicLogsTable, paymentsTable, leaveRecordsTable, leaveApplicationsTable, assessmentsTable, appraisalsTable, assignmentRecipientsTable, attendanceLogsTable, certificationsTable, postingsTable, thesisMilestonesTable, researchTable, auditTable, assignmentsTable, assignmentTypesTable, clinicalWorkLogsTable, conferencesTable, awardsTable } from "@workspace/db";
 
 // Permanently deletes a student or professor and every row tied to them, inside
@@ -133,6 +133,14 @@ export async function hardDeleteUserCascade(tx: any, targetUserId: number, role:
     const _assignments = await tx.delete(assignmentsTable).where(eq(assignmentsTable.facultyId, targetUserId)).returning({ id: assignmentsTable.id });
     deletedCounts.assignments = _assignments.length;
   }
+
+  const _profileNameHistory = await tx.delete(auditTable).where(and(
+    eq(auditTable.tableName, "users"),
+    eq(auditTable.recordId, String(targetUserId)),
+    eq(auditTable.action, "UPDATE"),
+    sql`${auditTable.afterState}->>'eventType' = 'profile_name_change'`,
+  )).returning({ id: auditTable.id });
+  deletedCounts.profileNameHistory = _profileNameHistory.length;
 
   const _audit = await tx.delete(auditTable).where(eq(auditTable.performedById, targetUserId)).returning({ id: auditTable.id });
   deletedCounts.audit = _audit.length;

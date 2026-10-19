@@ -27,7 +27,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiGet, apiPost } from "@/lib/apiClient";
-import { getCurrentUser, isDemoMode } from "@/lib/session";
+import { isDemoMode } from "@/lib/session";
+import { useCurrentUser } from "@/hooks/use-current-user";
+import { useNameChangeNotifications } from "@/hooks/use-name-change-notifications";
 import { DEMO_DEPARTMENT_CHANGED_EVENT } from "@/lib/demoDepartments";
 import { GuidedTour, type TourStep } from "@/components/GuidedTour";
 import {
@@ -57,6 +59,7 @@ import {
   Trophy,
   UserCheck,
   UserPlus,
+  UserRound,
 } from "lucide-react";
 
 import { LegalDisclaimerModal } from "@/components/LegalDisclaimerModal";
@@ -262,6 +265,7 @@ export function AppLayout({
   const [bubbleNotice, setBubbleNotice] = React.useState<MaintenanceAnnouncement | null>(null);
   const [maintenanceLoadError, setMaintenanceLoadError] = React.useState<string | null>(null);
   const [maintenanceRefreshToken, setMaintenanceRefreshToken] = React.useState(0);
+  const [notificationsOpen, setNotificationsOpen] = React.useState(false);
 
   // Notification item type
   type NotifItem = {
@@ -297,7 +301,8 @@ export function AppLayout({
   }, []);
 
   // Fix: Get actual user from session for the sidebar profile
-  const currentUser = getCurrentUser();
+  const currentUser = useCurrentUser();
+  const savedNameNotices = useNameChangeNotifications(currentUser, activeRole === "HOD");
   const currentActiveNotice = announcements.find((announcement) => announcement.status === "active") ?? null;
   const panelMaintenanceNotice = currentActiveNotice ?? announcements.find((announcement) => announcement.status === "scheduled") ?? null;
   const allNotifItems = React.useMemo<NotifItem[]>(() => [
@@ -309,7 +314,7 @@ export function AppLayout({
     })),
   ], [notifItems, announcements]);
   const displayName = currentUser?.name || "";
-  const initials = currentUser?.name 
+  const initials = currentUser?.name
     ? currentUser.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()
     : "";
 
@@ -661,6 +666,7 @@ export function AppLayout({
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-72 rounded-2xl border-white/70 bg-white/92 p-1 shadow-[0_24px_60px_rgba(15,23,42,0.12)] backdrop-blur-xl">
+                  <DropdownMenuItem asChild className="cursor-pointer rounded-xl text-xs"><Link href="/profile"><UserRound className="mr-2 h-4 w-4" />My Profile</Link></DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setIsChangePasswordOpen(true)} className="cursor-pointer rounded-xl text-xs">
                     <KeyRound className="mr-2 h-4 w-4" /> Change Password
                   </DropdownMenuItem>
@@ -718,11 +724,14 @@ export function AppLayout({
                     ?
                   </Button>
                 )}
-                <DropdownMenu>
+                <DropdownMenu open={notificationsOpen} onOpenChange={(open) => {
+                  setNotificationsOpen(open);
+                  if (open && activeRole === "HOD") void savedNameNotices.refresh();
+                }}>
                   <DropdownMenuTrigger asChild>
                     <button data-tour-id="notifications" aria-label="Open notifications" className="relative rounded-xl border border-white/70 bg-white/72 p-2 text-teal-800 shadow-[0_12px_24px_rgba(15,23,42,0.05)] transition hover:-translate-y-0.5 hover:bg-white">
                       <Bell className="h-4 w-4" />
-                      {allNotifItems.length > 0 && (
+                      {(allNotifItems.length > 0 || (activeRole === "HOD" && savedNameNotices.unreadCount > 0)) && (
                         <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-rose-500 ring-2 ring-white" />
                       )}
                     </button>
@@ -730,6 +739,17 @@ export function AppLayout({
                   <DropdownMenuContent align="end" className="w-80 rounded-2xl border-white/70 bg-white/92 p-2 shadow-[0_24px_60px_rgba(15,23,42,0.12)] backdrop-blur-xl">
                     <DropdownMenuLabel className="px-3 pt-2">Notifications</DropdownMenuLabel>
                     <DropdownMenuSeparator />
+                    {activeRole === "HOD" ? <>
+                      <DropdownMenuLabel className="px-3 py-1 text-[10px] uppercase tracking-wide text-slate-500">Saved name changes{savedNameNotices.unreadCount > 0 ? ` · ${savedNameNotices.unreadCount} unread` : ""}</DropdownMenuLabel>
+                      {savedNameNotices.error ? <div role="alert" className="mx-2 my-1 rounded-lg bg-amber-50 p-2 text-xs text-amber-900">Unable to refresh saved notices. <button type="button" className="ml-1 font-semibold underline" onClick={() => void savedNameNotices.refresh()}>Retry</button></div> : null}
+                      {savedNameNotices.loading && !savedNameNotices.hasLoaded ? <p role="status" className="px-3 py-2 text-xs text-slate-500">Loading saved notices…</p> : null}
+                      {savedNameNotices.hasLoaded && savedNameNotices.items.length === 0 && !savedNameNotices.error ? <p className="px-3 py-2 text-xs text-slate-500">No unread name-change notices.</p> : null}
+                      {savedNameNotices.items.map((item) => <DropdownMenuItem key={item.id} onClick={() => setLocation(item.detailHref)} className="cursor-pointer rounded-xl px-3 py-2 text-xs font-medium text-slate-700 hover:bg-teal-50 hover:text-teal-900">
+                        <span className="mr-2 h-2 w-2 shrink-0 rounded-full bg-teal-600" aria-hidden="true" />{item.previousName} → {item.newName}<span className="ml-auto text-[10px] text-slate-400">View</span>
+                      </DropdownMenuItem>)}
+                      <DropdownMenuItem onClick={() => setLocation("/notifications")} className="cursor-pointer rounded-xl px-3 py-2 text-xs font-semibold text-teal-800">View all updates</DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                    </> : null}
                     {maintenanceLoadError && <div role="alert" className="mx-2 my-1 rounded-lg bg-amber-50 p-2 text-xs text-amber-900">
                       {maintenanceLoadError} <button type="button" className="ml-1 font-semibold underline" onClick={() => setMaintenanceRefreshToken((value) => value + 1)}>Retry</button>
                     </div>}
@@ -752,7 +772,7 @@ export function AppLayout({
                         </DropdownMenuItem>
                       ))
                     ) : (
-                      <DropdownMenuItem className="rounded-xl px-3 py-2 text-slate-500 text-xs">No new notifications</DropdownMenuItem>
+                      <DropdownMenuItem className="rounded-xl px-3 py-2 text-slate-500 text-xs">{activeRole === "HOD" ? "No other notifications" : "No new notifications"}</DropdownMenuItem>
                     )}
                   </DropdownMenuContent>
                 </DropdownMenu>

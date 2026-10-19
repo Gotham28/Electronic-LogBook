@@ -21,14 +21,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { formatLogbookDate } from "@/lib/logbook-config";
 import { apiGet } from "@/lib/apiClient";
-import { getCurrentUser, isDemoMode } from "@/lib/session";
+import { isDemoMode } from "@/lib/session";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import { useDepartment } from "@/lib/department-context";
 
 export function Dashboard() {
   const { config: departmentConfig, clinicalWorkCategories, clinicalWorkSubtypes } = useDepartment();
   const deptConfig = departmentConfig;
   const features = deptConfig?.enabledFeatures ?? {};
-  const user = React.useMemo(() => getCurrentUser(), []);
+  const user = useCurrentUser();
   const [logs, setLogs] = React.useState<any>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -48,7 +49,7 @@ export function Dashboard() {
     } finally {
       setIsLoading(false);
     }
-  }, [user]);
+  }, [user?.studentProfileId]);
 
   React.useEffect(() => {
     fetchDashboardData();

@@ -1,5 +1,6 @@
 const TOKEN_KEY = 'elogbook-token';
 export const SESSION_EXPIRED_EVENT = 'elogbook:session-expired';
+export const SESSION_USER_CHANGED_EVENT = 'elogbook:user-changed';
 
 export interface UserSession {
   id: number;
@@ -23,6 +24,21 @@ export function getCurrentUser(): UserSession | null {
   } catch {
     return null;
   }
+}
+
+export function saveCurrentUser(session: Omit<UserSession, 'isDemoMode'> & Partial<Pick<UserSession, 'isDemoMode'>>): void {
+  const previous = getCurrentUser();
+  const compact: UserSession = {
+    id: session.id,
+    name: session.name,
+    role: session.role,
+    departmentId: session.departmentId,
+    departmentName: session.departmentName,
+    studentProfileId: session.studentProfileId,
+    ...(session.isDemoMode ?? previous?.isDemoMode ? { isDemoMode: true } : {}),
+  };
+  window.sessionStorage.setItem('elogbook-user', JSON.stringify(compact));
+  window.dispatchEvent(new CustomEvent(SESSION_USER_CHANGED_EVENT));
 }
 
 export function saveToken(token: string): void {

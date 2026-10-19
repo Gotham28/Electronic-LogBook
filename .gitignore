@@ -74,3 +74,6 @@ artifacts/api-server/data/
 IMPLEMENTATION_PLAN_*.md
 
 *.md
+
+# Local profile feature plan for review
+/IMPLEMENTATION_PLAN_PROFILE_NAME_CHANGES.md

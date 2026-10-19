@@ -8,8 +8,9 @@ import {
   assessmentsTable, attendanceLogsTable, leaveApplicationsTable,
   thesisMilestonesTable, appraisalsTable, auditTable,
   departmentCatalogTable, procedureTypesTable, conferencesTable, awardsTable, certificationsTable,
+  departmentNameChangeNotificationsTable, nameChangeEmailOutboxTable,
 } from "./database.js";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { deleteDepartmentCascade } from "../src/routes/superadmin.js";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
@@ -74,6 +75,29 @@ test("mirror department with rows in all 12 checked tables deletes cleanly via i
 
   const [mirrorStudent] = await db.select().from(studentsTable).where(eq(studentsTable.userId, mirrorStudentUser.id));
   assert.ok(mirrorStudent, "Mirror student profile should exist");
+
+  const mirrorStudentAccount = {
+    id: mirrorStudentUser.id,
+    email: mirrorStudentUser.email,
+    role: mirrorStudentUser.role,
+    departmentId: mirrorDeptId,
+    studentId: mirrorStudent.id,
+    token: jwt.sign({ id: mirrorStudentUser.id, sessionVersion: mirrorStudentUser.sessionVersion }, process.env.JWT_SECRET!, { expiresIn: "1h" }),
+  };
+  const selfRename = await request(runtime.base, "/profile", mirrorStudentAccount as any, "PATCH", {
+    fullName: "Mirror Resident Revised", expectedFullName: mirrorStudentUser.fullName,
+  });
+  assert.equal(selfRename.status, 200);
+  assert.equal(selfRename.body.notification.emailStatus, "suppressed_test");
+  const adminRename = await call(`/superadmin/departments/${mirrorDeptId}/users/${mirrorStudentUser.id}/name`, "PATCH", {
+    fullName: "Mirror Resident Corrected",
+  });
+  assert.equal(adminRename.status, 200);
+  const [selfNotice] = await db.select().from(departmentNameChangeNotificationsTable)
+    .where(eq(departmentNameChangeNotificationsTable.id, selfRename.body.notification.id));
+  assert.ok(selfNotice, "self-service notice exists before mirror cleanup");
+  assert.equal((await db.select().from(nameChangeEmailOutboxTable)
+    .where(eq(nameChangeEmailOutboxTable.notificationId, selfNotice.id))).length, 1);
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -168,6 +192,14 @@ test("mirror department with rows in all 12 checked tables deletes cleanly via i
   assert.equal(appraisalsAfter.length, 0, "appraisals should be empty");
   const auditAfter = await db.select().from(auditTable).where(eq(auditTable.performedById, mirrorProfUser.id));
   assert.equal(auditAfter.length, 0, "audit rows should be empty");
+  assert.equal((await db.select().from(auditTable).where(and(
+    eq(auditTable.tableName, "users"), eq(auditTable.recordId, String(mirrorStudentUser.id)),
+    sql`${auditTable.afterState}->>'eventType' = 'profile_name_change'`,
+  ))).length, 0, "mirror cleanup removes student and external admin name history");
+  assert.equal((await db.select().from(departmentNameChangeNotificationsTable)
+    .where(eq(departmentNameChangeNotificationsTable.id, selfNotice.id))).length, 0, "mirror cleanup removes the saved notice");
+  assert.equal((await db.select().from(nameChangeEmailOutboxTable)
+    .where(eq(nameChangeEmailOutboxTable.notificationId, selfNotice.id))).length, 0, "mirror cleanup removes its email job");
 });
 
 // =========================================================================

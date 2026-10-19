@@ -2,18 +2,19 @@
 // sent from the application's own address. Markup in that name must arrive as text.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { sendAccountCreatedEmail, sendHODApprovalRequestEmail, sendHODAppointmentEmail, sendStudentApprovalEmail } from "../src/lib/mailer.js";
+import { sendAccountCreatedEmail, sendHODApprovalRequestEmail, sendHODAppointmentEmail, sendStudentApprovalEmail, renderNameChangeEmail, sendFrozenNameChangeEmail } from "../src/lib/mailer.js";
 
 process.env.RESEND_API_KEY = "test-only-resend-key";
 process.env.EMAIL_FROM = "noreply@elogbookgothos.test";
 
-const sent: Array<{ to: string; subject: string; text: string; html: string }> = [];
+const sent: Array<{ to: string; subject: string; text: string; html: string; idempotencyKey?: string }> = [];
 
 const originalFetch = globalThis.fetch;
 globalThis.fetch = async (url: string | URL | Request, options?: RequestInit) => {
   if (url === "https://api.resend.com/emails") {
     const body = JSON.parse(options?.body as string);
-    sent.push(body);
+    const key = new Headers(options?.headers).get("Idempotency-Key");
+    sent.push({ ...body, ...(key ? { idempotencyKey: key } : {}) });
     return { ok: true, status: 200 } as Response;
   }
   return originalFetch ? originalFetch(url, options) : Promise.reject(new Error("fetch not found"));
@@ -57,6 +58,27 @@ test("HOD appointment and student approval use the shared mail form and escape u
   }
   assert.match(sent[0].text, /existing account/);
   assert.match(sent[1].text, /has been approved/);
+});
+
+test("name-change notice is professionally worded, escapes names and supports frozen idempotent transport", async () => {
+  const message = renderNameChangeEmail({
+    hodName: "HOD <b>Person</b>", previousName: "Resident <img src=x>", newName: "Resident & Co",
+    hodEmail: "hod@example.test", registrationNumber: "REG-1", kuhsId: "KUHS-1", departmentName: "Test <Dept>",
+    changedAt: new Date("2026-10-18T10:30:00.000Z"), notificationId: "00000000-0000-4000-8000-000000000001",
+    appOrigin: "https://elogbook.example.test",
+  });
+  assert.equal(message.subject, "Resident profile name updated");
+  assert.match(message.text, /A resident in your department has updated their profile name\./);
+  assert.match(message.text, /No action is required\./);
+  assert.ok(message.html.includes("Resident &lt;img src=x&gt;"));
+  assert.ok(!message.html.includes("<img src=x>"));
+  assert.ok(message.html.includes("Test &lt;Dept&gt;"));
+  sent.length = 0;
+  const payload = JSON.stringify(message);
+  await sendFrozenNameChangeEmail(payload, "profile-name-change/test-generation-0");
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].idempotencyKey, "profile-name-change/test-generation-0");
+  assert.equal(JSON.stringify({ from: sent[0].from, to: sent[0].to, subject: sent[0].subject, text: sent[0].text, html: sent[0].html }), payload);
 });
 
 test("mail transport rejects missing config and provider errors without exposing response bodies", async () => {
