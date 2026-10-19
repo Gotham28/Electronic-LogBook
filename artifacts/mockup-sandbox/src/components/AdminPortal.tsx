@@ -1,4 +1,5 @@
 import { MaintenanceAnnouncements } from './MaintenanceAnnouncements';
+import { Link } from "wouter";
 import { useEffect, useState, useMemo } from "react";
 import { toast } from "sonner";
 import { Building2, Users, UserCheck, UserX, Plus, GraduationCap, ArrowRight, XCircle, ChevronDown, ChevronRight, Info, UserPlus, Trash2, AlertTriangle, Pencil } from "lucide-react";
@@ -234,6 +235,7 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline" className="border-slate-200 text-slate-700"><Link href="/profile">My Profile</Link></Button>
           {onSignOut && (
             <Button variant="outline" onClick={onSignOut} className="border-slate-200 text-slate-700">
               Sign out

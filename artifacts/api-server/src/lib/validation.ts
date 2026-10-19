@@ -3,6 +3,10 @@ import { z } from "zod";
 
 export const idSchema = z.coerce.number().int().positive().safe();
 export const nameSchema = z.string().trim().min(1).max(160);
+export const profileNameSchema = z.string().refine(
+  (value) => !/[\u0000-\u001f\u007f-\u009f]/u.test(value) && value.trim().length > 0 && value.trim().length <= 160,
+  "Name must be 1–160 characters and contain no control characters",
+).transform((value) => value.trim());
 export const emailSchema = z.string().trim().toLowerCase().email().max(254);
 export const passwordSchema = z.string().min(8).max(72).refine((value) => Buffer.byteLength(value, "utf8") <= 72, "Password must be at most 72 UTF-8 bytes");
 export const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((s) => {

@@ -62,12 +62,19 @@ async function fetchWithAuth(
   // --- DEMO MODE INTERCEPTION ---
   const userStr = window.sessionStorage.getItem("elogbook-user");
   if (userStr && endpoint !== "/api/announcements/public-current") {
+    let demoUser: any = null;
     try {
-      const user = JSON.parse(userStr);
-      if (user.isDemoMode) {
-        return handleDemoRequest(options.method || "GET", endpoint, options.body ? JSON.parse(options.body as string) : undefined);
+      demoUser = JSON.parse(userStr);
+    } catch { /* Ignore a stale malformed session and let normal auth handle it. */ }
+    if (demoUser?.isDemoMode) {
+      let body: unknown;
+      try {
+        body = options.body ? JSON.parse(options.body as string) : undefined;
+      } catch {
+        throw new ApiError(400, "Invalid request body");
       }
-    } catch (e) { /* ignore parse error */ }
+      return handleDemoRequest(options.method || "GET", endpoint, body);
+    }
   }
   // ------------------------------
 
@@ -149,6 +156,62 @@ export function apiPatch<T = any>(path: string, body?: any, options?: RequestIni
 
 export function apiDelete<T = any>(path: string, options?: RequestInit): Promise<T> {
   return fetchWithAuth(path, { ...options, method: "DELETE" });
+}
+
+export type NameChangeEmailStatus = "queued" | "processing" | "waiting_for_hod" | "waiting_for_subject"
+  | "waiting_for_configuration" | "accepted" | "needs_attention" | "cancelled" | "suppressed_test";
+
+export type OwnProfile = {
+  user: {
+    id: number; fullName: string; email: string; role: string;
+    departmentId: number | null; departmentName: string | null;
+  };
+  student: null | {
+    id: number; registrationNumber: string | null; kuhsId: string; batch: string | null; dateOfJoining: string | null;
+  };
+  capabilities: { canEditName: boolean; readOnlyReason: "impersonation" | "demo" | null };
+};
+
+export type OwnNameHistoryItem = {
+  id: string; previousName: string; newName: string; changedAt: string;
+  source: "self_service" | "admin_roster"; notificationId: string | null; emailStatus: NameChangeEmailStatus | null;
+};
+
+export type NameChangeNotice = {
+  id: string; previousName: string; newName: string; createdAt: string; readAt: string | null;
+  subjectUserId: number; studentProfileId: number; currentStudentName: string;
+  registrationNumber: string | null; kuhsId: string; departmentName: string; detailHref: string;
+  emailStatus: NameChangeEmailStatus | null;
+};
+
+export type NameChangeNoticePage = { items: NameChangeNotice[]; unreadCount: number; hasMore: boolean; nextCursor: string | null };
+
+export function getOwnProfile(): Promise<OwnProfile> { return apiGet("/api/profile"); }
+export function updateOwnName(fullName: string, expectedFullName: string): Promise<{
+  changed: boolean; profile: OwnProfile; session: import("./session").UserSession;
+  change: { id: string; previousName: string; newName: string; changedAt: string } | null;
+  notification: { id: string; inAppSaved: true; emailStatus: NameChangeEmailStatus } | null;
+}> {
+  return apiPatch("/api/profile", { fullName, expectedFullName });
+}
+export function getOwnNameHistory(cursor?: string): Promise<{ items: OwnNameHistoryItem[]; hasMore: boolean; nextCursor: string | null }> {
+  return apiGet("/api/profile/name-history" + (cursor ? "?cursor=" + encodeURIComponent(cursor) : ""));
+}
+export function getNameChangeNotifications(options: { cursor?: string; unreadOnly?: boolean } = {}): Promise<NameChangeNoticePage> {
+  const query = new URLSearchParams();
+  if (options.cursor) query.set("cursor", options.cursor);
+  if (options.unreadOnly !== undefined) query.set("unreadOnly", String(options.unreadOnly));
+  return apiGet("/api/notifications/name-changes" + (query.size ? "?" + query.toString() : ""));
+}
+export type NameChangeNoticeDetail = NameChangeNotice & {
+  changedAt: string; subjectUserId: number; studentProfileId: number; currentStudentName: string;
+  source: "self_service"; readByUserId: number | null;
+};
+export function getNameChangeNotification(id: string): Promise<NameChangeNoticeDetail> {
+  return apiGet("/api/notifications/name-changes/" + encodeURIComponent(id));
+}
+export function markNameChangeNotificationRead(id: string): Promise<{ id: string; readAt: string; readByUserId: number; unreadCount: number }> {
+  return apiPost("/api/notifications/name-changes/" + encodeURIComponent(id) + "/read", {});
 }
 
 export type AdminDepartment = {

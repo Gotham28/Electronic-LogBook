@@ -1,7 +1,8 @@
 import * as React from "react";
 import { AcademicRecordDetails } from "@/components/AcademicRecordDetails";
 import { readAcademicRecord } from "@/lib/academic-logbook";
-import { getCurrentUser, isDemoMode } from "@/lib/session";
+import { isDemoMode } from "@/lib/session";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import { apiGet } from "@/lib/apiClient";
 import { formatLogbookDate } from "@/lib/logbook-config";
 import { useDepartment } from "@/lib/department-context";
@@ -185,7 +186,7 @@ function AggregateSummary({ rows, label }: { rows: any[]; label: string }) {
 }
 
 export function PrintableLogbook() {
-  const user = React.useMemo(() => getCurrentUser(), []);
+  const user = useCurrentUser();
   const hideUhid = isDemoMode();
   const shouldReduceMotion = useReducedMotion();
   const { config, clinicalWorkCategories, clinicalWorkSubtypes, competencyLevels, department: dept, academicLogbook } = useDepartment();
@@ -246,7 +247,7 @@ export function PrintableLogbook() {
     } finally {
       setLoading(false);
     }
-  }, [user, closePrintView]);
+  }, [user?.studentProfileId]);
 
   React.useEffect(() => { fetchAll(); }, [fetchAll]);
 

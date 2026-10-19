@@ -1,4 +1,4 @@
-import { useEffect, useState, type ComponentType, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
 import { Redirect, Route, Switch, useLocation } from "wouter";
 import { AppLayout, type RoleType } from "@/components/layout/AppLayout";
 import { DemoBanner } from "@/components/layout/DemoBanner";
@@ -24,7 +24,10 @@ import { PrintableLogbook } from "@/components/pages/PrintableLogbook";
 import { PrivacyPolicyPage } from "@/components/pages/PrivacyPolicyPage";
 import { GrievanceOfficerPage } from "@/components/pages/GrievanceOfficerPage";
 import { DataRightsPage } from "@/components/pages/DataRightsPage";
-import { getCurrentUser, clearSession, getToken, saveToken, SESSION_EXPIRED_EVENT } from "@/lib/session";
+import { ProfilePage } from "@/components/pages/ProfilePage";
+import { NotificationsPage } from "@/components/pages/NotificationsPage";
+import { NameChangeNotificationPage } from "@/components/pages/NameChangeNotificationPage";
+import { getCurrentUser, clearSession, getToken, saveToken, saveCurrentUser, SESSION_EXPIRED_EVENT, SESSION_USER_CHANGED_EVENT } from "@/lib/session";
 import { DEMO_SESSION_CHANGED_EVENT } from "@/lib/demoSession";
 import { DEMO_DEPARTMENT_CHANGED_EVENT, getDemoDepartmentProfile } from "@/lib/demoDepartments";
 import { apiGet, apiPost } from "@/lib/apiClient";
@@ -185,9 +188,10 @@ function getPreviewPath(): string | null {
 }
 
 function App() {
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const previewPath = getPreviewPath();
   const [currentUser, setCurrentUser] = useState(() => getCurrentUser());
+  const sessionGenerationRef = useRef(0);
   
   const activeRole: RoleType = (() => {
     if (currentUser?.role === "hod") return "HOD";
@@ -206,11 +210,17 @@ function App() {
 
   useEffect(() => {
     const syncCurrentUser = () => setCurrentUser(getCurrentUser());
+    const syncSessionUser = () => {
+      sessionGenerationRef.current += 1;
+      setCurrentUser(getCurrentUser());
+    };
     window.addEventListener(DEMO_DEPARTMENT_CHANGED_EVENT, syncCurrentUser);
     window.addEventListener(DEMO_SESSION_CHANGED_EVENT, syncCurrentUser);
+    window.addEventListener(SESSION_USER_CHANGED_EVENT, syncSessionUser);
     return () => {
       window.removeEventListener(DEMO_DEPARTMENT_CHANGED_EVENT, syncCurrentUser);
       window.removeEventListener(DEMO_SESSION_CHANGED_EVENT, syncCurrentUser);
+      window.removeEventListener(SESSION_USER_CHANGED_EVENT, syncSessionUser);
     };
   }, []);
 
@@ -254,6 +264,40 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (!isAuthenticated || !currentUser || currentUser.isDemoMode) return;
+    let active = true;
+    let inFlight = false;
+    const refreshSession = () => {
+      if (!active || inFlight || document.visibilityState !== "visible") return;
+      const generation = sessionGenerationRef.current;
+      const token = getToken();
+      const accountId = currentUser.id;
+      if (!token) return;
+      inFlight = true;
+      apiGet("/api/auth/me").then((fresh: any) => {
+        if (!active || generation !== sessionGenerationRef.current || getToken() !== token
+          || getCurrentUser()?.isDemoMode || fresh?.id !== accountId) return;
+        const stored = getCurrentUser();
+        if (!stored || stored.name !== fresh.name || stored.role !== fresh.role
+          || stored.departmentId !== fresh.departmentId || stored.departmentName !== fresh.departmentName
+          || stored.studentProfileId !== fresh.studentProfileId) {
+          saveCurrentUser(fresh);
+        }
+      }).catch(() => {
+        // The shared API client already handles expired sessions; transient focus refreshes
+        // leave the last known identity visible and retry on the next focus.
+      }).finally(() => { inFlight = false; });
+    };
+    window.addEventListener("focus", refreshSession);
+    document.addEventListener("visibilitychange", refreshSession);
+    return () => {
+      active = false;
+      window.removeEventListener("focus", refreshSession);
+      document.removeEventListener("visibilitychange", refreshSession);
+    };
+  }, [isAuthenticated, currentUser?.id]);
+
+  useEffect(() => {
     if (!isAuthenticated) return;
     const stopKeepalive = startSessionKeepalive();
     const onExpired = () => {
@@ -284,9 +328,9 @@ function App() {
 
   if (checkingSession) return <p className="p-10" role="status">Checking your session…</p>;
 
-  if (window.location.pathname === "/privacy-policy") return <PrivacyPolicyPage />;
-  if (window.location.pathname === "/grievance-officer") return <GrievanceOfficerPage />;
-  if (window.location.pathname === "/data-rights") return <DataRightsPage />;
+  if (location === "/privacy-policy") return <PrivacyPolicyPage />;
+  if (location === "/grievance-officer") return <GrievanceOfficerPage />;
+  if (location === "/data-rights") return <DataRightsPage />;
 
   if (!isAuthenticated) {
     if (authScreen === "register") {
@@ -318,6 +362,8 @@ function App() {
   }
 
   if (currentUser?.role === "admin") {
+    if (location === "/profile") return <ProfilePage adminShell />;
+    if (location === "/notifications" || location.startsWith("/notifications/")) return <AccessDeniedPage />;
     return (
       <>
         <AdminPortal
@@ -334,7 +380,7 @@ function App() {
     );
   }
 
-  if (window.location.pathname === "/print" && activeRole === "Student") {
+  if (location === "/print" && activeRole === "Student") {
     return (
       <DepartmentProvider departmentId={currentUser?.departmentId ?? null}>
         {currentUser?.isDemoMode && (
@@ -360,6 +406,9 @@ function App() {
       }}
     >
       <Switch>
+      <Route path="/profile">{() => <ProfilePage />}</Route>
+      <Route path="/notifications/name-changes/:notificationId">{(params) => <NameChangeNotificationPage notificationId={params.notificationId} />}</Route>
+      <Route path="/notifications">{() => activeRole === "HOD" ? <NotificationsPage /> : <AccessDeniedPage />}</Route>
       <Route>
       {activeRole === "Faculty" && (
         <ProfessorPortal />
@@ -391,6 +440,10 @@ function App() {
     </AppLayout>
     </DepartmentProvider>
   );
+}
+
+function AccessDeniedPage() {
+  return <main className="mx-auto max-w-3xl p-6"><div role="alert" className="rounded-2xl border border-rose-200 bg-white p-6"><h1 className="text-xl font-bold text-slate-900">Access unavailable</h1><p className="mt-2 text-sm text-slate-600">These saved name-change notices are available to the current department HOD.</p></div></main>;
 }
 
 function FeatureGate({ hiddenBy, requires, children }: { hiddenBy?: string; requires?: string; children: ReactNode }) {

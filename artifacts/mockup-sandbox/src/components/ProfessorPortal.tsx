@@ -66,6 +66,7 @@ import { CaseLogDetails, type CaseLogDetailRecord } from "@/components/CaseLogDe
 import { apiGet, apiPatch, apiPost, apiDelete } from "@/lib/apiClient";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { getCurrentUser, isDemoMode } from "@/lib/session";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import { QuarterlyAppraisalSection } from "@/components/QuarterlyAppraisalSection";
 import { publishArogyaContext } from "@/lib/arogya-context";
 import { useDepartment } from "@/lib/department-context";
@@ -131,6 +132,7 @@ type LogFilter =
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; embedded?: boolean }) {
+  const currentUser = useCurrentUser();
   const hideUhid = isDemoMode();
   const { config, competencyLevels, caseCategories: deptCaseCategories, procedures: deptProcedures, academics: deptAcademics,
     clinicalWorkCategories, clinicalWorkSubtypes } = useDepartment();
@@ -433,7 +435,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
             <Badge className="bg-teal-500/20 text-teal-300 border-teal-500/30 text-xs font-semibold mb-2">
               Faculty &amp; Evaluator Portal
             </Badge>
-            <h2 className="text-2xl font-black">Welcome, {data?.faculty?.name || getCurrentUser()?.name}</h2>
+            <h2 className="text-2xl font-black">Welcome, {currentUser?.name || data?.faculty?.name}</h2>
             <p className="text-xs text-slate-300">
               Department faculty • <strong><DemoCount value={allStudents.length} /> approved students</strong>
             </p>
