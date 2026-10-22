@@ -423,7 +423,8 @@ function App() {
           <Route path="/cases">{() => <FeatureGate hiddenBy="hideCaseLogs"><CaseLogsPage /></FeatureGate>}</Route>
           <Route path="/procedures">{() => <FeatureGate hiddenBy="hideProcedureLogs"><ProcedureLogsPage /></FeatureGate>}</Route>
           <Route path="/clinical-works">{() => <FeatureGate requires="clinicalWorks"><ClinicalWorksPage /></FeatureGate>}</Route>
-          <Route path="/academics" component={AcademicLogsPage} />
+          <Route path="/academics/:category">{(params) => <AcademicLogsPage key={`${currentUser?.departmentId}-${params.category}`} categoryId={params.category} />}</Route>
+          <Route path="/academics">{() => <AcademicLogsPage key={`${currentUser?.departmentId}-all`} />}</Route>
           <Route path="/conferences" component={ConferencesPage} />
           <Route path="/postings" component={PostingsPage} />
           <Route path="/attendance" component={AttendancePage} />

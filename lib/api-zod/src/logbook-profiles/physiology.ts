@@ -37,6 +37,26 @@ export const physiologyLogbook: AcademicLogbookProfile = {
   title: "Physiology logbook",
   departmentNames: ["Physiology"],
   departmentCodes: ["PSI", "PHYS", "PHYSIO", "PHY", "PHYSIOLOGY"],
+  navigationCategories: [
+    { id: "teaching-learning", title: "Teaching & Learning", icon: "teaching", sectionValues: [
+      "Lectures attended in the department", "Lectures attended in allied departments",
+      "Lectures attended in Biostatistics and Research Methodology", "PG teaching programs attended",
+      "UG teaching programs conducted", "UG practical classes conducted", "Microteaching",
+      "Seminars", "Journal club", "Symposium",
+    ] },
+    { id: "practicals-postings", title: "Practicals & Postings", icon: "practicals", sectionValues: [
+      "Practical procedures / classes in the department", "District Residency Programme", "Postings in allied departments",
+    ], relatedPages: [{ title: "Postings & Rotations", href: "/postings" }] },
+    { id: "research-events", title: "Research & Events", icon: "research", sectionValues: [
+      "Topic selection for thesis", "Papers presented / published", "Conferences, workshops and webinars",
+    ], relatedPages: [{ title: "Thesis", href: "/thesis" }, { title: "Conference records", href: "/conferences" }] },
+    { id: "assessments-appraisal", title: "Assessments & Appraisal", icon: "assessments", sectionValues: [
+      "Formative assessment", "Test paper marks", "Internal assessment", "Student appraisal form for MD in Physiology",
+    ], relatedPages: [{ title: "Assessment records & feedback", href: "/assessments" }] },
+    { id: "daily-attendance", title: "Daily Record & Attendance", icon: "daily", sectionValues: [
+      "Daily activity record", "Attendance",
+    ] },
+  ],
   sections: [
     section("Lectures attended in the department"),
     section("Practical procedures / classes in the department", allYears, { topicLabel: "Practical procedure / class", participation: ["Attended", "Performed"] }),

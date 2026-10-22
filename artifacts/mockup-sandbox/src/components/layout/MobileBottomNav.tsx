@@ -4,18 +4,13 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { MoreHorizontal } from "lucide-react";
 import { useSidebar } from "@/components/ui/sidebar";
 import { isDemoMode } from "@/lib/session";
+import { mobileNavigationItems, navigationIsActive } from "@/lib/academic-navigation";
 
-type BottomNavItem = { title: string; icon: React.ComponentType<{ className?: string }>; href: string };
+type BottomNavItem = { title: string; icon: React.ComponentType<{ className?: string }>; href: string; activePaths?: string[] };
 
 // Which of a role's own menu items get a slot, in order. Items come from the same list as the
 // sidebar, which already follows the department's settings, so a page a department does not
 // use (e.g. case logs in Radiology) is simply absent and the next one takes its place.
-const PRIORITY: Record<"Student" | "Faculty" | "HOD", string[]> = {
-  Student: ["/", "/cases", "/clinical-works", "/procedures", "/academics", "/postings"],
-  Faculty: ["/", "/mentees", "/assessments"],
-  HOD: ["/roster", "/mentees", "/review-queue", "/requirements"],
-};
-
 const SHORT_LABELS: Record<string, string> = {
   Dashboard: "Home",
   "Case Logs": "Cases",
@@ -23,6 +18,11 @@ const SHORT_LABELS: Record<string, string> = {
   "Clinical Work": "Clinical",
   "Academic Activities": "Academics",
   "Postings & Rotations": "Postings",
+  "Teaching & Learning": "Teaching",
+  "Practicals & Postings": "Practicals",
+  "Research & Events": "Research",
+  "Assessments & Appraisal": "Assessments",
+  "Daily Record & Attendance": "Daily record",
   "Evaluation Queue": "Queue",
   "Student Progress": "Students",
   "Review Queue": "Reviews",
@@ -36,8 +36,7 @@ export function MobileBottomNav({ role, items, location, departmentKey, switchin
   const reduceMotion = useReducedMotion();
   // Picking a page from the full menu closes it, so the page is not left hidden behind the menu.
   React.useEffect(() => { setOpenMobile(false); }, [location, setOpenMobile]);
-  const byHref = new Map(items.map((item) => [item.href, item]));
-  const slots = PRIORITY[role].map((href) => byHref.get(href)).filter((item): item is BottomNavItem => !!item).slice(0, 4);
+  const slots = mobileNavigationItems(role, items);
   const visibleSlots = switching ? [] : slots;
   const cell = "flex min-h-[60px] min-w-0 flex-1 flex-col items-center justify-center gap-1 px-0.5 pt-1 text-xs font-semibold leading-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-600";
 
@@ -46,7 +45,7 @@ export function MobileBottomNav({ role, items, location, departmentKey, switchin
       <ul className="flex min-h-[60px]">
         <AnimatePresence>
         {visibleSlots.map((item) => {
-          const isActive = location === item.href || (item.href !== "/" && location.startsWith(item.href));
+          const isActive = navigationIsActive(location, item);
           const Icon = item.icon;
           const itemContent = (
             <Link href={item.href} data-demo-target={`nav:${item.href}`} data-demo-navigation-href={item.href} aria-current={isActive ? "page" : undefined}

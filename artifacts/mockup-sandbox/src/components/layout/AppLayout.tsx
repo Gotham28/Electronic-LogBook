@@ -67,6 +67,8 @@ import { ArogyaPanel } from "@/components/arogya/ArogyaPanel";
 import { AROGYA_OPEN_EVENT } from "@/lib/arogya-context";
 import { MaintenanceNoticeBubble } from "@/components/arogya/MaintenanceNoticeBubble";
 import { useDepartment } from "@/lib/department-context";
+import type { AcademicLogbookProfile } from "@/lib/academic-logbook";
+import { navigationIsActive, profileNavigation } from "@/lib/academic-navigation";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { DemoBanner } from "@/components/layout/DemoBanner";
 import { DemoMovie } from "@/components/demo-movie/DemoMovie";
@@ -97,6 +99,7 @@ type NavigationItem = {
   badge?: string;
   badgeColor?: string;
   badgeLoading?: boolean;
+  activePaths?: string[];
 };
 
 const navigationDescriptions: Record<string, string> = {
@@ -111,6 +114,11 @@ const navigationDescriptions: Record<string, string> = {
   Thesis: "Keep thesis milestones and related records together.",
   Certifications: "Track certifications and supporting academic requirements.",
   "Leave Records": "Check your leave balance, previous requests, and approval status.",
+  "Teaching & Learning": "Record lectures, teaching, seminars, journal clubs and symposia.",
+  "Practicals & Postings": "Record practical activities and open your postings and rotations.",
+  "Research & Events": "Record thesis topics, papers and events, and open existing thesis and conference records.",
+  "Assessments & Appraisal": "Record assessment marks and appraisal, and open existing assessment records and feedback.",
+  "Daily Record & Attendance": "Record daily training activities and logbook attendance.",
   "Evaluation Queue": "Open student log entries that are waiting for your review and verification.",
   "Student Progress": "Follow the training progress and completion status of the students assigned to you.",
   "Review Queue": "Review pending case and procedure entries submitted across the department.",
@@ -121,7 +129,7 @@ const navigationDescriptions: Record<string, string> = {
   Requirements: "Configure the case, procedure, and academic requirements used to measure progress.",
 };
 
-function navigationForRole(role: RoleType, dashboardData?: any, loadingBadges?: boolean, config?: any, demoMode = false): NavigationItem[] {
+function navigationForRole(role: RoleType, dashboardData?: any, loadingBadges?: boolean, config?: any, demoMode = false, academicLogbook?: AcademicLogbookProfile | null): NavigationItem[] {
   if (role === "Faculty") {
     return [
       { title: "Evaluation Queue", icon: FileText, href: "/" },
@@ -141,6 +149,15 @@ function navigationForRole(role: RoleType, dashboardData?: any, loadingBadges?: 
       { title: "Leave Approvals", icon: CheckCircle2, href: "/leave-approvals" },
       { title: "Requirements", icon: ClipboardCheck, href: "/requirements" },
     ];
+  }
+
+  const academicNavigation = profileNavigation(academicLogbook);
+  if (academicNavigation) {
+    const icons: Record<string, NavigationItem["icon"]> = {
+      dashboard: LayoutDashboard, teaching: GraduationCap, practicals: Stethoscope,
+      research: Presentation, assessments: ClipboardCheck, daily: CalendarDays, certifications: Award,
+    };
+    return academicNavigation.map((item) => ({ ...item, icon: icons[item.icon] }));
   }
 
   const getCount = (id: string) => {
@@ -226,6 +243,7 @@ function navigationForRole(role: RoleType, dashboardData?: any, loadingBadges?: 
 
 function assistantWorkflowForPath(path: string, role: RoleType): string | undefined {
   const page = path.split("?")[0];
+  if (page.startsWith("/academics/")) return "academics";
   if (page === "/" || page === "/dashboard") return role === "Faculty" ? "evaluation-queue" : role === "HOD" ? "department-dashboard" : "dashboard";
   const map: Record<string, string> = {
     "/cases": "cases", "/procedures": "procedures", "/clinical-works": "clinical-work",
@@ -467,7 +485,7 @@ export function AppLayout({
 
 
   const navigationItems = React.useMemo(
-    () => navigationForRole(activeRole, dashboardData, loadingBadges, config, demoMode)
+    () => navigationForRole(activeRole, dashboardData, loadingBadges, config, demoMode, academicLogbook)
       .map((item) => item.href === "/academics" && academicLogbook ? { ...item, title: academicLogbook.title } : item),
     [activeRole, dashboardData, loadingBadges, config, demoMode, academicLogbook],
   );
@@ -588,9 +606,7 @@ export function AppLayout({
                   <SidebarMenu className="gap-1">
                     <AnimatePresence>
                     {visibleNavigationItems.map((item, index) => {
-                      const isActive =
-                        location === item.href ||
-                        (item.href !== "/" && location.startsWith(item.href));
+                      const isActive = navigationIsActive(location, item);
                       const Icon = item.icon;
                       const menuButton = (
                         <SidebarMenuButton
@@ -605,7 +621,7 @@ export function AppLayout({
                           }`}
                           style={demoMode && isActive ? { backgroundColor: "var(--demo-accent)", color: "var(--demo-accent-foreground)" } : undefined}
                         >
-                          <Link href={item.href} data-demo-target={`nav:${item.href}`} data-demo-navigation-href={item.href} className="flex w-full items-center gap-3 group-data-[collapsible=icon]:justify-center">
+                          <Link href={item.href} aria-current={isActive ? "page" : undefined} data-demo-target={`nav:${item.href}`} data-demo-navigation-href={item.href} className="flex w-full items-center gap-3 group-data-[collapsible=icon]:justify-center">
                             <Icon className={`h-4 w-4 ${isActive ? (demoMode ? "text-[var(--demo-accent-foreground)]" : "text-white") : demoMode ? "text-[var(--demo-accent-readable)]" : "text-teal-600"}`} />
                             <span className="flex-1 truncate text-[13px] group-data-[collapsible=icon]:hidden">{item.title}</span>
 
