@@ -4,11 +4,13 @@
 - Organise the 22 existing Physiology logbook sections into five navigation categories while preserving existing assessments, postings, thesis, certifications and leave features.
 
 ## Current state
+- CLOSE-OUT 2026-10-23: accepted Physiology-only commit 38d6c103bd0a1f415bd669c169116a798cce1857 published on codex/physiology-sidebar; PR #141 open against main: https://github.com/Gotham28/Electronic-LogBook/pull/141. User explicitly approved public publication. Source matches accepted review; all59 Cloudflare protected files unchanged. CodeRabbit skipped automatic review because the repository has fewer than10 stars; manual trigger awaits developer approval. No merge or production deployment.
 - Implementation and required local verification complete; four independent review lenses returned. Source/test snapshot frozen in docs/PHYSIOLOGY_SIDEBAR_HANDOFF.md.
 - Approved minor academic-assistant context fix implemented and independently reviewed with no findings. Developer ACCEPTED 2026-10-23 ("accept"). Verification evidence is in the separate handoff. Ready for close-task in a fresh chat; no close-out/deployment performed.
 - Cloudflare CURRENT_TASK.md, HANDOFF.md and all 59 pre-existing files remain unchanged.
 
 ## Approval
+- PUBLIC PUBLICATION APPROVED 2026-10-23: user explicitly answered "yes" to publishing the eleven reviewed Physiology files to the public https://github.com/Gotham28/Electronic-LogBook repository on codex/physiology-sidebar and opening a PR against main. This resolves the automatic approval rejection; no merge, production deployment or Cloudflare publication authorised.
 - CLOSE-OUT AUTHORISED 2026-10-23: after accepting the completed review, user said "do that here" to close-out. Use isolated codex/physiology-sidebar from verified origin/main670b761; commit/publish only this task's eleven named files, leaving Cloudflare's branch/task/handoff and all its dirty files intact. Merge and production deployment remain developer actions. Task-specific close-out state stays in these two Physiology documents; do not create STATUS.md or reset Cloudflare's CURRENT_TASK.md.
 - REVIEW ACCEPTED 2026-10-23: user said "accept" to the completed sidebar changes and fix-round review. This records implementation acceptance; close-out remains a separate stage and Cloudflare protection persists.
 - FIX ROUND APPROVED 2026-10-23: user said "proceed" to correcting the reviewed minor Arogya context mapping on category URLs. Limit the fix to the existing frontend mapper and behavioural browser verification, then repeat the same independent review. Cloudflare protection and all no-publication boundaries remain.
