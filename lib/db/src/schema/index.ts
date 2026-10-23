@@ -26,3 +26,4 @@ export * from "./posting_schedule.js";
 
 export * from './announcements.js';
 export * from "./profile_notifications.js";
+export * from "./logbook_sections.js";

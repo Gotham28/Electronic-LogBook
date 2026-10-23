@@ -1,0 +1,39 @@
+# HOD logbook section editor
+
+Open **Requirements → Logbook sections → Add logbook section** as an approved HOD.
+Choose the section name, navigation group, display order, training years, topic label,
+topic layout, participation choices and overall or monthly activity requirement.
+The section becomes available to residents after saving and reloading their logbook.
+
+Add optional or required text, long-text, number, date and dropdown fields. Each field
+supports a label and group heading. Text fields support character limits; number
+fields support minimum, maximum and comparison with another number field; date fields
+can require a date on or after the entry date. Conditional fields appear and become
+required when an unconditional source field matches the selected value. Reorder fields
+with the arrow controls. Use the interactive resident preview before saving.
+
+The editor supports up to 200 sections per department, 40 additional fields per section
+and 50 choices per dropdown/participation list. Names and labels have a 160-character
+limit. Text-field limits can be set up to 2,000 characters. Entry date, topic and an
+approved department reviewer remain part of every resident submission.
+
+Built-in sections can be edited using the same editor. Renaming keeps the internal
+section identity stable. New submissions carry a server-generated snapshot of their
+form definition; existing structured entries retain their original built-in definitions.
+Removed fields therefore remain readable in historical entries. Pending and rejected
+entries are edited against their original form and verified entries remain locked.
+
+Archive a section to stop new submissions and exclude its minimum from the academic
+target. Existing entries remain visible and reviewable. Unarchive it to restore its
+configured requirement. Managed section targets are edited here, rather than in the
+legacy Academic activities list. Mirrored test departments inherit their source
+department's configuration and expose the editor as read-only.
+
+## Deployment prerequisite
+
+Migration `lib/db/migrations/0026_department_logbook_sections.sql` adds the department-owned
+configuration table. Apply it through the project's normal migration process before
+deploying this API version, then build and deploy the frontend and API from the same
+revision. No production migration is run as part of implementing this feature.
+
+No TAUGHT TOPICS section is seeded. The HOD can create it using the editor.

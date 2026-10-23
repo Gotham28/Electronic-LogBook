@@ -12,8 +12,17 @@ import { recomputeProcedureRequirement, recomputeCatalogRequirements } from "../
 import { clinicalWorkTarget, verifiedClinicalWorkCounts } from "../lib/clinical-work-progress.js";
 import { getEmailFailure, sendAccountCreatedEmail, sendStudentApprovalEmail } from "../lib/mailer.js";
 import { hardDeleteUserCascade } from "../lib/hard-delete-user.js";
+import { departmentLogbookSectionsTable } from "@workspace/db";
 
 const router = Router();
+
+async function isLogbookCatalogOption(departmentId: number, entryId: number) {
+  const [row] = await db.select({ id: departmentLogbookSectionsTable.id }).from(departmentLogbookSectionsTable)
+    .innerJoin(departmentCatalogTable, and(eq(departmentCatalogTable.departmentId, departmentLogbookSectionsTable.departmentId),
+      eq(departmentCatalogTable.value, departmentLogbookSectionsTable.value), eq(departmentCatalogTable.kind, "academic")))
+    .where(and(eq(departmentLogbookSectionsTable.departmentId, departmentId), eq(departmentCatalogTable.id, entryId))).limit(1);
+  return !!row;
+}
 
 // Only HODs can access these routes
 router.use(requireAuth, requireRole(["hod"]), requireDepartment);
@@ -692,6 +701,9 @@ router.patch("/department/procedures/:id", validate(z.object({ required: targetS
 });
 
 router.patch("/department/catalog/:id", validate(z.object({ required: targetSchema, period: z.enum(["total", "month"]) }).strict()), async (req, res) => {
+  if (await isLogbookCatalogOption(req.user!.departmentId!, Number(req.params.id))) {
+    res.status(409).json({ message: "Edit this activity in Logbook sections" }); return;
+  }
   const [dept] = await db.select({ configSourceDepartmentId: departmentsTable.configSourceDepartmentId }).from(departmentsTable).where(eq(departmentsTable.id, req.user!.departmentId!));
   if (dept?.configSourceDepartmentId !== null) { res.status(403).json({ message: "Test departments cannot modify mirrored settings" }); return; }
   const [row] = await db.update(departmentCatalogTable).set(req.body)
@@ -815,6 +827,9 @@ router.delete("/department/catalog/:id", async (req, res) => {
   try {
     const entryId = parseInt(req.params.id);
     const departmentId = req.user?.departmentId;
+    if (await isLogbookCatalogOption(departmentId!, entryId)) {
+      res.status(409).json({ message: "Archive this activity in Logbook sections to preserve existing entries" }); return;
+    }
     
     const [entry] = await db.select().from(departmentCatalogTable)
       .where(and(eq(departmentCatalogTable.id, entryId), eq(departmentCatalogTable.departmentId, departmentId!))).limit(1);

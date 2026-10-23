@@ -17,7 +17,7 @@ import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTi
 import { Textarea } from "@/components/ui/textarea";
 import { formatLogbookDate, todayForInput } from "@/lib/logbook-config";
 import { useDepartment } from "@/lib/department-context";
-import { academicFieldVisible, readAcademicRecord, validateAcademicRecord, writeAcademicRecord } from "@/lib/academic-logbook";
+import { academicFieldVisible, academicSectionForRecord, academicSectionName, readAcademicRecord, validateAcademicRecord, writeAcademicRecord, type AcademicLogbookSection } from "@/lib/academic-logbook";
 import { AcademicRecordFields } from "@/components/AcademicRecordFields";
 import { AcademicRecordDetails } from "@/components/AcademicRecordDetails";
 import { categorySections, filterAcademicLogs, logbookCategory } from "@/lib/academic-navigation";
@@ -42,10 +42,11 @@ export function AcademicLogsPage({ categoryId }: { categoryId?: string } = {}) {
   const [selectedYear, setSelectedYear] = React.useState("all");
   const category = logbookCategory(academicLogbook, categoryId);
   const sections = categorySections(academicLogbook, categoryId);
-  const configuredOptions = configuredAcademicOptions.filter((option) => !categoryId || !!category?.sectionValues.includes(option.value));
+  const configuredOptions = configuredAcademicOptions.filter((option) => (!categoryId || !!category?.sectionValues.includes(option.value))
+    && !academicLogbook?.sections.some((section) => section.value === option.value && section.archived));
   const academicOptions = [...configuredOptions, ...sections
     .filter((section) => !configuredAcademicOptions.some((option) => option.value === section.value))
-    .map((section, index) => ({ id: -index - 1, name: section.value, value: section.value, required: 0, period: "total" as const }))];
+    .map((section, index) => ({ id: -index - 1, name: section.name || section.value, value: section.value, required: 0, period: "total" as const }))];
   const [open, setOpen] = React.useState(false);
   const [logs, setLogs] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -60,9 +61,10 @@ export function AcademicLogsPage({ categoryId }: { categoryId?: string } = {}) {
     trainingYear: "",
   });
   const [recordValues, setRecordValues] = React.useState<Record<string, string>>({});
+  const [recordSection, setRecordSection] = React.useState<AcademicLogbookSection | undefined>();
   const [formError, setFormError] = React.useState("");
   const formErrorRef = React.useRef<HTMLParagraphElement>(null);
-  const section = academicLogbook?.sections.find((item) => item.value === form.type);
+  const section = recordSection?.value === form.type ? recordSection : academicLogbook?.sections.find((item) => item.value === form.type);
   const availableOptions = academicOptions.filter((option) => !form.trainingYear
     || !academicLogbook?.sections.some((item) => item.value === option.value)
     || academicLogbook.sections.some((item) => item.value === option.value && item.years.includes(Number(form.trainingYear))));
@@ -78,6 +80,7 @@ export function AcademicLogsPage({ categoryId }: { categoryId?: string } = {}) {
     setForm({ date: todayForInput(), type, presentationType: "", topic: "", description: "", supervisorId: "",
       trainingYear: selectedYear === "all" ? "" : selectedYear });
     setRecordValues({});
+    setRecordSection(undefined);
     setFormError("");
     publishArogyaContext(null);
     if (openDialog) setOpen(true);
@@ -100,7 +103,7 @@ export function AcademicLogsPage({ categoryId }: { categoryId?: string } = {}) {
       setLogs(sortedLogs.map((log: any, index: number) => ({ 
         ...log, 
         number: sortedLogs.length - index,
-        type: log.activityType,
+        type: academicSectionName(academicLogbook, log.activityType),
         presentationType: log.presentationType || "—",
         faculty: log.supervisorName || "Unknown",
       })));
@@ -109,7 +112,7 @@ export function AcademicLogsPage({ categoryId }: { categoryId?: string } = {}) {
     } finally {
       setLoading(false);
     }
-  }, [user?.studentProfileId]);
+  }, [user?.studentProfileId, academicLogbook]);
 
   React.useEffect(() => {
     if (user?.departmentId) {
@@ -229,6 +232,7 @@ export function AcademicLogsPage({ categoryId }: { categoryId?: string } = {}) {
                     <SelectContent>
                       {!academicOptions.length && <p className="text-sm text-slate-500">Your HOD has not configured academic activities yet.</p>}
                       {availableOptions.map((item) => <SelectItem key={item.value} value={item.value}>{item.name}</SelectItem>)}
+                      {editLogId && !availableOptions.some((item) => item.value === form.type) && <SelectItem value={form.type}>{section?.name || form.type} (existing entry)</SelectItem>}
                     </SelectContent>
                   </Select>
                 </Field>
@@ -307,7 +311,7 @@ export function AcademicLogsPage({ categoryId }: { categoryId?: string } = {}) {
           {categorySections(academicLogbook, categoryId, selectedYear).map((item) => (
             <button key={item.value} type="button" onClick={() => openNewLog(item.value)}
               className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-3 text-left hover:border-teal-300 hover:bg-teal-50 focus-visible:outline-2 focus-visible:outline-teal-600">
-              <span><span className="block text-sm font-medium text-slate-900">{item.value}</span>
+              <span><span className="block text-sm font-medium text-slate-900">{item.name || item.value}</span>
                 <span className="mt-1 block text-xs text-slate-500">{loading || error ? "" : `${visibleLogs.filter((log) => log.activityType === item.value && log.status !== "rejected").length} recorded · `}Years {item.years.join(", ")}</span>
               </span><PlusCircle aria-hidden="true" className="h-4 w-4 shrink-0 text-teal-700" />
             </button>
@@ -321,7 +325,7 @@ export function AcademicLogsPage({ categoryId }: { categoryId?: string } = {}) {
         </CardHeader>
         <CardContent className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-4">
           {configuredOptions.filter((item) => item.required > 0).map((requirement) => {
-            const logged = logs.filter((log) => log.type === requirement.value && log.status !== "rejected" && (requirement.period !== "month" || log.date.startsWith(todayForInput().slice(0, 7)))).length;
+            const logged = logs.filter((log) => log.activityType === requirement.value && log.status !== "rejected" && (requirement.period !== "month" || log.date.startsWith(todayForInput().slice(0, 7)))).length;
             return (
               <div key={requirement.name} className="rounded-2xl border border-teal-100 bg-teal-50/50 p-4">
                 <p className="text-sm font-bold text-slate-900">{requirement.name}</p>
@@ -394,6 +398,7 @@ export function AcademicLogsPage({ categoryId }: { categoryId?: string } = {}) {
                           setEditLogId(log.id);
                           publishArogyaContext({ log: { type: "academic", id: Number(log.id) } });
                           const record = readAcademicRecord(log.description);
+                          setRecordSection(academicSectionForRecord(academicLogbook, log.activityType, log.description));
                           setRecordValues(record?.values ?? {});
                           setFormError("");
                           setForm({

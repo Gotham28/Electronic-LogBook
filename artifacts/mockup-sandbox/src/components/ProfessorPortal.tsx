@@ -1,5 +1,6 @@
 import * as React from "react";
 import { AcademicRecordDetails } from "@/components/AcademicRecordDetails";
+import { academicSectionName } from "@/lib/academic-logbook";
 import {
   Card,
   CardContent,
@@ -135,7 +136,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
   const currentUser = useCurrentUser();
   const hideUhid = isDemoMode();
   const { config, competencyLevels, caseCategories: deptCaseCategories, procedures: deptProcedures, academics: deptAcademics,
-    clinicalWorkCategories, clinicalWorkSubtypes } = useDepartment();
+    clinicalWorkCategories, clinicalWorkSubtypes, academicLogbook } = useDepartment();
   const clinicalNames = React.useMemo(() => new Map([...clinicalWorkCategories, ...clinicalWorkSubtypes].map((item) => [item.value, item.name])),
     [clinicalWorkCategories, clinicalWorkSubtypes]);
   const [location, setLocation] = useLocation();
@@ -1199,7 +1200,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                           }
                           return rows.map((log: any) => (
                             <TableRow key={log.id}>
-                              <TableCell className="text-xs font-semibold">{log.activityType}</TableCell>
+                              <TableCell className="text-xs font-semibold">{academicSectionName(academicLogbook, log.activityType)}</TableCell>
                               <TableCell className="whitespace-pre-wrap text-xs text-slate-900">{log.topic}
                                 <AcademicRecordDetails activityType={log.activityType} description={log.description} presentationType={log.presentationType} />
                               </TableCell>
@@ -1703,11 +1704,11 @@ function ProgressTabContent({
     if (!alreadyIncluded) {
       acadBarItems.push({
         key: item.value,
-        label: item.value,
+        label: deptAcademics.find((category) => category.value === item.value)?.name ?? item.value,
         verified: item.verified,
         pending: item.pending,
         required: null,
-        inCatalog: false,
+        inCatalog: deptAcademics.some((category) => category.value === item.value),
         done: false,
       });
     }

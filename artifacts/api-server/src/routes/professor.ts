@@ -6,6 +6,8 @@ import { completionPercent } from "../lib/validation.js";
 import { resolveConfigDepartmentId } from "../lib/department-config-source.js";
 import { clinicalWorkTarget, verifiedClinicalWorkCounts } from "../lib/clinical-work-progress.js";
 import { getDepartmentFeatures } from "../lib/department-features.js";
+import { getAcademicLogbook } from "../lib/academic-logbook.js";
+import { academicSectionName } from "@workspace/api-zod";
 
 const router: IRouter = Router();
 
@@ -54,6 +56,7 @@ router.get("/:professorId/review-queue", async (req, res) => {
     const deptId = caller.departmentId!;
     const isHod = profMatch[0].role === "hod";
     const { features } = await getDepartmentFeatures(deptId);
+    const logbook = await getAcademicLogbook(await resolveConfigDepartmentId(deptId));
 
     // For HOD: show pending logs assigned to them or unassigned (department-scoped below via join).
     // For professor: show only logs where they are the named supervisor.
@@ -209,10 +212,10 @@ router.get("/:professorId/review-queue", async (req, res) => {
         department: a.department?.name || "Unknown",
         departmentId: a.department?.id,
         type: "Academic",
-        title: `${a.log.activityType}: ${a.log.topic}`,
+        title: `${academicSectionName(logbook, a.log.activityType)}: ${a.log.topic}`,
         activityType: a.log.activityType,
         date: a.log.date,
-        detail: a.log.presentationType || a.log.activityType,
+        detail: a.log.presentationType || academicSectionName(logbook, a.log.activityType),
         description: a.log.description,
         presentationType: a.log.presentationType,
         status: a.log.status

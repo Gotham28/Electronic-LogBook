@@ -1,5 +1,7 @@
 export {
   academicFieldVisible,
+  academicSectionForRecord,
+  academicSectionName,
   academicRecordText,
   readAcademicRecord,
   validateAcademicRecord,

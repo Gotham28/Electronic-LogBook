@@ -11,7 +11,7 @@ export function logbookCategory(profile: AcademicLogbookProfile | null | undefin
 
 export function categorySections(profile: AcademicLogbookProfile | null | undefined, categoryId?: string, year = "all") {
   const category = logbookCategory(profile, categoryId);
-  return (profile?.sections ?? []).filter((section) => (!categoryId || !!category?.sectionValues.includes(section.value))
+  return (profile?.sections ?? []).filter((section) => !section.archived && (!categoryId || !!category?.sectionValues.includes(section.value))
     && (year === "all" || section.years.includes(Number(year))));
 }
 

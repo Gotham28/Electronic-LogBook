@@ -1,6 +1,6 @@
 import * as React from "react";
 import { AcademicRecordDetails } from "@/components/AcademicRecordDetails";
-import { readAcademicRecord } from "@/lib/academic-logbook";
+import { readAcademicRecord, academicSectionName } from "@/lib/academic-logbook";
 import { isDemoMode } from "@/lib/session";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { apiGet } from "@/lib/apiClient";
@@ -550,7 +550,7 @@ export function PrintableLogbook() {
                     <tr key={a.id} className={i % 2 === 0 ? "" : "bg-slate-50/50"}>
                       <Td muted>{rows.length - i}</Td>
                       <Td>{formatLogbookDate(a.date)}</Td>
-                      <Td>{(a.activityType ?? a.type ?? "—").replace(/_/g, " ")}</Td>
+                      <Td>{academicSectionName(academicLogbook, a.activityType ?? a.type ?? "—").replace(/_/g, " ")}</Td>
                       <Td><span className="font-medium">{a.topic ?? "—"}</span></Td>
                       <Td muted={!a.supervisorName}>{a.supervisorName || "—"}</Td>
                       <Td muted={!a.facultyGrade}>{a.facultyGrade || "—"}</Td>
@@ -564,7 +564,7 @@ export function PrintableLogbook() {
                   readAcademicRecord(a.description)!.trainingYear - readAcademicRecord(b.description)!.trainingYear
                   || a.activityType.localeCompare(b.activityType) || a.date.localeCompare(b.date)).map((row: any) => (
                   <article key={row.id}>
-                    <h4 className="font-semibold text-slate-900">{row.activityType} · {formatLogbookDate(row.date)}</h4>
+                    <h4 className="font-semibold text-slate-900">{academicSectionName(academicLogbook, row.activityType)} · {formatLogbookDate(row.date)}</h4>
                     <p className="mt-1 whitespace-pre-wrap text-sm">{row.topic}</p>
                     <AcademicRecordDetails activityType={row.activityType} description={row.description} presentationType={row.presentationType} />
                     <p className="mt-2 text-xs">Reviewing faculty: {row.supervisorName || "—"} · Status: {row.status}</p>

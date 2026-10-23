@@ -86,7 +86,9 @@ test("every document section can be saved and read back with its typed details",
     const body = payload(section);
     const result = await request(runtime.base, path(), owner(), "POST", body);
     assert.equal(result.status, 201, section.value);
-    assert.equal(result.body.description, body.description);
+    const { sectionSnapshot, ...stored } = readAcademicRecord(result.body.description)!;
+    assert.deepEqual(stored, readAcademicRecord(body.description));
+    assert.deepEqual(sectionSnapshot, section);
     assert.equal(result.body.status, "pending");
     ids.push(result.body.id);
   }
