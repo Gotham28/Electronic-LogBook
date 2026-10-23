@@ -1,4 +1,5 @@
 import * as React from "react";
+import { Link } from "wouter";
 import { AlertCircle, CheckCircle2, Clock, GraduationCap, PlusCircle, Loader2, Edit3 } from "lucide-react";
 import { toast } from "sonner";
 import { apiGet, apiPost, apiPatch } from "@/lib/apiClient";
@@ -19,6 +20,7 @@ import { useDepartment } from "@/lib/department-context";
 import { academicFieldVisible, readAcademicRecord, validateAcademicRecord, writeAcademicRecord } from "@/lib/academic-logbook";
 import { AcademicRecordFields } from "@/components/AcademicRecordFields";
 import { AcademicRecordDetails } from "@/components/AcademicRecordDetails";
+import { categorySections, filterAcademicLogs, logbookCategory } from "@/lib/academic-navigation";
 
 type AcademicLog = {
   number: number;
@@ -35,10 +37,13 @@ type AcademicLog = {
 
 
 
-export function AcademicLogsPage() {
+export function AcademicLogsPage({ categoryId }: { categoryId?: string } = {}) {
   const { academics: configuredAcademicOptions, config, academicLogbook } = useDepartment();
   const [selectedYear, setSelectedYear] = React.useState("all");
-  const academicOptions = [...configuredAcademicOptions, ...(academicLogbook?.sections ?? [])
+  const category = logbookCategory(academicLogbook, categoryId);
+  const sections = categorySections(academicLogbook, categoryId);
+  const configuredOptions = configuredAcademicOptions.filter((option) => !categoryId || !!category?.sectionValues.includes(option.value));
+  const academicOptions = [...configuredOptions, ...sections
     .filter((section) => !configuredAcademicOptions.some((option) => option.value === section.value))
     .map((section, index) => ({ id: -index - 1, name: section.value, value: section.value, required: 0, period: "total" as const }))];
   const [open, setOpen] = React.useState(false);
@@ -77,8 +82,7 @@ export function AcademicLogsPage() {
     publishArogyaContext(null);
     if (openDialog) setOpen(true);
   };
-  const visibleLogs = logs.filter((log) => selectedYear === "all" || !academicLogbook
-    || readAcademicRecord(log.description)?.trainingYear === Number(selectedYear));
+  const visibleLogs = filterAcademicLogs(logs, academicLogbook, categoryId, selectedYear);
 
 
 
@@ -114,8 +118,8 @@ export function AcademicLogsPage() {
   }, [user?.departmentId]);
 
   React.useEffect(() => {
-    fetchLogs();
-  }, [fetchLogs]);
+    if (!categoryId || category) fetchLogs();
+  }, [fetchLogs, categoryId, category]);
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -169,6 +173,14 @@ export function AcademicLogsPage() {
     }
   };
 
+  if (categoryId && !category) return (
+    <div className="space-y-4 p-6" role="alert">
+      <h2 className="page-title">Category unavailable</h2>
+      <p>This logbook category is not available for your department.</p>
+      <Button asChild variant="outline"><Link href="/academics">Open academic activities</Link></Button>
+    </div>
+  );
+
   return (
     <div className="space-y-6 pb-12">
       {error && (
@@ -180,8 +192,8 @@ export function AcademicLogsPage() {
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
         <div>
           <p className="page-eyebrow">Academic record</p>
-          <h2 className="page-title mt-1">{academicLogbook?.title || "Academic activities"}</h2>
-          <p className="mt-2 text-sm text-slate-500">{academicLogbook
+          <h2 className="page-title mt-1">{category?.title || academicLogbook?.title || "Academic activities"}</h2>
+          <p className="mt-2 text-sm text-slate-500">{category ? "Record entries in this category and select a training year to see the available logbook sections." : academicLogbook
             ? "Record lectures, practicals, daily activities, teaching, postings, research, assessment marks, attendance and appraisal."
             : "Presentations, journal clubs, seminars, symposia, mortality meetings and conferences."}</p>
         </div>
@@ -271,6 +283,10 @@ export function AcademicLogsPage() {
         </Dialog>
       </div>
 
+      {!!category?.relatedPages?.length && <nav aria-label="Related records" className="flex flex-wrap gap-2">
+        {category.relatedPages.map((page) => <Button key={page.href} asChild variant="outline"><Link href={page.href}>{page.title}</Link></Button>)}
+      </nav>}
+
       <div className="grid grid-cols-3 gap-2 sm:gap-4">
         <Summary label="Awaiting review" value={loading || error ? "—" : visibleLogs.filter((log) => log.status === "pending").length} />
         <Summary label="Verified activities" value={loading || error ? "—" : visibleLogs.filter((log) => log.status === "verified").length} />
@@ -288,7 +304,7 @@ export function AcademicLogsPage() {
           </div>
         </CardHeader>
         <CardContent className="grid gap-2 p-4 sm:grid-cols-2">
-          {academicLogbook.sections.filter((item) => selectedYear === "all" || item.years.includes(Number(selectedYear))).map((item) => (
+          {categorySections(academicLogbook, categoryId, selectedYear).map((item) => (
             <button key={item.value} type="button" onClick={() => openNewLog(item.value)}
               className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-3 text-left hover:border-teal-300 hover:bg-teal-50 focus-visible:outline-2 focus-visible:outline-teal-600">
               <span><span className="block text-sm font-medium text-slate-900">{item.value}</span>
@@ -299,12 +315,12 @@ export function AcademicLogsPage() {
         </CardContent>
       </Card>}
 
-      {configuredAcademicOptions.some((item) => item.required > 0) && <Card>
+      {configuredOptions.some((item) => item.required > 0) && <Card>
         <CardHeader className="border-b border-teal-100">
           <CardTitle className="text-lg">Mandatory academic requirements</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-4">
-          {configuredAcademicOptions.filter((item) => item.required > 0).map((requirement) => {
+          {configuredOptions.filter((item) => item.required > 0).map((requirement) => {
             const logged = logs.filter((log) => log.type === requirement.value && log.status !== "rejected" && (requirement.period !== "month" || log.date.startsWith(todayForInput().slice(0, 7)))).length;
             return (
               <div key={requirement.name} className="rounded-2xl border border-teal-100 bg-teal-50/50 p-4">

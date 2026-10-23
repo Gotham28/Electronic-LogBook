@@ -29,6 +29,15 @@ export type AcademicLogbookProfile = {
   departmentNames: string[];
   departmentCodes: string[];
   sections: AcademicLogbookSection[];
+  navigationCategories?: AcademicLogbookCategory[];
+};
+
+export type AcademicLogbookCategory = {
+  id: string;
+  title: string;
+  icon: "teaching" | "practicals" | "research" | "assessments" | "daily";
+  sectionValues: string[];
+  relatedPages?: Array<{ title: string; href: string }>;
 };
 
 export type AcademicRecordData = {
