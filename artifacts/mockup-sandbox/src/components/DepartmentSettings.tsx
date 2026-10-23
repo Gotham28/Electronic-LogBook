@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { LogbookSectionSettings } from "./LogbookSectionSettings";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -37,7 +38,8 @@ export function DepartmentSettings() {
     if (procedureTypesEnabled) list.push({ id: "procedures", label: "Procedures", items: data.procedures, kind: "procedure", addLabel: "+ Add procedure", desc: "Procedure groups and types, with the required count for each." });
     if (features.clinicalWorks) list.push({ id: "clinical", label: "Clinical work", items: data.clinicalWorkCategories, kind: "clinical_work_category", addLabel: "+ Add category", desc: "Categories residents log under, the minimum for each (0 means optional), and the sub-types offered. A category with no sub-types is logged without one." });
     list.push({ id: "postings", label: isRadiology ? "Postings" : "Wards / postings", items: data.postings, kind: "posting", addLabel: "+ Add posting", desc: `${isRadiology ? "Postings" : "Wards"}, academic activities and the other lists residents choose from.` });
-    list.push({ id: "academic", label: "Academic activities", items: data.academics, kind: "academic", addLabel: "+ Add activity" });
+    list.push({ id: "academic", label: "Academic activities", items: data.academics.filter((item) => !data.academicLogbook?.sections.some((section) => section.value === item.value)), kind: "academic", addLabel: "+ Add activity" });
+    list.push({ id: "logbook", label: "Logbook sections", items: (data.academicLogbook?.sections ?? []).map((section, index) => ({ id: index, name: section.name || section.value, required: 0 })), kind: "logbook", addLabel: "+ Add logbook section" });
     if (!features.hideCaseLogs) list.push({ id: "cases", label: "Case categories", items: data.caseCategories ?? [], kind: "case_category", addLabel: "+ Add case category" });
     if (!features.hideProcedureLogs) list.push({ id: "competency", label: "Competency levels", items: data.competencyLevels ?? [], kind: "competency_level", addLabel: "+ Add competency level" });
     if (features.conferenceLevels) list.push({ id: "conference", label: "Conference levels", items: data.conferenceLevels ?? [], kind: "conference_level", addLabel: "+ Add conference level" });
@@ -273,6 +275,7 @@ export function DepartmentSettings() {
         </div>
 
         <div className="min-w-0 flex flex-col gap-4 pb-12">
+          {activeSection.kind === "logbook" ? <LogbookSectionSettings /> : <>
           <div className="flex flex-col gap-2 border-b border-slate-200 pb-4">
             <div className="flex items-center justify-between gap-4">
               <h3 className="text-lg font-semibold text-slate-900">{activeSection.label}</h3>
@@ -497,7 +500,7 @@ export function DepartmentSettings() {
               )}
             </div>
           )}
-
+          </>}
         </div>
       </div>
 

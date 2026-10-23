@@ -16,6 +16,8 @@ export type AcademicLogbookField = {
 
 export type AcademicLogbookSection = {
   value: string;
+  name?: string;
+  archived?: boolean;
   years: number[];
   topicLabel: string;
   multilineTopic?: boolean;
@@ -30,6 +32,7 @@ export type AcademicLogbookProfile = {
   departmentCodes: string[];
   sections: AcademicLogbookSection[];
   navigationCategories?: AcademicLogbookCategory[];
+  legacySections?: AcademicLogbookSection[];
 };
 
 export type AcademicLogbookCategory = {
@@ -45,6 +48,7 @@ export type AcademicRecordData = {
   trainingYear: number;
   values: Record<string, string>;
   notes: string;
+  sectionSnapshot?: AcademicLogbookSection;
 };
 
 // Keep structured details in the existing description column: no schema change or
@@ -57,18 +61,52 @@ export function readAcademicRecord(description?: string | null): AcademicRecordD
       || !data.values || typeof data.values !== "object" || Array.isArray(data.values)
       || Object.values(data.values).some((value) => typeof value !== "string")
       || typeof data.notes !== "string") return null;
-    return data as AcademicRecordData;
+    const snapshot = data.sectionSnapshot;
+    const validSnapshot = snapshot && typeof snapshot.value === "string" && typeof snapshot.topicLabel === "string"
+      && (snapshot.name === undefined || typeof snapshot.name === "string")
+      && (snapshot.archived === undefined || typeof snapshot.archived === "boolean")
+      && (snapshot.multilineTopic === undefined || typeof snapshot.multilineTopic === "boolean")
+      && (snapshot.participation === undefined || (Array.isArray(snapshot.participation) && snapshot.participation.every((value: unknown) => typeof value === "string")))
+      && Array.isArray(snapshot.years) && snapshot.years.every((year: unknown) => typeof year === "number" && [1, 2, 3].includes(year))
+      && Array.isArray(snapshot.fields) && snapshot.fields.length <= 40 && snapshot.fields.every((field: any) => field
+        && typeof field.key === "string" && /^[A-Za-z][A-Za-z0-9_.-]{0,63}$/.test(field.key)
+        && !["constructor", "prototype"].includes(field.key) && typeof field.label === "string"
+        && ["text", "textarea", "number", "date", "select"].includes(field.type)
+        && (field.group === undefined || typeof field.group === "string")
+        && (field.maximumField === undefined || typeof field.maximumField === "string")
+        && (field.required === undefined || typeof field.required === "boolean")
+        && (field.notBeforeLogDate === undefined || typeof field.notBeforeLogDate === "boolean")
+        && ["min", "max", "maxLength"].every((key) => field[key] === undefined || (typeof field[key] === "number" && Number.isFinite(field[key])))
+        && (field.options === undefined || (Array.isArray(field.options) && field.options.every((option: unknown) => typeof option === "string")))
+        && (field.requiredWhen === undefined || (field.requiredWhen && typeof field.requiredWhen.field === "string" && typeof field.requiredWhen.value === "string")));
+    return { format: data.format, trainingYear: data.trainingYear, values: data.values, notes: data.notes,
+      ...(validSnapshot ? { sectionSnapshot: snapshot } : {}) };
   } catch {
     return null;
   }
 }
 
-export function writeAcademicRecord(trainingYear: number, values: Record<string, string>, notes: string): string {
-  return JSON.stringify({ format: "department-logbook-v1", trainingYear, values, notes } satisfies AcademicRecordData);
+export function writeAcademicRecord(trainingYear: number, values: Record<string, string>, notes: string, sectionSnapshot?: AcademicLogbookSection): string {
+  return JSON.stringify({ format: "department-logbook-v1", trainingYear, values, notes,
+    ...(sectionSnapshot ? { sectionSnapshot } : {}) } satisfies AcademicRecordData);
+}
+
+export function academicSectionForRecord(profile: AcademicLogbookProfile | null | undefined, value: string, description?: string | null) {
+  const record = readAcademicRecord(description);
+  const snapshot = record?.sectionSnapshot;
+  if (snapshot?.value === value && Array.isArray(snapshot.fields) && Array.isArray(snapshot.years)) return snapshot;
+  return (record && profile?.legacySections?.find((section) => section.value === value))
+    || profile?.sections.find((section) => section.value === value);
+}
+
+export function academicSectionName(profile: AcademicLogbookProfile | null | undefined, value: string): string {
+  return profile?.sections.find((section) => section.value === value)?.name || value;
 }
 
 export function academicFieldVisible(field: AcademicLogbookField, values: Record<string, string>): boolean {
-  return !field.requiredWhen || values[field.requiredWhen.field] === field.requiredWhen.value;
+  if (!field.requiredWhen) return true;
+  const source = values[field.requiredWhen.field];
+  return typeof source === "string" && source.trim() === field.requiredWhen.value;
 }
 
 function validDate(value: string): boolean {
@@ -99,11 +137,12 @@ export function validateAcademicRecord(
     if (field.type === "select" && !field.options?.includes(value)) return `Select a valid ${field.label.toLowerCase()}`;
     if (field.type === "number") {
       const number = Number(value);
-      if (!/^\d+(?:\.\d+)?$/.test(value) || !Number.isFinite(number)
+      if (!/^-?\d+(?:\.\d+)?$/.test(value) || !Number.isFinite(number)
         || (field.min !== undefined && number < field.min)
         || (field.max !== undefined && number > field.max)) return `Enter a valid ${field.label.toLowerCase()}`;
-      if (field.maximumField && record.values[field.maximumField]?.trim()
-        && number > Number(record.values[field.maximumField])) return `${field.label} must not exceed maximum marks`;
+      const maximum = field.maximumField ? record.values[field.maximumField] : undefined;
+      if (typeof maximum === "string" && maximum.trim()
+        && number > Number(maximum)) return `${field.label} must not exceed maximum marks`;
     }
     if (field.type === "date" && (!validDate(value) || (field.notBeforeLogDate && value < logDate))) {
       return `${field.label} must be a valid date on or after the entry date`;
@@ -115,7 +154,9 @@ export function validateAcademicRecord(
 export function academicRecordText(description?: string | null, section?: AcademicLogbookSection): string {
   const record = readAcademicRecord(description);
   if (!record) return description || "";
-  const fields = section?.fields ?? Object.keys(record.values).map((key) => ({ key, label: key, type: "text" as const }));
+  const known = record.sectionSnapshot?.fields ?? section?.fields ?? [];
+  const fields = [...known, ...Object.keys(record.values).filter((key) => !known.some((field) => field.key === key))
+    .map((key) => ({ key, label: key, type: "text" as const }))];
   const lines = [`Logbook year: ${record.trainingYear}`];
   for (const field of fields) {
     if (academicFieldVisible(field, record.values) && record.values[field.key]?.trim()) {

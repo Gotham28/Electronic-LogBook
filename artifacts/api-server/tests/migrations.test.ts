@@ -13,7 +13,8 @@ test("fresh installation and rerunning migrations are safe and checksum-tracked"
   try {
     await applyMigrations(migrationConnection(database));
     await applyMigrations(migrationConnection(database));
-    assert.equal((await database.query("SELECT * FROM elogbook_migrations")).rows.length, 25);
+    assert.equal((await database.query("SELECT * FROM elogbook_migrations")).rows.length, 26);
+    assert.equal((await database.query("SELECT to_regclass('department_logbook_sections') AS table_name")).rows[0].table_name, "department_logbook_sections");
     assert.equal((await database.query("SELECT to_regclass('maintenance_announcements') AS table_name")).rows[0].table_name, "maintenance_announcements");
     assert.equal((await database.query("SELECT * FROM departments")).rows.length, 0);
     assert.equal((await database.query("SELECT * FROM assignment_recipients")).rows.length, 0);

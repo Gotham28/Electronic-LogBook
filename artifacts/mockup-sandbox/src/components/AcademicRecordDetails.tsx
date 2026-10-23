@@ -1,4 +1,4 @@
-import { academicRecordText } from "@/lib/academic-logbook";
+import { academicRecordText, academicSectionForRecord } from "@/lib/academic-logbook";
 import { useDepartment } from "@/lib/department-context";
 
 /** One readable representation for resident, faculty/HOD review and printing. */
@@ -8,7 +8,7 @@ export function AcademicRecordDetails({ activityType, description, presentationT
   presentationType?: string | null;
 }) {
   const { academicLogbook } = useDepartment();
-  const section = academicLogbook?.sections.find((item) => item.value === activityType);
+  const section = academicSectionForRecord(academicLogbook, activityType, description);
   const text = academicRecordText(description, section);
   if (!text && !presentationType) return null;
   return <div className="mt-2 space-y-1 text-xs font-normal text-slate-700">

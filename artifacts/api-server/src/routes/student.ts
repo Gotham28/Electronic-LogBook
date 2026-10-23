@@ -14,7 +14,7 @@ import { dateSchema, idSchema, nameSchema, validate } from "../lib/validation.js
 import { resolveConfigDepartmentId } from "../lib/department-config-source.js";
 import { getDepartmentFeatures } from "../lib/department-features.js";
 import { clinicalWorkTarget } from "../lib/clinical-work-progress.js";
-import { validateAcademicRecord } from "@workspace/api-zod";
+import { validateAcademicRecord, readAcademicRecord, writeAcademicRecord, academicSectionForRecord } from "@workspace/api-zod";
 import { getAcademicLogbook } from "../lib/academic-logbook.js";
 
 const router: IRouter = Router();
@@ -1241,12 +1241,15 @@ router.post("/:studentId/academic-logs", validate(z.object({ supervisorId: idSch
     const [option] = await db.select({ id: departmentCatalogTable.id }).from(departmentCatalogTable).where(and(
       eq(departmentCatalogTable.departmentId, configSourceId), eq(departmentCatalogTable.kind, "academic"), eq(departmentCatalogTable.value, activityType))).limit(1);
     if (!option && !section) { res.status(400).json({ message: "Select an academic activity from your department" }); return; }
+    if (section?.archived) { res.status(400).json({ message: "This logbook section is archived" }); return; }
     if (section) {
       const error = validateAcademicRecord(section, description, date, presentationType);
       if (error) { res.status(400).json({ message: error }); return; }
     }
+    const record = readAcademicRecord(description);
     const [inserted] = await db.insert(academicLogsTable).values({
-      studentId, supervisorId: supervisorIdNum, activityType, presentationType, description,
+      studentId, supervisorId: supervisorIdNum, activityType, presentationType,
+      description: record ? writeAcademicRecord(record.trainingYear, record.values, record.notes, section) : description,
       topic, date, presenter: req.body.presenter, status: "pending"
     }).returning();
     res.status(201).json(inserted);
@@ -1636,7 +1639,11 @@ router.patch("/:studentId/academic-logs/:logId", requireAuth, validate(z.object(
     // Validate the resulting entry, including a PATCH that changes only marks or
     // dates. The edit guard has already read the row and resolved ownership.
     const resulting = { ...guard.log, ...req.body };
-    const section = logbook?.sections.find((item) => item.value === resulting.activityType);
+    const existingLog = guard.log!;
+    const section = resulting.activityType === existingLog.activityType
+      ? academicSectionForRecord(logbook, resulting.activityType, existingLog.description)
+      : logbook?.sections.find((item) => item.value === resulting.activityType);
+    if (section?.archived && resulting.activityType !== existingLog.activityType) { res.status(400).json({ message: "This logbook section is archived" }); return; }
     if (req.body.activityType && !section) {
       const [option] = await db.select({ id: departmentCatalogTable.id }).from(departmentCatalogTable).where(and(
         eq(departmentCatalogTable.departmentId, configSourceId), eq(departmentCatalogTable.kind, "academic"), eq(departmentCatalogTable.value, req.body.activityType))).limit(1);
@@ -1647,7 +1654,9 @@ router.patch("/:studentId/academic-logs/:logId", requireAuth, validate(z.object(
       if (error) { res.status(400).json({ message: error }); return; }
     }
 
-    const updateBody = { ...req.body, status: "pending", facultyRemarks: null, facultyGrade: null };
+    const record = readAcademicRecord(resulting.description);
+    const updateBody = { ...req.body, ...(record ? { description: writeAcademicRecord(record.trainingYear, record.values, record.notes, section) } : {}),
+      status: "pending", facultyRemarks: null, facultyGrade: null };
     const [updated] = await db.update(academicLogsTable).set(updateBody)
       .where(and(eq(academicLogsTable.id, logId), eq(academicLogsTable.studentId, studentId))).returning();
     if (!updated) { res.status(400).json({ message: "Log not found" }); return; }
