@@ -166,6 +166,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
   const [menteeAssessments, setMenteeAssessments] = React.useState<any[]>([]);
   const [reviewBusy, setReviewBusy] = React.useState(false);
   const [expandedCaseIds, setExpandedCaseIds] = React.useState<Set<number>>(new Set());
+  const [expandedProcIds, setExpandedProcIds] = React.useState<Set<number>>(new Set());
 
 
   // Dialog inner tab & click-through filter
@@ -1138,19 +1139,140 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                           if (!rows.length) {
                             return <TableRow><TableCell colSpan={4} className="text-center text-sm text-slate-500 py-6">No procedure logs found.</TableCell></TableRow>;
                           }
-                          return rows.map((log: any) => (
-                            <TableRow key={log.id}>
-                              <TableCell className="text-xs font-bold text-slate-900">{log.procedureName}</TableCell>
-                              <TableCell className="text-xs text-slate-600">
-                                {!hideUhid && <p className="font-semibold text-teal-800">{log.patientUhid || "—"}</p>}
-                                <p>{log.patientAge}</p>
-                              </TableCell>
-                              <TableCell className="text-xs text-teal-800 font-semibold">{log.competencyDeclared}</TableCell>
-                              <TableCell className="text-right">
-                                {renderLogStatusBadge(log.status)}
-                              </TableCell>
-                            </TableRow>
-                          ));
+                          return rows.map((log: any) => {
+                            const expanded = expandedProcIds.has(log.id);
+                            return (
+                              <React.Fragment key={log.id}>
+                                <TableRow>
+                                  <TableCell className="text-xs font-bold text-slate-900">{log.procedureName}</TableCell>
+                                  <TableCell className="text-xs text-slate-600">
+                                    {!hideUhid && <p className="font-semibold text-teal-800">{log.patientUhid || "—"}</p>}
+                                    <p>{log.patientAge}</p>
+                                  </TableCell>
+                                  <TableCell className="text-xs text-teal-800 font-semibold">{log.competencyLevel ?? log.competencyDeclared}</TableCell>
+                                  <TableCell className="text-right">
+                                    <div className="flex items-center justify-end gap-2">
+                                      {renderLogStatusBadge(log.status)}
+                                      <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        aria-expanded={expanded}
+                                        aria-controls={`proc-details-${log.id}`}
+                                        onClick={() => setExpandedProcIds((current) => {
+                                          const next = new Set(current);
+                                          if (next.has(log.id)) next.delete(log.id); else next.add(log.id);
+                                          return next;
+                                        })}
+                                      >
+                                        {expanded ? "Hide details" : "View details"}
+                                      </Button>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                                {expanded && (
+                                  <TableRow>
+                                    <TableCell id={`proc-details-${log.id}`} colSpan={4} className="bg-slate-50 p-3">
+                                      <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
+                                        <section aria-labelledby={`proc-ctx-${log.id}`}>
+                                          <h4 id={`proc-ctx-${log.id}`} className="mb-3 text-xs font-bold uppercase tracking-wide text-teal-800">Procedure &amp; patient context</h4>
+                                          <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                                            <div className="min-w-0">
+                                              <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Date</dt>
+                                              <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">{formatLogbookDate(log.date)}</dd>
+                                            </div>
+                                            <div className="min-w-0">
+                                              <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Procedure group</dt>
+                                              <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">{log.procedureGroup || <span className="text-slate-400">Not recorded</span>}</dd>
+                                            </div>
+                                            <div className="min-w-0">
+                                              <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Procedure name</dt>
+                                              <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">{log.procedureName || <span className="text-slate-400">Not recorded</span>}</dd>
+                                            </div>
+                                            <div className="min-w-0">
+                                              <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Patient age</dt>
+                                              <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">{log.patientAge || <span className="text-slate-400">Not recorded</span>}</dd>
+                                            </div>
+                                            <div className="min-w-0">
+                                              <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Patient sex</dt>
+                                              <dd className="mt-1 capitalize whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">{log.sex || <span className="text-slate-400">Not recorded</span>}</dd>
+                                            </div>
+                                            {!hideUhid && (
+                                              <div className="min-w-0">
+                                                <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">UHID</dt>
+                                                <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">{log.patientUhid || <span className="text-slate-400">Not recorded</span>}</dd>
+                                              </div>
+                                            )}
+                                            <div className="min-w-0">
+                                              <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Competency level</dt>
+                                              <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">{log.competencyLevel ?? log.competencyDeclared ?? <span className="text-slate-400">Not recorded</span>}</dd>
+                                            </div>
+                                            <div className="min-w-0 sm:col-span-2">
+                                              <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Diagnosis</dt>
+                                              <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">{log.diagnosis || <span className="text-slate-400">Not recorded</span>}</dd>
+                                            </div>
+                                          </dl>
+                                        </section>
+                                        {/* Show review result when already reviewed */}
+                                        {(log.status !== "pending" || log.facultyRemarks || log.facultyVerifiedLevel || log.reviewedAt) && (
+                                          <section aria-labelledby={`proc-review-${log.id}`} className="border-t border-slate-100 pt-4">
+                                            <h4 id={`proc-review-${log.id}`} className="mb-3 text-xs font-bold uppercase tracking-wide text-teal-800">Faculty review</h4>
+                                            <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                              <div className="min-w-0">
+                                                <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Status</dt>
+                                                <dd className="mt-1 capitalize whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">{log.status || <span className="text-slate-400">Not recorded</span>}</dd>
+                                              </div>
+                                              {log.facultyVerifiedLevel && (
+                                                <div className="min-w-0">
+                                                  <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Faculty verified level</dt>
+                                                  <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">{log.facultyVerifiedLevel}</dd>
+                                                </div>
+                                              )}
+                                              <div className="min-w-0">
+                                                <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Faculty remarks</dt>
+                                                <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">{log.facultyRemarks || <span className="text-slate-400">None</span>}</dd>
+                                              </div>
+                                              {log.reviewedAt && (
+                                                <div className="min-w-0">
+                                                  <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Reviewed at</dt>
+                                                  <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">{new Date(log.reviewedAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}</dd>
+                                                </div>
+                                              )}
+                                            </dl>
+                                          </section>
+                                        )}
+                                        {/* Inline review action form - only for pending logs the caller is authorised to review */}
+                                        {log.status === "pending" && (callerIsHod || currentUser?.role === "hod" || log.supervisorId === currentUser?.id) && (
+                                          <ProcedureLogReviewForm
+                                            logId={log.id}
+                                            studentId={selectedMentee.id}
+                                            competencyLevels={competencyLevels}
+                                            procedureExperience={Boolean(config?.enabledFeatures?.procedureExperience)}
+                                            initialCompetency={log.competencyLevel ?? log.competencyDeclared}
+                                            onDone={async () => {
+                                              setMenteeLogsLoading(true);
+                                              try {
+                                                const logs = await apiGet(`/api/students/${selectedMentee.id}/logs`);
+                                                setMenteeLogs(logs);
+                                                const progress = await apiGet(`/api/students/${selectedMentee.id}/progress`);
+                                                setMenteeProgress(progress as MenteeProgress);
+                                                await fetchProfessorData();
+                                              } catch {
+                                                setMenteeLoadErrors((prev) => ({ ...prev, logs: "Failed to reload logs after review" }));
+                                              } finally {
+                                                setMenteeLogsLoading(false);
+                                              }
+                                              setExpandedProcIds(new Set());
+                                            }}
+                                          />
+                                        )}
+                                      </div>
+                                    </TableCell>
+                                  </TableRow>
+                                )}
+                              </React.Fragment>
+                            );
+                          });
                         })()}
                       </TableBody>
                     </Table>
@@ -2415,6 +2537,99 @@ function AssessmentEditForm({ assessment, studentId, busy, onDone }: {
           setMarks(String(assessment.marks ?? ""));
         }}>
           Cancel
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ── ProcedureLogReviewForm ─────────────────────────────────────────────────────────
+
+function ProcedureLogReviewForm({
+  logId,
+  studentId,
+  competencyLevels,
+  procedureExperience,
+  initialCompetency,
+  onDone,
+}: {
+  logId: number;
+  studentId: number;
+  competencyLevels: any[];
+  procedureExperience: boolean;
+  initialCompetency?: string;
+  onDone: () => void;
+}) {
+  const [remarks, setRemarks] = React.useState("");
+  const [competencyOverride, setCompetencyOverride] = React.useState(initialCompetency || competencyLevels?.[0]?.value || "");
+  const [submitting, setSubmitting] = React.useState(false);
+
+  async function submit(status: "verified" | "rejected") {
+    setSubmitting(true);
+    try {
+      await apiPatch(`/api/logs/procedure/${logId}/review`, {
+        status,
+        comments: remarks || undefined,
+        ...(procedureExperience && competencyOverride ? { facultyVerifiedLevel: competencyOverride } : {}),
+      });
+      toast.success(status === "verified" ? "Procedure log verified" : "Revision requested for procedure log");
+      onDone();
+    } catch (e: any) {
+      toast.error(e.message || "Failed to save review");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="mt-4 border-t border-slate-200 pt-4 space-y-3 bg-slate-50/70 p-4 rounded-xl border">
+      <h5 className="text-xs font-bold uppercase tracking-wide text-teal-800">Faculty Evaluation</h5>
+
+      {procedureExperience && competencyLevels && competencyLevels.length > 0 && (
+        <div className="space-y-1.5 max-w-sm">
+          <label className="text-xs font-semibold text-slate-700">Verified Competency Level</label>
+          <Select value={competencyOverride} onValueChange={setCompetencyOverride}>
+            <SelectTrigger className="text-xs h-8 bg-white">
+              <SelectValue placeholder="Select competency level" />
+            </SelectTrigger>
+            <SelectContent>
+              {competencyLevels.map((c) => (
+                <SelectItem key={c.id || c.value} value={c.value}>{c.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      <div className="space-y-1.5">
+        <label className="text-xs font-semibold text-slate-700">Faculty Remarks</label>
+        <Textarea
+          rows={2}
+          placeholder="Add constructive feedback or remarks for the student..."
+          className="text-xs bg-white min-h-[60px]"
+          value={remarks}
+          onChange={(e) => setRemarks(e.target.value)}
+          maxLength={4000}
+        />
+      </div>
+
+      <div className="flex items-center gap-2 pt-1">
+        <Button
+          size="sm"
+          className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs gap-1.5 font-semibold"
+          disabled={submitting}
+          onClick={() => submit("verified")}
+        >
+          <CheckCircle2 className="h-4 w-4" /> Verify Procedure
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          className="border-rose-300 text-rose-700 hover:bg-rose-50 text-xs gap-1.5 font-semibold"
+          disabled={submitting}
+          onClick={() => submit("rejected")}
+        >
+          <XCircle className="h-4 w-4" /> Request Revision
         </Button>
       </div>
     </div>
