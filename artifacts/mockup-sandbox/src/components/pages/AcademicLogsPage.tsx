@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Link } from "wouter";
-import { AlertCircle, CheckCircle2, Clock, GraduationCap, PlusCircle, Loader2, Edit3 } from "lucide-react";
+import { AlertCircle, CheckCircle2, Clock, GraduationCap, PlusCircle, Loader2, Edit3, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { apiGet, apiPost, apiPatch } from "@/lib/apiClient";
 import { publishArogyaContext } from "@/lib/arogya-context";
@@ -69,6 +69,29 @@ export function AcademicLogsPage({ categoryId }: { categoryId?: string } = {}) {
     || !academicLogbook?.sections.some((item) => item.value === option.value)
     || academicLogbook.sections.some((item) => item.value === option.value && item.years.includes(Number(form.trainingYear))));
   const [editLogId, setEditLogId] = React.useState<number | null>(null);
+  const [editLogRemarks, setEditLogRemarks] = React.useState<string | null>(null);
+  const [editLogStatus, setEditLogStatus] = React.useState<string | null>(null);
+
+  const startEditAcademic = (log: any) => {
+    setEditLogId(log.id);
+    setEditLogRemarks(log.facultyRemarks || null);
+    setEditLogStatus(log.status);
+    publishArogyaContext({ log: { type: "academic", id: Number(log.id) } });
+    const record = readAcademicRecord(log.description);
+    setRecordSection(academicSectionForRecord(academicLogbook, log.activityType, log.description));
+    setRecordValues(record?.values ?? {});
+    setFormError("");
+    setForm({
+      date: log.date,
+      type: log.activityType || log.type,
+      presentationType: log.presentationType === "—" ? "" : (log.presentationType || ""),
+      topic: log.topic || "",
+      supervisorId: String(log.supervisorId || ""),
+      description: record?.notes ?? log.description ?? "",
+      trainingYear: record ? String(record.trainingYear) : ""
+    });
+    setOpen(true);
+  };
 
   const user = React.useMemo(() => getCurrentUser(), []);
   const [professors, setProfessors] = React.useState<any[]>([]);
@@ -77,6 +100,8 @@ export function AcademicLogsPage({ categoryId }: { categoryId?: string } = {}) {
 
   const openNewLog = (type = "", openDialog = true) => {
     setEditLogId(null);
+    setEditLogRemarks(null);
+    setEditLogStatus(null);
     setForm({ date: todayForInput(), type, presentationType: "", topic: "", description: "", supervisorId: "",
       trainingYear: selectedYear === "all" ? "" : selectedYear });
     setRecordValues({});
@@ -166,9 +191,17 @@ export function AcademicLogsPage({ categoryId }: { categoryId?: string } = {}) {
       await fetchLogs();
       setOpen(false);
       setEditLogId(null);
+      setEditLogRemarks(null);
+      setEditLogStatus(null);
       setForm({ ...form, topic: "", supervisorId: "", description: "" });
       setRecordValues({});
-      toast.success(editLogId ? `Academic activity updated successfully` : `Academic activity submitted successfully`);
+      toast.success(
+        editLogStatus === "rejected"
+          ? "Academic activity resubmitted for faculty review"
+          : editLogId
+          ? "Academic activity updated successfully"
+          : "Academic activity submitted successfully"
+      );
     } catch (err: any) {
       setFormError(err.message || "Failed to submit academic log");
     } finally {
@@ -203,15 +236,34 @@ export function AcademicLogsPage({ categoryId }: { categoryId?: string } = {}) {
         <Dialog open={open} onOpenChange={(val) => { 
           if (isSubmitting) return;
           setOpen(val);
-          if (!val) { publishArogyaContext(null); setForm({ date: todayForInput(), type: "", presentationType: "", topic: "", description: "", supervisorId: "", trainingYear: "" }); setEditLogId(null); setRecordValues({}); setFormError(""); }
+          if (!val) {
+            publishArogyaContext(null);
+            setForm({ date: todayForInput(), type: "", presentationType: "", topic: "", description: "", supervisorId: "", trainingYear: "" });
+            setEditLogId(null);
+            setEditLogRemarks(null);
+            setEditLogStatus(null);
+            setRecordValues({});
+            setFormError("");
+          }
         }}>
           <DialogTrigger asChild><Button onClick={() => openNewLog("", false)}><PlusCircle className="h-4 w-4" /> {academicLogbook ? "Add log entry" : "Log academic activity"}</Button></DialogTrigger>
           <DialogContent className="max-h-[85dvh] overflow-y-auto rounded-2xl bg-white sm:max-w-xl">
             <DialogHeader>
-              <DialogTitle>{editLogId ? "Edit log entry" : "New log entry"}</DialogTitle>
-              <DialogDescription>{academicLogbook ? "Choose the logbook year and section, then enter the details for faculty verification. Record completed appraisal ratings from your appraisal form." : "Add attendance or presentation details for faculty verification."}</DialogDescription>
+              <DialogTitle>{editLogStatus === "rejected" ? "Resubmit academic activity" : editLogId ? "Edit log entry" : "New log entry"}</DialogTitle>
+              <DialogDescription>{editLogStatus === "rejected" ? "Review the faculty feedback below, update your details, and resubmit for verification." : academicLogbook ? "Choose the logbook year and section, then enter the details for faculty verification. Record completed appraisal ratings from your appraisal form." : "Add attendance or presentation details for faculty verification."}</DialogDescription>
             </DialogHeader>
             <form onSubmit={submit} className="space-y-4">
+              {editLogStatus === "rejected" && (
+                <div className="rounded-xl border border-rose-200 bg-rose-50/90 p-3.5 text-xs text-rose-900">
+                  <div className="flex items-center gap-1.5 font-semibold text-rose-800">
+                    <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
+                    <span>Faculty Feedback / Revision Reason:</span>
+                  </div>
+                  <p className="mt-1.5 whitespace-pre-wrap rounded-lg bg-white/80 p-2.5 text-slate-800 border border-rose-100 font-medium leading-relaxed">
+                    {editLogRemarks || "No specific feedback was provided. Please verify the activity details and resubmit."}
+                  </p>
+                </div>
+              )}
               {formError && <p ref={formErrorRef} role="alert" tabIndex={-1} className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{formError}</p>}
               {academicLogbook && <Field label="Logbook year *">
                 <Select value={form.trainingYear} onValueChange={(trainingYear) => {
@@ -277,9 +329,21 @@ export function AcademicLogsPage({ categoryId }: { categoryId?: string } = {}) {
               </Field>
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => { setOpen(false); publishArogyaContext(null); }} disabled={isSubmitting}>Cancel</Button>
-                <Button type="submit" disabled={isSubmitting}>
+                <Button 
+                  type="submit" 
+                  className={editLogStatus === "rejected" ? "bg-rose-600 hover:bg-rose-700 text-white" : ""}
+                  disabled={isSubmitting}
+                >
                   {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Send to faculty
+                  {editLogStatus === "rejected" ? (
+                    <>
+                      <RotateCcw className="mr-1.5 h-4 w-4" /> Resubmit for review
+                    </>
+                  ) : editLogId ? (
+                    "Update entry"
+                  ) : (
+                    "Send to faculty"
+                  )}
                 </Button>
               </DialogFooter>
             </form>
@@ -393,24 +457,26 @@ export function AcademicLogsPage({ categoryId }: { categoryId?: string } = {}) {
                     </TableCell>
                     <TableCell>{log.status === "verified" ? <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700"><CheckCircle2 className="mr-1 h-3 w-3" /> Verified</Badge> : log.status === "rejected" ? <Badge className="border-rose-200 bg-rose-50 text-rose-700"><AlertCircle className="mr-1 h-3 w-3" /> Rejected</Badge> : <Badge className="border-amber-200 bg-amber-50 text-amber-700"><Clock className="mr-1 h-3 w-3" /> Pending</Badge>}</TableCell>
                     <TableCell className="text-right">
-                      {(log.status === "pending" || log.status === "rejected") && (
-                        <Button aria-label={`Edit ${log.topic}`} variant="ghost" size="sm" className="text-teal-600 hover:text-teal-800 hover:bg-teal-50" onClick={() => {
-                          setEditLogId(log.id);
-                          publishArogyaContext({ log: { type: "academic", id: Number(log.id) } });
-                          const record = readAcademicRecord(log.description);
-                          setRecordSection(academicSectionForRecord(academicLogbook, log.activityType, log.description));
-                          setRecordValues(record?.values ?? {});
-                          setFormError("");
-                          setForm({
-                            date: log.date, type: log.activityType || log.type, presentationType: log.presentationType === "—" ? "" : (log.presentationType || ""),
-                            topic: log.topic || "", supervisorId: String(log.supervisorId || ""),
-                            description: record?.notes ?? log.description ?? "", trainingYear: record ? String(record.trainingYear) : ""
-                          });
-                          setOpen(true);
-                        }}>
+                      {log.status === "rejected" ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-rose-300 text-rose-700 bg-rose-50 hover:bg-rose-100 hover:text-rose-800 font-semibold text-xs gap-1.5 h-8 px-2.5"
+                          onClick={() => startEditAcademic(log)}
+                        >
+                          <RotateCcw className="h-3.5 w-3.5" /> Resubmit
+                        </Button>
+                      ) : log.status === "pending" ? (
+                        <Button
+                          aria-label={`Edit ${log.topic}`}
+                          variant="ghost"
+                          size="sm"
+                          className="text-teal-600 hover:text-teal-800 hover:bg-teal-50"
+                          onClick={() => startEditAcademic(log)}
+                        >
                           <Edit3 className="h-4 w-4" />
                         </Button>
-                      )}
+                      ) : null}
                     </TableCell>
                   </TableRow>
                 ))}

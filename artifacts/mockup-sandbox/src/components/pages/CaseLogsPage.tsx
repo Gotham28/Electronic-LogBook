@@ -1,5 +1,5 @@
 import * as React from "react";
-import { AlertCircle, CheckCircle2, Clock, Eye, FileText, PlusCircle, Search, Loader2, Trash2, Edit3 } from "lucide-react";
+import { AlertCircle, CheckCircle2, Clock, Eye, FileText, PlusCircle, Search, Loader2, Trash2, Edit3, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { apiGet, apiPost, apiDelete, apiPatch } from "@/lib/apiClient";
 import { publishArogyaContext } from "@/lib/arogya-context";
@@ -80,6 +80,34 @@ export function CaseLogsPage() {
   const [error, setError] = React.useState<string | null>(null);
   const [form, setForm] = React.useState(emptyForm);
   const [editLogId, setEditLogId] = React.useState<number | null>(null);
+  const [editLogRemarks, setEditLogRemarks] = React.useState<string | null>(null);
+  const [editLogStatus, setEditLogStatus] = React.useState<string | null>(null);
+
+  const startEditCase = (log: any) => {
+    setEditLogId(log.id);
+    setEditLogRemarks(log.facultyRemarks || null);
+    setEditLogStatus(log.status);
+    publishArogyaContext({ log: { type: "case", id: Number(log.id) } });
+    setForm({
+      date: log.date,
+      patientUhid: log.patientUhid || "",
+      age: log.patientAge || log.age || "",
+      gender: (log.patientGender || log.gender || "male").charAt(0).toUpperCase() + (log.patientGender || log.gender || "male").slice(1),
+      category: log.category || "",
+      medicalSummary: getCaseMedicalSummary(log),
+      chiefComplaints: log.chiefComplaints || "",
+      history: log.history || "",
+      examination: log.examination || "",
+      investigations: log.investigations || "",
+      diagnosis: log.diagnosisFinal || log.diagnosisProvisional || log.diagnosis || "",
+      differentialDiagnosis: log.differentialDiagnosis || "",
+      management: log.managementPlan || log.management || "",
+      outcome: log.outcome || "",
+      learningPoints: log.learningPoints || "",
+      supervisorId: String(log.supervisorId || ""),
+    });
+    setIsModalOpen(true);
+  };
 
   const user = React.useMemo(() => getCurrentUser(), []);
   const hideUhid = true; // isDemoMode();
@@ -169,7 +197,15 @@ export function CaseLogsPage() {
       setForm({ ...emptyForm, date: todayForInput() });
       setIsModalOpen(false);
       setEditLogId(null);
-      toast.success(editLogId ? `Case updated successfully` : `Case submitted successfully`);
+      setEditLogRemarks(null);
+      setEditLogStatus(null);
+      toast.success(
+        editLogStatus === "rejected"
+          ? "Case resubmitted for faculty review"
+          : editLogId
+          ? "Case updated successfully"
+          : "Case submitted successfully"
+      );
     } catch (err: any) {
       toast.error(err.message || "Failed to submit case log");
     } finally {
@@ -221,17 +257,33 @@ export function CaseLogsPage() {
         </div>
         <Dialog open={isModalOpen} onOpenChange={(val) => { 
           setIsModalOpen(val); 
-          if (!val) { setForm({ ...emptyForm, date: todayForInput() }); setEditLogId(null); } 
+          if (!val) {
+            setForm({ ...emptyForm, date: todayForInput() });
+            setEditLogId(null);
+            setEditLogRemarks(null);
+            setEditLogStatus(null);
+          } 
         }}>
           <DialogTrigger asChild>
             <Button data-tour="caselog-add"><PlusCircle className="h-4 w-4" /> Log clinical case</Button>
           </DialogTrigger>
           <DialogContent className="max-h-[90vh] overflow-y-auto rounded-2xl bg-white sm:max-w-3xl">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-xl"><FileText className="h-5 w-5 text-teal-600" /> {editLogId ? "Edit clinical case" : "New clinical case"}</DialogTitle>
-              <DialogDescription>Complete the clinical record before sending it to a faculty member.</DialogDescription>
+              <DialogTitle className="flex items-center gap-2 text-xl"><FileText className="h-5 w-5 text-teal-600" /> {editLogStatus === "rejected" ? "Resubmit clinical case" : editLogId ? "Edit clinical case" : "New clinical case"}</DialogTitle>
+              <DialogDescription>{editLogStatus === "rejected" ? "Review the faculty feedback below, edit your case details, and resubmit for faculty review." : "Complete the clinical record before sending it to a faculty member."}</DialogDescription>
             </DialogHeader>
             <form data-tour="caselog-form" onSubmit={handleAddCase} className="space-y-5">
+              {editLogStatus === "rejected" && (
+                <div className="rounded-xl border border-rose-200 bg-rose-50/90 p-3.5 text-xs text-rose-900">
+                  <div className="flex items-center gap-1.5 font-semibold text-rose-800">
+                    <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
+                    <span>Faculty Feedback / Revision Reason:</span>
+                  </div>
+                  <p className="mt-1.5 whitespace-pre-wrap rounded-lg bg-white/80 p-2.5 text-slate-800 border border-rose-100 font-medium leading-relaxed">
+                    {editLogRemarks || "No specific feedback was provided. Please verify the case details and resubmit."}
+                  </p>
+                </div>
+              )}
               <div data-tour="caselog-patient-info" className={`grid gap-4 ${hideUhid ? "sm:grid-cols-3" : "sm:grid-cols-4"}`}>
                 <Field label="Date"><Input type="date" value={form.date} onChange={(e) => setField("date", e.target.value)} required /></Field>
                 <Field label="Age"><Input value={form.age} onChange={(e) => setField("age", e.target.value)} placeholder="e.g. 7 years" required /></Field>
@@ -287,9 +339,21 @@ export function CaseLogsPage() {
               </div>
               <DialogFooter data-tour="caselog-submit-actions">
                 <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)} disabled={isSubmitting}>Save draft</Button>
-                <Button type="submit" disabled={isSubmitting}>
+                <Button 
+                  type="submit" 
+                  className={editLogStatus === "rejected" ? "bg-rose-600 hover:bg-rose-700 text-white" : ""}
+                  disabled={isSubmitting}
+                >
                   {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Send to faculty
+                  {editLogStatus === "rejected" ? (
+                    <>
+                      <RotateCcw className="mr-1.5 h-4 w-4" /> Resubmit for review
+                    </>
+                  ) : editLogId ? (
+                    "Update case"
+                  ) : (
+                    "Send to faculty"
+                  )}
                 </Button>
               </DialogFooter>
             </form>
@@ -412,30 +476,25 @@ export function CaseLogsPage() {
                     <TableCell>{statusBadge(log.status)}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
-                        {(log.status === "pending" || log.status === "rejected") && (
+                        {log.status === "rejected" ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-rose-300 text-rose-700 bg-rose-50 hover:bg-rose-100 hover:text-rose-800 font-semibold text-xs gap-1.5 h-8 px-2.5"
+                            onClick={() => startEditCase(log)}
+                          >
+                            <RotateCcw className="h-3.5 w-3.5" /> Resubmit
+                          </Button>
+                        ) : log.status === "pending" ? (
                           <>
-                            <Button variant="ghost" size="sm" className="text-teal-600 hover:text-teal-800 hover:bg-teal-50" onClick={() => {
-                              setEditLogId(log.id);
-                              setForm({
-                                date: log.date, patientUhid: log.patientUhid || "", age: log.patientAge || log.age || "",
-                                gender: (log.patientGender || log.gender || "male").charAt(0).toUpperCase() + (log.patientGender || log.gender || "male").slice(1),
-                                category: log.category || "", medicalSummary: getCaseMedicalSummary(log), chiefComplaints: log.chiefComplaints || "",
-                                history: log.history || "", examination: log.examination || "", investigations: log.investigations || "",
-                                diagnosis: log.diagnosisFinal || log.diagnosisProvisional || log.diagnosis || "", differentialDiagnosis: log.differentialDiagnosis || "",
-                                management: log.managementPlan || log.management || "", outcome: log.outcome || "", learningPoints: log.learningPoints || "",
-                                supervisorId: String(log.supervisorId || ""),
-                              });
-                              setIsModalOpen(true);
-                            }}>
+                            <Button variant="ghost" size="sm" className="text-teal-600 hover:text-teal-800 hover:bg-teal-50" onClick={() => startEditCase(log)}>
                               <Edit3 className="h-4 w-4" />
                             </Button>
-                            {log.status === "pending" && (
-                              <Button variant="ghost" size="sm" className="text-rose-500 hover:text-rose-700 hover:bg-rose-50" onClick={() => handleDeleteCaseLog(log.id)}>
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            )}
+                            <Button variant="ghost" size="sm" className="text-rose-500 hover:text-rose-700 hover:bg-rose-50" onClick={() => handleDeleteCaseLog(log.id)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           </>
-                        )}
+                        ) : null}
                         <Button variant="ghost" size="sm" onClick={() => setSelectedLog(log)}><Eye className="h-4 w-4" /> Details</Button>
                       </div>
                     </TableCell>
@@ -475,12 +534,32 @@ export function CaseLogsPage() {
                 <Detail label="Management and interventions" value={selectedLog.managementPlan || selectedLog.management} />
                 <Detail label="Outcome / follow-up" value={selectedLog.outcome} />
                 <Detail label="Learning points" value={selectedLog.learningPoints} />
-                {selectedLog.status !== "pending" && (
+                {selectedLog.status === "rejected" ? (
+                  <div className="rounded-2xl border border-rose-200 bg-rose-50/80 p-4 space-y-3">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-rose-700">Faculty remarks (revision requested)</p>
+                      <p className="mt-1 text-sm font-medium text-rose-950 whitespace-pre-wrap">{selectedLog.facultyRemarks || "No remark provided"}</p>
+                    </div>
+                    <div className="pt-1 flex justify-end">
+                      <Button
+                        size="sm"
+                        className="bg-rose-600 hover:bg-rose-700 text-white font-semibold gap-1.5"
+                        onClick={() => {
+                          const logToEdit = selectedLog;
+                          setSelectedLog(null);
+                          startEditCase(logToEdit);
+                        }}
+                      >
+                        <RotateCcw className="h-4 w-4" /> Edit &amp; Resubmit Case
+                      </Button>
+                    </div>
+                  </div>
+                ) : selectedLog.status === "verified" ? (
                   <div className="rounded-2xl border border-teal-100 bg-teal-50/70 p-4">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-teal-700">Faculty remarks</p>
                     <p className="mt-1 text-sm text-teal-950">{selectedLog.facultyRemarks || "No remark"}</p>
                   </div>
-                )}
+                ) : null}
               </div>
             </>
           )}

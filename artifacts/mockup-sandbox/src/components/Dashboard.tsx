@@ -12,6 +12,7 @@ import {
   Stethoscope,
   Loader2,
   RefreshCcw,
+  RotateCcw,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -99,19 +100,19 @@ export function Dashboard() {
 
   const hideUhid = isDemoMode();
   const mappedCaseLogs = (logs.caseLogs || []).map((l: any) => ({
-    number: l.id, date: l.date, type: "Case", title: l.diagnosisProvisional || "Case Log", patientUhid: l.patientUhid, status: l.status, timestamp: new Date(l.createdAt).getTime()
+    number: l.id, date: l.date, type: "Case", title: l.diagnosisProvisional || "Case Log", patientUhid: l.patientUhid, status: l.status, timestamp: new Date(l.createdAt).getTime(), href: "/cases"
   }));
   const mappedProcLogs = (logs.procedureLogs || []).map((l: any) => ({
-    number: l.id, date: l.date, type: "Procedure", title: l.procedureName || "Procedure Log", patientUhid: l.patientUhid, status: l.status, timestamp: new Date(l.createdAt).getTime()
+    number: l.id, date: l.date, type: "Procedure", title: l.procedureName || "Procedure Log", patientUhid: l.patientUhid, status: l.status, timestamp: new Date(l.createdAt).getTime(), href: "/procedures"
   }));
   const mappedAcadLogs = (logs.academicLogs || []).map((l: any) => ({
-    number: l.id, date: l.date, type: "Academic", title: l.topic || "Academic Log", patientUhid: undefined, status: l.status, timestamp: new Date(l.createdAt).getTime()
+    number: l.id, date: l.date, type: "Academic", title: l.topic || "Academic Log", patientUhid: undefined, status: l.status, timestamp: new Date(l.createdAt).getTime(), href: "/academics"
   }));
 
   const mappedClinicalLogs = (features.clinicalWorks ? logs.clinicalWorkLogs || [] : []).map((l: any) => ({
     number: l.id, date: l.date, type: "Clinical work",
     title: [clinicalNames.get(l.category) ?? l.category, l.subType ? clinicalNames.get(l.subType) ?? l.subType : null].filter(Boolean).join(" — "),
-    patientUhid: l.caseNumber, status: l.status, timestamp: new Date(l.createdAt).getTime()
+    patientUhid: l.caseNumber, status: l.status, timestamp: new Date(l.createdAt).getTime(), href: "/clinical-works"
   }));
 
   const recent = [...(features.hideCaseLogs ? [] : mappedCaseLogs), ...(features.hideProcedureLogs ? [] : mappedProcLogs), ...mappedClinicalLogs, ...mappedAcadLogs]
@@ -122,12 +123,35 @@ export function Dashboard() {
   const pendingCount = [...(features.hideCaseLogs ? [] : logs.caseLogs || []), ...(features.hideProcedureLogs ? [] : logs.procedureLogs || []),
     ...(features.clinicalWorks ? logs.clinicalWorkLogs || [] : []), ...(logs.academicLogs || [])]
     .filter((entry: any) => entry.status === "pending").length;
+  const rejectedCount = [...(features.hideCaseLogs ? [] : logs.caseLogs || []), ...(features.hideProcedureLogs ? [] : logs.procedureLogs || []),
+    ...(features.clinicalWorks ? logs.clinicalWorkLogs || [] : []), ...(logs.academicLogs || [])]
+    .filter((entry: any) => entry.status === "rejected").length;
   const progressLabel = completion !== null ? (completion >= 75 ? "On track" : completion >= 40 ? "Needs attention" : "Getting started") : "Getting started";
 
   const hasAnyNumericTargets = configured.length > 0;
 
   return (
     <div className="section-spacing pb-12">
+      {rejectedCount > 0 && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-rose-200 bg-rose-50/90 p-4 text-rose-900 shadow-sm animate-float-up">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-100 text-rose-700">
+              <RotateCcw className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-rose-950">
+                {rejectedCount} {rejectedCount === 1 ? "entry requires" : "entries require"} revision
+              </p>
+              <p className="text-xs text-rose-800">
+                Faculty requested changes on your submitted logs. Review the feedback and resubmit them.
+              </p>
+            </div>
+          </div>
+          <Button asChild size="sm" variant="outline" className="border-rose-300 bg-white text-rose-700 hover:bg-rose-100 shrink-0 font-semibold text-xs">
+            <Link href={primaryLogHref}>Review &amp; resubmit <ArrowRight className="ml-1 h-3.5 w-3.5" /></Link>
+          </Button>
+        </div>
+      )}
       {!configured.length && <p className="rounded-xl bg-teal-50 p-4 text-sm text-teal-800">Your HOD has not configured completion targets yet.</p>}
       <Card className="overflow-hidden border-white/70 bg-white/72 layer-2 animate-float-up">
         <div className="h-1.5 bg-gradient-to-r from-teal-500 via-cyan-400 to-emerald-400" />
@@ -268,7 +292,7 @@ export function Dashboard() {
               </div>
             ) : (
               <Table>
-                <TableHeader><TableRow><TableHead>#</TableHead><TableHead>Date</TableHead><TableHead>Type</TableHead><TableHead>Entry</TableHead>{!hideUhid && <TableHead>Case ID</TableHead>}<TableHead>Status</TableHead></TableRow></TableHeader>
+                <TableHeader><TableRow><TableHead>#</TableHead><TableHead>Date</TableHead><TableHead>Type</TableHead><TableHead>Entry</TableHead>{!hideUhid && <TableHead>Case ID</TableHead>}<TableHead>Status</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
                 <TableBody>
                   {recent.map((item, index) => (
                     <TableRow key={`${item.type}-${item.number}`} className={isDemoMode() ? "demo-stagger-item" : undefined} style={isDemoMode() ? { "--demo-stagger-index": index } as React.CSSProperties : undefined}>
@@ -278,6 +302,21 @@ export function Dashboard() {
                       <TableCell className="max-w-xs font-semibold">{item.title}</TableCell>
                       {!hideUhid && <TableCell className="text-xs font-semibold text-teal-800">{item.patientUhid}</TableCell>}
                       <TableCell><Status value={item.status} /></TableCell>
+                      <TableCell className="text-right">
+                        {item.status === "rejected" ? (
+                          <Button asChild size="sm" variant="outline" className="border-rose-300 text-rose-700 bg-rose-50 hover:bg-rose-100 hover:text-rose-800 text-xs font-semibold h-7 px-2.5">
+                            <Link href={item.href}>
+                              <RotateCcw className="h-3 w-3 mr-1" /> Resubmit
+                            </Link>
+                          </Button>
+                        ) : (
+                          <Button asChild size="sm" variant="ghost" className="text-teal-600 hover:text-teal-800 hover:bg-teal-50 text-xs h-7 px-2">
+                            <Link href={item.href}>
+                              View
+                            </Link>
+                          </Button>
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
