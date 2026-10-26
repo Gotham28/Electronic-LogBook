@@ -1,5 +1,5 @@
 import * as React from "react";
-import { AlertCircle, CheckCircle2, Clock, PlusCircle, Stethoscope, Loader2, Trash2, Edit3 } from "lucide-react";
+import { AlertCircle, CheckCircle2, Clock, PlusCircle, Stethoscope, Loader2, Trash2, Edit3, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { apiGet, apiPost, apiDelete, apiPatch } from "@/lib/apiClient";
 import { publishArogyaContext } from "@/lib/arogya-context";
@@ -65,6 +65,8 @@ export function ProcedureLogsPage() {
     supervisorId: "",
   });
   const [editLogId, setEditLogId] = React.useState<number | null>(null);
+  const [editLogRemarks, setEditLogRemarks] = React.useState<string | null>(null);
+  const [editLogStatus, setEditLogStatus] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     if (competencyLevels.length > 0 && !form.experience) {
@@ -155,6 +157,8 @@ export function ProcedureLogsPage() {
       await fetchLogs();
       setOpen(false);
       setEditLogId(null);
+      setEditLogRemarks(null);
+      setEditLogStatus(null);
       setForm({
         date: todayForInput(),
         group: initialGroup,
@@ -166,7 +170,13 @@ export function ProcedureLogsPage() {
         experience: competencyLevels[0]?.value ?? "",
         supervisorId: "",
       });
-      toast.success(editLogId ? `Procedure updated successfully` : `Procedure submitted successfully`);
+      toast.success(
+        editLogStatus === "rejected"
+          ? "Procedure resubmitted for faculty review"
+          : editLogId
+          ? "Procedure updated successfully"
+          : "Procedure submitted successfully"
+      );
     } catch (err: any) {
       toast.error(err.message || "Failed to submit procedure log");
     } finally {
@@ -190,15 +200,26 @@ export function ProcedureLogsPage() {
         </div>
         <Dialog open={open} onOpenChange={(val) => { 
           setOpen(val); 
-          if (!val) { publishArogyaContext(null); setForm({ date: todayForInput(), group: initialGroup, procedureName: "", patientUhid: "", diagnosis: "", sex: "", age: "", experience: competencyLevels[0]?.value ?? "", supervisorId: "" }); setEditLogId(null); }
+          if (!val) { publishArogyaContext(null); setForm({ date: todayForInput(), group: initialGroup, procedureName: "", patientUhid: "", diagnosis: "", sex: "", age: "", experience: competencyLevels[0]?.value ?? "", supervisorId: "" }); setEditLogId(null); setEditLogRemarks(null); setEditLogStatus(null); }
         }}>
           <DialogTrigger asChild><Button><PlusCircle className="h-4 w-4" /> Log procedure</Button></DialogTrigger>
           <DialogContent className="rounded-2xl bg-white sm:max-w-xl">
             <DialogHeader>
-              <DialogTitle>{editLogId ? "Edit procedure entry" : "New procedure entry"}</DialogTitle>
-              <DialogDescription>{hideUhid && isFreeTextProcedures ? "Enter the procedure name and record the level of exposure." : "Select the required procedure and record the level of exposure."}</DialogDescription>
+              <DialogTitle>{editLogStatus === "rejected" ? "Resubmit procedure entry" : editLogId ? "Edit procedure entry" : "New procedure entry"}</DialogTitle>
+              <DialogDescription>{editLogStatus === "rejected" ? "Review the faculty feedback below, update the entry details, and resubmit for faculty verification." : hideUhid && isFreeTextProcedures ? "Enter the procedure name and record the level of exposure." : "Select the required procedure and record the level of exposure."}</DialogDescription>
             </DialogHeader>
             <form onSubmit={submit} className="space-y-4">
+              {editLogStatus === "rejected" && (
+                <div className="rounded-xl border border-rose-200 bg-rose-50/90 p-3.5 text-xs text-rose-900">
+                  <div className="flex items-center gap-1.5 font-semibold text-rose-800">
+                    <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
+                    <span>Faculty Feedback / Revision Reason:</span>
+                  </div>
+                  <p className="mt-1.5 whitespace-pre-wrap rounded-lg bg-white/80 p-2.5 text-slate-800 border border-rose-100 font-medium leading-relaxed">
+                    {editLogRemarks || "No specific feedback was provided. Please verify the entry details and resubmit."}
+                  </p>
+                </div>
+              )}
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Date"><Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required /></Field>
                 {!isFreeTextProcedures && (
@@ -261,7 +282,15 @@ export function ProcedureLogsPage() {
                   }
                 >
                   {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Send to faculty
+                  {editLogStatus === "rejected" ? (
+                    <>
+                      <RotateCcw className="mr-1.5 h-4 w-4" /> Resubmit for review
+                    </>
+                  ) : editLogId ? (
+                    "Update procedure"
+                  ) : (
+                    "Send to faculty"
+                  )}
                 </Button>
               </DialogFooter>
             </form>
@@ -370,10 +399,34 @@ export function ProcedureLogsPage() {
                     </TableCell>
                     <TableCell>{statusBadge(log.status)}</TableCell>
                     <TableCell className="text-right">
-                      {(log.status === "pending" || log.status === "rejected") && (
-                        <>
+                      {log.status === "rejected" ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-rose-300 text-rose-700 bg-rose-50 hover:bg-rose-100 hover:text-rose-800 font-semibold text-xs gap-1.5 h-8 px-2.5"
+                          onClick={() => {
+                            setEditLogId(log.id);
+                            setEditLogRemarks(log.facultyRemarks || null);
+                            setEditLogStatus(log.status);
+                            publishArogyaContext({ log: { type: "procedure", id: Number(log.id) } });
+                            setForm({
+                              date: log.date, group: log.procedureGroup, procedureName: log.procedureName,
+                              patientUhid: log.patientUhid === "N/A" ? "" : log.patientUhid, age: log.patientAge || log.age,
+                              diagnosis: (log as any).diagnosis || "",
+                              sex: (log as any).sex || "",
+                              experience: log.competencyLevel || "", supervisorId: String(log.supervisorId || ""),
+                            });
+                            setOpen(true);
+                          }}
+                        >
+                          <RotateCcw className="h-3.5 w-3.5" /> Resubmit
+                        </Button>
+                      ) : log.status === "pending" ? (
+                        <div className="flex items-center justify-end gap-1">
                           <Button variant="ghost" size="sm" className="text-teal-600 hover:text-teal-800 hover:bg-teal-50" onClick={() => {
                             setEditLogId(log.id);
+                            setEditLogRemarks(null);
+                            setEditLogStatus(log.status);
                             publishArogyaContext({ log: { type: "procedure", id: Number(log.id) } });
                             setForm({
                               date: log.date, group: log.procedureGroup, procedureName: log.procedureName,
@@ -386,13 +439,11 @@ export function ProcedureLogsPage() {
                           }}>
                             <Edit3 className="h-4 w-4" />
                           </Button>
-                          {log.status === "pending" && (
-                            <Button variant="ghost" size="sm" className="text-rose-500 hover:text-rose-700 hover:bg-rose-50" onClick={() => handleDeleteProcedureLog(log.id)}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </>
-                      )}
+                          <Button variant="ghost" size="sm" className="text-rose-500 hover:text-rose-700 hover:bg-rose-50" onClick={() => handleDeleteProcedureLog(log.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ) : null}
                     </TableCell>
                   </TableRow>
                 ))}

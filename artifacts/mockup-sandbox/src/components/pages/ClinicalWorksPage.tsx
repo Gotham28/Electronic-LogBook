@@ -1,5 +1,5 @@
 import * as React from "react";
-import { AlertCircle, CheckCircle2, Clock, Edit3, Loader2, PlusCircle, Search, Stethoscope, Trash2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, Clock, Edit3, Loader2, PlusCircle, Search, Stethoscope, Trash2, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/apiClient";
 import { publishArogyaContext } from "@/lib/arogya-context";
@@ -58,6 +58,8 @@ export function ClinicalWorksPage() {
   const [open, setOpen] = React.useState(false);
   const [form, setForm] = React.useState(emptyForm);
   const [editId, setEditId] = React.useState<number | null>(null);
+  const [editRemarks, setEditRemarks] = React.useState<string | null>(null);
+  const [editStatus, setEditStatus] = React.useState<string | null>(null);
   const [submitting, setSubmitting] = React.useState(false);
   const [search, setSearch] = React.useState("");
 
@@ -93,7 +95,13 @@ export function ClinicalWorksPage() {
 
   const closeDialog = (value: boolean) => {
     setOpen(value);
-    if (!value) { publishArogyaContext(null); setForm(emptyForm()); setEditId(null); }
+    if (!value) {
+      publishArogyaContext(null);
+      setForm(emptyForm());
+      setEditId(null);
+      setEditRemarks(null);
+      setEditStatus(null);
+    }
   };
 
   const submit = async (event: React.FormEvent) => {
@@ -118,7 +126,13 @@ export function ClinicalWorksPage() {
     try {
       if (editId) await apiPatch(`/api/students/${user.studentProfileId}/clinical-works/${editId}`, payload);
       else await apiPost(`/api/students/${user.studentProfileId}/clinical-works`, payload);
-      toast.success(editId ? "Clinical work updated" : "Clinical work sent to faculty");
+      toast.success(
+        editStatus === "rejected"
+          ? "Clinical work resubmitted for faculty review"
+          : editId
+          ? "Clinical work updated"
+          : "Clinical work sent to faculty"
+      );
       closeDialog(false);
       await fetchLogs();
     } catch (err: any) {
@@ -142,6 +156,8 @@ export function ClinicalWorksPage() {
   const startEdit = (log: ClinicalWorkLog) => {
     publishArogyaContext({ log: { type: "clinical-work", id: Number(log.id) } });
     setEditId(log.id);
+    setEditRemarks(log.facultyRemarks || null);
+    setEditStatus(log.status);
     setForm({ date: log.date, category: log.category, subType: log.subType || "", patientAge: log.patientAge, patientSex: log.patientSex,
       caseNumber: log.caseNumber, supervisorId: log.supervisorId ? String(log.supervisorId) : "",
       organSystem: log.organSystem || "", clinicalFindings: log.clinicalFindings || "", competency: log.competency || "" });
@@ -180,10 +196,21 @@ export function ClinicalWorksPage() {
           </DialogTrigger>
           <DialogContent className="max-h-[90vh] overflow-y-auto rounded-2xl bg-white sm:max-w-2xl">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-xl"><Stethoscope className="h-5 w-5 text-teal-600" /> {editId ? "Edit clinical work" : "New clinical work"}</DialogTitle>
-              <DialogDescription>All fields are required.</DialogDescription>
+              <DialogTitle className="flex items-center gap-2 text-xl"><Stethoscope className="h-5 w-5 text-teal-600" /> {editStatus === "rejected" ? "Resubmit clinical work" : editId ? "Edit clinical work" : "New clinical work"}</DialogTitle>
+              <DialogDescription>{editStatus === "rejected" ? "Review the faculty feedback below, edit the details, and resubmit for verification." : "All fields are required."}</DialogDescription>
             </DialogHeader>
             <form onSubmit={submit} className="space-y-5">
+              {editStatus === "rejected" && (
+                <div className="rounded-xl border border-rose-200 bg-rose-50/90 p-3.5 text-xs text-rose-900">
+                  <div className="flex items-center gap-1.5 font-semibold text-rose-800">
+                    <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
+                    <span>Faculty Feedback / Revision Reason:</span>
+                  </div>
+                  <p className="mt-1.5 whitespace-pre-wrap rounded-lg bg-white/80 p-2.5 text-slate-800 border border-rose-100 font-medium leading-relaxed">
+                    {editRemarks || "No specific feedback was provided. Please verify the entry details and resubmit."}
+                  </p>
+                </div>
+              )}
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Category" htmlFor="cw-category">
                   <Select value={form.category} onValueChange={(value) => setField("category", value)}>
@@ -255,7 +282,22 @@ export function ClinicalWorksPage() {
               )}
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => closeDialog(false)} disabled={submitting}>Cancel</Button>
-                <Button type="submit" disabled={submitting}>{submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{editId ? "Save changes" : "Send to faculty"}</Button>
+                <Button 
+                  type="submit" 
+                  className={editStatus === "rejected" ? "bg-rose-600 hover:bg-rose-700 text-white" : ""}
+                  disabled={submitting}
+                >
+                  {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {editStatus === "rejected" ? (
+                    <>
+                      <RotateCcw className="mr-1.5 h-4 w-4" /> Resubmit for review
+                    </>
+                  ) : editId ? (
+                    "Save changes"
+                  ) : (
+                    "Send to faculty"
+                  )}
+                </Button>
               </DialogFooter>
             </form>
           </DialogContent>
@@ -363,14 +405,21 @@ export function ClinicalWorksPage() {
                       </TableCell>
                       <TableCell>{statusBadge(log.status)}</TableCell>
                       <TableCell className="text-right">
-                        {(log.status === "pending" || log.status === "rejected") && (
+                        {log.status === "rejected" ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-rose-300 text-rose-700 bg-rose-50 hover:bg-rose-100 hover:text-rose-800 font-semibold text-xs gap-1.5 h-8 px-2.5"
+                            onClick={() => startEdit(log)}
+                          >
+                            <RotateCcw className="h-3.5 w-3.5" /> Resubmit
+                          </Button>
+                        ) : log.status === "pending" ? (
                           <div className="flex items-center justify-end gap-1">
                             <Button variant="ghost" size="sm" aria-label={`Edit entry ${log.number}`} className="text-teal-600 hover:bg-teal-50 hover:text-teal-800" onClick={() => startEdit(log)}><Edit3 className="h-4 w-4" /></Button>
-                            {log.status === "pending" && (
-                              <Button variant="ghost" size="sm" aria-label={`Delete entry ${log.number}`} className="text-rose-500 hover:bg-rose-50 hover:text-rose-700" onClick={() => void remove(log.id)}><Trash2 className="h-4 w-4" /></Button>
-                            )}
+                            <Button variant="ghost" size="sm" aria-label={`Delete entry ${log.number}`} className="text-rose-500 hover:bg-rose-50 hover:text-rose-700" onClick={() => void remove(log.id)}><Trash2 className="h-4 w-4" /></Button>
                           </div>
-                        )}
+                        ) : null}
                       </TableCell>
                     </TableRow>
                   );
