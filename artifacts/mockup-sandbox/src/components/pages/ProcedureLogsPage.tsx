@@ -40,13 +40,16 @@ type ProcedureLog = {
 
 
 export function ProcedureLogsPage() {
-  const { procedures: PROCEDURE_REQUIREMENTS, competencyLevels, config } = useDepartment();
+  const { procedures: PROCEDURE_REQUIREMENTS, competencyLevels, config, department } = useDepartment();
+  const isMicrobiology = department?.code?.toLowerCase() === "microbiology" || department?.name?.toLowerCase().includes("microbiology");
+  const hideProcedureAge = Boolean(config?.enabledFeatures?.hideProcedureAge || isMicrobiology);
+  const showProcedureExperience = Boolean(config?.enabledFeatures?.procedureExperience && !isMicrobiology);
   const PROCEDURE_GROUPS = React.useMemo(() => Object.fromEntries([...new Set(PROCEDURE_REQUIREMENTS.map((p) => p.group))].map((group) => [group, PROCEDURE_REQUIREMENTS.filter((p) => p.group === group).map((p) => p.name)])), [PROCEDURE_REQUIREMENTS]);
   const REQUIRED_PROCEDURE_COUNT = PROCEDURE_REQUIREMENTS.reduce((sum, p) => sum + p.required, 0);
   const groupNames: Record<string, string> = Object.fromEntries(Object.keys(PROCEDURE_GROUPS).map((group) => [group, group]));
   const user = React.useMemo(() => getCurrentUser(), []);
   const hideUhid = true; // isDemoMode();
-  const isFreeTextProcedures = Boolean(config?.enabledFeatures?.freeTextProcedures);
+  const isFreeTextProcedures = Boolean(config?.enabledFeatures?.freeTextProcedures || isMicrobiology);
   const hasProcedureTarget = config?.requiredProcedures !== null && config?.requiredProcedures !== undefined;
   const initialGroup = hideUhid ? PROCEDURE_REQUIREMENTS[0]?.group ?? "" : "";
   const [open, setOpen] = React.useState(false);
@@ -143,8 +146,8 @@ export function ProcedureLogsPage() {
         patientUhid: hideUhid ? "N/A" : form.patientUhid,
         diagnosis: form.diagnosis,
         sex: form.sex,
-        patientAge: form.age,
-        competencyLevel: config?.enabledFeatures?.procedureExperience ? form.experience : "N/A",
+        patientAge: hideProcedureAge ? "N/A" : form.age,
+        competencyLevel: showProcedureExperience ? form.experience : "N/A",
         supervisorId: form.supervisorId,
       };
       
@@ -242,15 +245,15 @@ export function ProcedureLogsPage() {
                 )}
               </Field>
               <div className={`grid gap-4 ${hideUhid ? "sm:grid-cols-1" : "sm:grid-cols-2"}`}>
-                {isFreeTextProcedures && (
+                {isFreeTextProcedures && !isMicrobiology && (
                   <>
                     <Field label="Diagnosis"><Input value={form.diagnosis} onChange={(e) => setForm({ ...form, diagnosis: e.target.value })} placeholder="e.g. Tinea Corporis" required /></Field>
                     <Field label="Sex"><Input value={form.sex} onChange={(e) => setForm({ ...form, sex: e.target.value })} placeholder="e.g. Male" required /></Field>
                   </>
                 )}
-                <Field label="Age"><Input value={form.age} onChange={(e) => setForm({ ...form, age: e.target.value })} placeholder="e.g. 4 months" required /></Field>
+                {!hideProcedureAge && <Field label="Age"><Input value={form.age} onChange={(e) => setForm({ ...form, age: e.target.value })} placeholder="e.g. 4 months" required /></Field>}
               </div>
-              {config?.enabledFeatures?.procedureExperience && (
+              {showProcedureExperience && (
                 <Field label="Competency level">
                   <Select value={form.experience} onValueChange={(value) => setForm({ ...form, experience: value })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
@@ -375,7 +378,7 @@ export function ProcedureLogsPage() {
             </Empty>
           ) : (
             <Table>
-              <TableHeader><TableRow><TableHead>Number</TableHead><TableHead>Date</TableHead>{!isFreeTextProcedures && <TableHead>Group</TableHead>}<TableHead>Procedure</TableHead><TableHead>Age</TableHead>{config?.enabledFeatures?.procedureExperience && <TableHead>Competency level</TableHead>}{config?.enabledFeatures?.procedureExperience && <TableHead>Verified competency</TableHead>}<TableHead>Remarks</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Number</TableHead><TableHead>Date</TableHead>{!isFreeTextProcedures && <TableHead>Group</TableHead>}<TableHead>Procedure</TableHead>{!hideProcedureAge && <TableHead>Age</TableHead>}{showProcedureExperience && <TableHead>Competency level</TableHead>}{showProcedureExperience && <TableHead>Verified competency</TableHead>}<TableHead>Remarks</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
               <TableBody>
                 {logs.map((log) => (
                   <TableRow key={log.id}>
@@ -383,9 +386,9 @@ export function ProcedureLogsPage() {
                     <TableCell>{formatLogbookDate(log.date)}</TableCell>
                     {!isFreeTextProcedures && <TableCell><Badge variant="outline" className="border-teal-100 bg-teal-50 text-teal-800">{groupNames[log.procedureGroup as ProcedureGroup] || log.procedureGroup}</Badge></TableCell>}
                     <TableCell className="font-semibold">{log.procedureName}</TableCell>
-                    <TableCell>{log.patientAge || log.age}</TableCell>
-                    {config?.enabledFeatures?.procedureExperience && <TableCell className="text-xs">{log.competencyLevel}</TableCell>}
-                    {config?.enabledFeatures?.procedureExperience && <TableCell className="text-xs">{log.facultyVerifiedLevel ? (competencyLevels.find(c => c.value === log.facultyVerifiedLevel)?.name || log.facultyVerifiedLevel) : 'Pending verification'}</TableCell>}
+                    {!hideProcedureAge && <TableCell>{log.patientAge || log.age}</TableCell>}
+                    {showProcedureExperience && <TableCell className="text-xs">{log.competencyLevel}</TableCell>}
+                    {showProcedureExperience && <TableCell className="text-xs">{log.facultyVerifiedLevel ? (competencyLevels.find(c => c.value === log.facultyVerifiedLevel)?.name || log.facultyVerifiedLevel) : 'Pending verification'}</TableCell>}
                     <TableCell className="text-xs max-w-[160px]">
                       {log.status === "pending"
                         ? <span className="text-slate-400">—</span>

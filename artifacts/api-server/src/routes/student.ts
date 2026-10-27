@@ -3,7 +3,7 @@ import crypto from "crypto";
 import { 
   db, studentsTable, caseLogsTable, procedureLogsTable, 
   academicLogsTable, usersTable, departmentsTable, departmentConfigsTable,
-  postingsTable, leaveRecordsTable, appraisalsTable, researchTable, assessmentsTable, procedureTypesTable, departmentCatalogTable, certificationsTable, conferencesTable, awardsTable, clinicalWorkLogsTable
+  postingsTable, leaveRecordsTable, appraisalsTable, researchTable, assessmentsTable, procedureTypesTable, departmentCatalogTable, certificationsTable, conferencesTable, awardsTable, clinicalWorkLogsTable, attendanceLogsTable
 } from "@workspace/db";
 import { eq, and, or, desc, count, sql, isNull, aliasedTable, inArray } from "drizzle-orm";
 import { splitLeaveDaysByYear } from "../lib/leave.js";
@@ -641,6 +641,67 @@ router.get("/:studentId/leave-records", requireAuth, async (req, res) => {
   }
 });
 
+// Daily Attendance for student
+router.get("/:studentId/attendance", requireAuth, async (req, res) => {
+  try {
+    const studentId = parseInt(String(req.params.studentId), 10);
+    if (isNaN(studentId)) {
+      res.status(400).json({ message: "Invalid studentId" });
+      return;
+    }
+    const caller = req.user!;
+
+    // Resolve student (AGENTS.md sec 3 & sec 4)
+    const [student] = await db
+      .select({ id: studentsTable.id, userId: studentsTable.userId, departmentId: usersTable.departmentId })
+      .from(studentsTable)
+      .innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
+      .where(eq(studentsTable.id, studentId))
+      .limit(1);
+
+    if (!student) {
+      res.status(404).json({ message: "Student not found" });
+      return;
+    }
+
+    if (caller.role === "student") {
+      if (student.userId !== caller.id) {
+        res.status(403).json({ message: "Forbidden: you may only view your own attendance" });
+        return;
+      }
+    } else if (caller.role === "professor" || caller.role === "hod") {
+      if (!caller.departmentId || student.departmentId !== caller.departmentId) {
+        res.status(403).json({ message: "Forbidden: student is outside your department" });
+        return;
+      }
+    } else if (caller.role !== "admin" && caller.role !== "superadmin") {
+      res.status(403).json({ message: "Forbidden" });
+      return;
+    }
+
+    const records = await db
+      .select({
+        id: attendanceLogsTable.id,
+        studentId: attendanceLogsTable.studentId,
+        date: attendanceLogsTable.date,
+        clockIn: attendanceLogsTable.clockIn,
+        clockOut: attendanceLogsTable.clockOut,
+        status: attendanceLogsTable.status,
+        verifiedBy: attendanceLogsTable.verifiedBy,
+        verifierName: usersTable.fullName,
+        createdAt: attendanceLogsTable.createdAt,
+      })
+      .from(attendanceLogsTable)
+      .leftJoin(usersTable, eq(attendanceLogsTable.verifiedBy, usersTable.id))
+      .where(eq(attendanceLogsTable.studentId, studentId))
+      .orderBy(desc(attendanceLogsTable.date));
+
+    res.json({ data: records });
+  } catch (error) {
+    req.log.error({ studentId: req.params.studentId, status: 500 }, "Error fetching student attendance");
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
 router.post("/:studentId/leave-records", validate(z.object({ startDate: dateSchema, endDate: dateSchema,
   leaveType: z.string().trim().min(1),
   reason: z.string().trim().min(1).max(4000) }).strict().refine((v) => v.endDate >= v.startDate, "End date must be on or after start date")), async (req, res) => {

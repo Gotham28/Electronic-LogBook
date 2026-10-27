@@ -36,11 +36,18 @@ function DetailField({ label, value }: { label: string; value?: string | number 
   );
 }
 
-export function CaseLogDetails({ caseLog, hideUhid = false, showReview = false, medicalSummaryCaseFields = false }: {
+export function CaseLogDetails({
+  caseLog,
+  hideUhid = false,
+  showReview = false,
+  medicalSummaryCaseFields = false,
+  microbiologyCaseFields = false,
+}: {
   caseLog: CaseLogDetailRecord;
   hideUhid?: boolean;
   showReview?: boolean;
   medicalSummaryCaseFields?: boolean;
+  microbiologyCaseFields?: boolean;
 }) {
   return (
     <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
@@ -49,34 +56,46 @@ export function CaseLogDetails({ caseLog, hideUhid = false, showReview = false, 
         <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <DetailField label="Date" value={formatLogbookDate(caseLog.date)} />
           <DetailField label="Attempt" value={caseLog.attemptNumber ?? 1} />
-          <DetailField label="Category" value={caseLog.category} />
+          <DetailField label={microbiologyCaseFields ? "Sample category" : "Category"} value={caseLog.category} />
           <DetailField label="Patient age" value={caseLog.patientAge} />
           <DetailField label="Patient gender" value={caseLog.patientGender} />
           {!hideUhid && <DetailField label="UHID" value={caseLog.patientUhid} />}
         </dl>
       </section>
-      {medicalSummaryCaseFields && (
-        <section aria-label="Medical Summary">
-          <dl>
-            <DetailField label="Medical Summary" value={getCaseMedicalSummary(caseLog)} />
+      {microbiologyCaseFields ? (
+        <section aria-labelledby="case-microbiology-heading">
+          <h4 id="case-microbiology-heading" className="mb-3 text-xs font-bold uppercase tracking-wide text-teal-800">Laboratory and diagnostic details</h4>
+          <dl className="grid grid-cols-1 gap-4">
+            <DetailField label="Provisional diagnosis" value={caseLog.diagnosisProvisional || caseLog.diagnosisFinal} />
+            <DetailField label="Sample processing in lab" value={caseLog.investigations || caseLog.managementPlan} />
           </dl>
         </section>
+      ) : (
+        <>
+          {medicalSummaryCaseFields && (
+            <section aria-label="Medical Summary">
+              <dl>
+                <DetailField label="Medical Summary" value={getCaseMedicalSummary(caseLog)} />
+              </dl>
+            </section>
+          )}
+          <section aria-labelledby="case-clinical-heading">
+            <h4 id="case-clinical-heading" className="mb-3 text-xs font-bold uppercase tracking-wide text-teal-800">Clinical details</h4>
+            <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {!medicalSummaryCaseFields && <DetailField label="Chief complaints" value={caseLog.chiefComplaints} />}
+              {!medicalSummaryCaseFields && <DetailField label="History" value={caseLog.history} />}
+              {!medicalSummaryCaseFields && <DetailField label="Examination" value={caseLog.examination} />}
+              <DetailField label="Investigations" value={caseLog.investigations} />
+              <DetailField label="Provisional diagnosis" value={caseLog.diagnosisProvisional} />
+              <DetailField label="Differential diagnosis" value={caseLog.differentialDiagnosis} />
+              <DetailField label="Final diagnosis" value={caseLog.diagnosisFinal} />
+              <DetailField label="Management plan" value={caseLog.managementPlan} />
+              <DetailField label="Outcome" value={caseLog.outcome} />
+              <DetailField label="Learning points" value={caseLog.learningPoints} />
+            </dl>
+          </section>
+        </>
       )}
-      <section aria-labelledby="case-clinical-heading">
-        <h4 id="case-clinical-heading" className="mb-3 text-xs font-bold uppercase tracking-wide text-teal-800">Clinical details</h4>
-        <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {!medicalSummaryCaseFields && <DetailField label="Chief complaints" value={caseLog.chiefComplaints} />}
-          {!medicalSummaryCaseFields && <DetailField label="History" value={caseLog.history} />}
-          {!medicalSummaryCaseFields && <DetailField label="Examination" value={caseLog.examination} />}
-          <DetailField label="Investigations" value={caseLog.investigations} />
-          <DetailField label="Provisional diagnosis" value={caseLog.diagnosisProvisional} />
-          <DetailField label="Differential diagnosis" value={caseLog.differentialDiagnosis} />
-          <DetailField label="Final diagnosis" value={caseLog.diagnosisFinal} />
-          <DetailField label="Management plan" value={caseLog.managementPlan} />
-          <DetailField label="Outcome" value={caseLog.outcome} />
-          <DetailField label="Learning points" value={caseLog.learningPoints} />
-        </dl>
-      </section>
       {showReview && (caseLog.status !== "pending" || caseLog.facultyRemarks || caseLog.facultyGrade || caseLog.reviewedAt) && (
         <section aria-labelledby="case-review-heading" className="border-t border-slate-100 pt-4">
           <h4 id="case-review-heading" className="mb-3 text-xs font-bold uppercase tracking-wide text-teal-800">Faculty review</h4>

@@ -40,6 +40,7 @@ type DemoProfileData = {
   hodAnalytics: any;
   leaveBalance: Record<string, unknown>;
   leaveRecords: any[];
+  attendance?: any[];
   assessments: any[];
   thesis: any | null;
   certifications: any[];
@@ -53,6 +54,7 @@ type DemoResident = {
   logs: { cases: any[]; procedures: any[]; academics: any[]; clinicalWorks: any[] };
   leaveBalance: Record<string, unknown>;
   leaveRecords: any[];
+  attendance?: any[];
 };
 
 export type DemoDepartmentProfile = {
@@ -340,7 +342,29 @@ const dermatologyProfile = createEmptyDepartmentProfile({
   ],
 });
 
-export const demoDepartmentProfiles: DemoDepartmentProfile[] = [pediatricsProfile, radiologyProfile, dermatologyProfile];
+const microbiologyProfile = createEmptyDepartmentProfile({
+  id: 18,
+  label: "Microbiology",
+  name: "Microbiology",
+  code: "microbiology",
+  accent: "#0d9488",
+  enabledFeatures: {
+    microbiologyCaseFields: true,
+    freeTextProcedures: true,
+    hideProcedureAge: true,
+    useThesisAndMandatoryCertificationsLabel: true,
+    attendedConferences: true,
+    hideLeaveRecords: true,
+    dailyAttendance: true,
+  },
+});
+
+microbiologyProfile.data.departmentCatalog.academics = [
+  { id: 1, name: "Journal club", value: "journal_club", required: 0, period: "total" },
+  { id: 2, name: "Presentation", value: "presentation", required: 0, period: "total" },
+];
+
+export const demoDepartmentProfiles: DemoDepartmentProfile[] = [pediatricsProfile, radiologyProfile, dermatologyProfile, microbiologyProfile];
 const defaultFeatureFlags = new Map(demoDepartmentProfiles.map((profile) => [
   profile.id,
   { ...profile.data.departmentCatalog.config.enabledFeatures },
@@ -398,27 +422,34 @@ function buildYearOfActivity(profile: DemoDepartmentProfile) {
     const academicCount = isPediatrics ? seed.academicCount : Math.round(24 * stageScale);
     const clinicalCount = hasClinicalWork ? seed.clinicalCount : 0;
 
-    const cases = Array.from({ length: caseCount }, (_, index) => ({
-      id: profile.id * 100000 + seed.id * 100 + index + 1,
-      number: index + 1,
-      date: activityDate(index, caseCount, random),
-      patientUhid: "",
-      patientAge: "",
-      patientGender: "",
-      age: "Sample",
-      gender: "Sample",
-      chiefComplaints: "Generic sample summary for interface preview.",
-      history: "Sample entry.",
-      examination: "Sample entry.",
-      investigations: "",
-      diagnosisProvisional: "Sample case entry " + String(index + 1).padStart(3, "0"),
-      diagnosisFinal: "",
-      diagnosis: "",
-      differentialDiagnosis: "",
-      management: "",
-      category: catalog.caseCategories[index % Math.max(catalog.caseCategories.length, 1)]?.value ?? null,
-      status: activityStatus(index, seed.id, residentIndex === 0 && index === caseCount - 1),
-    }));
+    const cases = Array.from({ length: caseCount }, (_, index) => {
+      const isMicro = Boolean(features.microbiologyCaseFields);
+      const sampleCategories = ["Blood culture", "Sputum examination", "Urine C/S", "Stool microscopy", "Pus aspirate", "CSF analysis"];
+      const microProvisional = ["Enteric fever workup", "Pulmonary tuberculosis suspect", "Urinary tract infection (E. coli suspect)", "Acute bacterial meningitis", "Staphylococcal wound infection"];
+      const sampleProcessing = "Sample inoculated onto 5% Sheep Blood agar and MacConkey agar. Incubated aerobically at 37°C for 24 hours. Gram stain performed showing Gram-negative bacilli. Biochemical testing (catalase, oxidase, citrate, TSI) initiated for species identification and Kirby-Bauer disc diffusion for antimicrobial susceptibility.";
+
+      return {
+        id: profile.id * 100000 + seed.id * 100 + index + 1,
+        number: index + 1,
+        date: activityDate(index, caseCount, random),
+        patientUhid: "",
+        patientAge: isMicro ? "28 years" : "",
+        patientGender: isMicro ? (index % 2 === 0 ? "Male" : "Female") : "",
+        age: isMicro ? "28 years" : "Sample",
+        gender: isMicro ? (index % 2 === 0 ? "Male" : "Female") : "Sample",
+        chiefComplaints: isMicro ? "" : "Generic sample summary for interface preview.",
+        history: isMicro ? "" : "Sample entry.",
+        examination: isMicro ? "" : "Sample entry.",
+        investigations: isMicro ? sampleProcessing : "",
+        diagnosisProvisional: isMicro ? microProvisional[index % microProvisional.length] : "Sample case entry " + String(index + 1).padStart(3, "0"),
+        diagnosisFinal: isMicro ? microProvisional[index % microProvisional.length] : "",
+        diagnosis: isMicro ? microProvisional[index % microProvisional.length] : "",
+        differentialDiagnosis: "",
+        management: isMicro ? sampleProcessing : "",
+        category: isMicro ? sampleCategories[index % sampleCategories.length] : catalog.caseCategories[index % Math.max(catalog.caseCategories.length, 1)]?.value ?? null,
+        status: activityStatus(index, seed.id, residentIndex === 0 && index === caseCount - 1),
+      };
+    });
 
     const procedures = Array.from({ length: procedureCount }, (_, index) => {
       const item = catalog.procedures[index % Math.max(catalog.procedures.length, 1)];
@@ -560,7 +591,28 @@ function buildYearOfActivity(profile: DemoDepartmentProfile) {
     academics.sort((a, b) => b.date.localeCompare(a.date));
     clinicalWorks.sort((a, b) => b.date.localeCompare(a.date));
 
-    return { student, studentProfile, postings, logs: { cases, procedures, academics, clinicalWorks }, leaveBalance: {}, leaveRecords };
+    const attendance: any[] = [];
+    const today = new Date();
+    for (let dayOffset = 0; dayOffset < 30; dayOffset++) {
+      const d = new Date(today.getTime() - dayOffset * 24 * 60 * 60 * 1000);
+      if (d.getDay() === 0) continue;
+      const dateStr = d.toISOString().slice(0, 10);
+      const roll = (seed.id * 17 + dayOffset * 7) % 20;
+      const status = roll === 0 ? "absent" : roll === 1 ? "leave" : roll === 2 ? "half_day" : "present";
+      attendance.push({
+        id: profile.id * 1000 + seed.id * 100 + dayOffset,
+        studentId: seed.id,
+        date: dateStr,
+        status,
+        clockIn: status === "present" || status === "half_day" ? "08:30" : null,
+        clockOut: status === "present" ? "16:30" : status === "half_day" ? "13:00" : null,
+        verifiedBy: 2,
+        verifierName: "Dr. Vivek Menon",
+        createdAt: `${dateStr}T08:35:00Z`
+      });
+    }
+
+    return { student, studentProfile, postings, logs: { cases, procedures, academics, clinicalWorks }, leaveBalance: {}, leaveRecords, attendance };
   });
 
   profile.data.residents = residents;
@@ -570,6 +622,7 @@ function buildYearOfActivity(profile: DemoDepartmentProfile) {
   profile.data.logs = residents[0].logs;
   profile.data.leaveBalance = residents[0].leaveBalance;
   profile.data.leaveRecords = residents.flatMap(({ leaveRecords }) => leaveRecords);
+  profile.data.attendance = residents.flatMap(({ attendance }) => attendance || []);
   profile.data.hodAnalytics = createAnalytics(profile);
 }
 
@@ -696,7 +749,7 @@ export function resetDemoDepartmentFeatures(): boolean {
   }
 }
 
-function getActiveDemoProfile() {
+export function getActiveDemoProfile() {
   return getDemoDepartmentProfile(getActiveDemoDepartmentId()).data;
 }
 
@@ -716,6 +769,7 @@ export const demoData = {
   get hodAnalytics() { const profile = getDemoDepartmentProfile(getActiveDemoDepartmentId()); refreshDerivedData(profile); return profile.data.hodAnalytics; },
   get leaveBalance() { return getActiveDemoProfile().leaveBalance; },
   get leaveRecords() { return getActiveDemoProfile().leaveRecords; },
+  get attendance() { return getActiveDemoProfile().attendance || []; },
   get assessments() { return getActiveDemoProfile().assessments; },
   get thesis() { return getActiveDemoProfile().thesis; },
   set thesis(value: any) { getActiveDemoProfile().thesis = value; },

@@ -110,10 +110,14 @@ const navigationDescriptions: Record<string, string> = {
   "Academic Activities": "Document seminars, journal clubs, presentations, teaching sessions, and other academic work.",
   Assessments: "View assessment records and feedback entered during your training.",
   "Thesis & Certifications": "Keep thesis milestones, certifications, and supporting academic requirements together.",
+  "Thesis and mandatory certifications": "Keep thesis milestones, certifications, and supporting academic requirements together.",
+  "CME and Conferences": "Track conferences, workshops, and continuing medical education events attended.",
   "Thesis and Publications": "Keep thesis milestones, publications, and related records together.",
   Thesis: "Keep thesis milestones and related records together.",
   Certifications: "Track certifications and supporting academic requirements.",
   "Leave Records": "Check your leave balance, previous requests, and approval status.",
+  Attendance: "View your daily attendance marked by department faculty.",
+  "Daily Attendance": "Mark and review daily attendance records for department students.",
   "Teaching & Learning": "Record lectures, teaching, seminars, journal clubs and symposia.",
   "Practicals & Postings": "Record practical activities and open your postings and rotations.",
   "Research & Events": "Record thesis topics, papers and events, and open existing thesis and conference records.",
@@ -131,24 +135,34 @@ const navigationDescriptions: Record<string, string> = {
 
 function navigationForRole(role: RoleType, dashboardData?: any, loadingBadges?: boolean, config?: any, demoMode = false, academicLogbook?: AcademicLogbookProfile | null): NavigationItem[] {
   if (role === "Faculty") {
-    return [
+    const items: NavigationItem[] = [
       { title: "Evaluation Queue", icon: FileText, href: "/" },
       { title: "Student Progress", icon: UserCheck, href: "/mentees" },
       { title: "Assessments", icon: ClipboardCheck, href: "/assessments" },
     ];
+    if (config?.enabledFeatures?.dailyAttendance) {
+      items.push({ title: "Daily Attendance", icon: CalendarDays, href: "/daily-attendance" });
+    }
+    return items;
   }
 
   if (role === "HOD") {
-    return [
+    const items: NavigationItem[] = [
       { title: "Dashboard", icon: GraduationCap, href: "/roster" },
       { title: "Student Progress", icon: UserCheck, href: "/mentees" },
       { title: "Review Queue", icon: FileText, href: "/review-queue" },
       { title: "Add Assessment", icon: ClipboardCheck, href: "/assessments" },
       { title: "Pending Students", icon: UserPlus, href: "/student-access" },
       { title: "Add Faculty", icon: UserCheck, href: "/professors" },
-      { title: "Leave Approvals", icon: CheckCircle2, href: "/leave-approvals" },
-      { title: "Requirements", icon: ClipboardCheck, href: "/requirements" },
     ];
+    if (!config?.enabledFeatures?.hideLeaveRecords) {
+      items.push({ title: "Leave Approvals", icon: CheckCircle2, href: "/leave-approvals" });
+    }
+    if (config?.enabledFeatures?.dailyAttendance) {
+      items.push({ title: "Daily Attendance", icon: CalendarDays, href: "/daily-attendance" });
+    }
+    items.push({ title: "Requirements", icon: ClipboardCheck, href: "/requirements" });
+    return items;
   }
 
   const academicNavigation = profileNavigation(academicLogbook);
@@ -224,7 +238,7 @@ function navigationForRole(role: RoleType, dashboardData?: any, loadingBadges?: 
   items.push({ title: "Academic Activities", icon: GraduationCap, href: "/academics" });
 
   if (config?.enabledFeatures?.attendedConferences) {
-    items.push({ title: "Conferences", icon: Presentation, href: "/conferences" });
+    items.push({ title: "CME and Conferences", icon: Presentation, href: "/conferences" });
   }
 
   items.push({ title: "Assessments", icon: ClipboardCheck, href: "/assessments" });
@@ -233,10 +247,14 @@ function navigationForRole(role: RoleType, dashboardData?: any, loadingBadges?: 
     items.push({ title: (config?.enabledFeatures?.useThesisAndPublicationsLabel || config?.enabledFeatures?.publicationsOnly) ? "Thesis and Publications" : "Thesis", icon: FileText, href: "/thesis" });
     items.push({ title: "Certifications", icon: Award, href: "/certifications" });
   } else {
-    items.push({ title: "Thesis & Certifications", icon: Award, href: "/milestones" });
+    items.push({ title: config?.enabledFeatures?.useThesisAndMandatoryCertificationsLabel ? "Thesis and mandatory certifications" : "Thesis & Certifications", icon: Award, href: "/milestones" });
   }
 
-  items.push({ title: "Leave Records", icon: CalendarDays, href: "/attendance" });
+  if (config?.enabledFeatures?.dailyAttendance) {
+    items.push({ title: "Attendance", icon: CalendarDays, href: "/attendance" });
+  } else if (!features.hideLeaveRecords) {
+    items.push({ title: "Leave Records", icon: CalendarDays, href: "/attendance" });
+  }
 
   return items;
 }

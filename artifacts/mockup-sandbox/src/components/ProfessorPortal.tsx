@@ -61,8 +61,10 @@ import {
   RefreshCw,
   Trash2,
   Pencil,
+  CalendarDays,
+  Clock,
 } from "lucide-react";
-import { formatLogbookDate } from "@/lib/logbook-config";
+import { formatLogbookDate, todayForInput } from "@/lib/logbook-config";
 import { CaseLogDetails, type CaseLogDetailRecord } from "@/components/CaseLogDetails";
 import { apiGet, apiPatch, apiPost, apiDelete } from "@/lib/apiClient";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -135,8 +137,10 @@ type LogFilter =
 export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; embedded?: boolean }) {
   const currentUser = useCurrentUser();
   const hideUhid = isDemoMode();
-  const { config, competencyLevels, caseCategories: deptCaseCategories, procedures: deptProcedures, academics: deptAcademics,
+  const { config, department, competencyLevels, caseCategories: deptCaseCategories, procedures: deptProcedures, academics: deptAcademics,
     clinicalWorkCategories, clinicalWorkSubtypes, academicLogbook } = useDepartment();
+  const isMicroDept = department?.code?.toLowerCase() === "microbiology" || department?.name?.toLowerCase().includes("microbiology");
+  const microbiologyCaseFields = Boolean(config?.enabledFeatures?.microbiologyCaseFields || isMicroDept);
   const clinicalNames = React.useMemo(() => new Map([...clinicalWorkCategories, ...clinicalWorkSubtypes].map((item) => [item.value, item.name])),
     [clinicalWorkCategories, clinicalWorkSubtypes]);
   const [location, setLocation] = useLocation();
@@ -191,6 +195,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
     if (activeTab) return activeTab;
     if (location === "/mentees") return "mentees";
     if (location === "/assessments") return "assessments";
+    if (location === "/daily-attendance" || location === "/attendance") return "daily-attendance";
     return "review-queue";
   };
 
@@ -199,6 +204,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
   const handleTabChange = (val: string) => {
     if (val === "mentees") setLocation("/mentees");
     else if (val === "assessments") setLocation("/assessments");
+    else if (val === "daily-attendance") setLocation("/daily-attendance");
     else setLocation("/");
   };
 
@@ -467,6 +473,11 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
             <TabsTrigger value="assessments" className="gap-2 text-xs font-semibold">
               <Award className="h-4 w-4" /> Add Assessment
             </TabsTrigger>
+            {(config?.enabledFeatures?.dailyAttendance || isMicroDept) && (
+              <TabsTrigger value="daily-attendance" className="gap-2 text-xs font-semibold">
+                <CalendarDays className="h-4 w-4" /> Daily Attendance
+              </TabsTrigger>
+            )}
           </TabsList>
         )}
 
@@ -529,7 +540,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                     </div>
 
                     {currentItem.type === "Case Log" ? (
-                      <CaseLogDetails caseLog={currentItem as CaseLogDetailRecord} hideUhid={hideUhid} medicalSummaryCaseFields={Boolean(config?.enabledFeatures?.medicalSummaryCaseFields)} />
+                      <CaseLogDetails caseLog={currentItem as CaseLogDetailRecord} hideUhid={hideUhid} medicalSummaryCaseFields={Boolean(config?.enabledFeatures?.medicalSummaryCaseFields)} microbiologyCaseFields={microbiologyCaseFields} />
                     ) : (
                       <div className="bg-slate-50 p-4 rounded-xl space-y-2 border border-slate-200/60">
                         <h4 className="text-xs font-semibold uppercase text-slate-500">Submission Details</h4>
@@ -828,6 +839,13 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
           </Card>
           <QuarterlyAppraisalSection />
         </TabsContent>
+
+        {/* Tab 4: Daily Attendance */}
+        {(config?.enabledFeatures?.dailyAttendance || isMicroDept) && (
+          <TabsContent value="daily-attendance" className="pt-4 space-y-4">
+            <FacultyDailyAttendanceSection allStudents={allStudents} />
+          </TabsContent>
+        )}
       </Tabs>
 
       {/* Mentee Detailed Logbook Inspector Dialog Modal */}
@@ -874,6 +892,9 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                     <TabsTrigger value="awards" className="text-xs whitespace-nowrap">Awards & Achievements</TabsTrigger>
                   )}
                   <TabsTrigger value="assessments" className="text-xs whitespace-nowrap">Assessments</TabsTrigger>
+                  {(config?.enabledFeatures?.dailyAttendance || isMicroDept) && (
+                    <TabsTrigger value="attendance" className="text-xs whitespace-nowrap">Daily Attendance</TabsTrigger>
+                  )}
                 </TabsList>
 
                 {/* ── Progress Tab ─────────────────────────────────────────── */}
@@ -1027,7 +1048,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                                   </TableCell>
                                 </TableRow>
                                 {expanded && <TableRow><TableCell id={`case-details-${log.id}`} colSpan={4} className="bg-slate-50 p-3">
-                                  <CaseLogDetails caseLog={log} hideUhid={hideUhid} showReview medicalSummaryCaseFields={Boolean(config?.enabledFeatures?.medicalSummaryCaseFields)} />
+                                  <CaseLogDetails caseLog={log} hideUhid={hideUhid} showReview medicalSummaryCaseFields={Boolean(config?.enabledFeatures?.medicalSummaryCaseFields)} microbiologyCaseFields={microbiologyCaseFields} />
                                 </TableCell></TableRow>}
                               </React.Fragment>
                             );
@@ -2632,6 +2653,363 @@ function ProcedureLogReviewForm({
           <XCircle className="h-4 w-4" /> Request Revision
         </Button>
       </div>
+    </div>
+  );
+}
+
+
+function FacultyDailyAttendanceSection({ allStudents }: { allStudents: any[] }) {
+  const [selectedDate, setSelectedDate] = React.useState(todayForInput());
+  const [loading, setLoading] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
+  const [studentRows, setStudentRows] = React.useState<Array<{
+    studentId: number;
+    name: string;
+    rollNumber: string;
+    status: "present" | "absent" | "half_day" | "leave";
+    clockIn?: string;
+    clockOut?: string;
+  }>>([]);
+
+  const loadAttendanceForDate = React.useCallback(async (date: string) => {
+    setLoading(true);
+    try {
+      const resp = await apiGet<{ date: string; students: any[] }>(`/api/professors/attendance?date=${date}`);
+      if (resp && Array.isArray(resp.students) && resp.students.length > 0) {
+        setStudentRows(resp.students.map((s: any) => ({
+          studentId: s.studentId,
+          name: s.name,
+          rollNumber: s.rollNumber || s.registrationNumber || "—",
+          status: s.status || "present",
+          clockIn: s.clockIn || "",
+          clockOut: s.clockOut || "",
+        })));
+      } else {
+        setStudentRows(allStudents.map((s) => ({
+          studentId: s.id,
+          name: s.name,
+          rollNumber: s.registrationNumber || "—",
+          status: "present",
+          clockIn: "",
+          clockOut: "",
+        })));
+      }
+    } catch (err: any) {
+      console.error("Failed to load attendance for date:", err);
+      setStudentRows(allStudents.map((s) => ({
+        studentId: s.id,
+        name: s.name,
+        rollNumber: s.registrationNumber || "—",
+        status: "present",
+        clockIn: "",
+        clockOut: "",
+      })));
+    } finally {
+      setLoading(false);
+    }
+  }, [allStudents]);
+
+  React.useEffect(() => {
+    loadAttendanceForDate(selectedDate);
+  }, [selectedDate, loadAttendanceForDate]);
+
+  const updateStatus = (studentId: number, status: "present" | "absent" | "half_day" | "leave") => {
+    setStudentRows((prev) =>
+      prev.map((r) => (r.studentId === studentId ? { ...r, status } : r))
+    );
+  };
+
+  const markAll = (status: "present" | "absent") => {
+    setStudentRows((prev) => prev.map((r) => ({ ...r, status })));
+    toast.info(`Marked all students as ${status}`);
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await apiPost("/api/professors/attendance", {
+        date: selectedDate,
+        records: studentRows.map((r) => ({
+          studentId: r.studentId,
+          status: r.status,
+          clockIn: r.clockIn || undefined,
+          clockOut: r.clockOut || undefined,
+        })),
+      });
+      toast.success(`Attendance saved for ${formatLogbookDate(selectedDate)}`);
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to save attendance");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const shiftDate = (deltaDays: number) => {
+    const d = new Date(selectedDate);
+    d.setDate(d.getDate() + deltaDays);
+    setSelectedDate(d.toISOString().slice(0, 10));
+  };
+
+  const presentCount = studentRows.filter((r) => r.status === "present").length;
+  const absentCount = studentRows.filter((r) => r.status === "absent").length;
+  const halfDayCount = studentRows.filter((r) => r.status === "half_day").length;
+  const leaveCount = studentRows.filter((r) => r.status === "leave").length;
+
+  return (
+    <Card className="border-slate-200 shadow-sm bg-white">
+      <CardHeader className="border-b border-slate-100 pb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <CardTitle className="text-lg font-bold text-slate-900 flex items-center gap-2">
+              <CalendarDays className="h-5 w-5 text-teal-600" />
+              Daily Attendance Marking
+            </CardTitle>
+            <p className="text-xs text-slate-500 mt-1">
+              Mark and verify the daily attendance of postgraduate trainees in your department.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={() => shiftDate(-1)} className="text-xs h-8">
+              &larr; Prev Day
+            </Button>
+            <Input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="text-xs h-8 w-36 font-medium"
+            />
+            <Button size="sm" variant="outline" onClick={() => shiftDate(1)} className="text-xs h-8">
+              Next Day &rarr;
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => setSelectedDate(todayForInput())} className="text-xs h-8">
+              Today
+            </Button>
+          </div>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="outline" className="text-xs bg-slate-50">
+              Total: {studentRows.length}
+            </Badge>
+            <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs">
+              Present: {presentCount}
+            </Badge>
+            <Badge className="bg-rose-50 text-rose-700 border-rose-200 text-xs">
+              Absent: {absentCount}
+            </Badge>
+            <Badge className="bg-amber-50 text-amber-700 border-amber-200 text-xs">
+              Half Day: {halfDayCount}
+            </Badge>
+            <Badge className="bg-slate-100 text-slate-700 border-slate-200 text-xs">
+              Leave: {leaveCount}
+            </Badge>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={() => markAll("present")} className="text-xs h-8 border-emerald-300 text-emerald-700 hover:bg-emerald-50">
+              Mark All Present
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleSave}
+              disabled={saving || loading || studentRows.length === 0}
+              className="text-xs h-8 bg-teal-600 hover:bg-teal-700 text-white font-semibold"
+            >
+              {saving ? "Saving..." : "Save Attendance"}
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="p-0">
+        {loading ? (
+          <div className="py-16 flex justify-center items-center">
+            <div className="animate-spin rounded-full border-4 border-slate-300 border-t-teal-600 h-8 w-8" />
+          </div>
+        ) : studentRows.length === 0 ? (
+          <div className="p-8 text-center text-slate-500 text-sm">
+            No students found in your department roster.
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="text-xs font-semibold">Student</TableHead>
+                <TableHead className="text-xs font-semibold">Roll / Reg No</TableHead>
+                <TableHead className="text-xs font-semibold">Status Selection</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {studentRows.map((row) => (
+                <TableRow key={row.studentId}>
+                  <TableCell className="py-3 font-medium text-slate-900 text-xs">
+                    {row.name}
+                  </TableCell>
+                  <TableCell className="py-3 text-xs text-slate-600 font-mono">
+                    {row.rollNumber}
+                  </TableCell>
+                  <TableCell className="py-3">
+                    <div className="flex items-center gap-1.5">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={row.status === "present" ? "default" : "outline"}
+                        onClick={() => updateStatus(row.studentId, "present")}
+                        className={`h-7 px-2.5 text-xs font-semibold ${
+                          row.status === "present"
+                            ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                            : "border-slate-200 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700"
+                        }`}
+                      >
+                        Present
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={row.status === "absent" ? "default" : "outline"}
+                        onClick={() => updateStatus(row.studentId, "absent")}
+                        className={`h-7 px-2.5 text-xs font-semibold ${
+                          row.status === "absent"
+                            ? "bg-rose-600 hover:bg-rose-700 text-white"
+                            : "border-slate-200 text-slate-600 hover:bg-rose-50 hover:text-rose-700"
+                        }`}
+                      >
+                        Absent
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={row.status === "half_day" ? "default" : "outline"}
+                        onClick={() => updateStatus(row.studentId, "half_day")}
+                        className={`h-7 px-2.5 text-xs font-semibold ${
+                          row.status === "half_day"
+                            ? "bg-amber-600 hover:bg-amber-700 text-white"
+                            : "border-slate-200 text-slate-600 hover:bg-amber-50 hover:text-amber-700"
+                        }`}
+                      >
+                        Half Day
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={row.status === "leave" ? "default" : "outline"}
+                        onClick={() => updateStatus(row.studentId, "leave")}
+                        className={`h-7 px-2.5 text-xs font-semibold ${
+                          row.status === "leave"
+                            ? "bg-slate-700 hover:bg-slate-800 text-white"
+                            : "border-slate-200 text-slate-600 hover:bg-slate-100"
+                        }`}
+                      >
+                        Leave
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function StudentModalAttendanceTab({ mentee }: { mentee: any }) {
+  const [records, setRecords] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    let active = true;
+    if (!mentee?.id) return;
+    setLoading(true);
+    apiGet<{ data: any[] } | any[]>(`/api/students/${mentee.id}/attendance`)
+      .then((resp) => {
+        if (!active) return;
+        const list = Array.isArray(resp) ? resp : (resp?.data || []);
+        setRecords(list);
+      })
+      .catch((err) => console.error("Error loading mentee attendance:", err))
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [mentee?.id]);
+
+  if (loading) {
+    return (
+      <div className="py-8 flex justify-center items-center">
+        <div className="animate-spin rounded-full border-4 border-slate-300 border-t-teal-600 h-8 w-8" />
+      </div>
+    );
+  }
+
+  if (records.length === 0) {
+    return (
+      <p className="text-sm text-slate-500 py-6 text-center">
+        No attendance records found for this student.
+      </p>
+    );
+  }
+
+  const presentCount = records.filter((r) => r.status === "present").length;
+  const absentCount = records.filter((r) => r.status === "absent").length;
+  const halfCount = records.filter((r) => r.status === "half_day").length;
+  const leaveCount = records.filter((r) => r.status === "leave").length;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2 pb-2 border-b border-slate-100">
+        <Badge variant="outline" className="text-xs bg-slate-50">Total Logged: {records.length}</Badge>
+        <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs">Present: {presentCount}</Badge>
+        <Badge className="bg-rose-50 text-rose-700 border-rose-200 text-xs">Absent: {absentCount}</Badge>
+        <Badge className="bg-amber-50 text-amber-700 border-amber-200 text-xs">Half Day: {halfCount}</Badge>
+        <Badge className="bg-slate-100 text-slate-700 border-slate-200 text-xs">Leave: {leaveCount}</Badge>
+      </div>
+
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="text-xs font-semibold">Date</TableHead>
+            <TableHead className="text-xs font-semibold">Status</TableHead>
+            <TableHead className="text-xs font-semibold">Timings</TableHead>
+            <TableHead className="text-xs font-semibold">Verified By</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {records.map((r: any) => (
+            <TableRow key={r.id}>
+              <TableCell className="py-2.5 text-xs font-medium text-slate-900">
+                {formatLogbookDate(r.date)}
+              </TableCell>
+              <TableCell className="py-2.5">
+                {r.status === "present" && (
+                  <Badge className="border-emerald-200 bg-emerald-50 text-[10px] font-semibold text-emerald-700">
+                    <CheckCircle2 className="mr-1 h-3 w-3" /> Present
+                  </Badge>
+                )}
+                {r.status === "absent" && (
+                  <Badge className="border-rose-200 bg-rose-50 text-[10px] font-semibold text-rose-700">
+                    <XCircle className="mr-1 h-3 w-3" /> Absent
+                  </Badge>
+                )}
+                {r.status === "half_day" && (
+                  <Badge className="border-amber-200 bg-amber-50 text-[10px] font-semibold text-amber-700">
+                    <Clock className="mr-1 h-3 w-3" /> Half Day
+                  </Badge>
+                )}
+                {r.status === "leave" && (
+                  <Badge className="border-slate-200 bg-slate-100 text-[10px] font-semibold text-slate-700">
+                    <CalendarDays className="mr-1 h-3 w-3" /> Leave
+                  </Badge>
+                )}
+              </TableCell>
+              <TableCell className="py-2.5 text-xs text-slate-600">
+                {r.clockIn || r.clockOut ? `${r.clockIn || "—"} to ${r.clockOut || "—"}` : "Full Day"}
+              </TableCell>
+              <TableCell className="py-2.5 text-xs text-slate-600">
+                {r.verifierName || "Faculty"}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </div>
   );
 }

@@ -29,10 +29,38 @@ export function DepartmentProvider({ departmentId, children }: { departmentId: n
     if (!departmentId) { setError("Your account has no department. Contact the database administrator."); return; }
     try {
       const result = await apiGet<DepartmentData>(`/api/departments/${departmentId}/catalog`);
+      const isMicro = result.department?.code?.toLowerCase() === "microbiology" || result.department?.name?.toLowerCase().includes("microbiology");
+      const enabledFeatures = { ...(result.config?.enabledFeatures || {}) };
+      if (isMicro) {
+        if (enabledFeatures.microbiologyCaseFields === undefined) enabledFeatures.microbiologyCaseFields = true;
+        if (enabledFeatures.freeTextProcedures === undefined) enabledFeatures.freeTextProcedures = true;
+        if (enabledFeatures.hideProcedureAge === undefined) enabledFeatures.hideProcedureAge = true;
+        if (enabledFeatures.procedureExperience === undefined) enabledFeatures.procedureExperience = false;
+        if (enabledFeatures.useThesisAndMandatoryCertificationsLabel === undefined) enabledFeatures.useThesisAndMandatoryCertificationsLabel = true;
+        if (enabledFeatures.attendedConferences === undefined) enabledFeatures.attendedConferences = true;
+        if (enabledFeatures.hideLeaveRecords === undefined) enabledFeatures.hideLeaveRecords = true;
+        if (enabledFeatures.dailyAttendance === undefined) enabledFeatures.dailyAttendance = true;
+      }
+      const resolvedConfig: DepartmentConfig | null = result.config ? {
+        ...result.config,
+        enabledFeatures,
+      } : isMicro ? {
+        requiredCases: null,
+        requiredProcedures: null,
+        requiredAcademic: null,
+        enabledFeatures,
+      } : null;
+
+      const academics = (result.academics && result.academics.length > 0) ? result.academics : isMicro ? [
+        { id: 1, name: "Journal club", value: "journal_club", required: 0, period: "total" as const },
+        { id: 2, name: "Presentation", value: "presentation", required: 0, period: "total" as const },
+      ] : [];
+
       setData({
         ...result,
+        config: resolvedConfig,
         postings: result.postings || [],
-        academics: result.academics || [],
+        academics,
         caseCategories: result.caseCategories || [],
         competencyLevels: result.competencyLevels || [],
         leaveTypes: result.leaveTypes || [],

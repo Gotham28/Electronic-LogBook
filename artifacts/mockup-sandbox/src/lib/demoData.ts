@@ -1,4 +1,4 @@
-import { demoData, getDemoDepartmentProfile, getDemoResident } from './demoDepartments';
+import { demoData, getDemoDepartmentProfile, getDemoResident, getActiveDemoProfile } from './demoDepartments';
 import { playDemoSound } from './demoSounds';
 import { isDemoMovieActive } from './demoSession';
 
@@ -183,6 +183,29 @@ export async function handleDemoRequest(method: string, path: string, body?: any
     if (path.match(/\/api\/students\/\d+\/procedure-logs$/)) return getDemoResident(requestedStudentId(path)).logs.procedures;
     if (path.match(/\/api\/students\/\d+\/academic-logs$/)) return getDemoResident(requestedStudentId(path)).logs.academics;
     if (path.match(/\/api\/students\/\d+\/clinical-works$/)) return getDemoResident(requestedStudentId(path)).logs.clinicalWorks;
+    if (path.match(/\/api\/students\/\d+\/attendance$/)) {
+      const resident = getDemoResident(requestedStudentId(path));
+      return { data: resident.attendance || [] };
+    }
+    if (path.match(/\/api\/professors\/attendance/)) {
+      const url = new URL(path, "http://localhost");
+      const date = url.searchParams.get("date") || new Date().toISOString().slice(0, 10);
+      const residents = getActiveDemoProfile().residents || [];
+      const students = residents.map((r: any) => {
+        const att = (r.attendance || []).find((a: any) => a.date === date);
+        return {
+          studentId: r.student.id,
+          name: r.student.fullName || r.student.name,
+          rollNumber: r.student.registrationNumber || r.student.rollNumber || `MB-2025-${r.student.id}`,
+          joinedYear: r.student.joinedYear || 2025,
+          status: att?.status || null,
+          clockIn: att?.clockIn || null,
+          clockOut: att?.clockOut || null,
+          attendanceId: att?.id || null,
+        };
+      });
+      return { date, students };
+    }
     if (path.match(/\/api\/students\/\d+\/leave-records$/)) return getDemoResident(requestedStudentId(path)).leaveRecords;
     if (path.match(/\/api\/students\/\d+\/leave-balance$/)) return demoData.leaveBalance;
     if (path.match(/\/api\/students\/\d+\/assessments$/)) return demoData.assessments;
@@ -339,6 +362,35 @@ export async function handleDemoRequest(method: string, path: string, body?: any
       return { success: true, id: newClinicalWork.id };
     }
 
+    const caseEditMatch = path.match(/\/api\/students\/(\d+)\/case-logs\/(\d+)$/);
+    if (caseEditMatch && body) {
+      const resident = getDemoResident(requestedStudentId(path));
+      const editId = Number(caseEditMatch[2]);
+      const existing = resident.logs.cases.find((c: any) => c.id === editId);
+      if (existing) {
+        Object.assign(existing, {
+          date: body.date,
+          patientUhid: body.patientUhid,
+          age: body.patientAge || existing.age,
+          gender: body.patientGender || existing.gender,
+          category: body.category ?? existing.category,
+          chiefComplaints: body.chiefComplaints || "",
+          history: body.history || "",
+          examination: body.examination || "",
+          investigations: body.investigations || "",
+          diagnosisProvisional: body.diagnosisProvisional || "",
+          diagnosisFinal: body.diagnosisFinal || "",
+          diagnosis: body.diagnosisFinal || body.diagnosisProvisional || existing.diagnosis,
+          differentialDiagnosis: body.differentialDiagnosis || "",
+          management: body.managementPlan || "",
+          status: "pending",
+          facultyRemarks: null,
+        });
+        playDemoSound("success");
+        return existing;
+      }
+    }
+
     if (path.includes("/case-logs") && body) {
       const resident = getDemoResident(requestedStudentId(path));
       const newCaseLog = {
@@ -348,6 +400,7 @@ export async function handleDemoRequest(method: string, path: string, body?: any
         patientUhid: body.patientUhid,
         age: body.patientAge || "Unknown",
         gender: body.patientGender || "Unknown",
+        category: body.category || "",
         chiefComplaints: body.chiefComplaints || "",
         history: body.history || "",
         examination: body.examination || "",
@@ -438,6 +491,36 @@ export async function handleDemoRequest(method: string, path: string, body?: any
       return { success: true, id: newAssessment.id };
     }
     
+    if (path.includes("/professors/attendance") && body) {
+      const { date, records } = body;
+      const residents = getActiveDemoProfile().residents || [];
+      for (const rec of (records || [])) {
+        const resident = residents.find((r: any) => r.student.id === rec.studentId);
+        if (resident) {
+          if (!resident.attendance) resident.attendance = [];
+          const existingIndex = resident.attendance.findIndex((a: any) => a.date === date);
+          const attEntry = {
+            id: existingIndex >= 0 ? resident.attendance[existingIndex].id : Date.now() + rec.studentId,
+            studentId: rec.studentId,
+            date,
+            status: rec.status,
+            clockIn: rec.clockIn || (rec.status === "present" || rec.status === "half_day" ? "08:30" : null),
+            clockOut: rec.clockOut || (rec.status === "present" ? "16:30" : rec.status === "half_day" ? "13:00" : null),
+            verifiedBy: 2,
+            verifierName: "Dr. Vivek Menon",
+            createdAt: new Date().toISOString(),
+          };
+          if (existingIndex >= 0) {
+            resident.attendance[existingIndex] = attEntry;
+          } else {
+            resident.attendance.unshift(attEntry);
+          }
+        }
+      }
+      playDemoSound("success");
+      return { success: true, count: records?.length || 0 };
+    }
+
     if (path.includes("/leave-records") && body) {
       const resident = getDemoResident(requestedStudentId(path));
       const start = new Date(body.startDate);
