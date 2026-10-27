@@ -34,8 +34,185 @@ type LeaveRecord = {
   approvedBy: string;
 };
 
+
+type AttendanceRecord = {
+  id: number;
+  date: string;
+  status: "present" | "absent" | "half_day" | "leave";
+  clockIn?: string | null;
+  clockOut?: string | null;
+  verifiedBy?: number | null;
+  verifierName?: string | null;
+  createdAt: string;
+};
+
+function renderAttendanceStatusBadge(status: string) {
+  switch (status) {
+    case "present":
+      return (
+        <Badge className="border-emerald-200 bg-emerald-50 text-[11px] font-semibold text-emerald-700">
+          <CheckCircle2 className="mr-1 h-3 w-3" /> Present
+        </Badge>
+      );
+    case "absent":
+      return (
+        <Badge className="border-rose-200 bg-rose-50 text-[11px] font-semibold text-rose-700">
+          <XCircle className="mr-1 h-3 w-3" /> Absent
+        </Badge>
+      );
+    case "half_day":
+      return (
+        <Badge className="border-amber-200 bg-amber-50 text-[11px] font-semibold text-amber-700">
+          <Clock className="mr-1 h-3 w-3" /> Half Day
+        </Badge>
+      );
+    case "leave":
+      return (
+        <Badge className="border-slate-200 bg-slate-100 text-[11px] font-semibold text-slate-700">
+          <CalendarDays className="mr-1 h-3 w-3" /> Leave
+        </Badge>
+      );
+    default:
+      return <Badge variant="outline">{status}</Badge>;
+  }
+}
+
+function StudentDailyAttendanceView() {
+  const user = React.useMemo(() => getCurrentUser(), []);
+  const [records, setRecords] = React.useState<AttendanceRecord[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const fetchAttendance = React.useCallback(async () => {
+    if (!user?.studentProfileId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const resp = await apiGet<{ data: AttendanceRecord[] } | AttendanceRecord[]>(
+        `/api/students/${user.studentProfileId}/attendance`
+      );
+      const data = Array.isArray(resp) ? resp : (resp?.data || []);
+      setRecords(data);
+    } catch (err: any) {
+      console.error("Failed to load attendance", err);
+      setError(err?.message || "Failed to load attendance records");
+      toast.error("Could not load attendance records");
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.studentProfileId]);
+
+  React.useEffect(() => {
+    fetchAttendance();
+  }, [fetchAttendance]);
+
+  const totalDays = records.length;
+  const presentDays = records.filter((r) => r.status === "present").length;
+  const halfDays = records.filter((r) => r.status === "half_day").length;
+  const absentDays = records.filter((r) => r.status === "absent").length;
+  const leaveDays = records.filter((r) => r.status === "leave").length;
+  const percentage = totalDays > 0 ? (((presentDays + halfDays * 0.5) / totalDays) * 100).toFixed(1) : "—";
+
+  return (
+    <div className="section-spacing pb-12 space-y-6">
+      <div>
+        <p className="page-eyebrow">Attendance administration</p>
+        <h2 className="page-title mt-1">Daily Attendance</h2>
+        <p className="mt-2 text-sm text-slate-500">
+          Review your verified daily attendance records marked by department faculty.
+        </p>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="rounded-[18px] border border-white/70 bg-white/76 p-4 shadow-[0_18px_48px_rgba(15,23,42,0.05)]">
+          <p className="text-3xl font-bold text-slate-900">{totalDays}</p>
+          <p className="mt-1 text-[11px] font-bold uppercase tracking-wider text-slate-500">Days Logged</p>
+        </div>
+        <div className="rounded-[18px] border border-white/70 bg-white/76 p-4 shadow-[0_18px_48px_rgba(15,23,42,0.05)]">
+          <p className="text-3xl font-bold text-emerald-600">{presentDays}</p>
+          <p className="mt-1 text-[11px] font-bold uppercase tracking-wider text-slate-500">Days Present</p>
+        </div>
+        <div className="rounded-[18px] border border-white/70 bg-white/76 p-4 shadow-[0_18px_48px_rgba(15,23,42,0.05)]">
+          <p className="text-3xl font-bold text-rose-600">{absentDays + leaveDays}</p>
+          <p className="mt-1 text-[11px] font-bold uppercase tracking-wider text-slate-500">Absent / Leave</p>
+        </div>
+        <div className="rounded-[18px] border border-white/70 bg-white/76 p-4 shadow-[0_18px_48px_rgba(15,23,42,0.05)]">
+          <p className="text-3xl font-bold text-teal-600">{percentage}{percentage !== "—" ? "%" : ""}</p>
+          <p className="mt-1 text-[11px] font-bold uppercase tracking-wider text-slate-500">Attendance Rate</p>
+        </div>
+      </div>
+
+      <Card className="border-white/70 bg-white/76">
+        <CardHeader className="border-b border-white/70 pb-3 flex flex-row items-center justify-between">
+          <CardTitle className="text-base font-bold text-slate-950">Attendance History</CardTitle>
+          <Button size="sm" variant="outline" onClick={fetchAttendance} disabled={loading} className="text-xs">
+            Refresh
+          </Button>
+        </CardHeader>
+        <CardContent className="p-0">
+          {loading ? (
+            <div className="py-12 flex justify-center items-center">
+              <div className="animate-spin rounded-full border-4 border-slate-300 border-t-teal-600 h-8 w-8" />
+            </div>
+          ) : error ? (
+            <div className="p-6 text-center text-rose-600 text-sm font-medium">
+              <p>{error}</p>
+              <Button size="sm" variant="outline" onClick={fetchAttendance} className="mt-3">
+                Try again
+              </Button>
+            </div>
+          ) : records.length === 0 ? (
+            <Empty className="py-14">
+              <EmptyHeader>
+                <EmptyMedia variant="icon"><CalendarDays className="h-6 w-6" /></EmptyMedia>
+                <EmptyTitle>No attendance records found</EmptyTitle>
+                <EmptyDescription>Your department faculty will mark your daily attendance here.</EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-xs font-semibold">Date</TableHead>
+                  <TableHead className="text-xs font-semibold">Status</TableHead>
+                  <TableHead className="text-xs font-semibold">Timings</TableHead>
+                  <TableHead className="text-xs font-semibold">Marked / Verified By</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {records.map((r) => (
+                  <TableRow key={r.id}>
+                    <TableCell className="text-xs font-medium text-slate-900 py-3">
+                      {formatLogbookDate(r.date)}
+                    </TableCell>
+                    <TableCell className="py-3">
+                      {renderAttendanceStatusBadge(r.status)}
+                    </TableCell>
+                    <TableCell className="text-xs text-slate-600 py-3">
+                      {r.clockIn || r.clockOut ? `${r.clockIn || "—"} to ${r.clockOut || "—"}` : "Full Day"}
+                    </TableCell>
+                    <TableCell className="text-xs text-slate-600 py-3">
+                      {r.verifierName || "Department Faculty"}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export function AttendancePage() {
   const dept = useDepartment();
+  const isMicroDept = dept.department?.code?.toLowerCase() === "microbiology" || dept.department?.name?.toLowerCase().includes("microbiology");
+  const isDailyAttendance = Boolean(dept.config?.enabledFeatures?.dailyAttendance || isMicroDept);
+
+  if (isDailyAttendance) {
+    return <StudentDailyAttendanceView />;
+  }
   const [leaveType, setLeaveType] = React.useState(dept.leaveTypes?.[0]?.value || "");
   const [fromDate, setFromDate] = React.useState(todayForInput());
   const [toDate, setToDate] = React.useState(todayForInput());

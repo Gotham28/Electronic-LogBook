@@ -46,8 +46,35 @@ router.get("/:departmentId/catalog", async (req, res) => {
         .orderBy(departmentPostingScheduleTable.trainingYear, departmentPostingScheduleTable.sortOrder),
       getAcademicLogbook(configSourceId),
     ]);
-    res.json({ department: department[0], hod: hod[0] || null, config: config[0] || null, procedures,
-      postings: catalog.filter((item) => item.kind === "posting"), academics: catalog.filter((item) => item.kind === "academic"), caseCategories: catalog.filter((item) => item.kind === "case_category"),
+    const deptInfo = department[0];
+    const isMicro = deptInfo?.code?.toLowerCase() === "microbiology" || deptInfo?.name?.toLowerCase().includes("microbiology");
+    let resolvedConfig = config[0] ? { ...config[0] } : null;
+    if (resolvedConfig) {
+      const enabledFeatures = { ...((resolvedConfig.enabledFeatures as Record<string, boolean>) || {}) };
+      if (isMicro) {
+        if (enabledFeatures.microbiologyCaseFields === undefined) enabledFeatures.microbiologyCaseFields = true;
+        if (enabledFeatures.freeTextProcedures === undefined) enabledFeatures.freeTextProcedures = true;
+        if (enabledFeatures.hideProcedureAge === undefined) enabledFeatures.hideProcedureAge = true;
+        if (enabledFeatures.procedureExperience === undefined) enabledFeatures.procedureExperience = false;
+        if (enabledFeatures.useThesisAndMandatoryCertificationsLabel === undefined) enabledFeatures.useThesisAndMandatoryCertificationsLabel = true;
+        if (enabledFeatures.attendedConferences === undefined) enabledFeatures.attendedConferences = true;
+        if (enabledFeatures.hideLeaveRecords === undefined) enabledFeatures.hideLeaveRecords = true;
+      }
+      resolvedConfig.enabledFeatures = enabledFeatures;
+    } else if (isMicro) {
+      resolvedConfig = {
+        id: 0,
+        departmentId: configSourceId,
+        requiredCases: null,
+        requiredProcedures: null,
+        requiredAcademic: null,
+        enabledFeatures: { procedureExperience: false, microbiologyCaseFields: true, freeTextProcedures: true, hideProcedureAge: true, useThesisAndMandatoryCertificationsLabel: true, attendedConferences: true, hideLeaveRecords: true },
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as any;
+    }
+    res.json({ department: deptInfo, hod: hod[0] || null, config: resolvedConfig, procedures,
+      postings: catalog.filter((item) => item.kind === "posting"), academics: (catalog.filter((item) => item.kind === "academic").length > 0 || !isMicro) ? catalog.filter((item) => item.kind === "academic") : [{ id: 1, departmentId: configSourceId, kind: "academic", name: "Journal club", value: "journal_club", required: 0, period: "total" as const, parentValue: null }, { id: 2, departmentId: configSourceId, kind: "academic", name: "Presentation", value: "presentation", required: 0, period: "total" as const, parentValue: null }] as any, caseCategories: catalog.filter((item) => item.kind === "case_category"),
       competencyLevels: catalog.filter((item) => item.kind === "competency_level"), leaveTypes: catalog.filter((item) => item.kind === "leave_type"),
       conferenceLevels: catalog.filter((item) => item.kind === "conference_level"),
       clinicalWorkCategories: catalog.filter((item) => item.kind === "clinical_work_category"),

@@ -1,8 +1,9 @@
 import { Router, type IRouter } from "express";
-import { db, caseLogsTable, procedureLogsTable, academicLogsTable, studentsTable, usersTable, departmentsTable, departmentConfigsTable, conferencesTable, clinicalWorkLogsTable, departmentCatalogTable } from "@workspace/db";
+import { db, caseLogsTable, procedureLogsTable, academicLogsTable, studentsTable, usersTable, departmentsTable, departmentConfigsTable, conferencesTable, clinicalWorkLogsTable, departmentCatalogTable, attendanceLogsTable } from "@workspace/db";
 import { eq, and, inArray, count, or, isNull } from "drizzle-orm";
 import { requireAuth, requireRole, requireDepartment } from "../middlewares/auth.js";
-import { completionPercent } from "../lib/validation.js";
+import { z } from "zod";
+import { completionPercent, dateSchema, validate } from "../lib/validation.js";
 import { resolveConfigDepartmentId } from "../lib/department-config-source.js";
 import { clinicalWorkTarget, verifiedClinicalWorkCounts } from "../lib/clinical-work-progress.js";
 import { getDepartmentFeatures } from "../lib/department-features.js";
@@ -24,6 +25,145 @@ function shortfallStatus(pct: number | null): "on_track" | "at_risk" | "behind" 
   if (pct >= 40) return "at_risk";
   return "behind";
 }
+
+// Daily Attendance - list department students and their status for a date
+router.get("/attendance", async (req, res) => {
+  try {
+    const caller = req.user!;
+    const deptId = caller.departmentId!;
+    const dateParam = typeof req.query.date === "string" ? req.query.date.trim() : "";
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : new Date().toISOString().split("T")[0];
+
+    const deptStudents = await db
+      .select({
+        studentId: studentsTable.id,
+        name: usersTable.fullName,
+        registrationNumber: studentsTable.registrationNumber,
+        batch: studentsTable.batch,
+      })
+      .from(studentsTable)
+      .innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
+      .where(and(eq(usersTable.departmentId, deptId), eq(usersTable.status, "approved")))
+      .orderBy(usersTable.fullName);
+
+    if (deptStudents.length === 0) {
+      res.json({ date, students: [] });
+      return;
+    }
+
+    const studentIds = deptStudents.map((s) => s.studentId);
+    const existingLogs = await db
+      .select({
+        id: attendanceLogsTable.id,
+        studentId: attendanceLogsTable.studentId,
+        date: attendanceLogsTable.date,
+        status: attendanceLogsTable.status,
+        clockIn: attendanceLogsTable.clockIn,
+        clockOut: attendanceLogsTable.clockOut,
+        verifiedBy: attendanceLogsTable.verifiedBy,
+      })
+      .from(attendanceLogsTable)
+      .where(and(inArray(attendanceLogsTable.studentId, studentIds), eq(attendanceLogsTable.date, date)));
+
+    const logMap = new Map(existingLogs.map((log) => [log.studentId, log]));
+
+    const result = deptStudents.map((s) => {
+      const log = logMap.get(s.studentId);
+      return {
+        studentId: s.studentId,
+        name: s.name,
+        rollNumber: s.registrationNumber,
+        joinedYear: parseInt(s.batch, 10) || 2025,
+        status: log?.status ?? null,
+        clockIn: log?.clockIn ?? null,
+        clockOut: log?.clockOut ?? null,
+        attendanceId: log?.id ?? null,
+      };
+    });
+
+    res.json({ date, students: result });
+  } catch (error) {
+    req.log.error({ status: 500 }, "Error fetching professor attendance list");
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// Daily Attendance - mark attendance for department students
+router.post(
+  "/attendance",
+  validate(
+    z.object({
+      date: dateSchema,
+      records: z.array(
+        z.object({
+          studentId: z.number().int().positive(),
+          status: z.enum(["present", "absent", "half_day", "leave"]),
+          clockIn: z.string().optional().nullable(),
+          clockOut: z.string().optional().nullable(),
+        })
+      ).min(1),
+    })
+  ),
+  async (req, res) => {
+    try {
+      const caller = req.user!;
+      const deptId = caller.departmentId!;
+      const { date, records } = req.body;
+
+      const studentIds = records.map((r: any) => r.studentId);
+
+      // Verify all studentIds belong to caller's department (AGENTS.md sec 3)
+      const validStudents = await db
+        .select({ id: studentsTable.id })
+        .from(studentsTable)
+        .innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
+        .where(and(inArray(studentsTable.id, studentIds), eq(usersTable.departmentId, deptId)));
+
+      const validIdSet = new Set(validStudents.map((s) => s.id));
+      const hasUnauthorizedStudent = studentIds.some((id: number) => !validIdSet.has(id));
+      if (hasUnauthorizedStudent) {
+        res.status(403).json({ message: "Cannot mark attendance for students outside your department" });
+        return;
+      }
+
+      await db.transaction(async (tx) => {
+        for (const record of records) {
+          const [existing] = await tx
+            .select({ id: attendanceLogsTable.id })
+            .from(attendanceLogsTable)
+            .where(and(eq(attendanceLogsTable.studentId, record.studentId), eq(attendanceLogsTable.date, date)))
+            .limit(1);
+
+          if (existing) {
+            await tx
+              .update(attendanceLogsTable)
+              .set({
+                status: record.status,
+                clockIn: record.clockIn ?? null,
+                clockOut: record.clockOut ?? null,
+                verifiedBy: caller.id,
+              })
+              .where(eq(attendanceLogsTable.id, existing.id));
+          } else {
+            await tx.insert(attendanceLogsTable).values({
+              studentId: record.studentId,
+              date,
+              status: record.status,
+              clockIn: record.clockIn ?? null,
+              clockOut: record.clockOut ?? null,
+              verifiedBy: caller.id,
+            });
+          }
+        }
+      });
+
+      res.json({ success: true, count: records.length });
+    } catch (error) {
+      req.log.error({ status: 500 }, "Error saving professor attendance");
+      res.status(500).json({ message: "Internal server error" });
+    }
+  }
+);
 
 router.get("/:professorId/review-queue", async (req, res) => {
   try {

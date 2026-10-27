@@ -76,6 +76,7 @@ const paths: Record<string, string> = {
   "assessments": "/assessments",
   "student-access": "/student-access",
   "leave-approvals": "/leave-approvals",
+  "daily-attendance": "/daily-attendance",
   "professors": "/professors",
   "requirements": "/requirements",
   // Legacy aliases so old links still resolve to the merged tab
@@ -96,6 +97,7 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
     if (location === "/student-access") return "student-access";
     if (location === "/professors") return "professors";
     if (location === "/leave-approvals") return "leave-approvals";
+    if (location === "/daily-attendance") return "daily-attendance";
     return "requirements";
   }, [activeTab, location]);
   const [analyticsData, setAnalyticsData] = React.useState<AnalyticsData | null>(null);
@@ -724,6 +726,18 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="daily-attendance" className="pt-4">
+          <ProfessorPortal activeTab="daily-attendance" embedded />
+        </TabsContent>
+
+        <TabsContent value="daily-attendance" className="pt-4">
+
+          <ProfessorPortal activeTab="daily-attendance" embedded />
+
+        </TabsContent>
+
+
 
         <TabsContent value="requirements" className="pt-4">
           {isDemoMode() && <DemoDepartmentCustomizer />}

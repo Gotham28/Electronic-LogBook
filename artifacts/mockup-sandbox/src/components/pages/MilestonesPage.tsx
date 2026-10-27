@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { formatLogbookDate } from "@/lib/logbook-config";
 import { apiGet, apiPost, apiPatch } from "@/lib/apiClient";
 import { getCurrentUser } from "@/lib/session";
+import { useDepartment } from "@/lib/department-context";
 
 const dateFields = [
   ["protocolSubmissionDate", "Protocol submission"], ["iecClearanceDate", "IEC clearance"],
@@ -25,6 +26,11 @@ const emptyThesis: Thesis = { thesisTitle: "", guideId: null, coGuideId: null, p
 const emptyCertificate = { title: "", provider: "", issueDate: "", expiryDate: "", certificateUrl: "" };
 
 export function MilestonesPage() {
+  const { config, department } = useDepartment();
+  const isMicrobiology = department?.code?.toLowerCase() === "microbiology" || department?.name?.toLowerCase().includes("microbiology");
+  const pageTitle = (config?.enabledFeatures?.useThesisAndMandatoryCertificationsLabel || isMicrobiology)
+    ? "Thesis and mandatory certifications"
+    : "Thesis & certifications";
   const user = getCurrentUser()!;
   const base = `/api/students/${user.studentProfileId}`;
   const [thesis, setThesis] = React.useState<Thesis | null>(null);
@@ -78,7 +84,7 @@ export function MilestonesPage() {
   }
   const guideName = (id: number | null) => faculty.find((person) => person.id === id)?.fullName || (id ? "Inactive faculty member" : "Not selected");
   return <div className="space-y-6 pb-12">
-    <div><p className="page-eyebrow">Research and training</p><h2 className="page-title mt-1">Thesis & certifications</h2>
+    <div><p className="page-eyebrow">Research and training</p><h2 className="page-title mt-1">{pageTitle}</h2>
       <p className="mt-2 text-sm text-slate-500">Record your research timeline and completed training.</p></div>
     {error && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-rose-700">{error} <Button variant="outline" onClick={load}>Try again</Button></div>}
     {loading ? <p role="status">Loading milestones…</p> : !error && <>

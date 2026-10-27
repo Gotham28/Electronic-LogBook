@@ -53,6 +53,7 @@ const emptyForm = {
   age: "",
   gender: "Male",
   category: "",
+  sampleProcessing: "",
   medicalSummary: "",
   chiefComplaints: "",
   history: "",
@@ -94,6 +95,7 @@ export function CaseLogsPage() {
       age: log.patientAge || log.age || "",
       gender: (log.patientGender || log.gender || "male").charAt(0).toUpperCase() + (log.patientGender || log.gender || "male").slice(1),
       category: log.category || "",
+      sampleProcessing: log.investigations || log.managementPlan || log.management || "",
       medicalSummary: getCaseMedicalSummary(log),
       chiefComplaints: log.chiefComplaints || "",
       history: log.history || "",
@@ -114,8 +116,10 @@ export function CaseLogsPage() {
   const [professors, setProfessors] = React.useState<any[]>([]);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
-  const { caseCategories, config: deptConfig } = useDepartment();
+  const { caseCategories, config: deptConfig, department } = useDepartment();
   const medicalSummaryCaseFields = Boolean(deptConfig?.enabledFeatures?.medicalSummaryCaseFields);
+  const isMicroDept = department?.code?.toLowerCase() === "microbiology" || department?.name?.toLowerCase().includes("microbiology");
+  const microbiologyCaseFields = Boolean(deptConfig?.enabledFeatures?.microbiologyCaseFields || isMicroDept);
 
   const totalRequired = React.useMemo(() => 
     caseCategories?.reduce((acc: number, c: any) => acc + c.required, 0) || 50,
@@ -162,7 +166,11 @@ export function CaseLogsPage() {
       return;
     }
     if (!form.category) {
-      toast.error("Please select a category");
+      toast.error(microbiologyCaseFields ? "Please enter a sample category" : "Please select a category");
+      return;
+    }
+    if (microbiologyCaseFields && !form.diagnosis?.trim()) {
+      toast.error("Please enter a provisional diagnosis");
       return;
     }
     
@@ -173,17 +181,17 @@ export function CaseLogsPage() {
         patientUhid: form.patientUhid,
         patientAge: form.age,
         patientGender: form.gender.toLowerCase(),
-        category: form.category,
-        chiefComplaints: medicalSummaryCaseFields ? form.medicalSummary : form.chiefComplaints,
-        history: medicalSummaryCaseFields ? "" : form.history,
-        examination: medicalSummaryCaseFields ? "" : form.examination,
-        investigations: form.investigations,
-        diagnosisProvisional: form.diagnosis,
-        diagnosisFinal: form.diagnosis, 
-        differentialDiagnosis: form.differentialDiagnosis,
-        managementPlan: form.management,
-        outcome: form.outcome,
-        learningPoints: form.learningPoints,
+        category: form.category.trim(),
+        chiefComplaints: microbiologyCaseFields ? "" : medicalSummaryCaseFields ? form.medicalSummary : form.chiefComplaints,
+        history: (microbiologyCaseFields || medicalSummaryCaseFields) ? "" : form.history,
+        examination: (microbiologyCaseFields || medicalSummaryCaseFields) ? "" : form.examination,
+        investigations: microbiologyCaseFields ? form.sampleProcessing : form.investigations,
+        diagnosisProvisional: form.diagnosis.trim(),
+        diagnosisFinal: form.diagnosis.trim(),
+        differentialDiagnosis: microbiologyCaseFields ? "" : form.differentialDiagnosis,
+        managementPlan: microbiologyCaseFields ? form.sampleProcessing : form.management,
+        outcome: microbiologyCaseFields ? "" : form.outcome,
+        learningPoints: microbiologyCaseFields ? "" : form.learningPoints,
         supervisorId: form.supervisorId,
       };
       
@@ -228,7 +236,7 @@ export function CaseLogsPage() {
   const search = searchTerm.toLowerCase();
   const filteredLogs = caseLogs.filter((log) => {
     const catName = caseCategories?.find((c: any) => c.value === log.category)?.name || log.category || "";
-    const summary = medicalSummaryCaseFields ? getCaseMedicalSummary(log) : log.chiefComplaints;
+    const summary = microbiologyCaseFields ? (log.investigations || log.managementPlan || "") : medicalSummaryCaseFields ? getCaseMedicalSummary(log) : log.chiefComplaints;
     const searchFields = hideUhid
       ? [log.number, log.diagnosisProvisional, log.diagnosis, summary, catName]
       : [log.number, log.diagnosisProvisional, log.diagnosis, log.patientUhid, summary, catName];
@@ -294,39 +302,72 @@ export function CaseLogsPage() {
                   </Select>
                 </Field>
               </div>
-              <div data-tour="caselog-clinical-details" className="space-y-5">
-              <Field label={deptConfig?.enabledFeatures?.useCaseTypeLabel ? "Case type" : "Case category"}>
-                <Select value={form.category} onValueChange={(value) => setField("category", value)}>
-                  <SelectTrigger><SelectValue placeholder={deptConfig?.enabledFeatures?.useCaseTypeLabel ? "Select a case type" : "Select a case category"} /></SelectTrigger>
-                  <SelectContent>
-                    {caseCategories?.map((cat: any) => (
-                      <SelectItem key={cat.value} value={cat.value}>
-                        {cat.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-              {medicalSummaryCaseFields ? (
-                <Field label="Medical Summary"><Textarea rows={8} maxLength={8000} value={form.medicalSummary} onChange={(e) => setField("medicalSummary", e.target.value)} /></Field>
+              {microbiologyCaseFields ? (
+                <>
+                  <Field label="Sample category">
+                    <Input
+                      value={form.category}
+                      onChange={(e) => setField("category", e.target.value)}
+                      placeholder="e.g. Blood, Sputum, Urine, Pus, CSF"
+                      required
+                    />
+                  </Field>
+                  <div data-tour="caselog-clinical-details" className="space-y-5">
+                    <Field label="Provisional diagnosis">
+                      <Input
+                        value={form.diagnosis}
+                        onChange={(e) => setField("diagnosis", e.target.value)}
+                        placeholder="e.g. Enteric fever, Pulmonary tuberculosis"
+                        required
+                      />
+                    </Field>
+                    <Field label="Sample processing in lab">
+                      <Textarea
+                        rows={4}
+                        value={form.sampleProcessing}
+                        onChange={(e) => setField("sampleProcessing", e.target.value)}
+                        placeholder="Describe sample receipt, macroscopic appearance, staining, culture media inoculation, incubation, colony characteristics, identification tests, and sensitivity..."
+                      />
+                    </Field>
+                  </div>
+                </>
               ) : (
                 <>
-                  <Field label="Chief complaints"><Textarea rows={2} value={form.chiefComplaints} onChange={(e) => setField("chiefComplaints", e.target.value)} /></Field>
-                  <Field label="Relevant history"><Textarea rows={3} value={form.history} onChange={(e) => setField("history", e.target.value)} /></Field>
-                  <Field label="Clinical examination"><Textarea rows={3} value={form.examination} onChange={(e) => setField("examination", e.target.value)} /></Field>
+                  <div data-tour="caselog-clinical-details" className="space-y-5">
+                    <Field label={deptConfig?.enabledFeatures?.useCaseTypeLabel ? "Case type" : "Case category"}>
+                      <Select value={form.category} onValueChange={(value) => setField("category", value)}>
+                        <SelectTrigger><SelectValue placeholder={deptConfig?.enabledFeatures?.useCaseTypeLabel ? "Select a case type" : "Select a case category"} /></SelectTrigger>
+                        <SelectContent>
+                          {caseCategories?.map((cat: any) => (
+                            <SelectItem key={cat.value} value={cat.value}>
+                              {cat.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                    {medicalSummaryCaseFields ? (
+                      <Field label="Medical Summary"><Textarea rows={8} maxLength={8000} value={form.medicalSummary} onChange={(e) => setField("medicalSummary", e.target.value)} /></Field>
+                    ) : (
+                      <>
+                        <Field label="Chief complaints"><Textarea rows={2} value={form.chiefComplaints} onChange={(e) => setField("chiefComplaints", e.target.value)} /></Field>
+                        <Field label="Relevant history"><Textarea rows={3} value={form.history} onChange={(e) => setField("history", e.target.value)} /></Field>
+                        <Field label="Clinical examination"><Textarea rows={3} value={form.examination} onChange={(e) => setField("examination", e.target.value)} /></Field>
+                      </>
+                    )}
+                    <Field label="Investigations"><Textarea rows={2} value={form.investigations} onChange={(e) => setField("investigations", e.target.value)} /></Field>
+                  </div>
+                  <div data-tour="caselog-diagnosis-details" className="space-y-5">
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <Field label="Final diagnosis"><Input value={form.diagnosis} onChange={(e) => setField("diagnosis", e.target.value)} required /></Field>
+                      <Field label="Differential diagnosis"><Input value={form.differentialDiagnosis} onChange={(e) => setField("differentialDiagnosis", e.target.value)} /></Field>
+                    </div>
+                    <Field label="Management and interventions"><Textarea rows={3} value={form.management} onChange={(e) => setField("management", e.target.value)} /></Field>
+                    <Field label="Outcome / follow-up"><Textarea rows={2} value={form.outcome} onChange={(e) => setField("outcome", e.target.value)} /></Field>
+                    <Field label="Learning points"><Textarea rows={2} value={form.learningPoints} onChange={(e) => setField("learningPoints", e.target.value)} /></Field>
+                  </div>
                 </>
               )}
-              <Field label="Investigations"><Textarea rows={2} value={form.investigations} onChange={(e) => setField("investigations", e.target.value)} /></Field>
-              </div>
-              <div data-tour="caselog-diagnosis-details" className="space-y-5">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Final diagnosis"><Input value={form.diagnosis} onChange={(e) => setField("diagnosis", e.target.value)} required /></Field>
-                <Field label="Differential diagnosis"><Input value={form.differentialDiagnosis} onChange={(e) => setField("differentialDiagnosis", e.target.value)} /></Field>
-              </div>
-              <Field label="Management and interventions"><Textarea rows={3} value={form.management} onChange={(e) => setField("management", e.target.value)} /></Field>
-              <Field label="Outcome / follow-up"><Textarea rows={2} value={form.outcome} onChange={(e) => setField("outcome", e.target.value)} /></Field>
-              <Field label="Learning points"><Textarea rows={2} value={form.learningPoints} onChange={(e) => setField("learningPoints", e.target.value)} /></Field>
-              </div>
               <div data-tour="caselog-reviewer">
               <Field label="Reviewing faculty member">
                 <Select value={form.supervisorId} onValueChange={(value) => setField("supervisorId", value)}>
@@ -361,7 +402,7 @@ export function CaseLogsPage() {
         </Dialog>
       </div>
 
-      {caseCategories && caseCategories.length > 0 && (
+      {!microbiologyCaseFields && caseCategories && caseCategories.length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-slate-700">Progress by category</h3>
@@ -407,7 +448,7 @@ export function CaseLogsPage() {
         <CardHeader className="flex flex-col justify-between gap-4 border-b border-teal-100 md:flex-row md:items-center">
           <div className="relative w-full max-w-md">
             <Search className="absolute left-3 top-3 h-4 w-4 text-teal-600" />
-            <Input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="h-11 pl-9 pr-24" placeholder={hideUhid ? "Search category or diagnosis..." : "Search patient, case ID, category or diagnosis..."} />
+            <Input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="h-11 pl-9 pr-24" placeholder={microbiologyCaseFields ? "Search sample category, provisional diagnosis or lab processing..." : hideUhid ? "Search category or diagnosis..." : "Search patient, case ID, category or diagnosis..."} />
             <div className="pointer-events-none absolute right-3 top-2.5 flex items-center gap-1">
               <Kbd>Ctrl</Kbd>
               <span className="text-[10px] text-slate-400">+</span>
@@ -441,8 +482,8 @@ export function CaseLogsPage() {
                   <TableHead>Number</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead>Age</TableHead>
-                  <TableHead>{deptConfig?.enabledFeatures?.useCaseTypeLabel ? "Type" : "Category"}</TableHead>
-                  <TableHead>Diagnosis</TableHead>
+                  <TableHead>{microbiologyCaseFields ? "Sample category" : deptConfig?.enabledFeatures?.useCaseTypeLabel ? "Type" : "Category"}</TableHead>
+                  <TableHead>{microbiologyCaseFields ? "Provisional diagnosis" : "Diagnosis"}</TableHead>
                   <TableHead>Remarks</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Record</TableHead>
@@ -461,7 +502,7 @@ export function CaseLogsPage() {
                         ? <Badge variant="outline" className="border-teal-100 bg-teal-50 text-teal-800">{catName}</Badge>
                         : <span className="text-slate-400 text-xs">—</span>}
                     </TableCell>
-                    <TableCell><p className="max-w-sm font-semibold text-slate-900">{log.diagnosisProvisional || log.diagnosis}</p></TableCell>
+                    <TableCell><p className="max-w-sm font-semibold text-slate-900">{log.diagnosisProvisional || log.diagnosisFinal || log.diagnosis}</p></TableCell>
                     <TableCell className="text-xs max-w-[160px]">
                       {log.status === "pending"
                         ? <span className="text-slate-400">—</span>
@@ -516,24 +557,39 @@ export function CaseLogsPage() {
                 <DialogDescription>{[hideUhid ? null : selectedLog.patientUhid, selectedLog.patientAge || selectedLog.age, selectedLog.patientGender || selectedLog.gender].filter(Boolean).join(" • ")}</DialogDescription>
               </DialogHeader>
               <div className="grid gap-4">
-                <Detail label={deptConfig?.enabledFeatures?.useCaseTypeLabel ? "Type" : "Category"} value={caseCategories?.find((c: any) => c.value === selectedLog.category)?.name || selectedLog.category} />
-                {medicalSummaryCaseFields ? (
-                  <Detail label="Medical Summary" value={getCaseMedicalSummary(selectedLog)} />
+                <Detail label={microbiologyCaseFields ? "Sample category" : deptConfig?.enabledFeatures?.useCaseTypeLabel ? "Type" : "Category"} value={caseCategories?.find((c: any) => c.value === selectedLog.category)?.name || selectedLog.category} />
+                {microbiologyCaseFields ? (
+                  <>
+                    <Detail label="Provisional diagnosis" value={selectedLog.diagnosisProvisional || selectedLog.diagnosisFinal || selectedLog.diagnosis} />
+                    <Detail label="Sample processing in lab" value={selectedLog.investigations || selectedLog.managementPlan || selectedLog.management} />
+                  </>
+                ) : medicalSummaryCaseFields ? (
+                  <>
+                    <Detail label="Medical Summary" value={getCaseMedicalSummary(selectedLog)} />
+                    <Detail label="Investigations" value={selectedLog.investigations} />
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <Detail label="Final diagnosis" value={selectedLog.diagnosisProvisional || selectedLog.diagnosis} />
+                      <Detail label="Differential diagnosis" value={selectedLog.differentialDiagnosis} />
+                    </div>
+                    <Detail label="Management and interventions" value={selectedLog.managementPlan || selectedLog.management} />
+                    <Detail label="Outcome / follow-up" value={selectedLog.outcome} />
+                    <Detail label="Learning points" value={selectedLog.learningPoints} />
+                  </>
                 ) : (
                   <>
                     <Detail label="Chief complaints" value={selectedLog.chiefComplaints} />
                     <Detail label="Relevant history" value={selectedLog.history} />
                     <Detail label="Clinical examination" value={selectedLog.examination} />
+                    <Detail label="Investigations" value={selectedLog.investigations} />
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <Detail label="Final diagnosis" value={selectedLog.diagnosisProvisional || selectedLog.diagnosis} />
+                      <Detail label="Differential diagnosis" value={selectedLog.differentialDiagnosis} />
+                    </div>
+                    <Detail label="Management and interventions" value={selectedLog.managementPlan || selectedLog.management} />
+                    <Detail label="Outcome / follow-up" value={selectedLog.outcome} />
+                    <Detail label="Learning points" value={selectedLog.learningPoints} />
                   </>
                 )}
-                <Detail label="Investigations" value={selectedLog.investigations} />
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <Detail label="Final diagnosis" value={selectedLog.diagnosisProvisional || selectedLog.diagnosis} />
-                  <Detail label="Differential diagnosis" value={selectedLog.differentialDiagnosis} />
-                </div>
-                <Detail label="Management and interventions" value={selectedLog.managementPlan || selectedLog.management} />
-                <Detail label="Outcome / follow-up" value={selectedLog.outcome} />
-                <Detail label="Learning points" value={selectedLog.learningPoints} />
                 {selectedLog.status === "rejected" ? (
                   <div className="rounded-2xl border border-rose-200 bg-rose-50/80 p-4 space-y-3">
                     <div>
