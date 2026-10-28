@@ -134,15 +134,16 @@ const navigationDescriptions: Record<string, string> = {
   Requirements: "Configure the case, procedure, and academic requirements used to measure progress.",
 };
 
-function navigationForRole(role: RoleType, dashboardData?: any, loadingBadges?: boolean, config?: any, demoMode = false, academicLogbook?: AcademicLogbookProfile | null): NavigationItem[] {
+function navigationForRole(role: RoleType, dashboardData?: any, loadingBadges?: boolean, config?: any, demoMode = false, academicLogbook?: AcademicLogbookProfile | null, department?: any): NavigationItem[] {
+  const isMicroDept = department?.code?.toLowerCase() === "microbiology" || department?.name?.toLowerCase().includes("microbiology");
   if (role === "Faculty") {
     const items: NavigationItem[] = [
       { title: "Evaluation Queue", icon: FileText, href: "/" },
       { title: "Student Progress", icon: UserCheck, href: "/mentees" },
       { title: "Assessments", icon: ClipboardCheck, href: "/assessments" },
     ];
-    if (config?.enabledFeatures?.yearlyAttendance || config?.enabledFeatures?.dailyAttendance) {
-      items.push({ title: config?.enabledFeatures?.yearlyAttendance ? "Yearly Attendance" : "Daily Attendance", icon: CalendarDays, href: "/daily-attendance" });
+    if (config?.enabledFeatures?.yearlyAttendance || config?.enabledFeatures?.dailyAttendance || isMicroDept) {
+      items.push({ title: (config?.enabledFeatures?.yearlyAttendance || isMicroDept) ? "Yearly Attendance" : "Daily Attendance", icon: CalendarDays, href: "/daily-attendance" });
     }
     return items;
   }
@@ -156,11 +157,11 @@ function navigationForRole(role: RoleType, dashboardData?: any, loadingBadges?: 
       { title: "Pending Students", icon: UserPlus, href: "/student-access" },
       { title: "Add Faculty", icon: UserCheck, href: "/professors" },
     ];
-    if (!config?.enabledFeatures?.hideLeaveRecords) {
+    if (!config?.enabledFeatures?.hideLeaveRecords && !isMicroDept) {
       items.push({ title: "Leave Approvals", icon: CheckCircle2, href: "/leave-approvals" });
     }
-    if (config?.enabledFeatures?.yearlyAttendance || config?.enabledFeatures?.dailyAttendance) {
-      items.push({ title: config?.enabledFeatures?.yearlyAttendance ? "Yearly Attendance" : "Daily Attendance", icon: CalendarDays, href: "/daily-attendance" });
+    if (config?.enabledFeatures?.yearlyAttendance || config?.enabledFeatures?.dailyAttendance || isMicroDept) {
+      items.push({ title: (config?.enabledFeatures?.yearlyAttendance || isMicroDept) ? "Yearly Attendance" : "Daily Attendance", icon: CalendarDays, href: "/daily-attendance" });
     }
     items.push({ title: "Requirements", icon: ClipboardCheck, href: "/requirements" });
     return items;
@@ -251,7 +252,7 @@ function navigationForRole(role: RoleType, dashboardData?: any, loadingBadges?: 
     items.push({ title: config?.enabledFeatures?.useThesisAndMandatoryCertificationsLabel ? "Thesis and mandatory certifications" : "Thesis & Certifications", icon: Award, href: "/milestones" });
   }
 
-  if (config?.enabledFeatures?.yearlyAttendance) {
+  if (config?.enabledFeatures?.yearlyAttendance || isMicroDept) {
     items.push({ title: "Yearly Attendance", icon: CalendarDays, href: "/attendance" });
   } else if (config?.enabledFeatures?.dailyAttendance) {
     items.push({ title: "Attendance", icon: CalendarDays, href: "/attendance" });
@@ -506,9 +507,9 @@ export function AppLayout({
 
 
   const navigationItems = React.useMemo(
-    () => navigationForRole(activeRole, dashboardData, loadingBadges, config, demoMode, academicLogbook)
+    () => navigationForRole(activeRole, dashboardData, loadingBadges, config, demoMode, academicLogbook, department)
       .map((item) => item.href === "/academics" && academicLogbook ? { ...item, title: academicLogbook.title } : item),
-    [activeRole, dashboardData, loadingBadges, config, demoMode, academicLogbook],
+    [activeRole, dashboardData, loadingBadges, config, demoMode, academicLogbook, department],
   );
   const visibleNavigationItems = isDepartmentSwitching ? [] : navigationItems;
   const closeTour = React.useCallback(() => {

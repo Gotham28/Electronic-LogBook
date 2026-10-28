@@ -157,6 +157,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
 
   // Selected mentee for Logbook Inspector Modal
   const [selectedMentee, setSelectedMentee] = React.useState<any | null>(null);
+  const isMenteeMicro = Boolean(isMicroDept || selectedMentee?.department?.toLowerCase().includes("microbiology") || selectedMentee?.departmentName?.toLowerCase().includes("microbiology"));
   const [menteeLogs, setMenteeLogs] = React.useState<any>(null);
   const [menteeProgress, setMenteeProgress] = React.useState<MenteeProgress | null>(null);
   const [menteeProgressError, setMenteeProgressError] = React.useState<string | null>(null);
@@ -915,9 +916,9 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                     <TabsTrigger value="awards" className="text-xs whitespace-nowrap">Awards & Achievements</TabsTrigger>
                   )}
                   <TabsTrigger value="assessments" className="text-xs whitespace-nowrap">Assessments</TabsTrigger>
-                  {(config?.enabledFeatures?.dailyAttendance || config?.enabledFeatures?.yearlyAttendance || isMicroDept) && (
+                  {(config?.enabledFeatures?.dailyAttendance || config?.enabledFeatures?.yearlyAttendance || isMenteeMicro) && (
                     <TabsTrigger value="attendance" className="text-xs whitespace-nowrap">
-                      {isMicroDept ? "Yearly Attendance" : "Daily Attendance"}
+                      {isMenteeMicro ? "Yearly Attendance" : "Daily Attendance"}
                     </TabsTrigger>
                   )}
                 </TabsList>
@@ -1073,7 +1074,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                                   </TableCell>
                                 </TableRow>
                                 {expanded && <TableRow><TableCell id={`case-details-${log.id}`} colSpan={4} className="bg-slate-50 p-3">
-                                  <CaseLogDetails caseLog={log} hideUhid={hideUhid} showReview medicalSummaryCaseFields={Boolean(config?.enabledFeatures?.medicalSummaryCaseFields)} microbiologyCaseFields={microbiologyCaseFields} />
+                                  <CaseLogDetails caseLog={log} hideUhid={hideUhid} showReview medicalSummaryCaseFields={Boolean(config?.enabledFeatures?.medicalSummaryCaseFields)} microbiologyCaseFields={microbiologyCaseFields || isMenteeMicro} />
                                 </TableCell></TableRow>}
                               </React.Fragment>
                             );
@@ -1222,7 +1223,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                                       <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
                                         <section aria-labelledby={`proc-ctx-${log.id}`}>
                                           <h4 id={`proc-ctx-${log.id}`} className="mb-3 text-xs font-bold uppercase tracking-wide text-teal-800">Procedure &amp; patient context</h4>
-                                          {isMicroDept ? (
+                                          {isMenteeMicro ? (
                                             <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                               <div className="min-w-0">
                                                 <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Date</dt>
@@ -1619,7 +1620,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                     <div className="flex h-32 items-center justify-center">
                       <div className="animate-spin rounded-full border-4 border-slate-300 border-t-teal-600 h-8 w-8" />
                     </div>
-                  ) : isMicroDept ? (
+                  ) : isMenteeMicro ? (
                     <div className="space-y-4">
                       {(() => {
                         const y1 = menteeAttendance.find((a: any) => a.date === "YEAR_1");
