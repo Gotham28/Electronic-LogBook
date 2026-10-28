@@ -187,7 +187,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
   const [assessExamName, setAssessExamName] = React.useState("");
   const [assessStudentId, setAssessStudentId] = React.useState("");
   const [assessMarks, setAssessMarks] = React.useState("");
-  const [assessType, setAssessType] = React.useState<"quarterly" | "annual">("quarterly");
+  const [assessType, setAssessType] = React.useState<string>("quarterly");
   const [assessDate, setAssessDate] = React.useState(() => new Date().toISOString().slice(0, 10));
   const [assessSubmitting, setAssessSubmitting] = React.useState(false);
 
@@ -473,9 +473,9 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
             <TabsTrigger value="assessments" className="gap-2 text-xs font-semibold">
               <Award className="h-4 w-4" /> Add Assessment
             </TabsTrigger>
-            {(config?.enabledFeatures?.dailyAttendance || isMicroDept) && (
+            {(config?.enabledFeatures?.dailyAttendance || config?.enabledFeatures?.yearlyAttendance || isMicroDept) && (
               <TabsTrigger value="daily-attendance" className="gap-2 text-xs font-semibold">
-                <CalendarDays className="h-4 w-4" /> Daily Attendance
+                <CalendarDays className="h-4 w-4" /> {isMicroDept ? "Yearly Attendance" : "Daily Attendance"}
               </TabsTrigger>
             )}
           </TabsList>
@@ -556,10 +556,10 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                           <AcademicRecordDetails activityType={currentItem.activityType || ""}
                             description={currentItem.description} presentationType={currentItem.presentationType} />
                         )}
-                        {currentItem.type === "Procedure" && config?.enabledFeatures?.freeTextProcedures && (
+                        {currentItem.type === "Procedure" && (config?.enabledFeatures?.freeTextProcedures || isMicroDept) && (
                           <>
-                            {currentItem.diagnosis && <p className="text-xs text-slate-600 font-medium">Diagnosis: {currentItem.diagnosis}</p>}
-                            {currentItem.sex && <p className="text-xs text-slate-600 font-medium">Sex: {currentItem.sex}</p>}
+                            {currentItem.diagnosis && <p className="text-xs text-slate-600 font-medium">{isMicroDept ? "Details" : "Diagnosis"}: {currentItem.diagnosis}</p>}
+                            {!isMicroDept && currentItem.sex && <p className="text-xs text-slate-600 font-medium">Sex: {currentItem.sex}</p>}
                           </>
                         )}
                         {currentItem.type === "Conference" && currentItem.certificateUrl && (
@@ -756,7 +756,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                     setAssessExamName("");
                     setAssessStudentId("");
                     setAssessMarks("");
-                    setAssessType("quarterly");
+                    setAssessType(isMicroDept ? "continuous" : "quarterly");
                     setAssessDate(new Date().toISOString().slice(0, 10));
                   } catch (err: any) {
                     toast.error(err.message || "Failed to record assessment");
@@ -811,8 +811,19 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="quarterly">Quarterly</SelectItem>
-                        <SelectItem value="annual">Annual</SelectItem>
+                        {isMicroDept ? (
+                          <>
+                            <SelectItem value="continuous">Continuous</SelectItem>
+                            <SelectItem value="quarterly">Quarterly</SelectItem>
+                            <SelectItem value="half_yearly">Half Yearly</SelectItem>
+                            <SelectItem value="annual">Annual</SelectItem>
+                          </>
+                        ) : (
+                          <>
+                            <SelectItem value="quarterly">Quarterly</SelectItem>
+                            <SelectItem value="annual">Annual</SelectItem>
+                          </>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
@@ -840,10 +851,14 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
           <QuarterlyAppraisalSection />
         </TabsContent>
 
-        {/* Tab 4: Daily Attendance */}
-        {(config?.enabledFeatures?.dailyAttendance || isMicroDept) && (
+        {/* Tab 4: Attendance (Daily or Yearly) */}
+        {(config?.enabledFeatures?.dailyAttendance || config?.enabledFeatures?.yearlyAttendance || isMicroDept) && (
           <TabsContent value="daily-attendance" className="pt-4 space-y-4">
-            <FacultyDailyAttendanceSection allStudents={allStudents} />
+            {isMicroDept ? (
+              <FacultyYearlyAttendanceSection allStudents={allStudents} />
+            ) : (
+              <FacultyDailyAttendanceSection allStudents={allStudents} />
+            )}
           </TabsContent>
         )}
       </Tabs>
@@ -1197,42 +1212,59 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                                       <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
                                         <section aria-labelledby={`proc-ctx-${log.id}`}>
                                           <h4 id={`proc-ctx-${log.id}`} className="mb-3 text-xs font-bold uppercase tracking-wide text-teal-800">Procedure &amp; patient context</h4>
-                                          <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                                            <div className="min-w-0">
-                                              <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Date</dt>
-                                              <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">{formatLogbookDate(log.date)}</dd>
-                                            </div>
-                                            <div className="min-w-0">
-                                              <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Procedure group</dt>
-                                              <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">{log.procedureGroup || <span className="text-slate-400">Not recorded</span>}</dd>
-                                            </div>
-                                            <div className="min-w-0">
-                                              <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Procedure name</dt>
-                                              <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">{log.procedureName || <span className="text-slate-400">Not recorded</span>}</dd>
-                                            </div>
-                                            <div className="min-w-0">
-                                              <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Patient age</dt>
-                                              <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">{log.patientAge || <span className="text-slate-400">Not recorded</span>}</dd>
-                                            </div>
-                                            <div className="min-w-0">
-                                              <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Patient sex</dt>
-                                              <dd className="mt-1 capitalize whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">{log.sex || <span className="text-slate-400">Not recorded</span>}</dd>
-                                            </div>
-                                            {!hideUhid && (
+                                          {isMicroDept ? (
+                                            <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                               <div className="min-w-0">
-                                                <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">UHID</dt>
-                                                <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">{log.patientUhid || <span className="text-slate-400">Not recorded</span>}</dd>
+                                                <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Date</dt>
+                                                <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">{formatLogbookDate(log.date)}</dd>
                                               </div>
-                                            )}
-                                            <div className="min-w-0">
-                                              <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Competency level</dt>
-                                              <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">{log.competencyLevel ?? log.competencyDeclared ?? <span className="text-slate-400">Not recorded</span>}</dd>
-                                            </div>
-                                            <div className="min-w-0 sm:col-span-2">
-                                              <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Diagnosis</dt>
-                                              <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">{log.diagnosis || <span className="text-slate-400">Not recorded</span>}</dd>
-                                            </div>
-                                          </dl>
+                                              <div className="min-w-0">
+                                                <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Procedure name</dt>
+                                                <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">{log.procedureName || <span className="text-slate-400">Not recorded</span>}</dd>
+                                              </div>
+                                              <div className="min-w-0 sm:col-span-2">
+                                                <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Details</dt>
+                                                <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">{log.diagnosis || <span className="text-slate-400">Not recorded</span>}</dd>
+                                              </div>
+                                            </dl>
+                                          ) : (
+                                            <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                                              <div className="min-w-0">
+                                                <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Date</dt>
+                                                <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">{formatLogbookDate(log.date)}</dd>
+                                              </div>
+                                              <div className="min-w-0">
+                                                <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Procedure group</dt>
+                                                <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">{log.procedureGroup || <span className="text-slate-400">Not recorded</span>}</dd>
+                                              </div>
+                                              <div className="min-w-0">
+                                                <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Procedure name</dt>
+                                                <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">{log.procedureName || <span className="text-slate-400">Not recorded</span>}</dd>
+                                              </div>
+                                              <div className="min-w-0">
+                                                <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Patient age</dt>
+                                                <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">{log.patientAge || <span className="text-slate-400">Not recorded</span>}</dd>
+                                              </div>
+                                              <div className="min-w-0">
+                                                <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Patient sex</dt>
+                                                <dd className="mt-1 capitalize whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">{log.sex || <span className="text-slate-400">Not recorded</span>}</dd>
+                                              </div>
+                                              {!hideUhid && (
+                                                <div className="min-w-0">
+                                                  <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">UHID</dt>
+                                                  <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">{log.patientUhid || <span className="text-slate-400">Not recorded</span>}</dd>
+                                                </div>
+                                              )}
+                                              <div className="min-w-0">
+                                                <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Competency level</dt>
+                                                <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">{log.competencyLevel ?? log.competencyDeclared ?? <span className="text-slate-400">Not recorded</span>}</dd>
+                                              </div>
+                                              <div className="min-w-0 sm:col-span-2">
+                                                <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Diagnosis</dt>
+                                                <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">{log.diagnosis || <span className="text-slate-400">Not recorded</span>}</dd>
+                                              </div>
+                                            </dl>
+                                          )}
                                         </section>
                                         {/* Show review result when already reviewed */}
                                         {(log.status !== "pending" || log.facultyRemarks || log.facultyVerifiedLevel || log.reviewedAt) && (
@@ -2657,6 +2689,234 @@ function ProcedureLogReviewForm({
   );
 }
 
+
+function FacultyYearlyAttendanceSection({ allStudents }: { allStudents: any[] }) {
+  const [loading, setLoading] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
+  const [studentRows, setStudentRows] = React.useState<Array<{
+    studentId: number;
+    name: string;
+    rollNumber: string;
+    year1: string;
+    year2: string;
+    year3: string;
+    y1Verifier?: string | null;
+    y2Verifier?: string | null;
+    y3Verifier?: string | null;
+  }>>([]);
+
+  const loadYearlyAttendance = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const resp = await apiGet<{ students: any[] }>(`/api/professors/yearly-attendance`);
+      if (resp && Array.isArray(resp.students) && resp.students.length > 0) {
+        setStudentRows(resp.students.map((s: any) => ({
+          studentId: s.studentId,
+          name: s.name,
+          rollNumber: s.rollNumber || "—",
+          year1: s.year1?.percentage != null ? String(s.year1.percentage) : "",
+          year2: s.year2?.percentage != null ? String(s.year2.percentage) : "",
+          year3: s.year3?.percentage != null ? String(s.year3.percentage) : "",
+          y1Verifier: s.year1?.verifierName || null,
+          y2Verifier: s.year2?.verifierName || null,
+          y3Verifier: s.year3?.verifierName || null,
+        })));
+      } else {
+        setStudentRows(allStudents.map((s) => ({
+          studentId: s.id,
+          name: s.name,
+          rollNumber: s.registrationNumber || "—",
+          year1: "",
+          year2: "",
+          year3: "",
+          y1Verifier: null,
+          y2Verifier: null,
+          y3Verifier: null,
+        })));
+      }
+    } catch (err: any) {
+      console.error("Failed to load yearly attendance:", err);
+      setStudentRows(allStudents.map((s) => ({
+        studentId: s.id,
+        name: s.name,
+        rollNumber: s.registrationNumber || "—",
+        year1: "",
+        year2: "",
+        year3: "",
+        y1Verifier: null,
+        y2Verifier: null,
+        y3Verifier: null,
+      })));
+    } finally {
+      setLoading(false);
+    }
+  }, [allStudents]);
+
+  React.useEffect(() => {
+    loadYearlyAttendance();
+  }, [loadYearlyAttendance]);
+
+  const updateYearPercentage = (studentId: number, year: "year1" | "year2" | "year3", val: string) => {
+    setStudentRows((prev) =>
+      prev.map((r) => (r.studentId === studentId ? { ...r, [year]: val } : r))
+    );
+  };
+
+  const handleSaveAll = async () => {
+    setSaving(true);
+    try {
+      const records: any[] = [];
+      for (const row of studentRows) {
+        if (row.year1 !== "") {
+          records.push({ studentId: row.studentId, year: 1, percentage: parseFloat(row.year1) });
+        }
+        if (row.year2 !== "") {
+          records.push({ studentId: row.studentId, year: 2, percentage: parseFloat(row.year2) });
+        }
+        if (row.year3 !== "") {
+          records.push({ studentId: row.studentId, year: 3, percentage: parseFloat(row.year3) });
+        }
+      }
+
+      await apiPost("/api/professors/yearly-attendance", { records });
+      toast.success("Yearly attendance percentages saved successfully");
+      await loadYearlyAttendance();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to save yearly attendance");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Card className="border-slate-200 shadow-sm bg-white">
+      <CardHeader className="border-b border-slate-100 pb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <CardTitle className="text-lg font-bold text-slate-900 flex items-center gap-2">
+              <CalendarDays className="h-5 w-5 text-teal-600" />
+              Yearly Attendance Marking
+            </CardTitle>
+            <p className="text-xs text-slate-500 mt-1">
+              Log and update annual attendance percentages for all postgraduate trainees across training years.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={loadYearlyAttendance} disabled={loading || saving} className="text-xs h-9">
+              Refresh
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleSaveAll}
+              disabled={loading || saving || studentRows.length === 0}
+              className="bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs h-9 px-4 gap-1.5"
+            >
+              <CheckCircle2 className="h-4 w-4" />
+              {saving ? "Saving..." : "Save All Attendance"}
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="p-0">
+        {loading ? (
+          <div className="py-12 flex justify-center items-center">
+            <div className="animate-spin rounded-full border-4 border-slate-300 border-t-teal-600 h-8 w-8" />
+          </div>
+        ) : studentRows.length === 0 ? (
+          <div className="py-12 text-center text-sm text-slate-500">
+            No students found in department.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-xs font-semibold">Trainee</TableHead>
+                  <TableHead className="text-xs font-semibold">Roll Number</TableHead>
+                  <TableHead className="text-xs font-semibold">Year 1 Attendance (%)</TableHead>
+                  <TableHead className="text-xs font-semibold">Year 2 Attendance (%)</TableHead>
+                  <TableHead className="text-xs font-semibold">Year 3 Attendance (%)</TableHead>
+                  <TableHead className="text-xs font-semibold">Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {studentRows.map((r) => {
+                  const recordedCount = [r.year1, r.year2, r.year3].filter((y) => y !== "").length;
+                  return (
+                    <TableRow key={r.studentId} className="hover:bg-slate-50/60">
+                      <TableCell className="text-xs font-bold text-slate-900 py-3">
+                        {r.name}
+                      </TableCell>
+                      <TableCell className="text-xs text-slate-600 py-3 font-mono">
+                        {r.rollNumber}
+                      </TableCell>
+                      <TableCell className="py-2.5">
+                        <div className="flex items-center gap-1.5 max-w-[130px]">
+                          <Input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.1"
+                            value={r.year1}
+                            onChange={(e) => updateYearPercentage(r.studentId, "year1", e.target.value)}
+                            placeholder="e.g. 85"
+                            className="text-xs h-8"
+                          />
+                          <span className="text-xs font-semibold text-slate-500">%</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-2.5">
+                        <div className="flex items-center gap-1.5 max-w-[130px]">
+                          <Input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.1"
+                            value={r.year2}
+                            onChange={(e) => updateYearPercentage(r.studentId, "year2", e.target.value)}
+                            placeholder="e.g. 90"
+                            className="text-xs h-8"
+                          />
+                          <span className="text-xs font-semibold text-slate-500">%</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-2.5">
+                        <div className="flex items-center gap-1.5 max-w-[130px]">
+                          <Input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.1"
+                            value={r.year3}
+                            onChange={(e) => updateYearPercentage(r.studentId, "year3", e.target.value)}
+                            placeholder="e.g. 92"
+                            className="text-xs h-8"
+                          />
+                          <span className="text-xs font-semibold text-slate-500">%</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-3">
+                        {recordedCount > 0 ? (
+                          <Badge className="border-emerald-200 bg-emerald-50 text-[11px] font-semibold text-emerald-700">
+                            <CheckCircle2 className="mr-1 h-3 w-3" /> {recordedCount}/3 Years Saved
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-[11px] text-slate-400">
+                            Not entered
+                          </Badge>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 function FacultyDailyAttendanceSection({ allStudents }: { allStudents: any[] }) {
   const [selectedDate, setSelectedDate] = React.useState(todayForInput());

@@ -8,7 +8,7 @@ export const assessmentsTable = pgTable("assessments", {
   examName: text("exam_name").notNull(),
   studentId: integer("student_id").notNull().references(() => studentsTable.id),
   marks: integer("marks"),
-  type: text("type", { enum: ["quarterly", "annual"] }).notNull(),
+  type: text("type", { enum: ["quarterly", "annual", "continuous", "half_yearly"] }).notNull(),
   date: text("date").notNull(),
   assessorId: integer("assessor_id").references(() => usersTable.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),

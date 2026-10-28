@@ -118,6 +118,7 @@ const navigationDescriptions: Record<string, string> = {
   "Leave Records": "Check your leave balance, previous requests, and approval status.",
   Attendance: "View your daily attendance marked by department faculty.",
   "Daily Attendance": "Mark and review daily attendance records for department students.",
+  "Yearly Attendance": "Mark and review yearly attendance percentages for department students.",
   "Teaching & Learning": "Record lectures, teaching, seminars, journal clubs and symposia.",
   "Practicals & Postings": "Record practical activities and open your postings and rotations.",
   "Research & Events": "Record thesis topics, papers and events, and open existing thesis and conference records.",
@@ -140,8 +141,8 @@ function navigationForRole(role: RoleType, dashboardData?: any, loadingBadges?: 
       { title: "Student Progress", icon: UserCheck, href: "/mentees" },
       { title: "Assessments", icon: ClipboardCheck, href: "/assessments" },
     ];
-    if (config?.enabledFeatures?.dailyAttendance) {
-      items.push({ title: "Daily Attendance", icon: CalendarDays, href: "/daily-attendance" });
+    if (config?.enabledFeatures?.yearlyAttendance || config?.enabledFeatures?.dailyAttendance) {
+      items.push({ title: config?.enabledFeatures?.yearlyAttendance ? "Yearly Attendance" : "Daily Attendance", icon: CalendarDays, href: "/daily-attendance" });
     }
     return items;
   }
@@ -158,8 +159,8 @@ function navigationForRole(role: RoleType, dashboardData?: any, loadingBadges?: 
     if (!config?.enabledFeatures?.hideLeaveRecords) {
       items.push({ title: "Leave Approvals", icon: CheckCircle2, href: "/leave-approvals" });
     }
-    if (config?.enabledFeatures?.dailyAttendance) {
-      items.push({ title: "Daily Attendance", icon: CalendarDays, href: "/daily-attendance" });
+    if (config?.enabledFeatures?.yearlyAttendance || config?.enabledFeatures?.dailyAttendance) {
+      items.push({ title: config?.enabledFeatures?.yearlyAttendance ? "Yearly Attendance" : "Daily Attendance", icon: CalendarDays, href: "/daily-attendance" });
     }
     items.push({ title: "Requirements", icon: ClipboardCheck, href: "/requirements" });
     return items;
@@ -250,7 +251,9 @@ function navigationForRole(role: RoleType, dashboardData?: any, loadingBadges?: 
     items.push({ title: config?.enabledFeatures?.useThesisAndMandatoryCertificationsLabel ? "Thesis and mandatory certifications" : "Thesis & Certifications", icon: Award, href: "/milestones" });
   }
 
-  if (config?.enabledFeatures?.dailyAttendance) {
+  if (config?.enabledFeatures?.yearlyAttendance) {
+    items.push({ title: "Yearly Attendance", icon: CalendarDays, href: "/attendance" });
+  } else if (config?.enabledFeatures?.dailyAttendance) {
     items.push({ title: "Attendance", icon: CalendarDays, href: "/attendance" });
   } else if (!features.hideLeaveRecords) {
     items.push({ title: "Leave Records", icon: CalendarDays, href: "/attendance" });
@@ -723,7 +726,7 @@ export function AppLayout({
                 <div className="hidden h-7 w-px bg-teal-100 sm:block" />
                 <div className="min-w-0">
                   <p className="truncate font-display text-base font-bold text-slate-900">
-                    Department of {department.name}
+                    Department of {department.name?.replace(/microbiology/i, "Microbiology")}
                   </p>
                   <p className="truncate text-[11px] font-medium text-slate-500">
                     {activeRole} workspace
@@ -819,7 +822,7 @@ export function AppLayout({
               </div>}
                 <DemoBanner />
               <div className="print-only mb-6 border-b border-slate-300 pb-4">
-                <p className="page-eyebrow">Department of {department.name}</p>
+                <p className="page-eyebrow">Department of {department.name?.replace(/microbiology/i, "Microbiology")}</p>
                 <h1 className="mt-1 text-2xl font-bold">Resident Training Record</h1>
               </div>
               {demoMode && reduceMotion === false ? (

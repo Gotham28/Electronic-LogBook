@@ -29,6 +29,9 @@ export function DepartmentProvider({ departmentId, children }: { departmentId: n
     if (!departmentId) { setError("Your account has no department. Contact the database administrator."); return; }
     try {
       const result = await apiGet<DepartmentData>(`/api/departments/${departmentId}/catalog`);
+      if (result.department && /microbiology/i.test(result.department.name)) {
+        result.department.name = result.department.name.replace(/microbiology/i, "Microbiology");
+      }
       const isMicro = result.department?.code?.toLowerCase() === "microbiology" || result.department?.name?.toLowerCase().includes("microbiology");
       const enabledFeatures = { ...(result.config?.enabledFeatures || {}) };
       if (isMicro) {
@@ -40,6 +43,8 @@ export function DepartmentProvider({ departmentId, children }: { departmentId: n
         if (enabledFeatures.attendedConferences === undefined) enabledFeatures.attendedConferences = true;
         if (enabledFeatures.hideLeaveRecords === undefined) enabledFeatures.hideLeaveRecords = true;
         if (enabledFeatures.dailyAttendance === undefined) enabledFeatures.dailyAttendance = true;
+        if (enabledFeatures.yearlyAttendance === undefined) enabledFeatures.yearlyAttendance = true;
+        if (enabledFeatures.conferenceLevels === undefined) enabledFeatures.conferenceLevels = true;
       }
       const resolvedConfig: DepartmentConfig | null = result.config ? {
         ...result.config,
@@ -51,10 +56,11 @@ export function DepartmentProvider({ departmentId, children }: { departmentId: n
         enabledFeatures,
       } : null;
 
-      const academics = (result.academics && result.academics.length > 0) ? result.academics : isMicro ? [
+      const academics = isMicro ? [
         { id: 1, name: "Journal club", value: "journal_club", required: 0, period: "total" as const },
-        { id: 2, name: "Presentation", value: "presentation", required: 0, period: "total" as const },
-      ] : [];
+        { id: 2, name: "UG teaching", value: "ug_teaching", required: 0, period: "total" as const },
+        { id: 3, name: "Seminars", value: "seminars", required: 0, period: "total" as const },
+      ] : ((result.academics && result.academics.length > 0) ? result.academics : []);
 
       setData({
         ...result,
@@ -64,7 +70,10 @@ export function DepartmentProvider({ departmentId, children }: { departmentId: n
         caseCategories: result.caseCategories || [],
         competencyLevels: result.competencyLevels || [],
         leaveTypes: result.leaveTypes || [],
-        conferenceLevels: result.conferenceLevels || [],
+        conferenceLevels: isMicro ? [
+          { id: 1, name: "National", value: "national", required: 0, period: "total" as const },
+          { id: 2, name: "State", value: "state", required: 0, period: "total" as const },
+        ] : (result.conferenceLevels || []),
         clinicalWorkCategories: result.clinicalWorkCategories || [],
         clinicalWorkSubtypes: result.clinicalWorkSubtypes || [],
         postingSchedule: result.postingSchedule || [],

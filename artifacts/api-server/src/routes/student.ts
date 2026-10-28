@@ -855,7 +855,7 @@ router.get("/:studentId/assessments", requireAuth, async (req, res) => {
 
 // POST /students/:studentId/assessments — professors only; assessorId set server-side
 router.post("/:studentId/assessments", requireAuth, requireRole(["professor", "hod"]), validate(z.object({ examName: nameSchema,
-  type: z.enum(["quarterly", "annual"]), date: dateSchema, marks: z.coerce.number().int().min(0).max(100) }).strict()), async (req, res) => {
+  type: z.enum(["quarterly", "annual", "continuous", "half_yearly"]), date: dateSchema, marks: z.coerce.number().int().min(0).max(100) }).strict()), async (req, res) => {
   try {
     const professorId = req.user!.id;
     const professorDeptId = req.user!.departmentId;
@@ -908,7 +908,7 @@ router.post("/:studentId/assessments", requireAuth, requireRole(["professor", "h
 
 // PATCH /students/:studentId/assessments/:assessmentId — edit score/details
 router.patch("/:studentId/assessments/:assessmentId", requireAuth, requireRole(["professor", "hod"]), validate(z.object({
-  examName: nameSchema.optional(), type: z.enum(["quarterly", "annual"]).optional(),
+  examName: nameSchema.optional(), type: z.enum(["quarterly", "annual", "continuous", "half_yearly"]).optional(),
   date: dateSchema.optional(), marks: z.coerce.number().int().min(0).max(100).optional()
 }).strict()), async (req, res) => {
   try {

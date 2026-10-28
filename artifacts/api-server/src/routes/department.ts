@@ -11,11 +11,15 @@ const router: IRouter = Router();
 
 // Registration only needs the directory, not department rosters or staff identities.
 router.get("/", async (_req, res) => {
-  res.json(await db.select({ id: departmentsTable.id, name: departmentsTable.name, code: departmentsTable.code }).from(departmentsTable)
+  const depts = await db.select({ id: departmentsTable.id, name: departmentsTable.name, code: departmentsTable.code }).from(departmentsTable)
     .innerJoin(usersTable, and(eq(usersTable.departmentId, departmentsTable.id), eq(usersTable.role, "hod"), eq(usersTable.status, "approved")))
     .leftJoin(departmentConfigsTable, eq(departmentConfigsTable.departmentId, departmentsTable.id))
     .where(eq(departmentsTable.isTest, false))
-    .orderBy(departmentsTable.name));
+    .orderBy(departmentsTable.name);
+  res.json(depts.map(d => ({
+    ...d,
+    name: /microbiology/i.test(d.name) ? d.name.replace(/microbiology/i, "Microbiology") : d.name
+  })));
 });
 
 router.use(requireAuth, requireRole(["student", "professor", "hod"]), requireDepartment);
@@ -46,7 +50,11 @@ router.get("/:departmentId/catalog", async (req, res) => {
         .orderBy(departmentPostingScheduleTable.trainingYear, departmentPostingScheduleTable.sortOrder),
       getAcademicLogbook(configSourceId),
     ]);
-    const deptInfo = department[0];
+    const rawDeptInfo = department[0];
+    const deptInfo = rawDeptInfo ? {
+      ...rawDeptInfo,
+      name: /microbiology/i.test(rawDeptInfo.name) ? rawDeptInfo.name.replace(/microbiology/i, "Microbiology") : rawDeptInfo.name,
+    } : rawDeptInfo;
     const isMicro = deptInfo?.code?.toLowerCase() === "microbiology" || deptInfo?.name?.toLowerCase().includes("microbiology");
     let resolvedConfig = config[0] ? { ...config[0] } : null;
     if (resolvedConfig) {
@@ -59,6 +67,8 @@ router.get("/:departmentId/catalog", async (req, res) => {
         if (enabledFeatures.useThesisAndMandatoryCertificationsLabel === undefined) enabledFeatures.useThesisAndMandatoryCertificationsLabel = true;
         if (enabledFeatures.attendedConferences === undefined) enabledFeatures.attendedConferences = true;
         if (enabledFeatures.hideLeaveRecords === undefined) enabledFeatures.hideLeaveRecords = true;
+        if (enabledFeatures.yearlyAttendance === undefined) enabledFeatures.yearlyAttendance = true;
+        if (enabledFeatures.conferenceLevels === undefined) enabledFeatures.conferenceLevels = true;
       }
       resolvedConfig.enabledFeatures = enabledFeatures;
     } else if (isMicro) {
@@ -68,15 +78,22 @@ router.get("/:departmentId/catalog", async (req, res) => {
         requiredCases: null,
         requiredProcedures: null,
         requiredAcademic: null,
-        enabledFeatures: { procedureExperience: false, microbiologyCaseFields: true, freeTextProcedures: true, hideProcedureAge: true, useThesisAndMandatoryCertificationsLabel: true, attendedConferences: true, hideLeaveRecords: true },
+        enabledFeatures: { procedureExperience: false, microbiologyCaseFields: true, freeTextProcedures: true, hideProcedureAge: true, useThesisAndMandatoryCertificationsLabel: true, attendedConferences: true, hideLeaveRecords: true, yearlyAttendance: true, conferenceLevels: true },
         createdAt: new Date(),
         updatedAt: new Date(),
       } as any;
     }
     res.json({ department: deptInfo, hod: hod[0] || null, config: resolvedConfig, procedures,
-      postings: catalog.filter((item) => item.kind === "posting"), academics: (catalog.filter((item) => item.kind === "academic").length > 0 || !isMicro) ? catalog.filter((item) => item.kind === "academic") : [{ id: 1, departmentId: configSourceId, kind: "academic", name: "Journal club", value: "journal_club", required: 0, period: "total" as const, parentValue: null }, { id: 2, departmentId: configSourceId, kind: "academic", name: "Presentation", value: "presentation", required: 0, period: "total" as const, parentValue: null }] as any, caseCategories: catalog.filter((item) => item.kind === "case_category"),
+      postings: catalog.filter((item) => item.kind === "posting"), academics: isMicro ? [
+        { id: 1, departmentId: configSourceId, kind: "academic", name: "Journal club", value: "journal_club", required: 0, period: "total" as const, parentValue: null },
+        { id: 2, departmentId: configSourceId, kind: "academic", name: "UG teaching", value: "ug_teaching", required: 0, period: "total" as const, parentValue: null },
+        { id: 3, departmentId: configSourceId, kind: "academic", name: "Seminars", value: "seminars", required: 0, period: "total" as const, parentValue: null },
+      ] as any : catalog.filter((item) => item.kind === "academic"), caseCategories: catalog.filter((item) => item.kind === "case_category"),
       competencyLevels: catalog.filter((item) => item.kind === "competency_level"), leaveTypes: catalog.filter((item) => item.kind === "leave_type"),
-      conferenceLevels: catalog.filter((item) => item.kind === "conference_level"),
+      conferenceLevels: isMicro ? [
+        { id: 1, departmentId: configSourceId, kind: "conference_level", name: "National", value: "national", required: 0, period: "total" as const, parentValue: null },
+        { id: 2, departmentId: configSourceId, kind: "conference_level", name: "State", value: "state", required: 0, period: "total" as const, parentValue: null },
+      ] as any : catalog.filter((item) => item.kind === "conference_level"),
       clinicalWorkCategories: catalog.filter((item) => item.kind === "clinical_work_category"),
       clinicalWorkSubtypes: catalog.filter((item) => item.kind === "clinical_work_subtype"),
       postingSchedule, academicLogbook });

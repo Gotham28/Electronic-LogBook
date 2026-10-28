@@ -205,11 +205,188 @@ function StudentDailyAttendanceView() {
   );
 }
 
+
+function StudentYearlyAttendanceView() {
+  const user = React.useMemo(() => getCurrentUser(), []);
+  const [records, setRecords] = React.useState<AttendanceRecord[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const fetchAttendance = React.useCallback(async () => {
+    if (!user?.studentProfileId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const resp = await apiGet<{ data: AttendanceRecord[] } | AttendanceRecord[]>(
+        `/api/students/${user.studentProfileId}/attendance`
+      );
+      const data = Array.isArray(resp) ? resp : (resp?.data || []);
+      setRecords(data);
+    } catch (err: any) {
+      console.error("Failed to load attendance", err);
+      setError(err?.message || "Failed to load yearly attendance records");
+      toast.error("Could not load yearly attendance records");
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.studentProfileId]);
+
+  React.useEffect(() => {
+    fetchAttendance();
+  }, [fetchAttendance]);
+
+  const year1 = records.find((r) => r.date === "YEAR_1");
+  const year2 = records.find((r) => r.date === "YEAR_2");
+  const year3 = records.find((r) => r.date === "YEAR_3");
+
+  const p1 = year1?.clockIn ? parseFloat(year1.clockIn) : null;
+  const p2 = year2?.clockIn ? parseFloat(year2.clockIn) : null;
+  const p3 = year3?.clockIn ? parseFloat(year3.clockIn) : null;
+
+  const validPercentages = [p1, p2, p3].filter((p): p is number => p !== null && !isNaN(p));
+  const avg = validPercentages.length > 0
+    ? (validPercentages.reduce((a, b) => a + b, 0) / validPercentages.length).toFixed(1)
+    : "—";
+
+  const yearRows = [
+    { year: 1, label: "Year 1", record: year1, pct: p1 },
+    { year: 2, label: "Year 2", record: year2, pct: p2 },
+    { year: 3, label: "Year 3", record: year3, pct: p3 },
+  ];
+
+  return (
+    <div className="section-spacing pb-12 space-y-6">
+      <div>
+        <p className="page-eyebrow">Attendance administration</p>
+        <h2 className="page-title mt-1">Yearly Attendance</h2>
+        <p className="mt-2 text-sm text-slate-500">
+          Review your annual attendance percentages logged and verified by department faculty.
+        </p>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {yearRows.map(({ year, label, pct, record }) => (
+          <div key={year} className="rounded-[18px] border border-white/70 bg-white/76 p-4 shadow-[0_18px_48px_rgba(15,23,42,0.05)]">
+            <div className="flex items-center justify-between">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{label}</p>
+              {pct !== null ? (
+                <Badge className="border-emerald-200 bg-emerald-50 text-[10px] font-semibold text-emerald-700">
+                  <CheckCircle2 className="mr-1 h-3 w-3" /> Recorded
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="text-[10px] text-slate-400">
+                  Pending
+                </Badge>
+              )}
+            </div>
+            <p className="mt-2 text-3xl font-bold text-slate-900">
+              {pct !== null ? `${pct}%` : "—"}
+            </p>
+            <p className="mt-1 text-xs text-slate-500 truncate">
+              {record?.verifierName ? `Marked by ${record.verifierName}` : "Not yet entered"}
+            </p>
+          </div>
+        ))}
+
+        <div className="rounded-[18px] border border-white/70 bg-white/76 p-4 shadow-[0_18px_48px_rgba(15,23,42,0.05)]">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-teal-600">Overall Average</p>
+          <p className="mt-2 text-3xl font-bold text-teal-700">
+            {avg}{avg !== "—" ? "%" : ""}
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            {validPercentages.length} of 3 years recorded
+          </p>
+        </div>
+      </div>
+
+      <Card className="border-white/70 bg-white/76">
+        <CardHeader className="border-b border-white/70 pb-3 flex flex-row items-center justify-between">
+          <CardTitle className="text-base font-bold text-slate-950">Yearly Attendance Breakdown</CardTitle>
+          <Button size="sm" variant="outline" onClick={fetchAttendance} disabled={loading} className="text-xs">
+            Refresh
+          </Button>
+        </CardHeader>
+        <CardContent className="p-0">
+          {loading ? (
+            <div className="py-12 flex justify-center items-center">
+              <div className="animate-spin rounded-full border-4 border-slate-300 border-t-teal-600 h-8 w-8" />
+            </div>
+          ) : error ? (
+            <div className="p-6 text-center text-rose-600 text-sm font-medium">
+              <p>{error}</p>
+              <Button size="sm" variant="outline" onClick={fetchAttendance} className="mt-3">
+                Try again
+              </Button>
+            </div>
+          ) : validPercentages.length === 0 ? (
+            <Empty className="py-14">
+              <EmptyHeader>
+                <EmptyMedia variant="icon"><CalendarDays className="h-6 w-6" /></EmptyMedia>
+                <EmptyTitle>No yearly attendance recorded</EmptyTitle>
+                <EmptyDescription>Your department faculty will log your attendance percentage for each training year here.</EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-xs font-semibold">Training Year</TableHead>
+                  <TableHead className="text-xs font-semibold">Attendance Percentage</TableHead>
+                  <TableHead className="text-xs font-semibold">Status</TableHead>
+                  <TableHead className="text-xs font-semibold">Marked / Verified By</TableHead>
+                  <TableHead className="text-xs font-semibold">Recorded Date</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {yearRows.map(({ year, label, pct, record }) => (
+                  <TableRow key={year}>
+                    <TableCell className="text-xs font-bold text-slate-900 py-3">
+                      {label}
+                    </TableCell>
+                    <TableCell className="py-3">
+                      {pct !== null ? (
+                        <span className="text-sm font-bold text-teal-800">{pct}%</span>
+                      ) : (
+                        <span className="text-xs text-slate-400">Not recorded</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="py-3">
+                      {pct !== null ? (
+                        <Badge className="border-emerald-200 bg-emerald-50 text-[11px] font-semibold text-emerald-700">
+                          <CheckCircle2 className="mr-1 h-3 w-3" /> Verified
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-[11px] text-slate-400">
+                          Pending
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-xs text-slate-600 py-3">
+                      {record?.verifierName || "—"}
+                    </TableCell>
+                    <TableCell className="text-xs text-slate-600 py-3">
+                      {record?.createdAt ? formatLogbookDate(record.createdAt.slice(0, 10)) : "—"}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export function AttendancePage() {
   const dept = useDepartment();
   const isMicroDept = dept.department?.code?.toLowerCase() === "microbiology" || dept.department?.name?.toLowerCase().includes("microbiology");
-  const isDailyAttendance = Boolean(dept.config?.enabledFeatures?.dailyAttendance || isMicroDept);
+  const isYearlyAttendance = Boolean(dept.config?.enabledFeatures?.yearlyAttendance || isMicroDept);
+  const isDailyAttendance = Boolean(dept.config?.enabledFeatures?.dailyAttendance && !isYearlyAttendance);
 
+  if (isYearlyAttendance) {
+    return <StudentYearlyAttendanceView />;
+  }
   if (isDailyAttendance) {
     return <StudentDailyAttendanceView />;
   }

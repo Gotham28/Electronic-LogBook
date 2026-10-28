@@ -46,7 +46,10 @@ export function RegistrationPage({
   const [departmentsLoading, setDepartmentsLoading] = React.useState(true);
   const loadDepartments = React.useCallback(async () => {
     setDepartmentsLoading(true); setDepartmentError("");
-    try { setDepartments(await apiGet("/api/departments")); }
+    try {
+      const list = await apiGet<Array<{ id: number; name: string }>>("/api/departments");
+      setDepartments(list.map((d) => ({ ...d, name: /microbiology/i.test(d.name) ? d.name.replace(/microbiology/i, "Microbiology") : d.name })));
+    }
     catch (err) { setDepartmentError(err instanceof Error ? err.message : "Could not load departments"); }
     finally { setDepartmentsLoading(false); }
   }, []);
