@@ -168,6 +168,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
   const [menteeCerts, setMenteeCerts] = React.useState<any[]>([]);
   const [menteeAwards, setMenteeAwards] = React.useState<any[]>([]);
   const [menteeAssessments, setMenteeAssessments] = React.useState<any[]>([]);
+  const [menteeAttendance, setMenteeAttendance] = React.useState<any[]>([]);
   const [reviewBusy, setReviewBusy] = React.useState(false);
   const [expandedCaseIds, setExpandedCaseIds] = React.useState<Set<number>>(new Set());
   const [expandedProcIds, setExpandedProcIds] = React.useState<Set<number>>(new Set());
@@ -298,6 +299,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
       setMenteeCerts([]);
       setMenteeAwards([]);
       setMenteeAssessments([]);
+      setMenteeAttendance([]);
       setMenteeLoadErrors({});
       return;
     }
@@ -362,6 +364,12 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
         const assessResp = await apiGet(`/api/students/${selectedMentee.id}/assessments`);
         if (mounted) setMenteeAssessments(Array.isArray(assessResp) ? assessResp : (assessResp?.data || []));
       } catch { failed("assessments", "Could not load this student's assessments. Close and reopen to try again."); }
+
+      // Fetch attendance
+      try {
+        const attResp = await apiGet(`/api/students/${selectedMentee.id}/attendance`);
+        if (mounted) setMenteeAttendance(Array.isArray(attResp) ? attResp : (attResp?.data || []));
+      } catch { failed("attendance", "Could not load this student's attendance. Close and reopen to try again."); }
 
       if (mounted) setMenteeLogsLoading(false);
     };
@@ -907,8 +915,10 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                     <TabsTrigger value="awards" className="text-xs whitespace-nowrap">Awards & Achievements</TabsTrigger>
                   )}
                   <TabsTrigger value="assessments" className="text-xs whitespace-nowrap">Assessments</TabsTrigger>
-                  {(config?.enabledFeatures?.dailyAttendance || isMicroDept) && (
-                    <TabsTrigger value="attendance" className="text-xs whitespace-nowrap">Daily Attendance</TabsTrigger>
+                  {(config?.enabledFeatures?.dailyAttendance || config?.enabledFeatures?.yearlyAttendance || isMicroDept) && (
+                    <TabsTrigger value="attendance" className="text-xs whitespace-nowrap">
+                      {isMicroDept ? "Yearly Attendance" : "Daily Attendance"}
+                    </TabsTrigger>
                   )}
                 </TabsList>
 
@@ -1599,6 +1609,104 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                           />
                         </div>
                       ))}
+                    </div>
+                  )}
+                </TabsContent>
+
+                {/* ── Attendance Tab ─────────────────────────────────────── */}
+                <TabsContent value="attendance" className="pt-3">
+                  {menteeLogsLoading ? (
+                    <div className="flex h-32 items-center justify-center">
+                      <div className="animate-spin rounded-full border-4 border-slate-300 border-t-teal-600 h-8 w-8" />
+                    </div>
+                  ) : isMicroDept ? (
+                    <div className="space-y-4">
+                      {(() => {
+                        const y1 = menteeAttendance.find((a: any) => a.date === "YEAR_1");
+                        const y2 = menteeAttendance.find((a: any) => a.date === "YEAR_2");
+                        const y3 = menteeAttendance.find((a: any) => a.date === "YEAR_3");
+                        const p1 = y1?.clockIn ? parseFloat(y1.clockIn) : null;
+                        const p2 = y2?.clockIn ? parseFloat(y2.clockIn) : null;
+                        const p3 = y3?.clockIn ? parseFloat(y3.clockIn) : null;
+                        const valid = [p1, p2, p3].filter((p): p is number => p !== null && !isNaN(p));
+                        const avg = valid.length > 0 ? (valid.reduce((a, b) => a + b, 0) / valid.length).toFixed(1) : "—";
+                        const rows = [
+                          { year: "Year 1", pct: p1, rec: y1 },
+                          { year: "Year 2", pct: p2, rec: y2 },
+                          { year: "Year 3", pct: p3, rec: y3 },
+                        ];
+                        return (
+                          <>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                              {rows.map(({ year, pct }) => (
+                                <div key={year} className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
+                                  <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">{year}</span>
+                                  <p className="text-xl font-bold text-slate-900 mt-1">{pct !== null ? `${pct}%` : "—"}</p>
+                                </div>
+                              ))}
+                              <div className="p-3.5 bg-teal-50 border border-teal-200 rounded-xl">
+                                <span className="text-[11px] font-semibold text-teal-700 uppercase tracking-wide">Average</span>
+                                <p className="text-xl font-bold text-teal-800 mt-1">{avg}{avg !== "—" ? "%" : ""}</p>
+                              </div>
+                            </div>
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead className="text-xs font-semibold">Training Year</TableHead>
+                                  <TableHead className="text-xs font-semibold">Attendance %</TableHead>
+                                  <TableHead className="text-xs font-semibold">Status</TableHead>
+                                  <TableHead className="text-xs font-semibold">Verified By</TableHead>
+                                  <TableHead className="text-xs font-semibold">Recorded Date</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {rows.map(({ year, pct, rec }) => (
+                                  <TableRow key={year}>
+                                    <TableCell className="text-xs font-bold text-slate-900">{year}</TableCell>
+                                    <TableCell className="text-xs font-bold text-teal-800">{pct !== null ? `${pct}%` : "Not recorded"}</TableCell>
+                                    <TableCell>
+                                      {pct !== null ? (
+                                        <Badge className="border-emerald-200 bg-emerald-50 text-[10px] font-semibold text-emerald-700">Verified</Badge>
+                                      ) : (
+                                        <Badge variant="outline" className="text-[10px] text-slate-400">Pending</Badge>
+                                      )}
+                                    </TableCell>
+                                    <TableCell className="text-xs text-slate-600">{rec?.verifierName || "—"}</TableCell>
+                                    <TableCell className="text-xs text-slate-600">{rec?.createdAt ? formatLogbookDate(rec.createdAt.slice(0, 10)) : "—"}</TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {menteeAttendance.length === 0 ? (
+                        <div className="text-center text-sm text-slate-500 py-6">No daily attendance records found.</div>
+                      ) : (
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="text-xs font-semibold">Date</TableHead>
+                              <TableHead className="text-xs font-semibold">Status</TableHead>
+                              <TableHead className="text-xs font-semibold">Timings</TableHead>
+                              <TableHead className="text-xs font-semibold">Verified By</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {menteeAttendance.map((a: any) => (
+                              <TableRow key={a.id}>
+                                <TableCell className="text-xs font-medium text-slate-900">{formatLogbookDate(a.date)}</TableCell>
+                                <TableCell className="text-xs">{a.status}</TableCell>
+                                <TableCell className="text-xs text-slate-600">{a.clockIn || a.clockOut ? `${a.clockIn || "—"} to ${a.clockOut || "—"}` : "Full Day"}</TableCell>
+                                <TableCell className="text-xs text-slate-600">{a.verifierName || "—"}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      )}
                     </div>
                   )}
                 </TabsContent>
