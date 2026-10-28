@@ -35,7 +35,12 @@ export function ConferencesPage() {
   const [editLogId, setEditLogId] = React.useState<number | null>(null);
 
   const user = React.useMemo(() => getCurrentUser(), []);
-  const { config, conferenceLevels } = useDepartment();
+  const { config, conferenceLevels: deptConferenceLevels, department } = useDepartment();
+  const isMicrobiology = department?.code?.toLowerCase() === "microbiology" || department?.name?.toLowerCase().includes("microbiology");
+  const conferenceLevels = isMicrobiology ? [
+    { id: 1, name: "National", value: "national" },
+    { id: 2, name: "State", value: "state" },
+  ] : deptConferenceLevels;
   const [professors, setProfessors] = React.useState<any[]>([]);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 

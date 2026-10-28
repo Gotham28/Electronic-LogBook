@@ -187,6 +187,23 @@ export async function handleDemoRequest(method: string, path: string, body?: any
       const resident = getDemoResident(requestedStudentId(path));
       return { data: resident.attendance || [] };
     }
+    if (path.match(/\/api\/professors\/yearly-attendance/)) {
+      const residents = getActiveDemoProfile().residents || [];
+      const students = residents.map((r: any) => {
+        const y1 = (r.attendance || []).find((a: any) => a.date === "YEAR_1");
+        const y2 = (r.attendance || []).find((a: any) => a.date === "YEAR_2");
+        const y3 = (r.attendance || []).find((a: any) => a.date === "YEAR_3");
+        return {
+          studentId: r.student.id,
+          name: r.student.fullName || r.student.name,
+          rollNumber: r.student.registrationNumber || r.student.rollNumber || `MB-2025-${r.student.id}`,
+          year1: y1 ? { percentage: parseFloat(y1.clockIn || "0"), verifierName: y1.verifierName || "Dr. Vivek Menon" } : null,
+          year2: y2 ? { percentage: parseFloat(y2.clockIn || "0"), verifierName: y2.verifierName || "Dr. Vivek Menon" } : null,
+          year3: y3 ? { percentage: parseFloat(y3.clockIn || "0"), verifierName: y3.verifierName || "Dr. Vivek Menon" } : null,
+        };
+      });
+      return { students };
+    }
     if (path.match(/\/api\/professors\/attendance/)) {
       const url = new URL(path, "http://localhost");
       const date = url.searchParams.get("date") || new Date().toISOString().slice(0, 10);
@@ -491,6 +508,42 @@ export async function handleDemoRequest(method: string, path: string, body?: any
       return { success: true, id: newAssessment.id };
     }
     
+    if (path.includes("/professors/yearly-attendance") && body) {
+      const { records } = body;
+      const residents = getActiveDemoProfile().residents || [];
+      for (const rec of (records || [])) {
+        const resident = residents.find((r: any) => r.student.id === rec.studentId);
+        if (resident) {
+          if (!resident.attendance) resident.attendance = [];
+          const dateKey = `YEAR_${rec.year}`;
+          const existingIndex = resident.attendance.findIndex((a: any) => a.date === dateKey);
+          if (rec.percentage == null) {
+            if (existingIndex >= 0) {
+              resident.attendance.splice(existingIndex, 1);
+            }
+          } else {
+            const attEntry = {
+              id: existingIndex >= 0 ? resident.attendance[existingIndex].id : Date.now() + rec.studentId + Number(rec.year),
+              studentId: rec.studentId,
+              date: dateKey,
+              status: "present",
+              clockIn: String(rec.percentage),
+              clockOut: null,
+              verifiedBy: 2,
+              verifierName: "Dr. Vivek Menon",
+              createdAt: new Date().toISOString(),
+            };
+            if (existingIndex >= 0) {
+              resident.attendance[existingIndex] = attEntry;
+            } else {
+              resident.attendance.push(attEntry);
+            }
+          }
+        }
+      }
+      playDemoSound("success");
+      return { success: true, count: records?.length || 0 };
+    }
     if (path.includes("/professors/attendance") && body) {
       const { date, records } = body;
       const residents = getActiveDemoProfile().residents || [];

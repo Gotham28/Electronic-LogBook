@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { formatLogbookDate } from "@/lib/logbook-config";
 import { apiGet } from "@/lib/apiClient";
 import { getCurrentUser } from "@/lib/session";
+import { useDepartment } from "@/lib/department-context";
 import { toast } from "sonner";
 import { QuarterlyAppraisalRecord } from "@/components/QuarterlyAppraisalRecord";
 import type { QuarterlyAppraisal } from "@/lib/quarterly-appraisal";
@@ -26,6 +27,8 @@ type Assessment = {
 export function AssessmentsPage() {
   const [assessments, setAssessments] = React.useState<Assessment[]>([]);
   const user = React.useMemo(() => getCurrentUser(), []);
+  const { department } = useDepartment();
+  const isMicrobiology = department?.code?.toLowerCase() === "microbiology" || department?.name?.toLowerCase().includes("microbiology");
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [appraisals, setAppraisals] = React.useState<QuarterlyAppraisal[]>([]);
@@ -77,7 +80,7 @@ export function AssessmentsPage() {
         <div>
           <p className="page-eyebrow flex items-center gap-2">Training progress</p>
           <h2 className="page-title mt-1">Assessments</h2>
-          <p className="mt-2 text-sm text-slate-500">Your quarterly and annual assessment results, entered by your faculty assessor.</p>
+          <p className="mt-2 text-sm text-slate-500">Your {isMicrobiology ? "continuous, quarterly, half yearly, and annual" : "quarterly and annual"} assessment results, entered by your faculty assessor.</p>
         </div>
       </div>
 
@@ -118,7 +121,7 @@ export function AssessmentsPage() {
                     <TableCell className="font-medium text-slate-900">{formatLogbookDate(item.date)}</TableCell>
                     <TableCell>{item.examName}</TableCell>
                     <TableCell>
-                      <Badge variant="outline" className="capitalize">{item.type}</Badge>
+                      <Badge variant="outline" className="capitalize">{item.type?.replace(/_/g, " ")}</Badge>
                     </TableCell>
                     <TableCell className="font-bold text-slate-900">{item.marks} / {item.maximum}</TableCell>
                     <TableCell>{item.assessorName}</TableCell>

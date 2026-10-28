@@ -343,7 +343,7 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
           <Badge className="bg-teal-500/20 text-teal-300 border-teal-500/30 text-xs font-semibold mb-2">
             Head of Department Dashboard
           </Badge>
-          <h2 className="text-2xl font-black">{department.name}</h2>
+          <h2 className="text-2xl font-black">{department.name?.replace(/microbiology/i, "Microbiology")}</h2>
           <p className="text-xs text-slate-300 mt-1">{currentUser?.name} · Department overview</p>
         </div>
         {analyticsData && (

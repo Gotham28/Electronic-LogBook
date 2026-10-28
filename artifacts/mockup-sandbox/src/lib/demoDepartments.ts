@@ -356,12 +356,27 @@ const microbiologyProfile = createEmptyDepartmentProfile({
     attendedConferences: true,
     hideLeaveRecords: true,
     dailyAttendance: true,
+    yearlyAttendance: true,
+    conferenceLevels: true,
   },
 });
 
 microbiologyProfile.data.departmentCatalog.academics = [
   { id: 1, name: "Journal club", value: "journal_club", required: 0, period: "total" },
-  { id: 2, name: "Presentation", value: "presentation", required: 0, period: "total" },
+  { id: 2, name: "UG teaching", value: "ug_teaching", required: 0, period: "total" },
+  { id: 3, name: "Seminars", value: "seminars", required: 0, period: "total" },
+];
+
+microbiologyProfile.data.departmentCatalog.conferenceLevels = [
+  { id: 1, name: "National", value: "national", required: 0 },
+  { id: 2, name: "State", value: "state", required: 0 },
+];
+
+microbiologyProfile.data.assessments = [
+  { number: 1, date: "2026-03-15", examName: "Continuous Assessment 1", type: "continuous", marks: 82, maximum: 100, assessorName: "Dr. Vivek Menon" },
+  { number: 2, date: "2026-06-20", examName: "Q1 Theory & Practical", type: "quarterly", marks: 78, maximum: 100, assessorName: "Dr. Vivek Menon" },
+  { number: 3, date: "2026-09-10", examName: "Half Yearly Practical Exam", type: "half_yearly", marks: 85, maximum: 100, assessorName: "Dr. Vivek Menon" },
+  { number: 4, date: "2026-10-01", examName: "Annual Comprehensive Review", type: "annual", marks: 88, maximum: 100, assessorName: "Dr. Vivek Menon" },
 ];
 
 export const demoDepartmentProfiles: DemoDepartmentProfile[] = [pediatricsProfile, radiologyProfile, dermatologyProfile, microbiologyProfile];
@@ -592,24 +607,60 @@ function buildYearOfActivity(profile: DemoDepartmentProfile) {
     clinicalWorks.sort((a, b) => b.date.localeCompare(a.date));
 
     const attendance: any[] = [];
-    const today = new Date();
-    for (let dayOffset = 0; dayOffset < 30; dayOffset++) {
-      const d = new Date(today.getTime() - dayOffset * 24 * 60 * 60 * 1000);
-      if (d.getDay() === 0) continue;
-      const dateStr = d.toISOString().slice(0, 10);
-      const roll = (seed.id * 17 + dayOffset * 7) % 20;
-      const status = roll === 0 ? "absent" : roll === 1 ? "leave" : roll === 2 ? "half_day" : "present";
+    if (profile.data.departmentCatalog.department.code === "microbiology") {
       attendance.push({
-        id: profile.id * 1000 + seed.id * 100 + dayOffset,
+        id: profile.id * 1000 + seed.id * 100 + 1,
         studentId: seed.id,
-        date: dateStr,
-        status,
-        clockIn: status === "present" || status === "half_day" ? "08:30" : null,
-        clockOut: status === "present" ? "16:30" : status === "half_day" ? "13:00" : null,
+        date: "YEAR_1",
+        status: "present",
+        clockIn: "88",
+        clockOut: null,
         verifiedBy: 2,
         verifierName: "Dr. Vivek Menon",
-        createdAt: `${dateStr}T08:35:00Z`
+        createdAt: "2025-06-30T10:00:00Z"
       });
+      attendance.push({
+        id: profile.id * 1000 + seed.id * 100 + 2,
+        studentId: seed.id,
+        date: "YEAR_2",
+        status: "present",
+        clockIn: "92",
+        clockOut: null,
+        verifiedBy: 2,
+        verifierName: "Dr. Vivek Menon",
+        createdAt: "2026-06-30T10:00:00Z"
+      });
+      attendance.push({
+        id: profile.id * 1000 + seed.id * 100 + 3,
+        studentId: seed.id,
+        date: "YEAR_3",
+        status: "present",
+        clockIn: "95",
+        clockOut: null,
+        verifiedBy: 2,
+        verifierName: "Dr. Vivek Menon",
+        createdAt: "2026-10-15T10:00:00Z"
+      });
+    } else {
+      const today = new Date();
+      for (let dayOffset = 0; dayOffset < 30; dayOffset++) {
+        const d = new Date(today.getTime() - dayOffset * 24 * 60 * 60 * 1000);
+        if (d.getDay() === 0) continue;
+        const dateStr = d.toISOString().slice(0, 10);
+        const roll = (seed.id * 17 + dayOffset * 7) % 20;
+        const status = roll === 0 ? "absent" : roll === 1 ? "leave" : roll === 2 ? "half_day" : "present";
+        attendance.push({
+          id: profile.id * 1000 + seed.id * 100 + dayOffset,
+          studentId: seed.id,
+          date: dateStr,
+          status,
+          clockIn: status === "present" || status === "half_day" ? "08:30" : null,
+          clockOut: status === "present" ? "16:30" : status === "half_day" ? "13:00" : null,
+          verifiedBy: 2,
+          verifierName: "Dr. Vivek Menon",
+          createdAt: `${dateStr}T08:35:00Z`
+        });
+      }
     }
 
     return { student, studentProfile, postings, logs: { cases, procedures, academics, clinicalWorks }, leaveBalance: {}, leaveRecords, attendance };

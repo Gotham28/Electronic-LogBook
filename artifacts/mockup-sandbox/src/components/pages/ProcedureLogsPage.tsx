@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -244,15 +245,27 @@ export function ProcedureLogsPage() {
                 </Select>
                 )}
               </Field>
-              <div className={`grid gap-4 ${hideUhid ? "sm:grid-cols-1" : "sm:grid-cols-2"}`}>
-                {isFreeTextProcedures && !isMicrobiology && (
-                  <>
-                    <Field label="Diagnosis"><Input value={form.diagnosis} onChange={(e) => setForm({ ...form, diagnosis: e.target.value })} placeholder="e.g. Tinea Corporis" required /></Field>
-                    <Field label="Sex"><Input value={form.sex} onChange={(e) => setForm({ ...form, sex: e.target.value })} placeholder="e.g. Male" required /></Field>
-                  </>
-                )}
-                {!hideProcedureAge && <Field label="Age"><Input value={form.age} onChange={(e) => setForm({ ...form, age: e.target.value })} placeholder="e.g. 4 months" required /></Field>}
-              </div>
+              {isMicrobiology ? (
+                <Field label="Details">
+                  <Textarea
+                    value={form.diagnosis}
+                    onChange={(e) => setForm({ ...form, diagnosis: e.target.value })}
+                    placeholder="Enter procedure details"
+                    rows={3}
+                    required
+                  />
+                </Field>
+              ) : (
+                <div className={`grid gap-4 ${hideUhid ? "sm:grid-cols-1" : "sm:grid-cols-2"}`}>
+                  {isFreeTextProcedures && !isMicrobiology && (
+                    <>
+                      <Field label="Diagnosis"><Input value={form.diagnosis} onChange={(e) => setForm({ ...form, diagnosis: e.target.value })} placeholder="e.g. Tinea Corporis" required /></Field>
+                      <Field label="Sex"><Input value={form.sex} onChange={(e) => setForm({ ...form, sex: e.target.value })} placeholder="e.g. Male" required /></Field>
+                    </>
+                  )}
+                  {!hideProcedureAge && <Field label="Age"><Input value={form.age} onChange={(e) => setForm({ ...form, age: e.target.value })} placeholder="e.g. 4 months" required /></Field>}
+                </div>
+              )}
               {showProcedureExperience && (
                 <Field label="Competency level">
                   <Select value={form.experience} onValueChange={(value) => setForm({ ...form, experience: value })}>
@@ -301,61 +314,65 @@ export function ProcedureLogsPage() {
         </Dialog>
       </div>
 
-      {!PROCEDURE_REQUIREMENTS.length && <p className="rounded-xl bg-teal-50 p-4 text-sm text-teal-800">{hideUhid && isFreeTextProcedures ? "Procedure names can be entered directly. This demo department has no configured procedure list or target." : "Your HOD has not configured procedure types for this department yet."}</p>}
-      {(PROCEDURE_REQUIREMENTS.length > 0 || !hideUhid) && <div className="grid gap-4 md:grid-cols-2">
-        {(Object.keys(PROCEDURE_GROUPS) as ProcedureGroup[]).map((group) => {
-          const completed = logs.filter((log) => log.procedureGroup === group && log.status !== "rejected").length;
-          return (
-            <Card key={group} className={group === "emergency" ? "border-cyan-100" : "border-teal-100"}>
-              <CardContent className="flex items-center justify-between p-5">
-                <div>
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{groupNames[group]}</p>
-                  <p className="mt-1 text-2xl font-bold text-slate-900">{completed} logged</p>
-                </div>
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-teal-50 text-teal-700"><Stethoscope className="h-5 w-5" /></div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>}
+      {!isMicrobiology && (
+        <>
+          {!PROCEDURE_REQUIREMENTS.length && <p className="rounded-xl bg-teal-50 p-4 text-sm text-teal-800">{hideUhid && isFreeTextProcedures ? "Procedure names can be entered directly. This demo department has no configured procedure list or target." : "Your HOD has not configured procedure types for this department yet."}</p>}
+          {(PROCEDURE_REQUIREMENTS.length > 0 || !hideUhid) && <div className="grid gap-4 md:grid-cols-2">
+            {(Object.keys(PROCEDURE_GROUPS) as ProcedureGroup[]).map((group) => {
+              const completed = logs.filter((log) => log.procedureGroup === group && log.status !== "rejected").length;
+              return (
+                <Card key={group} className={group === "emergency" ? "border-cyan-100" : "border-teal-100"}>
+                  <CardContent className="flex items-center justify-between p-5">
+                    <div>
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{groupNames[group]}</p>
+                      <p className="mt-1 text-2xl font-bold text-slate-900">{completed} logged</p>
+                    </div>
+                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-teal-50 text-teal-700"><Stethoscope className="h-5 w-5" /></div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>}
 
-      {(!hideUhid || hasProcedureTarget) && <div className="flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50/80 p-4">
-        <AlertCircle className="h-5 w-5 text-amber-700" />
-        <p className="text-xs text-amber-900"><strong>{logs.length}/{REQUIRED_PROCEDURE_COUNT}</strong> required procedures logged. Continue adding procedures from the departmental list.</p>
-      </div>}
+          {(!hideUhid || hasProcedureTarget) && <div className="flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50/80 p-4">
+            <AlertCircle className="h-5 w-5 text-amber-700" />
+            <p className="text-xs text-amber-900"><strong>{logs.length}/{REQUIRED_PROCEDURE_COUNT}</strong> required procedures logged. Continue adding procedures from the departmental list.</p>
+          </div>}
 
-      {(!hideUhid || hasProcedureTarget) && <Card>
-        <CardHeader className="border-b border-teal-100">
-          <CardTitle className="text-lg">Number of procedures required</CardTitle>
-          <p className="text-xs text-slate-500">The total is calculated from the procedure targets configured by your HOD.</p>
-        </CardHeader>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow><TableHead>Procedure</TableHead>{!isFreeTextProcedures && <TableHead>Group</TableHead>}<TableHead>Logged</TableHead><TableHead>Required</TableHead><TableHead>Remaining</TableHead></TableRow>
-            </TableHeader>
-            <TableBody>
-              {PROCEDURE_REQUIREMENTS.map((requirement) => {
-                const logged = loggedCounts[requirement.name] ?? 0;
-                return (
-                  <TableRow key={requirement.name}>
-                    <TableCell className="font-semibold">{requirement.name}</TableCell>
-                    {!isFreeTextProcedures && <TableCell><Badge variant="outline" className="border-teal-100 bg-teal-50 text-teal-800">{groupNames[requirement.group]}</Badge></TableCell>}
-                    <TableCell>{logged}</TableCell>
-                    <TableCell className="font-bold text-teal-800">{requirement.required}</TableCell>
-                    <TableCell>{Math.max(requirement.required - logged, 0)}</TableCell>
+          {(!hideUhid || hasProcedureTarget) && <Card>
+            <CardHeader className="border-b border-teal-100">
+              <CardTitle className="text-lg">Number of procedures required</CardTitle>
+              <p className="text-xs text-slate-500">The total is calculated from the procedure targets configured by your HOD.</p>
+            </CardHeader>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow><TableHead>Procedure</TableHead>{!isFreeTextProcedures && <TableHead>Group</TableHead>}<TableHead>Logged</TableHead><TableHead>Required</TableHead><TableHead>Remaining</TableHead></TableRow>
+                </TableHeader>
+                <TableBody>
+                  {PROCEDURE_REQUIREMENTS.map((requirement) => {
+                    const logged = loggedCounts[requirement.name] ?? 0;
+                    return (
+                      <TableRow key={requirement.name}>
+                        <TableCell className="font-semibold">{requirement.name}</TableCell>
+                        {!isFreeTextProcedures && <TableCell><Badge variant="outline" className="border-teal-100 bg-teal-50 text-teal-800">{groupNames[requirement.group]}</Badge></TableCell>}
+                        <TableCell>{logged}</TableCell>
+                        <TableCell className="font-bold text-teal-800">{requirement.required}</TableCell>
+                        <TableCell>{Math.max(requirement.required - logged, 0)}</TableCell>
+                      </TableRow>
+                    );
+                  })}
+                  <TableRow className="bg-teal-50/60">
+                    <TableCell className="font-bold" colSpan={3}>Combined target</TableCell>
+                    <TableCell className="font-bold text-teal-800">{REQUIRED_PROCEDURE_COUNT}</TableCell>
+                    <TableCell className="font-bold">{Math.max(REQUIRED_PROCEDURE_COUNT - logs.length, 0)}</TableCell>
                   </TableRow>
-                );
-              })}
-              <TableRow className="bg-teal-50/60">
-                <TableCell className="font-bold" colSpan={3}>Combined target</TableCell>
-                <TableCell className="font-bold text-teal-800">{REQUIRED_PROCEDURE_COUNT}</TableCell>
-                <TableCell className="font-bold">{Math.max(REQUIRED_PROCEDURE_COUNT - logs.length, 0)}</TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>}
+        </>
+      )}
 
       <Card>
         <CardHeader className="border-b border-teal-100"><CardTitle className="text-lg">Procedure entries sent</CardTitle></CardHeader>
@@ -378,7 +395,7 @@ export function ProcedureLogsPage() {
             </Empty>
           ) : (
             <Table>
-              <TableHeader><TableRow><TableHead>Number</TableHead><TableHead>Date</TableHead>{!isFreeTextProcedures && <TableHead>Group</TableHead>}<TableHead>Procedure</TableHead>{!hideProcedureAge && <TableHead>Age</TableHead>}{showProcedureExperience && <TableHead>Competency level</TableHead>}{showProcedureExperience && <TableHead>Verified competency</TableHead>}<TableHead>Remarks</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Number</TableHead><TableHead>Date</TableHead>{!isFreeTextProcedures && <TableHead>Group</TableHead>}<TableHead>Procedure</TableHead>{isMicrobiology && <TableHead>Details</TableHead>}{!hideProcedureAge && <TableHead>Age</TableHead>}{showProcedureExperience && <TableHead>Competency level</TableHead>}{showProcedureExperience && <TableHead>Verified competency</TableHead>}<TableHead>Remarks</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
               <TableBody>
                 {logs.map((log) => (
                   <TableRow key={log.id}>
@@ -386,6 +403,7 @@ export function ProcedureLogsPage() {
                     <TableCell>{formatLogbookDate(log.date)}</TableCell>
                     {!isFreeTextProcedures && <TableCell><Badge variant="outline" className="border-teal-100 bg-teal-50 text-teal-800">{groupNames[log.procedureGroup as ProcedureGroup] || log.procedureGroup}</Badge></TableCell>}
                     <TableCell className="font-semibold">{log.procedureName}</TableCell>
+                    {isMicrobiology && <TableCell className="text-xs max-w-[200px] truncate" title={log.diagnosis || ""}>{log.diagnosis || "—"}</TableCell>}
                     {!hideProcedureAge && <TableCell>{log.patientAge || log.age}</TableCell>}
                     {showProcedureExperience && <TableCell className="text-xs">{log.competencyLevel}</TableCell>}
                     {showProcedureExperience && <TableCell className="text-xs">{log.facultyVerifiedLevel ? (competencyLevels.find(c => c.value === log.facultyVerifiedLevel)?.name || log.facultyVerifiedLevel) : 'Pending verification'}</TableCell>}

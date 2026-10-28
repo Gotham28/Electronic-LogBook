@@ -165,6 +165,162 @@ router.post(
   }
 );
 
+// Yearly Attendance - list department students and their Year 1, 2, 3 attendance percentages
+router.get("/yearly-attendance", async (req, res) => {
+  try {
+    const caller = req.user!;
+    const deptId = caller.departmentId;
+    if (!deptId) {
+      res.status(403).json({ message: "No department assigned" });
+      return;
+    }
+
+    const deptStudents = await db
+      .select({
+        studentId: studentsTable.id,
+        name: usersTable.fullName,
+        registrationNumber: studentsTable.registrationNumber,
+        batch: studentsTable.batch,
+      })
+      .from(studentsTable)
+      .innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
+      .where(and(eq(usersTable.departmentId, deptId), eq(usersTable.status, "approved")))
+      .orderBy(usersTable.fullName);
+
+    if (deptStudents.length === 0) {
+      res.json({ students: [] });
+      return;
+    }
+
+    const studentIds = deptStudents.map((s) => s.studentId);
+    const existingLogs = await db
+      .select({
+        id: attendanceLogsTable.id,
+        studentId: attendanceLogsTable.studentId,
+        date: attendanceLogsTable.date,
+        clockIn: attendanceLogsTable.clockIn,
+        verifiedBy: attendanceLogsTable.verifiedBy,
+        verifierName: usersTable.fullName,
+      })
+      .from(attendanceLogsTable)
+      .leftJoin(usersTable, eq(attendanceLogsTable.verifiedBy, usersTable.id))
+      .where(and(
+        inArray(attendanceLogsTable.studentId, studentIds),
+        inArray(attendanceLogsTable.date, ["YEAR_1", "YEAR_2", "YEAR_3"])
+      ));
+
+    const logMap = new Map<string, typeof existingLogs[0]>();
+    for (const log of existingLogs) {
+      logMap.set(`${log.studentId}:${log.date}`, log);
+    }
+
+    const result = deptStudents.map((s) => {
+      const y1 = logMap.get(`${s.studentId}:YEAR_1`);
+      const y2 = logMap.get(`${s.studentId}:YEAR_2`);
+      const y3 = logMap.get(`${s.studentId}:YEAR_3`);
+
+      return {
+        studentId: s.studentId,
+        name: s.name,
+        rollNumber: s.registrationNumber,
+        year1: y1 ? { percentage: parseFloat(y1.clockIn || "0"), verifierName: y1.verifierName } : null,
+        year2: y2 ? { percentage: parseFloat(y2.clockIn || "0"), verifierName: y2.verifierName } : null,
+        year3: y3 ? { percentage: parseFloat(y3.clockIn || "0"), verifierName: y3.verifierName } : null,
+      };
+    });
+
+    res.json({ students: result });
+  } catch (error) {
+    req.log.error({ status: 500 }, "Error fetching professor yearly attendance list");
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// Yearly Attendance - save Year 1, 2, 3 attendance percentages for department students
+router.post(
+  "/yearly-attendance",
+  validate(
+    z.object({
+      records: z.array(
+        z.object({
+          studentId: z.number().int().positive(),
+          year: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal("1"), z.literal("2"), z.literal("3")]),
+          percentage: z.number().min(0).max(100).nullable().optional(),
+        })
+      ).min(1),
+    })
+  ),
+  async (req, res) => {
+    try {
+      const caller = req.user!;
+      const deptId = caller.departmentId;
+      if (!deptId) {
+        res.status(403).json({ message: "No department assigned" });
+        return;
+      }
+
+      const { records } = req.body;
+      const studentIds = Array.from(new Set(records.map((r: any) => r.studentId))) as number[];
+
+      // Verify all studentIds belong to caller's department (AGENTS.md sec 3)
+      const validStudents = await db
+        .select({ id: studentsTable.id })
+        .from(studentsTable)
+        .innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
+        .where(and(inArray(studentsTable.id, studentIds), eq(usersTable.departmentId, deptId)));
+
+      const validIdSet = new Set(validStudents.map((s) => s.id));
+      const hasUnauthorizedStudent = studentIds.some((id: number) => !validIdSet.has(id));
+      if (hasUnauthorizedStudent) {
+        res.status(403).json({ message: "Cannot mark attendance for students outside your department" });
+        return;
+      }
+
+      await db.transaction(async (tx) => {
+        for (const record of records) {
+          const dateKey = `YEAR_${record.year}`;
+          const [existing] = await tx
+            .select({ id: attendanceLogsTable.id })
+            .from(attendanceLogsTable)
+            .where(and(eq(attendanceLogsTable.studentId, record.studentId), eq(attendanceLogsTable.date, dateKey)))
+            .limit(1);
+
+          if (record.percentage === null || record.percentage === undefined) {
+            if (existing) {
+              await tx.delete(attendanceLogsTable).where(eq(attendanceLogsTable.id, existing.id));
+            }
+          } else {
+            const pctStr = String(record.percentage);
+            if (existing) {
+              await tx
+                .update(attendanceLogsTable)
+                .set({
+                  status: "present",
+                  clockIn: pctStr,
+                  verifiedBy: caller.id,
+                })
+                .where(eq(attendanceLogsTable.id, existing.id));
+            } else {
+              await tx.insert(attendanceLogsTable).values({
+                studentId: record.studentId,
+                date: dateKey,
+                status: "present",
+                clockIn: pctStr,
+                verifiedBy: caller.id,
+              });
+            }
+          }
+        }
+      });
+
+      res.json({ success: true, count: records.length });
+    } catch (error) {
+      req.log.error({ status: 500 }, "Error saving professor yearly attendance");
+      res.status(500).json({ message: "Internal server error" });
+    }
+  }
+);
+
 router.get("/:professorId/review-queue", async (req, res) => {
   try {
     const professorId = parseInt(String(req.params.professorId), 10);
