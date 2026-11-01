@@ -148,44 +148,112 @@ export function ConferencesPage() {
               <DialogDescription>Add details about a conference you attended or presented at.</DialogDescription>
             </DialogHeader>
             <form onSubmit={submit} className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2">
               {isConferenceDateRange ? (
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="From Date"><Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} required /></Field>
-                  <Field label="To Date"><Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} required /></Field>
-                </div>
+                <>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <Field label="From Date">
+                      <Input
+                        type="date"
+                        value={fromDate}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setFromDate(val);
+                          if (val && toDate && val > toDate) {
+                            setToDate(val);
+                          }
+                        }}
+                        onClick={(e) => {
+                          try { e.currentTarget.showPicker?.(); } catch {}
+                        }}
+                        className="cursor-pointer [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                        required
+                      />
+                    </Field>
+                    <Field label="To Date">
+                      <Input
+                        type="date"
+                        value={toDate}
+                        onChange={(e) => setToDate(e.target.value)}
+                        onClick={(e) => {
+                          try { e.currentTarget.showPicker?.(); } catch {}
+                        }}
+                        className="cursor-pointer [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                        required
+                      />
+                    </Field>
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <Field label="Conference/CME">
+                      <Select value={form.conferenceType} onValueChange={(value) => setForm({ ...form, conferenceType: value })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="conference">Conference</SelectItem>
+                          <SelectItem value="cme">CME</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                    <Field label="Level (optional)">
+                      <Select value={form.level} onValueChange={(value) => setForm({ ...form, level: value })}>
+                        <SelectTrigger><SelectValue placeholder="Select level" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">None</SelectItem>
+                          {conferenceLevels?.map((level: any) => (
+                            <SelectItem key={level.id} value={level.value}>{level.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                  </div>
+                </>
               ) : (
-                <Field label="Date"><Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required /></Field>
+                <>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <Field label="Date">
+                      <Input
+                        type="date"
+                        value={form.date}
+                        onChange={(e) => setForm({ ...form, date: e.target.value })}
+                        onClick={(e) => {
+                          try { e.currentTarget.showPicker?.(); } catch {}
+                        }}
+                        className="cursor-pointer [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                        required
+                      />
+                    </Field>
+                    <Field label="Conference/CME">
+                      <Select value={form.conferenceType} onValueChange={(value) => setForm({ ...form, conferenceType: value })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="conference">Conference</SelectItem>
+                          <SelectItem value="cme">CME</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <Field label="Level (optional)">
+                      <Select value={form.level} onValueChange={(value) => setForm({ ...form, level: value })}>
+                        <SelectTrigger><SelectValue placeholder="Select level" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">None</SelectItem>
+                          {conferenceLevels?.map((level: any) => (
+                            <SelectItem key={level.id} value={level.value}>{level.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                    {!config?.enabledFeatures?.hideConferenceLocation && (
+                      <Field label="Location (optional)"><Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} maxLength={160} /></Field>
+                    )}
+                  </div>
+                </>
               )}
-                <Field label="Conference/CME">
-                  <Select value={form.conferenceType} onValueChange={(value) => setForm({ ...form, conferenceType: value })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="conference">Conference</SelectItem>
-                      <SelectItem value="cme">CME</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </Field>
-              </div>
               <Field label="Conference Name">
                 <Input value={form.conferenceName} onChange={(e) => setForm({ ...form, conferenceName: e.target.value })} required />
               </Field>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Level (optional)">
-                  <Select value={form.level} onValueChange={(value) => setForm({ ...form, level: value })}>
-                    <SelectTrigger><SelectValue placeholder="Select level" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">None</SelectItem>
-                      {conferenceLevels?.map((level: any) => (
-                        <SelectItem key={level.id} value={level.value}>{level.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Field>
-                {!config?.enabledFeatures?.hideConferenceLocation && (
-                  <Field label="Location (optional)"><Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} maxLength={160} /></Field>
-                )}
-              </div>
+              {isConferenceDateRange && !config?.enabledFeatures?.hideConferenceLocation && (
+                <Field label="Location (optional)"><Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} maxLength={160} /></Field>
+              )}
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Role">
                   <Select value={form.role} onValueChange={(value) => setForm({ ...form, role: value })}>
