@@ -141,6 +141,11 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
     clinicalWorkCategories, clinicalWorkSubtypes, academicLogbook } = useDepartment();
   const isMicroDept = department?.code?.toLowerCase() === "microbiology" || department?.name?.toLowerCase().includes("microbiology");
   const microbiologyCaseFields = Boolean(config?.enabledFeatures?.microbiologyCaseFields || isMicroDept);
+  const isHodUser = Boolean(embedded || currentUser?.role === "hod");
+  const hideQuarterlyAppraisal = Boolean(
+    config?.enabledFeatures?.hideQuarterlyAppraisal ||
+    (isHodUser && (config?.enabledFeatures?.hideHodQuarterlyAppraisal || isMicroDept))
+  );
   const clinicalNames = React.useMemo(() => new Map([...clinicalWorkCategories, ...clinicalWorkSubtypes].map((item) => [item.value, item.name])),
     [clinicalWorkCategories, clinicalWorkSubtypes]);
   const [location, setLocation] = useLocation();
@@ -857,7 +862,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
               </form>
             </CardContent>
           </Card>
-          <QuarterlyAppraisalSection />
+          {!hideQuarterlyAppraisal && <QuarterlyAppraisalSection />}
         </TabsContent>
 
         {/* Tab 4: Attendance (Daily or Yearly) */}

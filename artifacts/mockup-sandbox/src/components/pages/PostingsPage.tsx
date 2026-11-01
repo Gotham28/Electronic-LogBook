@@ -41,6 +41,7 @@ export function PostingsPage() {
   const { postings: postingOptions, config, postingSchedule, department } = useDepartment();
   const isRadiology = department?.name?.toLowerCase().includes("radiology");
   const isDermatology = department?.name?.toLowerCase().includes("dermatology");
+  const isMicrobiology = department?.code?.toLowerCase() === "microbiology" || department?.name?.toLowerCase().includes("microbiology");
   const postingLabelTitle = isRadiology ? "Posting" : isDermatology ? "Posting unit" : "Ward / Posting Unit";
   const postingLabelLower = isRadiology ? "posting" : isDermatology ? "posting unit" : "ward posting or rotation";
   const [open, setOpen] = React.useState(false);
@@ -57,7 +58,7 @@ export function PostingsPage() {
   const [supervisorId, setSupervisorId] = React.useState("");
   const [editId, setEditId] = React.useState<number | null>(null);
 
-  const isFreeTextWard = !!config?.enabledFeatures?.freeTextPostingUnit;
+  const isFreeTextWard = Boolean(config?.enabledFeatures?.freeTextPostingUnit || isMicrobiology);
 
   const fetchPostings = React.useCallback(async () => {
     if (!user?.studentProfileId) return;
@@ -93,7 +94,7 @@ export function PostingsPage() {
     }
 
     try {
-      const finalSupervisorId = isFreeTextWard ? undefined : supervisorId;
+      const finalSupervisorId = isFreeTextWard ? (supervisorId && supervisorId !== "none" ? supervisorId : undefined) : supervisorId;
       if (editId) {
         await apiPatch(`/api/students/${user.studentProfileId}/postings/${editId}`, { ward, startDate, endDate, supervisorId: finalSupervisorId });
         toast.success("Posting updated successfully");
@@ -164,12 +165,13 @@ export function PostingsPage() {
                   <Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} required />
                 </div>
               </div>
-              {!isFreeTextWard && (
+              {(!isFreeTextWard || (isMicrobiology && professors.length > 0)) && (
                 <div className="space-y-2">
-                  <Label>Supervisor (Unit Chief)</Label>
+                  <Label>Supervisor (Unit Chief) {isFreeTextWard && <span className="text-slate-400 font-normal text-xs">(optional)</span>}</Label>
                   <Select value={supervisorId} onValueChange={setSupervisorId}>
-                    <SelectTrigger><SelectValue placeholder="Select faculty member" /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder={isFreeTextWard ? "Select faculty member (optional)" : "Select faculty member"} /></SelectTrigger>
                     <SelectContent>
+                      {isFreeTextWard && <SelectItem value="none">None</SelectItem>}
                       {professors.map(p => <SelectItem key={p.id} value={String(p.id)}>{p.fullName}</SelectItem>)}
                     </SelectContent>
                   </Select>
@@ -216,8 +218,8 @@ export function PostingsPage() {
                   <TableHead>{postingLabelTitle}</TableHead>
                   <TableHead>Start Date</TableHead>
                   <TableHead>End Date</TableHead>
-                  {!isFreeTextWard && <TableHead>Supervisor</TableHead>}
-                  {!isFreeTextWard && <TableHead>Status</TableHead>}
+                  {(!isFreeTextWard || isMicrobiology) && <TableHead>Supervisor</TableHead>}
+                  {(!isFreeTextWard || isMicrobiology) && <TableHead>Status</TableHead>}
                   <TableHead className="text-right">{isFreeTextWard ? "Action" : "Faculty Remarks"}</TableHead>
                 </TableRow>
               </TableHeader>
@@ -227,8 +229,8 @@ export function PostingsPage() {
                     <TableCell className="font-medium text-slate-900">{item.ward}</TableCell>
                     <TableCell>{formatLogbookDate(item.startDate)}</TableCell>
                     <TableCell>{formatLogbookDate(item.endDate)}</TableCell>
-                    {!isFreeTextWard && <TableCell>{item.supervisorName}</TableCell>}
-                    {!isFreeTextWard && (
+                    {(!isFreeTextWard || isMicrobiology) && <TableCell>{item.supervisorName || "—"}</TableCell>}
+                    {(!isFreeTextWard || isMicrobiology) && (
                       <TableCell>
                         <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
                           item.status === "verified" ? "bg-emerald-100 text-emerald-700" :
@@ -241,7 +243,7 @@ export function PostingsPage() {
                     )}
                     <TableCell className="text-right max-w-[220px]">
                       {/* Auto-verified postings (no supervisor) stay editable; faculty-verified ones are locked. */}
-                      {(item.status === "pending" || (isFreeTextWard && item.status === "verified" && !item.supervisorId)) ? (
+                      {(item.status === "pending" || (!item.supervisorId || item.status === "verified")) ? (
                         <Button variant="ghost" size="sm" className="text-teal-600 hover:text-teal-800 hover:bg-teal-50" onClick={() => {
                           setEditId(item.id);
                           setWard(item.ward);

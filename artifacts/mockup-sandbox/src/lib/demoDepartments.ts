@@ -323,8 +323,8 @@ const dermatologyProfile = createEmptyDepartmentProfile({
     awards: true,
     hideConferenceLocation: true,
     conferenceLevels: true,
-    academicActivityExtras: true,
     freeTextPostingUnit: true,
+    academicActivityExtras: true,
     freeTextProcedures: true,
     academicsFirstInNav: true,
   },
@@ -357,7 +357,10 @@ const microbiologyProfile = createEmptyDepartmentProfile({
     hideLeaveRecords: true,
     dailyAttendance: true,
     yearlyAttendance: true,
+    conferenceDateRange: true,
+    hideHodQuarterlyAppraisal: true,
     conferenceLevels: true,
+    freeTextPostingUnit: true,
   },
 });
 

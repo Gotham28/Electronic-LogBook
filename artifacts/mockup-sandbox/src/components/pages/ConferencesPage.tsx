@@ -37,10 +37,13 @@ export function ConferencesPage() {
   const user = React.useMemo(() => getCurrentUser(), []);
   const { config, conferenceLevels: deptConferenceLevels, department } = useDepartment();
   const isMicrobiology = department?.code?.toLowerCase() === "microbiology" || department?.name?.toLowerCase().includes("microbiology");
+  const isConferenceDateRange = Boolean(config?.enabledFeatures?.conferenceDateRange || isMicrobiology);
   const conferenceLevels = isMicrobiology ? [
     { id: 1, name: "National", value: "national" },
     { id: 2, name: "State", value: "state" },
   ] : deptConferenceLevels;
+  const [fromDate, setFromDate] = React.useState(todayForInput());
+  const [toDate, setToDate] = React.useState(todayForInput());
   const [professors, setProfessors] = React.useState<any[]>([]);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
@@ -77,6 +80,13 @@ export function ConferencesPage() {
   }, [fetchLogs]);
 
   const submit = async (event: React.FormEvent) => {
+    if (isConferenceDateRange && fromDate && toDate && toDate < fromDate) {
+      toast.error("To date cannot be earlier than From date");
+      return;
+    }
+    const submissionDate = isConferenceDateRange
+      ? (fromDate === toDate ? fromDate : `${fromDate} to ${toDate}`)
+      : form.date;
     event.preventDefault();
     
     setIsSubmitting(true);
@@ -87,7 +97,7 @@ export function ConferencesPage() {
         level: form.level === "none" ? null : form.level || null,
         category: form.category || null,
         role: form.role,
-        date: form.date,
+        date: submissionDate,
         location: form.location || null,
         certificateUrl: form.certificateUrl || null,
         supervisorId: form.supervisorId === "none" ? null : form.supervisorId || null,
@@ -103,6 +113,8 @@ export function ConferencesPage() {
       setOpen(false);
       setEditLogId(null);
       setForm({ ...form, conferenceName: "", conferenceType: "conference", level: "", category: "", location: "", certificateUrl: "", supervisorId: "" });
+      setFromDate(todayForInput());
+      setToDate(todayForInput());
       toast.success(editLogId ? `Conference log updated successfully` : `Conference log submitted successfully`);
     } catch (err: any) {
       toast.error(err.message || "Failed to submit conference log");
@@ -127,7 +139,7 @@ export function ConferencesPage() {
         </div>
         <Dialog open={open} onOpenChange={(val) => { 
           setOpen(val); 
-          if (!val) { publishArogyaContext(null); setForm({ date: todayForInput(), conferenceName: "", conferenceType: "conference", level: "", category: "", role: "attended", location: "", certificateUrl: "", supervisorId: "" }); setEditLogId(null); }
+          if (!val) { publishArogyaContext(null); setForm({ date: todayForInput(), conferenceName: "", conferenceType: "conference", level: "", category: "", role: "attended", location: "", certificateUrl: "", supervisorId: "" }); setFromDate(todayForInput()); setToDate(todayForInput()); setEditLogId(null); }
         }}>
           <DialogTrigger asChild><Button><PlusCircle className="h-4 w-4" /> Log conference</Button></DialogTrigger>
           <DialogContent className="rounded-2xl bg-white sm:max-w-lg">
@@ -136,37 +148,112 @@ export function ConferencesPage() {
               <DialogDescription>Add details about a conference you attended or presented at.</DialogDescription>
             </DialogHeader>
             <form onSubmit={submit} className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Date"><Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required /></Field>
-                <Field label="Conference/CME">
-                  <Select value={form.conferenceType} onValueChange={(value) => setForm({ ...form, conferenceType: value })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="conference">Conference</SelectItem>
-                      <SelectItem value="cme">CME</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </Field>
-              </div>
+              {isConferenceDateRange ? (
+                <>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <Field label="From Date">
+                      <Input
+                        type="date"
+                        value={fromDate}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setFromDate(val);
+                          if (val && toDate && val > toDate) {
+                            setToDate(val);
+                          }
+                        }}
+                        onClick={(e) => {
+                          try { e.currentTarget.showPicker?.(); } catch {}
+                        }}
+                        className="cursor-pointer [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                        required
+                      />
+                    </Field>
+                    <Field label="To Date">
+                      <Input
+                        type="date"
+                        value={toDate}
+                        onChange={(e) => setToDate(e.target.value)}
+                        onClick={(e) => {
+                          try { e.currentTarget.showPicker?.(); } catch {}
+                        }}
+                        className="cursor-pointer [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                        required
+                      />
+                    </Field>
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <Field label="Conference/CME">
+                      <Select value={form.conferenceType} onValueChange={(value) => setForm({ ...form, conferenceType: value })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="conference">Conference</SelectItem>
+                          <SelectItem value="cme">CME</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                    <Field label="Level (optional)">
+                      <Select value={form.level} onValueChange={(value) => setForm({ ...form, level: value })}>
+                        <SelectTrigger><SelectValue placeholder="Select level" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">None</SelectItem>
+                          {conferenceLevels?.map((level: any) => (
+                            <SelectItem key={level.id} value={level.value}>{level.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <Field label="Date">
+                      <Input
+                        type="date"
+                        value={form.date}
+                        onChange={(e) => setForm({ ...form, date: e.target.value })}
+                        onClick={(e) => {
+                          try { e.currentTarget.showPicker?.(); } catch {}
+                        }}
+                        className="cursor-pointer [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                        required
+                      />
+                    </Field>
+                    <Field label="Conference/CME">
+                      <Select value={form.conferenceType} onValueChange={(value) => setForm({ ...form, conferenceType: value })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="conference">Conference</SelectItem>
+                          <SelectItem value="cme">CME</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <Field label="Level (optional)">
+                      <Select value={form.level} onValueChange={(value) => setForm({ ...form, level: value })}>
+                        <SelectTrigger><SelectValue placeholder="Select level" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">None</SelectItem>
+                          {conferenceLevels?.map((level: any) => (
+                            <SelectItem key={level.id} value={level.value}>{level.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                    {!config?.enabledFeatures?.hideConferenceLocation && (
+                      <Field label="Location (optional)"><Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} maxLength={160} /></Field>
+                    )}
+                  </div>
+                </>
+              )}
               <Field label="Conference Name">
                 <Input value={form.conferenceName} onChange={(e) => setForm({ ...form, conferenceName: e.target.value })} required />
               </Field>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Level (optional)">
-                  <Select value={form.level} onValueChange={(value) => setForm({ ...form, level: value })}>
-                    <SelectTrigger><SelectValue placeholder="Select level" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">None</SelectItem>
-                      {conferenceLevels?.map((level: any) => (
-                        <SelectItem key={level.id} value={level.value}>{level.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Field>
-                {!config?.enabledFeatures?.hideConferenceLocation && (
-                  <Field label="Location (optional)"><Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} maxLength={160} /></Field>
-                )}
-              </div>
+              {isConferenceDateRange && !config?.enabledFeatures?.hideConferenceLocation && (
+                <Field label="Location (optional)"><Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} maxLength={160} /></Field>
+              )}
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Role">
                   <Select value={form.role} onValueChange={(value) => setForm({ ...form, role: value })}>
@@ -228,7 +315,7 @@ export function ConferencesPage() {
             </Empty>
           ) : (
             <Table>
-              <TableHeader><TableRow><TableHead>Number</TableHead><TableHead>Date</TableHead><TableHead>Type</TableHead><TableHead>Conference</TableHead><TableHead>Level</TableHead><TableHead>Role</TableHead>{!config?.enabledFeatures?.hideConferenceLocation && <TableHead>Location</TableHead>}<TableHead>Reviewing faculty</TableHead><TableHead>Remarks</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Number</TableHead><TableHead>{isConferenceDateRange ? "Dates" : "Date"}</TableHead><TableHead>Type</TableHead><TableHead>Conference</TableHead><TableHead>Level</TableHead><TableHead>Role</TableHead>{!config?.enabledFeatures?.hideConferenceLocation && <TableHead>Location</TableHead>}<TableHead>Reviewing faculty</TableHead><TableHead>Remarks</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
               <TableBody>
                 {logs.map((log) => (
                   <TableRow key={log.id}>
@@ -252,6 +339,17 @@ export function ConferencesPage() {
                       {log.status === "pending" && (
                         <Button variant="ghost" size="sm" className="text-teal-600 hover:text-teal-800 hover:bg-teal-50" onClick={() => {
                           setEditLogId(log.id);
+                          if (log.date?.includes(" to ")) {
+                            const [f, t] = log.date.split(" to ");
+                            setFromDate(f.trim());
+                            setToDate(t.trim());
+                          } else if (log.date) {
+                            setFromDate(log.date);
+                            setToDate(log.date);
+                          } else {
+                            setFromDate(todayForInput());
+                            setToDate(todayForInput());
+                          }
                           publishArogyaContext({ log: { type: "conference", id: Number(log.id) } });
                           setForm({
                             date: log.date, conferenceName: log.conferenceName || "", conferenceType: log.conferenceType || "conference", level: log.level || "", category: log.category || "", role: log.role || "attended",

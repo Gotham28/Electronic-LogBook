@@ -45,6 +45,9 @@ export function DepartmentProvider({ departmentId, children }: { departmentId: n
         if (enabledFeatures.dailyAttendance === undefined) enabledFeatures.dailyAttendance = true;
         if (enabledFeatures.yearlyAttendance === undefined) enabledFeatures.yearlyAttendance = true;
         if (enabledFeatures.conferenceLevels === undefined) enabledFeatures.conferenceLevels = true;
+        if (enabledFeatures.freeTextPostingUnit === undefined) enabledFeatures.freeTextPostingUnit = true;
+        if (enabledFeatures.conferenceDateRange === undefined) enabledFeatures.conferenceDateRange = true;
+        if (enabledFeatures.hideHodQuarterlyAppraisal === undefined) enabledFeatures.hideHodQuarterlyAppraisal = true;
       }
       const resolvedConfig: DepartmentConfig | null = result.config ? {
         ...result.config,
