@@ -10,7 +10,7 @@ import { splitLeaveDaysByYear } from "../lib/leave.js";
 import { requireAuth, requireRole, requireDepartment } from "../middlewares/auth.js";
 import { studentAccess } from "../middlewares/student-access.js";
 import { z } from "zod";
-import { dateSchema, idSchema, nameSchema, validate } from "../lib/validation.js";
+import { dateOrRangeSchema, dateSchema, idSchema, nameSchema, validate } from "../lib/validation.js";
 import { resolveConfigDepartmentId } from "../lib/department-config-source.js";
 import { getDepartmentFeatures } from "../lib/department-features.js";
 import { clinicalWorkTarget } from "../lib/clinical-work-progress.js";
@@ -1324,7 +1324,7 @@ router.post("/:studentId/academic-logs", validate(z.object({ supervisorId: idSch
 
 router.post("/:studentId/conference-logs", validate(z.object({ supervisorId: idSchema.optional().nullable(), conferenceName: nameSchema,
   conferenceType: z.enum(["conference", "cme"]).default("conference"), level: optionalText.nullable(), category: optionalText.nullable(),
-  role: z.enum(["attended", "presented"]), date: dateSchema, location: optionalText.nullable(),
+  role: z.enum(["attended", "presented"]), date: dateOrRangeSchema, location: optionalText.nullable(),
   certificateUrl: optionalText.nullable() }).strict()), async (req, res) => {
   try {
     const studentId = parseInt(String(req.params.studentId), 10);
@@ -1728,7 +1728,7 @@ router.patch("/:studentId/academic-logs/:logId", requireAuth, validate(z.object(
 // 4. Conference Logs
 router.patch("/:studentId/conference-logs/:logId", requireAuth, validate(z.object({ supervisorId: idSchema.optional().nullable(), conferenceName: nameSchema,
   conferenceType: z.enum(["conference", "cme"]), level: optionalText.nullable(), category: optionalText.nullable(),
-  role: z.enum(["attended", "presented"]), date: dateSchema, location: optionalText.nullable(),
+  role: z.enum(["attended", "presented"]), date: dateOrRangeSchema, location: optionalText.nullable(),
   certificateUrl: optionalText.nullable() }).strict().partial()), async (req, res) => {
   try {
     const studentId = parseInt(String(req.params.studentId), 10);

@@ -69,6 +69,9 @@ router.get("/:departmentId/catalog", async (req, res) => {
         if (enabledFeatures.hideLeaveRecords === undefined) enabledFeatures.hideLeaveRecords = true;
         if (enabledFeatures.yearlyAttendance === undefined) enabledFeatures.yearlyAttendance = true;
         if (enabledFeatures.conferenceLevels === undefined) enabledFeatures.conferenceLevels = true;
+        if (enabledFeatures.freeTextPostingUnit === undefined) enabledFeatures.freeTextPostingUnit = true;
+        if (enabledFeatures.conferenceDateRange === undefined) enabledFeatures.conferenceDateRange = true;
+        if (enabledFeatures.hideHodQuarterlyAppraisal === undefined) enabledFeatures.hideHodQuarterlyAppraisal = true;
       }
       resolvedConfig.enabledFeatures = enabledFeatures;
     } else if (isMicro) {
@@ -78,7 +81,7 @@ router.get("/:departmentId/catalog", async (req, res) => {
         requiredCases: null,
         requiredProcedures: null,
         requiredAcademic: null,
-        enabledFeatures: { procedureExperience: false, microbiologyCaseFields: true, freeTextProcedures: true, hideProcedureAge: true, useThesisAndMandatoryCertificationsLabel: true, attendedConferences: true, hideLeaveRecords: true, yearlyAttendance: true, conferenceLevels: true },
+        enabledFeatures: { procedureExperience: false, microbiologyCaseFields: true, freeTextProcedures: true, hideProcedureAge: true, useThesisAndMandatoryCertificationsLabel: true, attendedConferences: true, hideLeaveRecords: true, yearlyAttendance: true, conferenceLevels: true, freeTextPostingUnit: true, conferenceDateRange: true, hideHodQuarterlyAppraisal: true },
         createdAt: new Date(),
         updatedAt: new Date(),
       } as any;

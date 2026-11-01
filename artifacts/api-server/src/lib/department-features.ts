@@ -20,6 +20,10 @@ export async function getDepartmentFeatures(departmentId: number) {
     if (features.attendedConferences === undefined) features.attendedConferences = true;
     if (features.hideLeaveRecords === undefined) features.hideLeaveRecords = true;
     if (features.dailyAttendance === undefined) features.dailyAttendance = true;
+    if (features.yearlyAttendance === undefined) features.yearlyAttendance = true;
+    if (features.freeTextPostingUnit === undefined) features.freeTextPostingUnit = true;
+    if (features.conferenceDateRange === undefined) features.conferenceDateRange = true;
+    if (features.hideHodQuarterlyAppraisal === undefined) features.hideHodQuarterlyAppraisal = true;
   }
   return { configSourceId, features };
 }

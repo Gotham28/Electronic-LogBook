@@ -13,6 +13,21 @@ export const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((s) => 
   const d = new Date(s + "T00:00:00Z");
   return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
 }, "Invalid date");
+export const dateOrRangeSchema = z.string().refine((s) => {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    const d = new Date(s + "T00:00:00Z");
+    return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
+  }
+  if (/^\d{4}-\d{2}-\d{2} to \d{4}-\d{2}-\d{2}$/.test(s)) {
+    const [s1, s2] = s.split(" to ");
+    const d1 = new Date(s1 + "T00:00:00Z");
+    const d2 = new Date(s2 + "T00:00:00Z");
+    return !Number.isNaN(d1.getTime()) && d1.toISOString().slice(0, 10) === s1 &&
+           !Number.isNaN(d2.getTime()) && d2.toISOString().slice(0, 10) === s2 &&
+           s1 <= s2;
+  }
+  return false;
+}, "Invalid date or date range");
 export const targetSchema = z.coerce.number().int().min(0).max(100000);
 export const configSchema = z.object({
 
