@@ -1,0 +1,115 @@
+{
+  "completeness": "partial",
+  "deferred": [
+    {
+      "id": "broad-repo-remainder",
+      "paths": [
+        "artifacts/api-server/src/routes/student.ts",
+        "artifacts/api-server/src/routes/admin.ts",
+        "artifacts/api-server/src/routes/superadmin.ts",
+        "artifacts/mockup-sandbox/src"
+      ],
+      "reason": "Large student/admin/superadmin routes and presentation components were reviewed in relevant sections only; remaining product paths were not completely audited."
+    }
+  ],
+  "documentType": "codex-security.coverage",
+  "excludePaths": [
+    "node_modules",
+    ".git",
+    "artifacts/security-audit-20261026"
+  ],
+  "explicitExclusions": [
+    {
+      "pattern": "node_modules/**",
+      "reason": "Dependencies were not exhaustively audited or queried against vulnerability databases."
+    },
+    {
+      "pattern": ".git/**",
+      "reason": "Only the authorized current local state was analyzed, not history."
+    },
+    {
+      "pattern": "artifacts/security-audit-20261026/**",
+      "reason": "Generated review artifacts are not product source."
+    }
+  ],
+  "includePaths": [
+    "."
+  ],
+  "inventoryStrategy": "repository",
+  "mode": "repository",
+  "openQuestions": [
+    {
+      "question": "Which real order/payment IDs were charged but remained created/failed, and what were the provider capture/webhook-delivery states? A production operator should reconcile using IDs only; this review did not access those records."
+    },
+    {
+      "question": "Is the embedded database credential already revoked, and what privileges did its role hold? Do not validate by using the leaked value."
+    },
+    {
+      "question": "Are successful checkout signatures guaranteed to represent captured funds under the deployed gateway configuration? The current verify handler checks HMAC but does not query capture/amount/currency state."
+    },
+    {
+      "question": "What is the approved refund/chargeback/fee-waiver policy? Current source handles only payment.captured/payment.failed, contains no refund event reconciliation, and checks payment on pending login/approval rather than ongoing entitlement."
+    },
+    {
+      "question": "HOD payment notice email failure is caught after the paid write; retries of already-paid events do not resend. Should approval notices use a durable outbox? This affects awareness, not stored payment success."
+    },
+    {
+      "question": "The generic API client overwrites explicit Authorization headers with a stored session token. App startup/signout normally clears stale sessions, so ordinary payment-flow reachability is not established; do not treat this as a confirmed incident cause."
+    },
+    {
+      "question": "Tracked old demo environment values have no current VITE_DEMO consumers. Their live credential status is unknown and should be reviewed by the owner without reproducing values."
+    }
+  ],
+  "scanId": "elogbook-local-20261026-payments-security",
+  "schemaVersion": "1.0",
+  "surfaces": [
+    {
+      "disposition": "reported",
+      "id": "payments",
+      "label": "Payment confirmation and checkout recovery",
+      "notes": "Two directly reproduced payment-state failures. Browser state only stores success payload in callback memory, offers no confirm-status retry/polling, and tells uncertain applicants to contact HOD. Current routes expose only create-order, verify and webhook; no gateway reconciliation endpoint was found. The 30-minute reuse cutoff can create another order while old unconfirmed orders still exist; do not advise affected users to pay again until provider status is reconciled.",
+      "receiptRefs": [],
+      "riskArea": "Financial integrity and availability"
+    },
+    {
+      "disposition": "no_issue_found",
+      "id": "auth",
+      "label": "Session, registration/reset and approval controls",
+      "notes": "HS256 allowlist, server-resolved account/session state, separation of payment/session tokens, payment row ownership and actual user IDs checked. Login/approval use any paid row rather than latest attempt. Trusted account provisioning intentionally bypasses payment. No additional exploitable bypass substantiated in inspected paths.",
+      "receiptRefs": [],
+      "riskArea": "Authentication and department isolation"
+    },
+    {
+      "disposition": "reported",
+      "id": "secrets",
+      "label": "Current tracked credential exposure",
+      "notes": "14 credential-bearing scripts independently confirmed with values redacted. No credential was used or validated. The normal production start path does not call these helpers.",
+      "receiptRefs": [],
+      "riskArea": "Database credentials"
+    },
+    {
+      "disposition": "reported",
+      "id": "clinical-logs",
+      "label": "Clinical work insert/update errors",
+      "notes": "Both raw console error sinks confirmed. Other large student route sections were not exhaustively reviewed.",
+      "receiptRefs": [],
+      "riskArea": "Clinical text in operational logs"
+    },
+    {
+      "disposition": "reported",
+      "id": "deletion",
+      "label": "HOD/admin permanent account deletion",
+      "notes": "Payment deletion and unknown-order acknowledgment reproduced using synthetic data; no privilege escalation claimed.",
+      "receiptRefs": [],
+      "riskArea": "Financial ledger retention"
+    },
+    {
+      "disposition": "needs_follow_up",
+      "id": "deferred-broad",
+      "label": "Remaining repository paths and deployment state",
+      "notes": "Broad sampling is not an exhaustive audit. Live provider subscriptions, captures/refunds/settlement, secret rotation and production log policy were not inspected.",
+      "receiptRefs": [],
+      "riskArea": "Unreviewed source and external configuration"
+    }
+  ]
+}

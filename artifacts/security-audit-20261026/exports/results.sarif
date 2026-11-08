@@ -1,0 +1,687 @@
+{
+  "$schema": "https://docs.oasis-open.org/sarif/sarif/v2.1.0/os/schemas/sarif-schema-2.1.0.json",
+  "runs": [
+    {
+      "automationDetails": {
+        "id": "elogbook-local-20261026-payments-security"
+      },
+      "invocations": [
+        {
+          "executionSuccessful": true,
+          "toolExecutionNotifications": [
+            {
+              "level": "warning",
+              "message": {
+                "text": "Large student/admin/superadmin routes and presentation components were reviewed in relevant sections only; remaining product paths were not completely audited."
+              }
+            }
+          ]
+        }
+      ],
+      "properties": {
+        "codexSecurityCoverageCompleteness": "partial",
+        "codexSecuritySchemaVersion": "1.0",
+        "codexSecurityTargetKind": "git_revision"
+      },
+      "results": [
+        {
+          "level": "warning",
+          "locations": [
+            {
+              "message": {
+                "text": "root_control"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "artifacts/api-server/src/routes/payments-webhook.ts"
+                },
+                "region": {
+                  "endLine": 138,
+                  "startLine": 124
+                }
+              }
+            },
+            {
+              "message": {
+                "text": "outcome"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "artifacts/api-server/src/routes/auth.ts"
+                },
+                "region": {
+                  "endLine": 224,
+                  "startLine": 220
+                }
+              }
+            },
+            {
+              "message": {
+                "text": "evidence:capture-write"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "artifacts/api-server/src/routes/payments-webhook.ts"
+                },
+                "region": {
+                  "endLine": 105,
+                  "startLine": 103
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Captured payments are acknowledged even when recording them fails\n\nA captured-payment notification can receive `200` while its database write failed and the account remains unpaid. When the browser callback is unavailable, the application has acknowledged its recovery event without recording the payment.\n\nSeverity: medium\n\nCategory: Payment processing reliability financial integrity\n\nWeaknesses: CWE-703\n\nRemediation:\nAcknowledge only after durably storing the event or applying the payment update. Return a retryable failure for transient storage errors; implement an idempotent durable inbox/reconciliation worker and alert on irreconcilable events. Verify gateway state server-side before offering another payment.\n\nRemediation tests:\n- Force one storage failure during capture; require retryable response or durable queued event.\n- Replay the same capture after recovery and assert one paid transition and no duplicate charge.\n- Lose the browser callback and verify eventual paid-state recovery."
+          },
+          "partialFingerprints": {
+            "codexSecurity/v1": "codex-security/v1:sha256:fc1b0e47bf87f82366bf06e4bf81846f4ebb875ac3524550f637c1841fe8f311",
+            "primaryLocationLineHash": "d15582a43b8ce4b1:1"
+          },
+          "properties": {
+            "category": "Payment processing reliability / financial integrity",
+            "confidence": "high",
+            "findingId": "csf_3e47c52f348d444f7672fc06",
+            "occurrenceId": "occ_3350424d48c0dd9fae960ad6",
+            "severity": "medium"
+          },
+          "ruleId": "payment-webhook-acknowledges-storage-failure",
+          "ruleIndex": 4
+        },
+        {
+          "level": "warning",
+          "locations": [
+            {
+              "message": {
+                "text": "root_control"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "artifacts/api-server/src/routes/student.ts"
+                },
+                "region": {
+                  "endLine": 1465,
+                  "startLine": 1465
+                }
+              }
+            },
+            {
+              "message": {
+                "text": "root_control"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "artifacts/api-server/src/routes/student.ts"
+                },
+                "region": {
+                  "endLine": 1512,
+                  "startLine": 1512
+                }
+              }
+            },
+            {
+              "message": {
+                "text": "evidence:clinical-input"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "artifacts/api-server/src/routes/student.ts"
+                },
+                "region": {
+                  "endLine": 1412,
+                  "startLine": 1406
+                }
+              }
+            },
+            {
+              "message": {
+                "text": "evidence:clinical-insert"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "artifacts/api-server/src/routes/student.ts"
+                },
+                "region": {
+                  "endLine": 1466,
+                  "startLine": 1458
+                }
+              }
+            },
+            {
+              "message": {
+                "text": "evidence:clinical-patch"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "artifacts/api-server/src/routes/student.ts"
+                },
+                "region": {
+                  "endLine": 1514,
+                  "startLine": 1502
+                }
+              }
+            },
+            {
+              "message": {
+                "text": "evidence:central-handler-comparison"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "artifacts/api-server/src/app.ts"
+                },
+                "region": {
+                  "endLine": 112,
+                  "startLine": 106
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Clinical write failures send clinical fields to server logs\n\nFailed clinical-work inserts and edits print complete database error objects to `console.error`. Those query errors can contain bound patient case identifiers and clinical findings, copying clinical data into operational log systems.\n\nSeverity: medium\n\nCategory: Sensitive clinical information in logs\n\nWeaknesses: CWE-532\n\nRemediation:\nRemove the two raw console calls. Log only operation, vetted IDs/status and safe error codes. Check local catches elsewhere for equivalent raw-error logging. Test failure paths with synthetic sensitive markers and assert none reach console/logger output.\n\nRemediation tests:\n- Induce insert and update failures with synthetic clinical markers; assert no marker appears in console or logger calls.\n- Check that client responses remain generic and ownership guards still apply."
+          },
+          "partialFingerprints": {
+            "codexSecurity/v1": "codex-security/v1:sha256:425bb61b8c6264108a63f859838bb7b416edfada4b50dba585fee30b2623244a",
+            "primaryLocationLineHash": "4abdf4777936a282:1"
+          },
+          "properties": {
+            "category": "Sensitive clinical information in logs",
+            "confidence": "high",
+            "findingId": "csf_1b62357fb73ce9be3db8953b",
+            "occurrenceId": "occ_87faeeaac823ef3611dba2e1",
+            "severity": "medium"
+          },
+          "ruleId": "clinical-query-errors-in-console",
+          "ruleIndex": 1
+        },
+        {
+          "level": "warning",
+          "locations": [
+            {
+              "message": {
+                "text": "root_control"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "artifacts/api-server/src/routes/payments.ts"
+                },
+                "region": {
+                  "endLine": 199,
+                  "startLine": 185
+                }
+              }
+            },
+            {
+              "message": {
+                "text": "outcome"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "artifacts/api-server/src/routes/admin.ts"
+                },
+                "region": {
+                  "endLine": 110,
+                  "startLine": 105
+                }
+              }
+            },
+            {
+              "message": {
+                "text": "evidence:verified-input"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "artifacts/api-server/src/routes/payments.ts"
+                },
+                "region": {
+                  "endLine": 183,
+                  "startLine": 178
+                }
+              }
+            },
+            {
+              "message": {
+                "text": "evidence:webhook-can-recover"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "artifacts/api-server/src/routes/payments-webhook.ts"
+                },
+                "region": {
+                  "endLine": 105,
+                  "startLine": 98
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "A successful retry cannot clear an earlier failed order through browser verification\n\nWhen a failed attempt is followed by a successful checkout on the same order, `/verify` rejects the valid signed success with 409 because it only promotes `created` rows. If the capture webhook is late or missing, login and HOD approval continue to return 402.\n\nSeverity: medium\n\nCategory: Payment state machine reliability\n\nWeaknesses: CWE-841\n\nRemediation:\nUse one shared, idempotent payment-finalization path for browser verification and webhooks. After authoritative provider verification, permit legitimate failed-to-paid recovery; retain explicit protections for refunded orders and owner mismatches.\n\nRemediation tests:\n- Failed attempt then valid successful retry with no captured webhook must recover.\n- Refused/invalid signature must leave state unchanged.\n- Refunded orders must not be resurrected.\n- Concurrent success callbacks must remain idempotent."
+          },
+          "partialFingerprints": {
+            "codexSecurity/v1": "codex-security/v1:sha256:78449e1c4b0da1dd6a2fe43660cc584e7ded6e8745bcc7293d4831c5b540bf47",
+            "primaryLocationLineHash": "9238856763a72061:1"
+          },
+          "properties": {
+            "category": "Payment state-machine reliability",
+            "confidence": "high",
+            "findingId": "csf_5987e4bc56a66d2f62f5bc92",
+            "occurrenceId": "occ_dab3f859ab529c26ed89e24c",
+            "severity": "medium"
+          },
+          "ruleId": "payment-verify-rejects-failed-retry",
+          "ruleIndex": 3
+        },
+        {
+          "level": "note",
+          "locations": [
+            {
+              "message": {
+                "text": "root_control"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "artifacts/api-server/src/lib/hard-delete-user.ts"
+                },
+                "region": {
+                  "endLine": 152,
+                  "startLine": 148
+                }
+              }
+            },
+            {
+              "message": {
+                "text": "entrypoint"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "artifacts/api-server/src/routes/admin.ts"
+                },
+                "region": {
+                  "endLine": 747,
+                  "startLine": 742
+                }
+              }
+            },
+            {
+              "message": {
+                "text": "entrypoint"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "artifacts/api-server/src/routes/superadmin.ts"
+                },
+                "region": {
+                  "endLine": 815,
+                  "startLine": 795
+                }
+              }
+            },
+            {
+              "message": {
+                "text": "evidence:unknown-capture"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "artifacts/api-server/src/routes/payments-webhook.ts"
+                },
+                "region": {
+                  "endLine": 88,
+                  "startLine": 84
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Deleting an applicant also removes outstanding payment linkage\n\nHard-deleting a pending applicant removes every payment row, including an outstanding checkout order. A later genuine capture then has no account mapping and is acknowledged without recording it. Deleting a paid account also removes local payment/refund reference data.\n\nSeverity: low\n\nCategory: Payment ledger retention reconciliation reliability\n\nRemediation:\nDefine payment retention independently of account deletion. Keep a financial tombstone/provider identifiers and block or reconcile outstanding payments before removal. Avoid recreating clinical/personal records merely to retain a receipt.\n\nRemediation tests:\n- An account with an unsettled order must not lose its reconciliation mapping.\n- A later capture after permitted account deletion must be durably correlated for refund/reconciliation."
+          },
+          "partialFingerprints": {
+            "codexSecurity/v1": "codex-security/v1:sha256:1ff80aaf09162dc7d90de5d1a13ed6cde772684a14a1b5cc356d107c481f5e4b",
+            "primaryLocationLineHash": "17c6923bf7dd6cec:1"
+          },
+          "properties": {
+            "category": "Payment ledger retention / reconciliation reliability",
+            "confidence": "high",
+            "findingId": "csf_dab71e01cb3139e6fedcf53c",
+            "occurrenceId": "occ_ddd8433510d372ce4421ea0c",
+            "severity": "low"
+          },
+          "ruleId": "account-deletion-erases-payment-ledger",
+          "ruleIndex": 0
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "message": {
+                "text": "root_control"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "artifacts/api-server/run.mjs"
+                },
+                "region": {
+                  "endLine": 11,
+                  "startLine": 11
+                }
+              }
+            },
+            {
+              "message": {
+                "text": "root_control"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "lib/db/cleanup_test.cjs"
+                },
+                "region": {
+                  "endLine": 2,
+                  "startLine": 2
+                }
+              }
+            },
+            {
+              "message": {
+                "text": "root_control"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "lib/db/dedup.cjs"
+                },
+                "region": {
+                  "endLine": 2,
+                  "startLine": 2
+                }
+              }
+            },
+            {
+              "message": {
+                "text": "root_control"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "lib/db/final_check.cjs"
+                },
+                "region": {
+                  "endLine": 3,
+                  "startLine": 3
+                }
+              }
+            },
+            {
+              "message": {
+                "text": "root_control"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "lib/db/leave_test.cjs"
+                },
+                "region": {
+                  "endLine": 2,
+                  "startLine": 2
+                }
+              }
+            },
+            {
+              "message": {
+                "text": "root_control"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "lib/db/merge_accounts.cjs"
+                },
+                "region": {
+                  "endLine": 2,
+                  "startLine": 2
+                }
+              }
+            },
+            {
+              "message": {
+                "text": "root_control"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "lib/db/merge_accounts_2.cjs"
+                },
+                "region": {
+                  "endLine": 2,
+                  "startLine": 2
+                }
+              }
+            },
+            {
+              "message": {
+                "text": "root_control"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "lib/db/rename_user.cjs"
+                },
+                "region": {
+                  "endLine": 2,
+                  "startLine": 2
+                }
+              }
+            },
+            {
+              "message": {
+                "text": "root_control"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "lib/db/reset_pass.cjs"
+                },
+                "region": {
+                  "endLine": 3,
+                  "startLine": 3
+                }
+              }
+            },
+            {
+              "message": {
+                "text": "root_control"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "lib/db/reset_radhamani.cjs"
+                },
+                "region": {
+                  "endLine": 2,
+                  "startLine": 2
+                }
+              }
+            },
+            {
+              "message": {
+                "text": "root_control"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "lib/db/restore.cjs"
+                },
+                "region": {
+                  "endLine": 2,
+                  "startLine": 2
+                }
+              }
+            },
+            {
+              "message": {
+                "text": "root_control"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "lib/db/schema_test.cjs"
+                },
+                "region": {
+                  "endLine": 2,
+                  "startLine": 2
+                }
+              }
+            },
+            {
+              "message": {
+                "text": "root_control"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "lib/db/sync_mohammed.cjs"
+                },
+                "region": {
+                  "endLine": 2,
+                  "startLine": 2
+                }
+              }
+            },
+            {
+              "message": {
+                "text": "root_control"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "lib/db/test.cjs"
+                },
+                "region": {
+                  "endLine": 2,
+                  "startLine": 2
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Database credentials remain embedded in 14 tracked scripts\n\nReading the current tracked source reveals one repeated, non-placeholder database credential group in 14 helper scripts. Treat the credential as exposed and rotate it; its live validity and privileges were deliberately not tested.\n\nSeverity: high\n\nCategory: Hardcoded database credentials\n\nWeaknesses: CWE-798\n\nRemediation:\nRevoke/rotate the repeated database credential first. Remove it from all 14 tracked locations, delete obsolete helpers or require explicit configuration and verified targets, and coordinate history cleanup and access review. Review the fixed legacy account-reset passwords separately.\n\nRemediation tests:\n- Scan current tracked files for credential-bearing URLs without printing their values.\n- Verify obsolete credentials are revoked through the database owner, not by trying leaked credentials."
+          },
+          "partialFingerprints": {
+            "codexSecurity/v1": "codex-security/v1:sha256:4c0768cbd1b901bfec9ff896ce8b06e0e79bad3e13bca95eae0cac3e017ffc91",
+            "primaryLocationLineHash": "5a8acf7a2c4d477c:1"
+          },
+          "properties": {
+            "category": "Hardcoded database credentials",
+            "confidence": "high",
+            "findingId": "csf_193b4bac081170b845621118",
+            "occurrenceId": "occ_de902ef4fd45c0da033670be",
+            "severity": "high"
+          },
+          "ruleId": "hardcoded-database-credentials",
+          "ruleIndex": 2
+        }
+      ],
+      "tool": {
+        "driver": {
+          "name": "Codex Security",
+          "rules": [
+            {
+              "fullDescription": {
+                "text": "Account deletion erases payment ledger. Categories: Payment ledger retention reconciliation reliability."
+              },
+              "help": {
+                "markdown": "Account deletion erases payment ledger. Categories: Payment ledger retention reconciliation reliability.\n\n## Remediation\n\nDefine payment retention independently of account deletion. Keep a financial tombstone/provider identifiers and block or reconcile outstanding payments before removal. Avoid recreating clinical/personal records merely to retain a receipt.",
+                "text": "Account deletion erases payment ledger. Categories: Payment ledger retention reconciliation reliability.\n\nRemediation:\n\nDefine payment retention independently of account deletion. Keep a financial tombstone/provider identifiers and block or reconcile outstanding payments before removal. Avoid recreating clinical/personal records merely to retain a receipt."
+              },
+              "id": "account-deletion-erases-payment-ledger",
+              "name": "Account deletion erases payment ledger",
+              "properties": {
+                "security-severity": "2.0",
+                "tags": [
+                  "Payment ledger retention / reconciliation reliability",
+                  "security"
+                ]
+              },
+              "shortDescription": {
+                "text": "Account deletion erases payment ledger"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "Clinical query errors in console. Categories: Sensitive clinical information in logs. Weaknesses: CWE-532."
+              },
+              "help": {
+                "markdown": "Clinical query errors in console. Categories: Sensitive clinical information in logs. Weaknesses: CWE-532.\n\n## Remediation\n\nRemove the two raw console calls. Log only operation, vetted IDs/status and safe error codes. Check local catches elsewhere for equivalent raw-error logging. Test failure paths with synthetic sensitive markers and assert none reach console/logger output.",
+                "text": "Clinical query errors in console. Categories: Sensitive clinical information in logs. Weaknesses: CWE-532.\n\nRemediation:\n\nRemove the two raw console calls. Log only operation, vetted IDs/status and safe error codes. Check local catches elsewhere for equivalent raw-error logging. Test failure paths with synthetic sensitive markers and assert none reach console/logger output."
+              },
+              "id": "clinical-query-errors-in-console",
+              "name": "Clinical query errors in console",
+              "properties": {
+                "security-severity": "5.0",
+                "tags": [
+                  "Sensitive clinical information in logs",
+                  "external/cwe/cwe-532",
+                  "security"
+                ]
+              },
+              "shortDescription": {
+                "text": "Clinical query errors in console"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "Hardcoded database credentials. Categories: Hardcoded database credentials. Weaknesses: CWE-798."
+              },
+              "help": {
+                "markdown": "Hardcoded database credentials. Categories: Hardcoded database credentials. Weaknesses: CWE-798.\n\n## Remediation\n\nRevoke/rotate the repeated database credential first. Remove it from all 14 tracked locations, delete obsolete helpers or require explicit configuration and verified targets, and coordinate history cleanup and access review. Review the fixed legacy account-reset passwords separately.",
+                "text": "Hardcoded database credentials. Categories: Hardcoded database credentials. Weaknesses: CWE-798.\n\nRemediation:\n\nRevoke/rotate the repeated database credential first. Remove it from all 14 tracked locations, delete obsolete helpers or require explicit configuration and verified targets, and coordinate history cleanup and access review. Review the fixed legacy account-reset passwords separately."
+              },
+              "id": "hardcoded-database-credentials",
+              "name": "Hardcoded database credentials",
+              "properties": {
+                "security-severity": "8.0",
+                "tags": [
+                  "Hardcoded database credentials",
+                  "external/cwe/cwe-798",
+                  "security"
+                ]
+              },
+              "shortDescription": {
+                "text": "Hardcoded database credentials"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "Payment verify rejects failed retry. Categories: Payment state machine reliability. Weaknesses: CWE-841."
+              },
+              "help": {
+                "markdown": "Payment verify rejects failed retry. Categories: Payment state machine reliability. Weaknesses: CWE-841.\n\n## Remediation\n\nUse one shared, idempotent payment-finalization path for browser verification and webhooks. After authoritative provider verification, permit legitimate failed-to-paid recovery; retain explicit protections for refunded orders and owner mismatches.",
+                "text": "Payment verify rejects failed retry. Categories: Payment state machine reliability. Weaknesses: CWE-841.\n\nRemediation:\n\nUse one shared, idempotent payment-finalization path for browser verification and webhooks. After authoritative provider verification, permit legitimate failed-to-paid recovery; retain explicit protections for refunded orders and owner mismatches."
+              },
+              "id": "payment-verify-rejects-failed-retry",
+              "name": "Payment verify rejects failed retry",
+              "properties": {
+                "security-severity": "5.0",
+                "tags": [
+                  "Payment state-machine reliability",
+                  "external/cwe/cwe-841",
+                  "security"
+                ]
+              },
+              "shortDescription": {
+                "text": "Payment verify rejects failed retry"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "Payment webhook acknowledges storage failure. Categories: Payment processing reliability financial integrity. Weaknesses: CWE-703."
+              },
+              "help": {
+                "markdown": "Payment webhook acknowledges storage failure. Categories: Payment processing reliability financial integrity. Weaknesses: CWE-703.\n\n## Remediation\n\nAcknowledge only after durably storing the event or applying the payment update. Return a retryable failure for transient storage errors; implement an idempotent durable inbox/reconciliation worker and alert on irreconcilable events. Verify gateway state server-side before offering another payment.",
+                "text": "Payment webhook acknowledges storage failure. Categories: Payment processing reliability financial integrity. Weaknesses: CWE-703.\n\nRemediation:\n\nAcknowledge only after durably storing the event or applying the payment update. Return a retryable failure for transient storage errors; implement an idempotent durable inbox/reconciliation worker and alert on irreconcilable events. Verify gateway state server-side before offering another payment."
+              },
+              "id": "payment-webhook-acknowledges-storage-failure",
+              "name": "Payment webhook acknowledges storage failure",
+              "properties": {
+                "security-severity": "5.0",
+                "tags": [
+                  "Payment processing reliability / financial integrity",
+                  "external/cwe/cwe-703",
+                  "security"
+                ]
+              },
+              "shortDescription": {
+                "text": "Payment webhook acknowledges storage failure"
+              }
+            }
+          ],
+          "version": "0.1.32"
+        }
+      }
+    }
+  ],
+  "version": "2.1.0"
+}

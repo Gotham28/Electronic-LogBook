@@ -16,6 +16,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { formatLogbookDate, todayForInput } from "@/lib/logbook-config";
 import { useDepartment } from "@/lib/department-context";
+import { PROCEDURE_SETTINGS, PROCEDURE_SEX_OPTIONS, validateProcedureLogFields } from "@/lib/procedure-log-fields";
+import { ProcedureClinicalDetails } from "@/components/ProcedureClinicalDetails";
 type ProcedureGroup = string;
 
 type ProcedureLog = {
@@ -42,14 +44,15 @@ type ProcedureLog = {
 
 export function ProcedureLogsPage() {
   const { procedures: PROCEDURE_REQUIREMENTS, competencyLevels, config, department } = useDepartment();
+  const recordDetailsEnabled = !!config?.enabledFeatures?.procedureClinicalDetails || PROCEDURE_REQUIREMENTS.some((item) => item.requiredLogFields?.length);
   const isMicrobiology = department?.code?.toLowerCase() === "microbiology" || department?.name?.toLowerCase().includes("microbiology");
-  const hideProcedureAge = Boolean(config?.enabledFeatures?.hideProcedureAge || isMicrobiology);
-  const showProcedureExperience = Boolean(config?.enabledFeatures?.procedureExperience && !isMicrobiology);
+  const hideProcedureAge = !recordDetailsEnabled && Boolean(config?.enabledFeatures?.hideProcedureAge || isMicrobiology);
+  const showProcedureExperience = recordDetailsEnabled || Boolean(config?.enabledFeatures?.procedureExperience && !isMicrobiology);
   const PROCEDURE_GROUPS = React.useMemo(() => Object.fromEntries([...new Set(PROCEDURE_REQUIREMENTS.map((p) => p.group))].map((group) => [group, PROCEDURE_REQUIREMENTS.filter((p) => p.group === group).map((p) => p.name)])), [PROCEDURE_REQUIREMENTS]);
   const REQUIRED_PROCEDURE_COUNT = PROCEDURE_REQUIREMENTS.reduce((sum, p) => sum + p.required, 0);
   const groupNames: Record<string, string> = Object.fromEntries(Object.keys(PROCEDURE_GROUPS).map((group) => [group, group]));
   const user = React.useMemo(() => getCurrentUser(), []);
-  const hideUhid = true; // isDemoMode();
+  const hideUhid = !recordDetailsEnabled;
   const isFreeTextProcedures = Boolean(config?.enabledFeatures?.freeTextProcedures || isMicrobiology);
   const hasProcedureTarget = config?.requiredProcedures !== null && config?.requiredProcedures !== undefined;
   const initialGroup = hideUhid ? PROCEDURE_REQUIREMENTS[0]?.group ?? "" : "";
@@ -65,18 +68,22 @@ export function ProcedureLogsPage() {
     diagnosis: "",
     sex: "",
     age: "",
-    experience: competencyLevels[0]?.value ?? "",
+    setting: "",
+    experience: recordDetailsEnabled ? "" : competencyLevels[0]?.value ?? "",
     supervisorId: "",
   });
+  const selectedProcedure = PROCEDURE_REQUIREMENTS.find((item) => item.name === form.procedureName && item.group === form.group);
+  const requiredLogFields = selectedProcedure?.requiredLogFields ?? [];
+  const requires = (field: string) => requiredLogFields.includes(field);
   const [editLogId, setEditLogId] = React.useState<number | null>(null);
   const [editLogRemarks, setEditLogRemarks] = React.useState<string | null>(null);
   const [editLogStatus, setEditLogStatus] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    if (competencyLevels.length > 0 && !form.experience) {
+    if (!recordDetailsEnabled && competencyLevels.length > 0 && !form.experience) {
       setForm((prev) => ({ ...prev, experience: competencyLevels[0].value }));
     }
-  }, [competencyLevels, form.experience]);
+  }, [competencyLevels, form.experience, recordDetailsEnabled]);
   const loggedCounts = React.useMemo(
     () => Object.fromEntries(PROCEDURE_REQUIREMENTS.map((requirement) => [
       requirement.name,
@@ -144,13 +151,16 @@ export function ProcedureLogsPage() {
         procedureGroup: isFreeTextProcedures ? undefined : form.group,
         procedureName: form.procedureName,
         date: form.date,
-        patientUhid: hideUhid ? "N/A" : form.patientUhid,
+        patientUhid: hideUhid ? "N/A" : form.patientUhid.trim() || "N/A",
         diagnosis: form.diagnosis,
         sex: form.sex,
-        patientAge: hideProcedureAge ? "N/A" : form.age,
-        competencyLevel: showProcedureExperience ? form.experience : "N/A",
+        patientAge: hideProcedureAge ? "N/A" : form.age.trim() || "N/A",
+        competencyLevel: showProcedureExperience ? form.experience || "N/A" : "N/A",
+        ...(recordDetailsEnabled ? { setting: form.setting || null } : {}),
         supervisorId: form.supervisorId,
       };
+      const requiredError = validateProcedureLogFields(requiredLogFields, payload);
+      if (requiredError) throw new Error(requiredError);
       
       if (editLogId) {
         await apiPatch(`/api/students/${user?.studentProfileId}/procedure-logs/${editLogId}`, payload);
@@ -171,7 +181,8 @@ export function ProcedureLogsPage() {
         diagnosis: "",
         sex: "",
         age: "",
-        experience: competencyLevels[0]?.value ?? "",
+        setting: "",
+        experience: recordDetailsEnabled ? "" : competencyLevels[0]?.value ?? "",
         supervisorId: "",
       });
       toast.success(
@@ -204,7 +215,7 @@ export function ProcedureLogsPage() {
         </div>
         <Dialog open={open} onOpenChange={(val) => { 
           setOpen(val); 
-          if (!val) { publishArogyaContext(null); setForm({ date: todayForInput(), group: initialGroup, procedureName: "", patientUhid: "", diagnosis: "", sex: "", age: "", experience: competencyLevels[0]?.value ?? "", supervisorId: "" }); setEditLogId(null); setEditLogRemarks(null); setEditLogStatus(null); }
+          if (!val) { publishArogyaContext(null); setForm({ date: todayForInput(), group: initialGroup, procedureName: "", patientUhid: "", diagnosis: "", sex: "", age: "", setting: "", experience: recordDetailsEnabled ? "" : competencyLevels[0]?.value ?? "", supervisorId: "" }); setEditLogId(null); setEditLogRemarks(null); setEditLogStatus(null); }
         }}>
           <DialogTrigger asChild><Button><PlusCircle className="h-4 w-4" /> Log procedure</Button></DialogTrigger>
           <DialogContent className="rounded-2xl bg-white sm:max-w-xl">
@@ -257,20 +268,41 @@ export function ProcedureLogsPage() {
                 </Field>
               ) : (
                 <div className={`grid gap-4 ${hideUhid ? "sm:grid-cols-1" : "sm:grid-cols-2"}`}>
-                  {isFreeTextProcedures && !isMicrobiology && (
+                  {isFreeTextProcedures && !isMicrobiology && !recordDetailsEnabled && (
                     <>
                       <Field label="Diagnosis"><Input value={form.diagnosis} onChange={(e) => setForm({ ...form, diagnosis: e.target.value })} placeholder="e.g. Tinea Corporis" required /></Field>
                       <Field label="Sex"><Input value={form.sex} onChange={(e) => setForm({ ...form, sex: e.target.value })} placeholder="e.g. Male" required /></Field>
                     </>
                   )}
-                  {!hideProcedureAge && <Field label="Age"><Input value={form.age} onChange={(e) => setForm({ ...form, age: e.target.value })} placeholder="e.g. 4 months" required /></Field>}
+                  {!hideProcedureAge && <Field label={`Age${recordDetailsEnabled ? requires("patientAge") ? " *" : " (optional)" : ""}`}><Input aria-label="Age" value={form.age} onChange={(e) => setForm({ ...form, age: e.target.value })} placeholder="Age with unit" maxLength={160} required={!recordDetailsEnabled || requires("patientAge")} /></Field>}
                 </div>
               )}
+              {recordDetailsEnabled && <div className="grid min-w-0 gap-4 sm:grid-cols-2">
+                <Field label={`Sex${requires("sex") ? " *" : " (optional)"}`}>
+                  <Select value={form.sex} onValueChange={(sex) => setForm({ ...form, sex: sex === "__none__" ? "" : sex })}>
+                    <SelectTrigger aria-label="Sex"><SelectValue placeholder="Select sex" /></SelectTrigger>
+                    <SelectContent>{!requires("sex") && <SelectItem value="__none__">Not recorded</SelectItem>}{PROCEDURE_SEX_OPTIONS.map((sex) => <SelectItem key={sex} value={sex}>{sex}</SelectItem>)}</SelectContent>
+                  </Select>
+                </Field>
+                <Field label={`De-identified patient ID (IP/OP number)${requires("patientUhid") ? " *" : " (optional)"}`}>
+                  <Input aria-label="De-identified patient ID (IP/OP number)" value={form.patientUhid} onChange={(e) => setForm({ ...form, patientUhid: e.target.value })} maxLength={160} required={requires("patientUhid")} />
+                </Field>
+                <div className="sm:col-span-2"><Field label={`Diagnosis or indication${requires("diagnosis") ? " *" : " (optional)"}`}>
+                  <Textarea aria-label="Diagnosis or indication" value={form.diagnosis} onChange={(e) => setForm({ ...form, diagnosis: e.target.value })} maxLength={8000} required={requires("diagnosis")} />
+                </Field></div>
+                <Field label={`Setting${requires("setting") ? " *" : " (optional)"}`}>
+                  <Select value={form.setting} onValueChange={(setting) => setForm({ ...form, setting: setting === "__none__" ? "" : setting })}>
+                    <SelectTrigger aria-label="Setting"><SelectValue placeholder="Select setting" /></SelectTrigger>
+                    <SelectContent>{!requires("setting") && <SelectItem value="__none__">Not recorded</SelectItem>}{PROCEDURE_SETTINGS.map((setting) => <SelectItem key={setting} value={setting}>{setting}</SelectItem>)}</SelectContent>
+                  </Select>
+                </Field>
+              </div>}
               {showProcedureExperience && (
-                <Field label="Competency level">
+                <Field label={recordDetailsEnabled ? `Role level${requires("competencyLevel") ? " *" : " (optional)"}` : "Competency level"}>
                   <Select value={form.experience} onValueChange={(value) => setForm({ ...form, experience: value })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger aria-label={recordDetailsEnabled ? "Role level" : "Competency level"}><SelectValue placeholder="Select a level" /></SelectTrigger>
                     <SelectContent>
+                      {recordDetailsEnabled && !requires("competencyLevel") && <SelectItem value="N/A">Not recorded</SelectItem>}
                       {competencyLevels.map((c) => <SelectItem key={c.id} value={c.value}>{c.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
@@ -289,12 +321,12 @@ export function ProcedureLogsPage() {
                 </Select>
               </Field>
               <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={isSubmitting}>Save draft</Button>
+                <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={isSubmitting}>Cancel</Button>
                 <Button 
                   type="submit" 
                   disabled={
                     isSubmitting || 
-                    (Boolean(config?.enabledFeatures?.procedureExperience) && (!competencyLevels.length || !form.experience))
+                    ((requires("competencyLevel") || (!recordDetailsEnabled && Boolean(config?.enabledFeatures?.procedureExperience))) && (!competencyLevels.length || !form.experience))
                   }
                 >
                   {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -402,7 +434,9 @@ export function ProcedureLogsPage() {
                     <TableCell className="font-bold">{log.number}</TableCell>
                     <TableCell>{formatLogbookDate(log.date)}</TableCell>
                     {!isFreeTextProcedures && <TableCell><Badge variant="outline" className="border-teal-100 bg-teal-50 text-teal-800">{groupNames[log.procedureGroup as ProcedureGroup] || log.procedureGroup}</Badge></TableCell>}
-                    <TableCell className="font-semibold">{log.procedureName}</TableCell>
+                    <TableCell className="font-semibold">{log.procedureName}
+                      {recordDetailsEnabled && <details className="mt-2"><summary className="cursor-pointer text-xs font-medium text-teal-700">Entry details</summary><ProcedureClinicalDetails entry={log} /></details>}
+                    </TableCell>
                     {isMicrobiology && <TableCell className="text-xs max-w-[200px] truncate" title={log.diagnosis || ""}>{log.diagnosis || "—"}</TableCell>}
                     {!hideProcedureAge && <TableCell>{log.patientAge || log.age}</TableCell>}
                     {showProcedureExperience && <TableCell className="text-xs">{log.competencyLevel}</TableCell>}
@@ -435,6 +469,7 @@ export function ProcedureLogsPage() {
                               patientUhid: log.patientUhid === "N/A" ? "" : log.patientUhid, age: log.patientAge || log.age,
                               diagnosis: (log as any).diagnosis || "",
                               sex: (log as any).sex || "",
+                              setting: log.setting || "",
                               experience: log.competencyLevel || "", supervisorId: String(log.supervisorId || ""),
                             });
                             setOpen(true);
@@ -454,6 +489,7 @@ export function ProcedureLogsPage() {
                               patientUhid: log.patientUhid === "N/A" ? "" : log.patientUhid, age: log.patientAge || log.age,
                               diagnosis: (log as any).diagnosis || "",
                               sex: (log as any).sex || "",
+                              setting: log.setting || "",
                               experience: log.competencyLevel || "", supervisorId: String(log.supervisorId || ""),
                             });
                             setOpen(true);

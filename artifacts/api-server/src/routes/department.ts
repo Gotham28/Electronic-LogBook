@@ -5,6 +5,7 @@ import { requireAuth, requireDepartment, requireRole } from "../middlewares/auth
 import { completionPercent, idSchema } from "../lib/validation.js";
 import { resolveConfigDepartmentId } from "../lib/department-config-source.js";
 import { clinicalWorkTarget, verifiedClinicalWorkCounts } from "../lib/clinical-work-progress.js";
+import { PROCEDURE_ROLE_CODES } from "@workspace/api-zod";
 import { getAcademicLogbook } from "../lib/academic-logbook.js";
 
 const router: IRouter = Router();
@@ -92,7 +93,9 @@ router.get("/:departmentId/catalog", async (req, res) => {
         { id: 2, departmentId: configSourceId, kind: "academic", name: "UG teaching", value: "ug_teaching", required: 0, period: "total" as const, parentValue: null },
         { id: 3, departmentId: configSourceId, kind: "academic", name: "Seminars", value: "seminars", required: 0, period: "total" as const, parentValue: null },
       ] as any : catalog.filter((item) => item.kind === "academic"), caseCategories: catalog.filter((item) => item.kind === "case_category"),
-      competencyLevels: catalog.filter((item) => item.kind === "competency_level"), leaveTypes: catalog.filter((item) => item.kind === "leave_type"),
+      competencyLevels: catalog.filter((item) => item.kind === "competency_level"
+        && (!config[0]?.enabledFeatures?.procedureClinicalDetails || (PROCEDURE_ROLE_CODES as readonly string[]).includes(item.value))),
+      leaveTypes: catalog.filter((item) => item.kind === "leave_type"),
       conferenceLevels: isMicro ? [
         { id: 1, departmentId: configSourceId, kind: "conference_level", name: "National", value: "national", required: 0, period: "total" as const, parentValue: null },
         { id: 2, departmentId: configSourceId, kind: "conference_level", name: "State", value: "state", required: 0, period: "total" as const, parentValue: null },

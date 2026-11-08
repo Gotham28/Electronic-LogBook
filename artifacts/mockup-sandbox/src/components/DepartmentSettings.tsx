@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LogbookSectionSettings } from "./LogbookSectionSettings";
+import { ProcedureFieldSelector, ProcedureFieldRequirementsEditor } from "./ProcedureFieldRequirements";
+import { PROCEDURE_LOG_FIELDS } from "@/lib/procedure-log-fields";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -167,8 +169,10 @@ export function DepartmentSettings() {
   const [procedureGroup, setProcedureGroup] = React.useState("");
   const [isAddingNewGroup, setIsAddingNewGroup] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState("");
+  const [entryLogFields, setEntryLogFields] = React.useState<string[]>(features.procedureClinicalDetails ? [...PROCEDURE_LOG_FIELDS] : []);
 
   const resetAddForm = () => {
+    setEntryLogFields(features.procedureClinicalDetails ? [...PROCEDURE_LOG_FIELDS] : []);
     setEntryName("");
     setEntryRequired("");
     setEntryPeriod("total");
@@ -185,13 +189,14 @@ export function DepartmentSettings() {
     setProcedureGroup("");
     setIsAddingNewGroup(false);
     setSearchQuery("");
-  }, [activeSectionId]);
+    setEntryLogFields(features.procedureClinicalDetails ? [...PROCEDURE_LOG_FIELDS] : []);
+  }, [activeSectionId, features.procedureClinicalDetails]);
 
   const handleAddSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     void save(async () => {
       if (activeSection.kind === "procedure") {
-        await apiPost("/api/admin/department/procedures", { name: entryName, group: procedureGroup, required: Number(entryRequired) });
+        await apiPost("/api/admin/department/procedures", { name: entryName, group: procedureGroup, required: Number(entryRequired), requiredLogFields: entryLogFields });
       } else {
         await apiPost("/api/admin/department/catalog", { 
           kind: activeSection.kind, 
@@ -338,6 +343,9 @@ export function DepartmentSettings() {
                   </div>
                 )}
 
+                {activeSection.kind === "procedure" && features.procedureClinicalDetails && <div className="w-full">
+                  <ProcedureFieldSelector value={entryLogFields} onChange={setEntryLogFields} disabled={busy} />
+                </div>}
                 <div className="flex gap-2 w-full justify-end mt-2">
                   <Button type="button" variant="outline" onClick={resetAddForm}>Cancel</Button>
                   <Button type="submit" disabled={busy}>Add log option</Button>
@@ -672,9 +680,10 @@ function ProcedureGroupBlock({ group, types, forceExpand, getDraft, setDraft, is
         <div className="flex flex-col divide-y divide-slate-100 border-t border-slate-200">
           {types.map((p: any) => (
             <div key={p.id} className="flex flex-wrap items-center justify-between p-3 gap-2">
-              <div className="flex flex-col">
+              <div className="flex min-w-0 flex-1 flex-col">
                 <span className="text-sm text-slate-900 font-medium">{p.name}</span>
                 <span className="text-xs text-slate-500">{p.group}</span>
+                <ProcedureFieldRequirementsEditor procedure={p} />
               </div>
               <div className="flex items-center gap-3">
                 <form onSubmit={(e) => {

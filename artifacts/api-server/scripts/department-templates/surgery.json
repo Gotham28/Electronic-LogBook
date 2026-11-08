@@ -1,0 +1,15 @@
+{
+  "features": {
+    "procedureExperience": true,
+    "procedureClinicalDetails": true,
+    "freeTextProcedures": false,
+    "hideProcedureAge": false,
+    "hideProcedureLogs": false
+  },
+  "catalog": [
+    { "kind": "competency_level", "name": "O", "value": "O" },
+    { "kind": "competency_level", "name": "A", "value": "A" },
+    { "kind": "competency_level", "name": "PS", "value": "PS" },
+    { "kind": "competency_level", "name": "PI", "value": "PI" }
+  ]
+}

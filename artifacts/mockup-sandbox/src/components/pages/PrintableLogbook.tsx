@@ -1,4 +1,5 @@
 import * as React from "react";
+import { ProcedureClinicalDetails } from "@/components/ProcedureClinicalDetails";
 import { AcademicRecordDetails } from "@/components/AcademicRecordDetails";
 import { readAcademicRecord, academicSectionName } from "@/lib/academic-logbook";
 import { isDemoMode } from "@/lib/session";
@@ -484,7 +485,9 @@ export function PrintableLogbook() {
                     <tr key={p.id} className={i % 2 === 0 ? "" : "bg-slate-50/50"}>
                       <Td muted>{rows.length - i}</Td>
                       <Td>{formatLogbookDate(p.date)}</Td>
-                      <Td><span className="font-medium">{p.procedureName}</span></Td>
+                      <Td><span className="font-medium">{p.procedureName}</span>
+                        {(features.procedureClinicalDetails || p.setting) && <ProcedureClinicalDetails entry={p} />}
+                      </Td>
                       <Td>{p.procedureGroup ?? "—"}</Td>
                       {!hideUhid && <Td muted={!p.patientUhid}>{p.patientUhid || "—"}</Td>}
                       <Td muted={!p.competencyLevel}>{p.competencyLevel || "—"}</Td>

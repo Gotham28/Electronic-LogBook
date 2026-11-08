@@ -492,6 +492,8 @@ router.get("/:professorId/review-queue", async (req, res) => {
         date: p.log.date,
         patientUhid: p.log.patientUhid,
         patientInfo: p.log.patientAge,
+        patientAge: p.log.patientAge,
+        setting: p.log.setting,
         detail: features.freeTextProcedures ? ((p.log as any).diagnosis ? `${p.log.procedureName} - ${(p.log as any).diagnosis}` : p.log.procedureName) : `${p.log.procedureGroup} procedure`,
         declaredCompetency: p.log.competencyLevel,
         diagnosis: (p.log as any).diagnosis,

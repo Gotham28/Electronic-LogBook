@@ -49,6 +49,7 @@ export const procedureLogsTable = pgTable("procedure_logs", {
   diagnosis: text("diagnosis"),
   sex: text("sex"),
   facultyVerifiedLevel: text("faculty_verified_level"),
+  setting: text("setting"),
   status: text("status", { enum: ["pending", "verified", "rejected"] }).notNull().default("pending"),
   facultyRemarks: text("faculty_remarks"),
   reviewedBy: integer("reviewed_by").references(() => usersTable.id),

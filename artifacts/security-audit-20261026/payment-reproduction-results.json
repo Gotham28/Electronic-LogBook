@@ -1,0 +1,61 @@
+{
+  "method": "Direct handler calls against in-memory PGlite; not HTTP integration",
+  "evidence": [
+    {
+      "scenario": "Valid signed checkout after earlier failed attempt",
+      "verification": {
+        "status": 409,
+        "body": {
+          "message": "This payment cannot be completed",
+          "status": "failed"
+        }
+      },
+      "localPaymentStatus": "failed",
+      "login": {
+        "status": 402,
+        "message": "Payment is required before your account can be approved."
+      },
+      "approval": {
+        "status": 402,
+        "body": {
+          "message": "This student has not completed payment and cannot be approved yet"
+        }
+      }
+    },
+    {
+      "scenario": "Control: captured webhook repairs failed row",
+      "webhook": {
+        "status": 200,
+        "body": "200"
+      },
+      "localPaymentStatus": "paid",
+      "approval": {
+        "status": 200,
+        "body": {
+          "message": "Student approved successfully",
+          "emailAccepted": true
+        }
+      }
+    },
+    {
+      "scenario": "Captured webhook while database write throws",
+      "webhook": {
+        "status": 200,
+        "body": "200"
+      },
+      "localPaymentStatus": "created",
+      "login": {
+        "status": 402,
+        "message": "Payment is required before your account can be approved."
+      }
+    },
+    {
+      "scenario": "Hard deletion removes order before capture reconciliation",
+      "webhook": {
+        "status": 200,
+        "body": "200"
+      },
+      "localPaymentRow": null
+    }
+  ]
+}

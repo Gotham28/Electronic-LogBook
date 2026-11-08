@@ -1,0 +1,102 @@
+{
+  "documentType": "codex-security.scan-manifest",
+  "scan": {
+    "artifacts": [
+      {
+        "mediaType": "application/json",
+        "path": "findings.json",
+        "sha256": "bec1632ea0a43927d36307952dcdf07f0c87b5c7e0d3bf0bde2272380a9f38b8"
+      },
+      {
+        "mediaType": "application/json",
+        "path": "coverage.json",
+        "sha256": "22be9d9758437415d43d30c2b2266fa17597d6f4340647bed405e413247cbc91"
+      }
+    ],
+    "completedAt": "2026-10-26T09:15:42.201336+00:00",
+    "coverageRef": "coverage.json",
+    "findingsRef": "findings.json",
+    "id": "elogbook-local-20261026-payments-security",
+    "producer": {
+      "name": "codex-security-plugin",
+      "version": "0.1.32"
+    },
+    "scope": {
+      "artifactsReviewed": [
+        "artifacts/api-server/src/routes/payments.ts",
+        "artifacts/api-server/src/routes/payments-webhook.ts",
+        "artifacts/api-server/src/routes/auth.ts",
+        "artifacts/api-server/src/middlewares/auth.ts",
+        "artifacts/api-server/src/middlewares/payment-token.ts",
+        "artifacts/api-server/src/middlewares/student-access.ts",
+        "artifacts/api-server/src/app.ts",
+        "artifacts/api-server/src/routes/index.ts",
+        "artifacts/api-server/src/lib/student-notifications.ts",
+        "artifacts/api-server/src/lib/hard-delete-user.ts",
+        "artifacts/api-server/src/routes/admin.ts (relevant excerpts)",
+        "artifacts/api-server/src/routes/superadmin.ts (relevant excerpts)",
+        "artifacts/api-server/src/routes/student.ts (clinical-work excerpts)",
+        "artifacts/mockup-sandbox/src/components/PaymentStep.tsx",
+        "artifacts/mockup-sandbox/src/lib/apiClient.ts (payment/auth excerpts)",
+        "artifacts/mockup-sandbox/src/components/HODPortal.tsx (approval excerpts)",
+        "artifacts/mockup-sandbox/src/components/LoginPage.tsx (login/payment excerpts)",
+        "artifacts/mockup-sandbox/src/components/RegistrationPage.tsx (registration/payment excerpts)",
+        "lib/db/src/schema/payments.ts",
+        "lib/db/src/schema/users.ts",
+        "lib/db/src/schema/students.ts",
+        "lib/db/src/schema/subscription_plans.ts",
+        "lib/db/migrations/0003_subscriptions_payments.sql",
+        "artifacts/api-server/tests/payments-webhook.test.ts",
+        "artifacts/api-server/tests/admin-resident-approval.test.ts",
+        "artifacts/api-server/run.mjs",
+        "lib/db/cleanup_test.cjs",
+        "lib/db/dedup.cjs",
+        "lib/db/final_check.cjs",
+        "lib/db/leave_test.cjs",
+        "lib/db/merge_accounts.cjs",
+        "lib/db/merge_accounts_2.cjs",
+        "lib/db/rename_user.cjs",
+        "lib/db/reset_pass.cjs",
+        "lib/db/reset_radhamani.cjs",
+        "lib/db/restore.cjs",
+        "lib/db/schema_test.cjs",
+        "lib/db/sync_mohammed.cjs",
+        "lib/db/test.cjs"
+      ],
+      "context": "User reported that people pay but remain unpaid/unapproved, and requested a security/payment code review. Follow-up explicitly authorized the current local repository and ignoring AGENTS.md. Source-backed threat model generated during review. No fixes requested or applied.",
+      "excludePaths": [
+        "node_modules",
+        ".git",
+        "artifacts/security-audit-20261026"
+      ],
+      "includePaths": [
+        "."
+      ],
+      "limitations": [
+        "Not a complete line-by-line repository audit; reviewed paths and excerpts are listed below.",
+        "No production database, live gateway, credential validation or real patient data accessed.",
+        "Direct handler invocations inject authenticated caller context and do not verify HTTP middleware wiring.",
+        "Local revision was used without pulling, as explicitly authorized.",
+        "Token usage measurements are unavailable for this chat-based review."
+      ],
+      "runtimeStatus": "Four direct handler/PGlite scenarios reproduced the reported failure mechanisms. The existing 21 HTTP route tests could not connect to loopback (EACCES); they are blocked, not passing.\n\nReproduction results:\n\n```json\n{\n  \"method\": \"Direct handler calls against in-memory PGlite; not HTTP integration\",\n  \"evidence\": [\n    {\n      \"scenario\": \"Valid signed checkout after earlier failed attempt\",\n      \"verification\": {\n        \"status\": 409,\n        \"body\": {\n          \"message\": \"This payment cannot be completed\",\n          \"status\": \"failed\"\n        }\n      },\n      \"localPaymentStatus\": \"failed\",\n      \"login\": {\n        \"status\": 402,\n        \"message\": \"Payment is required before your account can be approved.\"\n      },\n      \"approval\": {\n        \"status\": 402,\n        \"body\": {\n          \"message\": \"This student has not completed payment and cannot be approved yet\"\n        }\n      }\n    },\n    {\n      \"scenario\": \"Control: captured webhook repairs failed row\",\n      \"webhook\": {\n        \"status\": 200,\n        \"body\": \"200\"\n      },\n      \"localPaymentStatus\": \"paid\",\n      \"approval\": {\n        \"status\": 200,\n        \"body\": {\n          \"message\": \"Student approved successfully\",\n          \"emailAccepted\": true\n        }\n      }\n    },\n    {\n      \"scenario\": \"Captured webhook while database write throws\",\n      \"webhook\": {\n        \"status\": 200,\n        \"body\": \"200\"\n      },\n      \"localPaymentStatus\": \"created\",\n      \"login\": {\n        \"status\": 402,\n        \"message\": \"Payment is required before your account can be approved.\"\n      }\n    },\n    {\n      \"scenario\": \"Hard deletion removes order before capture reconciliation\",\n      \"webhook\": {\n        \"status\": 200,\n        \"body\": \"200\"\n      },\n      \"localPaymentRow\": null\n    }\n  ]\n}\n```",
+      "summary": "Payment confirmation, approval consumers, financial ledger integrity, authentication boundaries and source-backed security findings. Broad repository coverage is partial.",
+      "validationMode": "Offline static review plus direct actual-handler tests using in-memory PGlite, synthetic accounts and mocked mail; no live provider calls."
+    },
+    "sealedAt": "2026-10-26T09:15:42.201336+00:00",
+    "startedAt": "2026-10-26T09:15:42.201336+00:00",
+    "status": "completed",
+    "target": {
+      "displayName": "Arogya Electronic LogBook",
+      "kind": "git_revision",
+      "revision": "06a25b5d88e521b9a60a7f6ebe87e806107e97a7",
+      "targetId": "local:Electronic-LogBook"
+    },
+    "threatModel": {
+      "content": "# Local payment and security threat model\n\nThis model was generated from current source; it is not a supplied deployment guarantee.\n\nThe React client calls the Express JSON API using a session token. Pending self-registered residents receive a separate, 30-minute payment-scoped token and cannot use it as an application session. `requireAuth` verifies HS256 and resolves current status, session version and department from the database (`middlewares/auth.ts:32-70`).\n\n`POST /api/payments/create-order` resolves the account and configured subscription plan server-side, requests an external Razorpay order and stores the order-to-user mapping (`routes/payments.ts:56-158`). The browser submits the order/payment IDs plus a checkout signature to `/verify`. The server checks the stored order owner and HMAC (`payments.ts:167-199`). An independent raw-body `/api/payments/webhook` endpoint checks its own HMAC and handles captured/failed events (`app.ts:84-93`; `payments-webhook.ts:37-138`). External gateway configuration, actual captured amounts and settlement state were not contacted or checked.\n\nLogin and HOD approval both require an existing local paid row for self-registered pending students (`auth.ts:213-228`; `admin.ts:88-117`). Payment confirmation does not automatically approve an account. Trusted administrative provisioning intentionally bypasses the payment requirement. Approval remains an explicit department HOD decision.\n\nProtected assets: payment-to-account linkage and financial integrity; payment/account approval state; authentication credentials; patient clinical detail; department isolation and resident records. Boundaries: browser-to-API; payment token-to-session token; gateway-to-webhook; tenant-to-tenant; account deletion-to-financial ledger; clinical submission-to-operational logs; repository read access-to-database access.\n\nA malicious client can control JSON fields and supplied IDs/tokens but cannot forge HMACs under the assumed uncompromised configured secrets. Authenticated residents control their own submitted clinical text. HODs and administrators have intentionally privileged lifecycle operations, with their existing role/department limits. A source reader can read embedded literal credentials, independent of HTTP authorization. Provider/network/storage failures are reliability triggers rather than attacker privileges.\n\nUnknowns: credential rotation/live validity and database-role permissions; deployment revision; webhook subscriptions, delivery failures and secret configuration; captured/refunded/settled status of any real payment; actual log access and retention. No production database was contacted. Current source was reviewed offline. No claim of public repository access or real exploitation is made.\n\nRepository: local:Electronic-LogBook\nVersion: 06a25b5d88e521b9a60a7f6ebe87e806107e97a7\n",
+      "format": "markdown",
+      "origin": "generated"
+    }
+  },
+  "schemaVersion": "1.0"
+}
