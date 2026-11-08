@@ -13,6 +13,7 @@ import { clinicalWorkTarget, verifiedClinicalWorkCounts } from "../lib/clinical-
 import { getEmailFailure, sendAccountCreatedEmail, sendStudentApprovalEmail } from "../lib/mailer.js";
 import { hardDeleteUserCascade } from "../lib/hard-delete-user.js";
 import { departmentLogbookSectionsTable } from "@workspace/db";
+import { PROCEDURE_LOG_FIELDS } from "@workspace/api-zod";
 
 const router = Router();
 
@@ -545,7 +546,8 @@ router.get("/department/procedures", async (req, res) => {
 });
 
 // POST /api/admin/department/procedures
-router.post("/department/procedures", validate(z.object({ name: nameSchema, group: nameSchema, required: targetSchema }).strict()), async (req, res) => {
+router.post("/department/procedures", validate(z.object({ name: nameSchema, group: nameSchema, required: targetSchema,
+  requiredLogFields: z.array(z.enum(PROCEDURE_LOG_FIELDS)).max(PROCEDURE_LOG_FIELDS.length).optional() }).strict()), async (req, res) => {
   try {
     const departmentId = req.user?.departmentId;
     if (!departmentId) {
@@ -565,11 +567,16 @@ router.post("/department/procedures", validate(z.object({ name: nameSchema, grou
       return;
     }
 
+    const [config] = await db.select({ enabledFeatures: departmentConfigsTable.enabledFeatures })
+      .from(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, departmentId)).limit(1);
+    const requiredLogFields = req.body.requiredLogFields
+      ?? (config?.enabledFeatures?.procedureClinicalDetails ? [...PROCEDURE_LOG_FIELDS] : []);
     const [inserted] = await db.insert(procedureTypesTable).values({
       departmentId,
       name,
       group,
       required: req.body.required,
+      requiredLogFields: [...new Set<string>(requiredLogFields)],
     }).returning();
     await recomputeProcedureRequirement(departmentId);
     res.json(inserted);
@@ -690,10 +697,15 @@ router.post("/department/catalog", validate(z.object({ kind: z.enum(["posting", 
   res.status(201).json(row);
 });
 
-router.patch("/department/procedures/:id", validate(z.object({ required: targetSchema }).strict()), async (req, res) => {
+router.patch("/department/procedures/:id", validate(z.object({ required: targetSchema.optional(),
+  requiredLogFields: z.array(z.enum(PROCEDURE_LOG_FIELDS)).max(PROCEDURE_LOG_FIELDS.length).optional() }).strict()
+  .refine((body) => body.required !== undefined || body.requiredLogFields !== undefined, "Select a field to update")), async (req, res) => {
   const [dept] = await db.select({ configSourceDepartmentId: departmentsTable.configSourceDepartmentId }).from(departmentsTable).where(eq(departmentsTable.id, req.user!.departmentId!));
   if (dept?.configSourceDepartmentId !== null) { res.status(403).json({ message: "Test departments cannot modify mirrored settings" }); return; }
-  const [row] = await db.update(procedureTypesTable).set({ required: req.body.required })
+  const [row] = await db.update(procedureTypesTable).set({
+    ...(req.body.required !== undefined ? { required: req.body.required } : {}),
+    ...(req.body.requiredLogFields !== undefined ? { requiredLogFields: [...new Set<string>(req.body.requiredLogFields)] } : {}),
+  })
     .where(and(eq(procedureTypesTable.id, Number(req.params.id)), eq(procedureTypesTable.departmentId, req.user!.departmentId!))).returning();
   if (!row) { res.status(404).json({ message: "Procedure not found" }); return; }
   await recomputeProcedureRequirement(req.user!.departmentId!);

@@ -15,7 +15,7 @@ export type DepartmentData = {
   department: { id: number; name: string; code: string };
   hod: { id: number; name: string } | null;
   config: DepartmentConfig | null;
-  procedures: Array<{ id: number; name: string; group: string; required: number }>;
+  procedures: Array<{ id: number; name: string; group: string; required: number; requiredLogFields?: string[] }>;
   postings: CatalogItem[]; academics: CatalogItem[]; caseCategories: CatalogItem[]; competencyLevels: CatalogItem[]; leaveTypes: CatalogItem[]; conferenceLevels: CatalogItem[];
   clinicalWorkCategories: CatalogItem[]; clinicalWorkSubtypes: CatalogItem[]; postingSchedule: PostingScheduleRow[];
   academicLogbook?: AcademicLogbookProfile | null;

@@ -1,0 +1,706 @@
+{
+  "documentType": "codex-security.findings",
+  "findings": [
+    {
+      "attackPath": {
+        "dataflow": {
+          "evidenceRefs": [
+            "embedded-db-url"
+          ],
+          "summary": "Tracked literal -> source reader obtains credential -> potential direct database authentication outside application controls."
+        },
+        "reachability": {
+          "evidenceRefs": [
+            "embedded-db-url"
+          ],
+          "summary": "Requires reading the repository. Any further access requires the credential still to be valid and the database reachable. Neither live validity nor public source exposure is asserted."
+        }
+      },
+      "codeEvidence": [
+        {
+          "code": "const pool = new Pool({ connectionString: 'postgresql://[REDACTED]' });",
+          "endLine": 11,
+          "explanation": "A source reader can obtain database authentication material directly from this literal. The credential is intentionally redacted in this report.",
+          "id": "embedded-db-url",
+          "label": "Embedded database authentication material",
+          "language": "typescript",
+          "path": "artifacts/api-server/run.mjs",
+          "role": "root_control",
+          "startLine": 11
+        }
+      ],
+      "confidence": {
+        "level": "high",
+        "rationale": "Verified against current source; payment behavior additionally reproduced with actual handlers and in-memory PGlite where stated. Live deployment state is untested."
+      },
+      "findingId": "csf_193b4bac081170b845621118",
+      "fingerprints": {
+        "algorithm": "codex-security/v1",
+        "primary": "codex-security/v1:sha256:4c0768cbd1b901bfec9ff896ce8b06e0e79bad3e13bca95eae0cac3e017ffc91"
+      },
+      "identity": {
+        "anchor": "hardcoded-database-credentials"
+      },
+      "locations": [
+        {
+          "endLine": 11,
+          "path": "artifacts/api-server/run.mjs",
+          "role": "root_control",
+          "startLine": 11
+        },
+        {
+          "endLine": 2,
+          "path": "lib/db/cleanup_test.cjs",
+          "role": "root_control",
+          "startLine": 2
+        },
+        {
+          "endLine": 2,
+          "path": "lib/db/dedup.cjs",
+          "role": "root_control",
+          "startLine": 2
+        },
+        {
+          "endLine": 3,
+          "path": "lib/db/final_check.cjs",
+          "role": "root_control",
+          "startLine": 3
+        },
+        {
+          "endLine": 2,
+          "path": "lib/db/leave_test.cjs",
+          "role": "root_control",
+          "startLine": 2
+        },
+        {
+          "endLine": 2,
+          "path": "lib/db/merge_accounts.cjs",
+          "role": "root_control",
+          "startLine": 2
+        },
+        {
+          "endLine": 2,
+          "path": "lib/db/merge_accounts_2.cjs",
+          "role": "root_control",
+          "startLine": 2
+        },
+        {
+          "endLine": 2,
+          "path": "lib/db/rename_user.cjs",
+          "role": "root_control",
+          "startLine": 2
+        },
+        {
+          "endLine": 3,
+          "path": "lib/db/reset_pass.cjs",
+          "role": "root_control",
+          "startLine": 3
+        },
+        {
+          "endLine": 2,
+          "path": "lib/db/reset_radhamani.cjs",
+          "role": "root_control",
+          "startLine": 2
+        },
+        {
+          "endLine": 2,
+          "path": "lib/db/restore.cjs",
+          "role": "root_control",
+          "startLine": 2
+        },
+        {
+          "endLine": 2,
+          "path": "lib/db/schema_test.cjs",
+          "role": "root_control",
+          "startLine": 2
+        },
+        {
+          "endLine": 2,
+          "path": "lib/db/sync_mohammed.cjs",
+          "role": "root_control",
+          "startLine": 2
+        },
+        {
+          "endLine": 2,
+          "path": "lib/db/test.cjs",
+          "role": "root_control",
+          "startLine": 2
+        }
+      ],
+      "occurrenceId": "occ_de902ef4fd45c0da033670be",
+      "provenance": {
+        "source": "local_plugin-independent-baseline"
+      },
+      "remediation": "Revoke/rotate the repeated database credential first. Remove it from all 14 tracked locations, delete obsolete helpers or require explicit configuration and verified targets, and coordinate history cleanup and access review. Review the fixed legacy account-reset passwords separately.",
+      "remediationTests": [
+        "Scan current tracked files for credential-bearing URLs without printing their values.",
+        "Verify obsolete credentials are revoked through the database owner, not by trying leaked credentials."
+      ],
+      "rootCause": {
+        "evidenceRefs": [
+          "embedded-db-url"
+        ],
+        "summary": "Each listed script feeds an embedded PostgreSQL URL directly into `pg.Pool`, rather than requiring a secret from the environment. Source access therefore discloses authentication material across the repository/database boundary. Several helpers intend to delete records or reset account passwords; they were not executed."
+      },
+      "ruleId": "hardcoded-database-credentials",
+      "severity": {
+        "changeConditions": "Provider configuration, credential rotation, production incidence and log-access controls may change operational impact; no such state was inspected.",
+        "level": "high",
+        "rationale": "The source exposes reusable database authentication material to every source reader; impact depends on the role privileges and whether rotation has already invalidated it."
+      },
+      "summary": "Reading the current tracked source reveals one repeated, non-placeholder database credential group in 14 helper scripts. Treat the credential as exposed and rotate it; its live validity and privileges were deliberately not tested.",
+      "taxonomy": {
+        "category": "Hardcoded database credentials",
+        "cwe": [
+          "CWE-798"
+        ]
+      },
+      "title": "Database credentials remain embedded in 14 tracked scripts",
+      "validation": {
+        "evidenceRefs": [
+          "embedded-db-url"
+        ],
+        "limitations": [
+          "No leaked credential was used; live validity, rotation status and role privileges remain unknown."
+        ],
+        "method": "Static source trace and local synthetic direct-handler tests where stated",
+        "summary": "Parent independently verified credential-shaped user/password URLs at all 14 listed lines with values redacted. The independent auditor traced unconditional helper runners and their read/write queries. Normal package start uses `dist/index.mjs`, so automatic execution of these helpers is not established. That counterevidence does not remove disclosure to source readers."
+      }
+    },
+    {
+      "attackPath": {
+        "dataflow": {
+          "evidenceRefs": [
+            "capture-write",
+            "ack-on-error",
+            "login-gate"
+          ],
+          "summary": "Captured event -> signature verification -> database update throws -> catch returns 200 -> row stays created -> login/approval sees no paid row."
+        },
+        "reachability": {
+          "evidenceRefs": [
+            "capture-write",
+            "ack-on-error",
+            "login-gate"
+          ],
+          "summary": "A normal paying applicant is affected when storage fails during capture processing and no browser verification repairs the state. No attacker privilege escalation is claimed; this is the reported payment reliability failure."
+        }
+      },
+      "codeEvidence": [
+        {
+          "code": "      const [updated] = await db.update(paymentsTable).set({ status: \"paid\", razorpayPaymentId: paymentId, updatedAt: new Date() })\n        .where(and(eq(paymentsTable.razorpayOrderId, orderId), inArray(paymentsTable.status, [\"created\", \"failed\"])))\n        .returning({ id: paymentsTable.id });",
+          "endLine": 105,
+          "explanation": "The authenticated provider event attempts to persist paid state before approval can recognize it.",
+          "id": "capture-write",
+          "label": "Captured event updates the local ledger",
+          "language": "typescript",
+          "path": "artifacts/api-server/src/routes/payments-webhook.ts",
+          "role": "root_control",
+          "startLine": 103
+        },
+        {
+          "code": "  } catch (error) {\n    // Never surface a non-2xx to Razorpay for a database error: it triggers retries and, after\n    // 24 hours of failures, Razorpay disables the webhook outright. The row simply stays at its\n    // previous status, which the browser /verify path already handles safely. No error object,\n    // payload, or stack trace is logged - only these four fields.\n    if (postgresErrorCode(error) === \"23505\") {\n      // payments_one_paid_per_user rejected this write: the user already has a 'paid' row and\n      // this capture could not be recorded against a second one. This is not a transient\n      // blip - it means the user was charged twice and only one charge is on record.\n      logger.error({ event, eventId, orderId, status: 200 },\n        \"Razorpay webhook: duplicate paid row for this user, capture could not be recorded, MANUAL RECONCILIATION REQUIRED\");\n    } else {\n      logger.error({ event, eventId, orderId, status: 200 }, \"Razorpay webhook: database operation failed\");\n    }\n    res.sendStatus(200);",
+          "endLine": 138,
+          "explanation": "The catch acknowledges even transient storage failures without durable event storage, retry queue or reconciliation.",
+          "id": "ack-on-error",
+          "label": "Database failures are acknowledged as success",
+          "language": "typescript",
+          "path": "artifacts/api-server/src/routes/payments-webhook.ts",
+          "role": "root_control",
+          "startLine": 124
+        },
+        {
+          "code": "    const [paid] = await db.select({ id: paymentsTable.id }).from(paymentsTable)\n      .where(and(eq(paymentsTable.userId, user.id), eq(paymentsTable.status, \"paid\"))).limit(1);\n    if (!paid) {\n      const paymentToken = jwt.sign({ id: user.id, scope: \"payment\" }, JWT_SECRET, { expiresIn: \"30m\" });\n      res.status(402).json({ message: \"Payment is required before your account can be approved.\", paymentToken });",
+          "endLine": 224,
+          "explanation": "An unrecorded capture is presented to the applicant as payment still required.",
+          "id": "login-gate",
+          "label": "Login uses only the local paid ledger",
+          "language": "typescript",
+          "path": "artifacts/api-server/src/routes/auth.ts",
+          "role": "outcome",
+          "startLine": 220
+        }
+      ],
+      "confidence": {
+        "level": "high",
+        "rationale": "Verified against current source; payment behavior additionally reproduced with actual handlers and in-memory PGlite where stated. Live deployment state is untested."
+      },
+      "findingId": "csf_3e47c52f348d444f7672fc06",
+      "fingerprints": {
+        "algorithm": "codex-security/v1",
+        "primary": "codex-security/v1:sha256:fc1b0e47bf87f82366bf06e4bf81846f4ebb875ac3524550f637c1841fe8f311"
+      },
+      "identity": {
+        "anchor": "payment-webhook-acknowledges-storage-failure"
+      },
+      "locations": [
+        {
+          "endLine": 138,
+          "path": "artifacts/api-server/src/routes/payments-webhook.ts",
+          "role": "root_control",
+          "startLine": 124
+        },
+        {
+          "endLine": 224,
+          "path": "artifacts/api-server/src/routes/auth.ts",
+          "role": "outcome",
+          "startLine": 220
+        }
+      ],
+      "occurrenceId": "occ_3350424d48c0dd9fae960ad6",
+      "provenance": {
+        "source": "local_plugin"
+      },
+      "remediation": "Acknowledge only after durably storing the event or applying the payment update. Return a retryable failure for transient storage errors; implement an idempotent durable inbox/reconciliation worker and alert on irreconcilable events. Verify gateway state server-side before offering another payment.",
+      "remediationTests": [
+        "Force one storage failure during capture; require retryable response or durable queued event.",
+        "Replay the same capture after recovery and assert one paid transition and no duplicate charge.",
+        "Lose the browser callback and verify eventual paid-state recovery."
+      ],
+      "rootCause": {
+        "evidenceRefs": [
+          "capture-write",
+          "ack-on-error",
+          "login-gate"
+        ],
+        "summary": "The webhook verifies its HMAC, but its database catch always returns `200`. The comment relies on browser `/verify` as a fallback, although that callback can be lost, expire or independently fail. Current payment routes contain no provider reconciliation endpoint or durable webhook inbox."
+      },
+      "ruleId": "payment-webhook-acknowledges-storage-failure",
+      "severity": {
+        "changeConditions": "Provider configuration, credential rotation, production incidence and log-access controls may change operational impact; no such state was inspected.",
+        "level": "medium",
+        "rationale": "Priority reflects the source-backed financial integrity, access availability or sensitive logging impact; deployment-specific reachability and restrictions are stated below."
+      },
+      "summary": "A captured-payment notification can receive `200` while its database write failed and the account remains unpaid. When the browser callback is unavailable, the application has acknowledged its recovery event without recording the payment.",
+      "taxonomy": {
+        "category": "Payment processing reliability / financial integrity",
+        "cwe": [
+          "CWE-703"
+        ]
+      },
+      "title": "Captured payments are acknowledged even when recording them fails",
+      "validation": {
+        "evidenceRefs": [
+          "capture-write",
+          "ack-on-error",
+          "login-gate"
+        ],
+        "limitations": [
+          "Not tested against the deployed service or a real payment."
+        ],
+        "method": "Static source trace and local synthetic direct-handler tests where stated",
+        "summary": "Directly invoked the real webhook handler with a signed synthetic capture and made its database update throw once. It returned 200, the in-memory row remained `created`, and the real login handler returned 402. All provider/mail traffic was mocked or blocked. A delivery that is retried later can heal the row; the bug is acknowledging an uncommitted event."
+      }
+    },
+    {
+      "attackPath": {
+        "dataflow": {
+          "evidenceRefs": [
+            "verified-input",
+            "created-only",
+            "webhook-can-recover",
+            "approval-gate"
+          ],
+          "summary": "Earlier failed attempt -> local failed order -> later signed success -> created-only UPDATE affects zero rows -> 409 -> approval 402."
+        },
+        "reachability": {
+          "evidenceRefs": [
+            "verified-input",
+            "created-only",
+            "webhook-can-recover",
+            "approval-gate"
+          ],
+          "summary": "A normal applicant who retries within an existing checkout order is affected until the independent captured webhook repairs it. No forged signature, another user order or unauthorized account access was demonstrated."
+        }
+      },
+      "codeEvidence": [
+        {
+          "code": "  const expected = crypto.createHmac(\"sha256\", credentials.keySecret)\n    .update(`${razorpay_order_id}|${razorpay_payment_id}`).digest(\"hex\");\n  const expectedBuffer = Buffer.from(expected, \"utf8\");\n  const providedBuffer = Buffer.from(razorpay_signature, \"utf8\");\n  const matches = expectedBuffer.length === providedBuffer.length && crypto.timingSafeEqual(expectedBuffer, providedBuffer);\n  if (!matches) { res.status(400).json({ message: \"Signature verification failed\" }); return; }",
+          "endLine": 183,
+          "explanation": "The success callback can carry a valid gateway signature even though an earlier attempt marked the local order failed.",
+          "id": "verified-input",
+          "label": "The checkout signature is checked",
+          "language": "typescript",
+          "path": "artifacts/api-server/src/routes/payments.ts",
+          "role": "entrypoint",
+          "startLine": 178
+        },
+        {
+          "code": "  const [updated] = await db.update(paymentsTable).set({ status: \"paid\", razorpayPaymentId: razorpay_payment_id, updatedAt: new Date() })\n    .where(and(eq(paymentsTable.id, payment.id), eq(paymentsTable.status, \"created\")))\n    .returning({ id: paymentsTable.id });\n  if (!updated) {\n    // The row was not 'created', so nothing was marked paid. Report what it actually is\n    // rather than the stale copy read above.\n    const [current] = await db.select({ status: paymentsTable.status }).from(paymentsTable)\n      .where(eq(paymentsTable.id, payment.id)).limit(1);\n    if (!current) { res.status(404).json({ message: \"Payment order not found\" }); return; }\n    // 'paid' here means a concurrent verify for this same order won the race and wrote the\n    // row first. The payment did succeed, so this caller gets the same 200 as the idempotent\n    // path above. Answering 409 would tell an applicant who has genuinely paid that they\n    // have not. Do NOT collapse this back into a single 409.\n    if (current.status === \"paid\") { res.json({ status: \"paid\" }); return; }\n    res.status(409).json({ message: \"This payment cannot be completed\", status: current.status });",
+          "endLine": 199,
+          "explanation": "The created-only predicate leaves failed rows unchanged and sends 409.",
+          "id": "created-only",
+          "label": "Verification only promotes created rows",
+          "language": "typescript",
+          "path": "artifacts/api-server/src/routes/payments.ts",
+          "role": "root_control",
+          "startLine": 185
+        },
+        {
+          "code": "      // Razorpay allows retrying payment against the same order_id, so a prior payment.failed\n      // must not permanently strand the row - a declined card followed by a successful one is\n      // payment.failed then payment.captured for the same order_id. 'paid' is excluded (never\n      // reprocess an already-paid row) and 'refunded' is excluded (never silently resurrect a\n      // refunded payment back to paid) - inArray only, no \"status != 'paid'\" shortcut.\n      const [updated] = await db.update(paymentsTable).set({ status: \"paid\", razorpayPaymentId: paymentId, updatedAt: new Date() })\n        .where(and(eq(paymentsTable.razorpayOrderId, orderId), inArray(paymentsTable.status, [\"created\", \"failed\"])))\n        .returning({ id: paymentsTable.id });",
+          "endLine": 105,
+          "explanation": "This sibling path demonstrates that failed is an intermediate order-attempt state, not a terminal prohibition.",
+          "id": "webhook-can-recover",
+          "label": "The sibling capture path explicitly allows successful retries",
+          "language": "typescript",
+          "path": "artifacts/api-server/src/routes/payments-webhook.ts",
+          "role": "expected_control",
+          "startLine": 98
+        },
+        {
+          "code": "    if (!target.adminProvisioned) {\n      const [paidPayment] = await db.select({ id: paymentsTable.id }).from(paymentsTable)\n        .where(and(eq(paymentsTable.userId, userId), eq(paymentsTable.status, \"paid\"))).limit(1);\n      if (!paidPayment) {\n        res.status(402).json({ message: \"This student has not completed payment and cannot be approved yet\" });\n        return;",
+          "endLine": 110,
+          "explanation": "The uncorrected failed state blocks approval.",
+          "id": "approval-gate",
+          "label": "HOD approval requires a local paid row",
+          "language": "typescript",
+          "path": "artifacts/api-server/src/routes/admin.ts",
+          "role": "outcome",
+          "startLine": 105
+        }
+      ],
+      "confidence": {
+        "level": "high",
+        "rationale": "Verified against current source; payment behavior additionally reproduced with actual handlers and in-memory PGlite where stated. Live deployment state is untested."
+      },
+      "findingId": "csf_5987e4bc56a66d2f62f5bc92",
+      "fingerprints": {
+        "algorithm": "codex-security/v1",
+        "primary": "codex-security/v1:sha256:78449e1c4b0da1dd6a2fe43660cc584e7ded6e8745bcc7293d4831c5b540bf47"
+      },
+      "identity": {
+        "anchor": "payment-verify-rejects-failed-retry"
+      },
+      "locations": [
+        {
+          "endLine": 199,
+          "path": "artifacts/api-server/src/routes/payments.ts",
+          "role": "root_control",
+          "startLine": 185
+        },
+        {
+          "endLine": 110,
+          "path": "artifacts/api-server/src/routes/admin.ts",
+          "role": "outcome",
+          "startLine": 105
+        }
+      ],
+      "occurrenceId": "occ_dab3f859ab529c26ed89e24c",
+      "provenance": {
+        "source": "local_plugin"
+      },
+      "remediation": "Use one shared, idempotent payment-finalization path for browser verification and webhooks. After authoritative provider verification, permit legitimate failed-to-paid recovery; retain explicit protections for refunded orders and owner mismatches.",
+      "remediationTests": [
+        "Failed attempt then valid successful retry with no captured webhook must recover.",
+        "Refused/invalid signature must leave state unchanged.",
+        "Refunded orders must not be resurrected.",
+        "Concurrent success callbacks must remain idempotent."
+      ],
+      "rootCause": {
+        "evidenceRefs": [
+          "verified-input",
+          "created-only",
+          "webhook-can-recover",
+          "approval-gate"
+        ],
+        "summary": "The browser and webhook implement incompatible payment state transitions. A failed attempt marks the order failed; subsequent valid browser verification only updates rows whose status is created. Refunded rows must remain protected, but treating failed rows identically to refunded rows strands legitimate retries."
+      },
+      "ruleId": "payment-verify-rejects-failed-retry",
+      "severity": {
+        "changeConditions": "Provider configuration, credential rotation, production incidence and log-access controls may change operational impact; no such state was inspected.",
+        "level": "medium",
+        "rationale": "Priority reflects the source-backed financial integrity, access availability or sensitive logging impact; deployment-specific reachability and restrictions are stated below."
+      },
+      "summary": "When a failed attempt is followed by a successful checkout on the same order, `/verify` rejects the valid signed success with 409 because it only promotes `created` rows. If the capture webhook is late or missing, login and HOD approval continue to return 402.",
+      "taxonomy": {
+        "category": "Payment state-machine reliability",
+        "cwe": [
+          "CWE-841"
+        ]
+      },
+      "title": "A successful retry cannot clear an earlier failed order through browser verification",
+      "validation": {
+        "evidenceRefs": [
+          "verified-input",
+          "created-only",
+          "webhook-can-recover",
+          "approval-gate"
+        ],
+        "limitations": [
+          "Not tested against the deployed service or a real payment."
+        ],
+        "method": "Static source trace and local synthetic direct-handler tests where stated",
+        "summary": "With a synthetic failed order and a valid HMAC, the actual verification handler returned 409 with status failed; the login handler returned 402 and the HOD approval handler returned 402. A subsequent synthetic captured webhook changed the same row to paid and approval then returned 200. This control proves the webhook already supports the retry that browser verification denies."
+      }
+    },
+    {
+      "attackPath": {
+        "dataflow": {
+          "evidenceRefs": [
+            "clinical-input",
+            "clinical-insert",
+            "clinical-patch",
+            "central-handler-comparison"
+          ],
+          "summary": "Clinical fields -> insert/update query parameters -> query failure -> raw console error/cause -> stderr and downstream logging."
+        },
+        "reachability": {
+          "evidenceRefs": [
+            "clinical-input",
+            "clinical-insert",
+            "clinical-patch",
+            "central-handler-comparison"
+          ],
+          "summary": "A legitimate clinical write can fail during a database outage. An approved resident with valid own-record inputs can also submit text that the database rejects. Resulting log exposure depends on deployment stderr collection and access; those settings were not inspected."
+        }
+      },
+      "codeEvidence": [
+        {
+          "code": "  patientAge: nameSchema,\n  patientSex: z.enum([\"male\", \"female\", \"other\"]),\n  caseNumber: nameSchema,\n  // Radiology-specific optional fields (other departments send null/undefined)\n  organSystem: z.string().trim().min(1).max(160).nullable().optional(),\n  clinicalFindings: z.string().trim().min(1).max(5000).nullable().optional(),\n  competency: z.string().trim().min(1).max(160).nullable().optional(),",
+          "endLine": 1412,
+          "explanation": "Clinical record fields pass string validation and reach the database query.",
+          "id": "clinical-input",
+          "label": "Resident-controlled clinical text",
+          "language": "typescript",
+          "path": "artifacts/api-server/src/routes/student.ts",
+          "role": "user_input",
+          "startLine": 1406
+        },
+        {
+          "code": "    const [inserted] = await db.insert(clinicalWorkLogsTable).values({\n      studentId, supervisorId, date, category, subType: subType || null, patientAge, patientSex, caseNumber,\n      organSystem: organSystem || null, clinicalFindings: clinicalFindings ? clinicalFindings.trim() : null,\n      competency: competency || null, status: \"pending\",\n    }).returning();\n    res.status(201).json(inserted);\n  } catch (error: any) {\n    console.error(\"POST ERROR\", error, error?.cause);\n    req.log.error({ studentId: req.params.studentId, status: 500 }, \"Error creating clinical work log\");",
+          "endLine": 1466,
+          "explanation": "The failure catch prints the entire query error and its cause after binding these clinical fields.",
+          "id": "clinical-insert",
+          "label": "Patient fields enter the query",
+          "language": "typescript",
+          "path": "artifacts/api-server/src/routes/student.ts",
+          "role": "sink",
+          "startLine": 1458
+        },
+        {
+          "code": "    if (req.body.clinicalFindings !== undefined && req.body.clinicalFindings !== null) {\n      req.body.clinicalFindings = req.body.clinicalFindings.trim();\n    }\n    const [updated] = await db.update(clinicalWorkLogsTable)\n      .set({ ...req.body, status: \"pending\", facultyRemarks: null, reviewedBy: null, reviewedAt: null })\n      .where(and(eq(clinicalWorkLogsTable.id, logId), eq(clinicalWorkLogsTable.studentId, studentId), isNull(clinicalWorkLogsTable.deletedAt)))\n      .returning();\n    if (!updated) { res.status(404).json({ message: \"Log not found\" }); return; }\n    res.json(updated);\n  } catch (error) {\n    console.error(\"PATCH ERROR\", error);\n    req.log.error({ logId: req.params.logId, status: 500 }, \"Error updating clinical work log\");\n    res.status(500).json({ message: \"Internal server error\" });",
+          "endLine": 1514,
+          "explanation": "Updated clinical text is passed to the query, and errors are printed unredacted.",
+          "id": "clinical-patch",
+          "label": "Edits use the same raw error sink",
+          "language": "typescript",
+          "path": "artifacts/api-server/src/routes/student.ts",
+          "role": "sink",
+          "startLine": 1502
+        },
+        {
+          "code": "  // Drizzle errors can contain SQL parameters, including credentials and clinical records.\n  req.log.error({\n    code: typeof code === \"string\" && /^[A-Z0-9]{5}$/.test(code) ? code : \"UNEXPECTED\",\n    ...(typeof pgError?.table === \"string\" ? { table: pgError.table } : {}),\n    ...(typeof pgError?.column === \"string\" ? { column: pgError.column } : {}),\n    ...(typeof pgError?.constraint === \"string\" ? { constraint: pgError.constraint } : {}),\n  }, \"Request failed\");",
+          "endLine": 112,
+          "explanation": "This safer handler documents query-parameter exposure, but the local console calls bypass it.",
+          "id": "central-handler-comparison",
+          "label": "Central error handler already avoids raw Drizzle errors",
+          "language": "typescript",
+          "path": "artifacts/api-server/src/app.ts",
+          "role": "expected_control",
+          "startLine": 106
+        }
+      ],
+      "confidence": {
+        "level": "high",
+        "rationale": "Verified against current source; payment behavior additionally reproduced with actual handlers and in-memory PGlite where stated. Live deployment state is untested."
+      },
+      "findingId": "csf_1b62357fb73ce9be3db8953b",
+      "fingerprints": {
+        "algorithm": "codex-security/v1",
+        "primary": "codex-security/v1:sha256:425bb61b8c6264108a63f859838bb7b416edfada4b50dba585fee30b2623244a"
+      },
+      "identity": {
+        "anchor": "clinical-query-errors-in-console"
+      },
+      "locations": [
+        {
+          "endLine": 1465,
+          "path": "artifacts/api-server/src/routes/student.ts",
+          "role": "root_control",
+          "startLine": 1465
+        },
+        {
+          "endLine": 1512,
+          "path": "artifacts/api-server/src/routes/student.ts",
+          "role": "root_control",
+          "startLine": 1512
+        }
+      ],
+      "occurrenceId": "occ_87faeeaac823ef3611dba2e1",
+      "provenance": {
+        "source": "local_plugin-independent-baseline"
+      },
+      "remediation": "Remove the two raw console calls. Log only operation, vetted IDs/status and safe error codes. Check local catches elsewhere for equivalent raw-error logging. Test failure paths with synthetic sensitive markers and assert none reach console/logger output.",
+      "remediationTests": [
+        "Induce insert and update failures with synthetic clinical markers; assert no marker appears in console or logger calls.",
+        "Check that client responses remain generic and ownership guards still apply."
+      ],
+      "rootCause": {
+        "evidenceRefs": [
+          "clinical-input",
+          "clinical-insert",
+          "clinical-patch",
+          "central-handler-comparison"
+        ],
+        "summary": "After an authenticated resident supplies owned clinical data, the insert/update binds it as query parameters. On error, these route-local catches print the raw error instead of only vetted metadata. Console output is independent of the pino serializers and the safer centralized error handler."
+      },
+      "ruleId": "clinical-query-errors-in-console",
+      "severity": {
+        "changeConditions": "Provider configuration, credential rotation, production incidence and log-access controls may change operational impact; no such state was inspected.",
+        "level": "medium",
+        "rationale": "Priority reflects the source-backed financial integrity, access availability or sensitive logging impact; deployment-specific reachability and restrictions are stated below."
+      },
+      "summary": "Failed clinical-work inserts and edits print complete database error objects to `console.error`. Those query errors can contain bound patient case identifiers and clinical findings, copying clinical data into operational log systems.",
+      "taxonomy": {
+        "category": "Sensitive clinical information in logs",
+        "cwe": [
+          "CWE-532"
+        ]
+      },
+      "title": "Clinical write failures send clinical fields to server logs",
+      "validation": {
+        "evidenceRefs": [
+          "clinical-input",
+          "clinical-insert",
+          "clinical-patch",
+          "central-handler-comparison"
+        ],
+        "limitations": [
+          "Static validation only for this finding; production log collection/access and an exact malformed request were not tested."
+        ],
+        "method": "Static source trace and local synthetic direct-handler tests where stated",
+        "summary": "Parent confirmed both raw console sinks and the complete input-to-query trace. Query errors in the installed ORM retain their parameter arrays. Authentication, ownership, department features and catalog checks limit who may submit, but do not sanitize the error sink. JSON NUL in otherwise valid text is a possible database-error trigger; that exact request was not executed."
+      }
+    },
+    {
+      "attackPath": {
+        "dataflow": {
+          "evidenceRefs": [
+            "delete-entry",
+            "delete-payments",
+            "unknown-capture"
+          ],
+          "summary": "Privileged account removal -> delete all payments -> external capture arrives -> order lookup empty -> acknowledge 200 with no recorded receipt."
+        },
+        "reachability": {
+          "evidenceRefs": [
+            "delete-entry",
+            "delete-payments",
+            "unknown-capture"
+          ],
+          "summary": "Requires an authorized HOD/admin delete while checkout or reconciliation is outstanding. Its privileged-only reachability lowers severity; the financial data-loss behavior is directly reproduced."
+        }
+      },
+      "codeEvidence": [
+        {
+          "code": "    const role = target.role as \"student\" | \"professor\";\n    let deletedCounts: Record<string, number> = {};\n\n    await db.transaction(async (tx) => {\n      deletedCounts = await hardDeleteUserCascade(tx, targetUserId, role, req.user!.id);\n    });",
+          "endLine": 747,
+          "explanation": "The HOD deletion path calls the shared helper without a payment-state precondition.",
+          "id": "delete-entry",
+          "label": "Privileged account deletion invokes the cascade",
+          "language": "typescript",
+          "path": "artifacts/api-server/src/routes/admin.ts",
+          "role": "entrypoint",
+          "startLine": 742
+        },
+        {
+          "code": "  const _payments = await tx.delete(paymentsTable).where(eq(paymentsTable.userId, targetUserId)).returning({ id: paymentsTable.id });\n  deletedCounts.payments = _payments.length;\n\n  const _users = await tx.delete(usersTable).where(eq(usersTable.id, targetUserId)).returning({ id: usersTable.id });\n  deletedCounts.users = _users.length;",
+          "endLine": 152,
+          "explanation": "There is no created/paid/refund retention rule before removing payment linkage.",
+          "id": "delete-payments",
+          "label": "All payment rows are deleted with the account",
+          "language": "typescript",
+          "path": "artifacts/api-server/src/lib/hard-delete-user.ts",
+          "role": "root_control",
+          "startLine": 148
+        },
+        {
+          "code": "    const [row] = await db.select().from(paymentsTable).where(eq(paymentsTable.razorpayOrderId, orderId)).limit(1);\n    if (!row) {\n      logger.warn({ event, eventId, orderId, status: 200 }, \"Razorpay webhook: order not found\");\n      res.sendStatus(200);\n      return;",
+          "endLine": 88,
+          "explanation": "The missing local order is acknowledged 200 and no ledger entry is recreated.",
+          "id": "unknown-capture",
+          "label": "A later capture cannot be correlated",
+          "language": "typescript",
+          "path": "artifacts/api-server/src/routes/payments-webhook.ts",
+          "role": "outcome",
+          "startLine": 84
+        }
+      ],
+      "confidence": {
+        "level": "high",
+        "rationale": "Verified against current source; payment behavior additionally reproduced with actual handlers and in-memory PGlite where stated. Live deployment state is untested."
+      },
+      "findingId": "csf_dab71e01cb3139e6fedcf53c",
+      "fingerprints": {
+        "algorithm": "codex-security/v1",
+        "primary": "codex-security/v1:sha256:1ff80aaf09162dc7d90de5d1a13ed6cde772684a14a1b5cc356d107c481f5e4b"
+      },
+      "identity": {
+        "anchor": "account-deletion-erases-payment-ledger"
+      },
+      "locations": [
+        {
+          "endLine": 152,
+          "path": "artifacts/api-server/src/lib/hard-delete-user.ts",
+          "role": "root_control",
+          "startLine": 148
+        },
+        {
+          "endLine": 747,
+          "path": "artifacts/api-server/src/routes/admin.ts",
+          "role": "entrypoint",
+          "startLine": 742
+        },
+        {
+          "endLine": 815,
+          "path": "artifacts/api-server/src/routes/superadmin.ts",
+          "role": "entrypoint",
+          "startLine": 795
+        }
+      ],
+      "occurrenceId": "occ_ddd8433510d372ce4421ea0c",
+      "provenance": {
+        "source": "local_plugin"
+      },
+      "remediation": "Define payment retention independently of account deletion. Keep a financial tombstone/provider identifiers and block or reconcile outstanding payments before removal. Avoid recreating clinical/personal records merely to retain a receipt.",
+      "remediationTests": [
+        "An account with an unsettled order must not lose its reconciliation mapping.",
+        "A later capture after permitted account deletion must be durably correlated for refund/reconciliation."
+      ],
+      "rootCause": {
+        "evidenceRefs": [
+          "delete-entry",
+          "delete-payments",
+          "unknown-capture"
+        ],
+        "summary": "Financial records share the account deletion lifecycle. The helper deletes payments unconditionally and then removes the user, even if an external order is still unsettled. The webhook requires the local mapping and drops unknown orders."
+      },
+      "ruleId": "account-deletion-erases-payment-ledger",
+      "severity": {
+        "changeConditions": "Provider configuration, credential rotation, production incidence and log-access controls may change operational impact; no such state was inspected.",
+        "level": "low",
+        "rationale": "Priority reflects the source-backed financial integrity, access availability or sensitive logging impact; deployment-specific reachability and restrictions are stated below."
+      },
+      "summary": "Hard-deleting a pending applicant removes every payment row, including an outstanding checkout order. A later genuine capture then has no account mapping and is acknowledged without recording it. Deleting a paid account also removes local payment/refund reference data.",
+      "taxonomy": {
+        "category": "Payment ledger retention / reconciliation reliability",
+        "cwe": []
+      },
+      "title": "Deleting an applicant also removes outstanding payment linkage",
+      "validation": {
+        "evidenceRefs": [
+          "delete-entry",
+          "delete-payments",
+          "unknown-capture"
+        ],
+        "limitations": [
+          "Not tested against the deployed service or a real payment."
+        ],
+        "method": "Static source trace and local synthetic direct-handler tests where stated",
+        "summary": "Invoked the actual cascade inside an in-memory transaction on a synthetic pending account with a created order. The payment row disappeared. Invoking the signed captured-event handler afterward returned 200 and did not recreate it. HOD and admin deletion paths are privileged and intentional; this is not a demonstrated authorization bypass."
+      }
+    }
+  ],
+  "scanId": "elogbook-local-20261026-payments-security",
+  "schemaVersion": "1.0"
+}

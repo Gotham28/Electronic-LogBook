@@ -1,4 +1,5 @@
 import * as React from "react";
+import { ProcedureClinicalDetails } from "@/components/ProcedureClinicalDetails";
 import { AcademicRecordDetails } from "@/components/AcademicRecordDetails";
 import { academicSectionName } from "@/lib/academic-logbook";
 import {
@@ -139,6 +140,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
   const hideUhid = isDemoMode();
   const { config, department, competencyLevels, caseCategories: deptCaseCategories, procedures: deptProcedures, academics: deptAcademics,
     clinicalWorkCategories, clinicalWorkSubtypes, academicLogbook } = useDepartment();
+  const showProcedureDetails = !!config?.enabledFeatures?.procedureClinicalDetails || deptProcedures.some((item) => item.requiredLogFields?.length);
   const isMicroDept = department?.code?.toLowerCase() === "microbiology" || department?.name?.toLowerCase().includes("microbiology");
   const microbiologyCaseFields = Boolean(config?.enabledFeatures?.microbiologyCaseFields || isMicroDept);
   const isHodUser = Boolean(embedded || currentUser?.role === "hod");
@@ -570,7 +572,12 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                           <AcademicRecordDetails activityType={currentItem.activityType || ""}
                             description={currentItem.description} presentationType={currentItem.presentationType} />
                         )}
-                        {currentItem.type === "Procedure" && (config?.enabledFeatures?.freeTextProcedures || isMicroDept) && (
+                        {currentItem.type === "Procedure" && showProcedureDetails && <ProcedureClinicalDetails entry={{
+                          patientAge: currentItem.patientAge || currentItem.patientInfo, patientUhid: currentItem.patientUhid,
+                          sex: currentItem.sex, diagnosis: currentItem.diagnosis, setting: currentItem.setting,
+                          competencyLevel: currentItem.declaredCompetency,
+                        }} />}
+                        {currentItem.type === "Procedure" && !showProcedureDetails && (config?.enabledFeatures?.freeTextProcedures || isMicroDept) && (
                           <>
                             {currentItem.diagnosis && <p className="text-xs text-slate-600 font-medium">{isMicroDept ? "Details" : "Diagnosis"}: {currentItem.diagnosis}</p>}
                             {!isMicroDept && currentItem.sex && <p className="text-xs text-slate-600 font-medium">Sex: {currentItem.sex}</p>}
@@ -1243,7 +1250,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                                                 <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">{log.diagnosis || <span className="text-slate-400">Not recorded</span>}</dd>
                                               </div>
                                             </dl>
-                                          ) : (
+                                          ) : showProcedureDetails ? <ProcedureClinicalDetails entry={log} /> : (
                                             <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                                               <div className="min-w-0">
                                                 <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Date</dt>

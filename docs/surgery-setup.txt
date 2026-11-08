@@ -1,0 +1,75 @@
+SURGERY DEPARTMENT AND PROCEDURE ENTRY REQUIREMENTS
+
+The application shares departments, procedure_types and procedure_logs across
+specialties. Surgery does not need separate copies of these tables.
+
+DATABASE COMMANDS
+
+In the existing application's database editor, run the full contents of these
+two SQL files, in this order:
+
+1. lib/db/migrations/0027_procedure_log_fields.sql
+
+   This adds required_log_fields to procedure_types and setting to procedure_logs.
+   Both additions are safe to repeat. Existing procedure types receive an empty
+   requirement list; existing procedure entries receive a NULL setting.
+
+2. artifacts/api-server/scripts/department-templates/surgery-setup.sql
+
+   This creates a real department named Surgery with code SURG if none exists.
+   If Surgery already exists, it keeps that department's ID and current code.
+   It creates/updates the department configuration and adds role codes O, A, PS,
+   and PI. It preserves unrelated feature flags and existing target counts.
+   It stops on duplicate real Surgery departments or a conflicting SURG code.
+
+The scripts contain no department-ID placeholders and create no user credentials
+or patient records. Run them on the existing app database, not an empty database.
+No live database commands were run by the coding agent.
+
+DEPLOYMENT AND HOD SETUP
+
+Apply the schema SQL before deploying this code. Deploy both the API and frontend.
+An approved Surgery HOD account is required: create/assign it through the admin
+portal. If the portal creates/replaces the department configuration while doing
+so, rerun surgery-setup.sql afterwards; it is safe to repeat.
+
+In the HOD console, open Requirements > Procedures > Add procedure. Enter the
+procedure name, group and actual required count. Surgery selects these six
+resident entry requirements by default:
+
+- Age
+- Sex
+- De-identified patient ID (IP/OP number)
+- Diagnosis or indication
+- Setting: Ward / Casualty / OT / NICU
+- Role level: O / A / PS / PI
+
+The HOD can change which details are mandatory for each procedure. For existing
+procedure types, expand the procedure group, open Required entry details under
+the procedure and save the checked fields. Existing procedure types are not
+silently changed by the SQL setup.
+
+Residents select a procedure in Procedure log. Its checked fields are required
+in both the form and API. Blank, omitted or N/A values do not satisfy a required
+field. Age accepts a value with its unit. Only a de-identified reference belongs
+in the patient ID field; do not enter patient names.
+
+The HOD/faculty review queue, procedure details and printed logbook show these
+values. Residents still create their own entries; the HOD defines requirements
+and reviews them. This does not give the HOD permission to create resident logs.
+
+Requirements apply to new submissions and edits. No existing records are
+backfilled or assigned invented clinical details. Mirrored test departments
+inherit the real department's requirements and use their own reviewing faculty.
+
+No Surgery procedure list or training quotas were supplied, so none were invented.
+Add those through the HOD console using the department's approved requirements.
+
+VERIFICATION (ISOLATED IN-MEMORY TEST DATABASE)
+
+From artifacts/api-server:
+pnpm exec tsx --tsconfig tests/tsconfig.json --test tests/surgery-procedure-fields.test.ts
+
+Builds from the repository root:
+pnpm --filter @workspace/api-server build
+pnpm --filter @workspace/mockup-sandbox build

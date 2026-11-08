@@ -5,6 +5,7 @@ import { requireAuth, requireRole, requireDepartment } from "../middlewares/auth
 import { z } from "zod";
 import { validate } from "../lib/validation.js";
 import { resolveConfigDepartmentId } from "../lib/department-config-source.js";
+import { PROCEDURE_ROLE_CODES } from "@workspace/api-zod";
 
 const router: IRouter = Router();
 
@@ -99,6 +100,10 @@ router.patch("/:logType/:logId/review", requireAuth, requireRole(["professor", "
         .limit(1);
       
       const enabledFeatures = config?.enabledFeatures as Record<string, boolean> | undefined;
+      if (enabledFeatures?.procedureClinicalDetails && facultyVerifiedLevel !== undefined
+        && !(PROCEDURE_ROLE_CODES as readonly string[]).includes(facultyVerifiedLevel)) {
+        res.status(400).json({ message: "Select a valid verified role level" }); return;
+      }
       if (enabledFeatures?.procedureExperience && facultyVerifiedLevel !== undefined) {
         procedureUpdateData.facultyVerifiedLevel = facultyVerifiedLevel || null;
       }
