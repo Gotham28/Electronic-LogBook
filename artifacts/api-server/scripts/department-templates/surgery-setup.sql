@@ -1,4 +1,4 @@
--- Run 0027_procedure_log_fields.sql before deploying the new application code.
+-- Run 0027_procedure_log_fields.sql and 0028_surgery_dynamic_procedure_fields.sql before deploying the new application code.
 -- This script creates/configures department metadata only. It creates no users,
 -- patient records, procedure lists or training targets.
 -- SURG is the default code for a new Surgery department. If a real department
@@ -28,7 +28,7 @@ BEGIN
   END IF;
 
   INSERT INTO public.department_configs (department_id, enabled_features)
-    VALUES (surgery_id, '{"procedureExperience":true,"procedureClinicalDetails":true,"freeTextProcedures":false,"hideProcedureAge":false,"hideProcedureLogs":false}'::jsonb)
+    VALUES (surgery_id, '{"procedureExperience":true,"procedureClinicalDetails":true,"dynamicProcedureFields":true,"freeTextProcedures":false,"hideProcedureAge":false,"hideProcedureLogs":false}'::jsonb)
   ON CONFLICT (department_id) DO UPDATE SET enabled_features =
     COALESCE(public.department_configs.enabled_features, '{}'::jsonb) || EXCLUDED.enabled_features;
 

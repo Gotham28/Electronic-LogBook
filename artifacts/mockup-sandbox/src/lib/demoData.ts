@@ -1,6 +1,13 @@
 import { demoData, getDemoDepartmentProfile, getDemoResident, getActiveDemoProfile } from './demoDepartments';
 import { playDemoSound } from './demoSounds';
 import { isDemoMovieActive } from './demoSession';
+import {
+  isBuiltInProcedureField,
+  normalizeCustomProcedureFieldValues,
+  normalizeProcedureFieldDefinitions,
+  procedureFieldDefinitionsSchema,
+  validateDynamicProcedureLogFields,
+} from './procedure-log-fields';
 
 export const DEMO_MOVIE_ASK_QUESTION = "How am I doing on my procedure and case targets?";
 
@@ -63,7 +70,16 @@ function buildReviewQueue() {
       })),
       ...resident.logs.procedures.filter((item) => item.status === "pending").map((item) => ({
         ...common, id: "procedure-" + item.id, dbId: item.id, logType: "procedure", type: "Procedure",
-        title: item.procedureName, date: item.date, patientInfo: "Sample record", detail: item.procedureGroup, status: item.status,
+        title: item.procedureName, date: item.date,
+        patientInfo: item.patientAge || item.age || "Sample record",
+        patientAge: item.patientAge || item.age || "",
+        patientUhid: item.patientUhid || "",
+        sex: item.sex || "",
+        diagnosis: item.diagnosis || "",
+        setting: item.setting || "",
+        declaredCompetency: item.competencyLevel ?? item.experience ?? "",
+        customFields: item.customFields ?? {},
+        detail: item.procedureGroup, status: item.status,
       })),
       ...resident.logs.academics.filter((item) => item.status === "pending").map((item) => ({
         ...common, id: "academic-" + item.id, dbId: item.id, logType: "academic", type: "Academic",
@@ -146,6 +162,37 @@ export async function handleDemoRequest(method: string, path: string, body?: any
     if (path.match(/\/api\/auth\/me$/)) {
       const stored = window.sessionStorage.getItem("elogbook-user");
       return stored ? JSON.parse(stored) : null;
+    }
+
+    // Surgery dynamic procedure fields & groups
+    if (routePath === "/api/admin/department/procedure-fields") {
+      const catalog = demoData.departmentCatalog;
+      const enabled = Boolean(catalog.config.enabledFeatures?.dynamicProcedureFields);
+      return {
+        enabled,
+        readOnlyConfig: false,
+        fields: enabled ? (catalog.procedureFields ?? []) : [],
+      };
+    }
+    if (routePath === "/api/admin/department/procedure-groups") {
+      const counts = new Map<string, number>();
+      demoData.departmentCatalog.procedures.forEach((proc) => {
+        counts.set(proc.group, (counts.get(proc.group) ?? 0) + 1);
+      });
+      return [...counts.entries()].map(([name, count]) => ({ id: name, name, count }));
+    }
+    const procUsageMatch = routePath.match(/^\/api\/admin\/department\/procedures\/(\d+)\/usage-count$/);
+    if (procUsageMatch) {
+      const procId = Number(procUsageMatch[1]);
+      const proc = demoData.departmentCatalog.procedures.find((p) => p.id === procId);
+      const residents = getActiveDemoProfile().residents || [];
+      const count = proc
+        ? residents.reduce((sum, r) => sum + r.logs.procedures.filter((l: any) => l.procedureName === proc.name).length, 0)
+        : 0;
+      return { count };
+    }
+    if (/^\/api\/admin\/department\/(?:procedure-groups|catalog)\/[^/]+\/usage-count$/.test(routePath)) {
+      return { count: 0 };
     }
 
     // Configs & Meta
@@ -350,10 +397,106 @@ export async function handleDemoRequest(method: string, path: string, body?: any
         if (!isDemoMovieActive()) {
           item.status = body.status === "rejected" ? "rejected" : "verified";
           item.reviewComments = body.comments || "";
+          item.facultyRemarks = body.comments || null;
+          if (reviewMatch[1] === "procedure" && body.facultyVerifiedLevel !== undefined) {
+            item.facultyVerifiedLevel = body.facultyVerifiedLevel || null;
+          }
         }
         if (body.status !== "rejected") playDemoSound("success");
       }
       return { success: true, id: dbId };
+    }
+
+    if (method === "PATCH" && routePath === "/api/admin/department/procedure-fields" && body) {
+      const catalog = demoData.departmentCatalog;
+      const enabled = Boolean(catalog.config.enabledFeatures?.dynamicProcedureFields);
+      if (!enabled) {
+        throw new Error("Dynamic procedure entry fields are not enabled for this department");
+      }
+      const parsed = procedureFieldDefinitionsSchema.safeParse(body.fields);
+      if (!parsed.success) {
+        throw new Error(parsed.error.issues[0]?.message || "Invalid procedure fields configuration");
+      }
+      const prevFields = catalog.procedureFields ?? [];
+      const normalized = normalizeProcedureFieldDefinitions(parsed.data);
+      const activeIdSet = new Set(normalized.map((f) => f.id));
+      const prevIdSet = new Set(prevFields.map((f) => f.id));
+      const toggledSet = new Set<string>(Array.isArray(body.toggledRequiredIds) ? body.toggledRequiredIds : []);
+      const syncExisting = body.applyRequiredToExisting !== false;
+
+      catalog.procedureFields = normalized;
+      catalog.config.procedureLogFields = normalized;
+
+      const roleField = normalized.find((f) => f.id === "competencyLevel");
+      if (roleField && (roleField.type === "select" || roleField.type === "radio")) {
+        catalog.competencyLevels = (roleField.options ?? []).map((opt, idx) => ({
+          id: -(idx + 1),
+          name: opt,
+          value: opt,
+          required: 0,
+          period: "total",
+        }));
+      } else {
+        catalog.competencyLevels = [];
+      }
+
+      catalog.procedures = catalog.procedures.map((proc) => {
+        const existingReq = proc.requiredLogFields ?? [];
+        let nextReq = existingReq.filter((id) => activeIdSet.has(id));
+        if (syncExisting) {
+          for (const field of normalized) {
+            const isNew = !prevIdSet.has(field.id);
+            const wasToggled = toggledSet.has(field.id);
+            if ((isNew || wasToggled) && field.isRequired && !nextReq.includes(field.id)) {
+              nextReq.push(field.id);
+            } else if (wasToggled && !field.isRequired) {
+              nextReq = nextReq.filter((id) => id !== field.id);
+            }
+          }
+        }
+        return { ...proc, requiredLogFields: [...new Set(nextReq)] };
+      });
+
+      playDemoSound("success");
+      return { fields: normalized };
+    }
+
+    if (method === "POST" && routePath === "/api/admin/department/procedures" && body) {
+      const catalog = demoData.departmentCatalog;
+      const dynamicEnabled = Boolean(catalog.config.enabledFeatures?.dynamicProcedureFields);
+      const activeFields = dynamicEnabled ? (catalog.procedureFields ?? []) : [];
+      const activeIdSet = new Set(activeFields.map((f) => f.id));
+      const reqFields = Array.isArray(body.requiredLogFields)
+        ? body.requiredLogFields.filter((id: string) => !dynamicEnabled || activeIdSet.has(id))
+        : (dynamicEnabled ? activeFields.filter((f) => f.isRequired).map((f) => f.id) : []);
+      const created = {
+        id: Date.now(),
+        name: String(body.name || "").trim(),
+        group: String(body.group || "").trim(),
+        required: Number(body.required) || 0,
+        requiredLogFields: [...new Set<string>(reqFields)],
+      };
+      catalog.procedures.push(created);
+      catalog.config.requiredProcedures = catalog.procedures.reduce((sum, p) => sum + p.required, 0);
+      playDemoSound("success");
+      return created;
+    }
+
+    const adminProcPatchMatch = routePath.match(/^\/api\/admin\/department\/procedures\/(\d+)$/);
+    if (method === "PATCH" && adminProcPatchMatch && body) {
+      const catalog = demoData.departmentCatalog;
+      const procId = Number(adminProcPatchMatch[1]);
+      const target = catalog.procedures.find((p) => p.id === procId);
+      if (!target) throw new Error("Procedure type not found");
+      if (body.required !== undefined) target.required = Number(body.required) || 0;
+      if (Array.isArray(body.requiredLogFields)) {
+        const dynamicEnabled = Boolean(catalog.config.enabledFeatures?.dynamicProcedureFields);
+        const activeIdSet = new Set((catalog.procedureFields ?? []).map((f) => f.id));
+        target.requiredLogFields = [...new Set<string>(body.requiredLogFields.filter((id: string) => !dynamicEnabled || activeIdSet.has(id)))];
+      }
+      catalog.config.requiredProcedures = catalog.procedures.reduce((sum, p) => sum + p.required, 0);
+      playDemoSound("success");
+      return target;
     }
 
     if (path.includes("/clinical-works") && body) {
@@ -434,20 +577,94 @@ export async function handleDemoRequest(method: string, path: string, body?: any
       return { success: true, id: newCaseLog.id };
     }
 
+    const procEditMatch = routePath.match(/^\/api\/students\/(\d+)\/procedure-logs\/(\d+)$/);
+    if (method === "PATCH" && procEditMatch && body) {
+      const resident = getDemoResident(requestedStudentId(path));
+      const editId = Number(procEditMatch[2]);
+      const existing = resident.logs.procedures.find((p: any) => p.id === editId);
+      if (existing) {
+        const catalog = demoData.departmentCatalog;
+        const dynamicEnabled = Boolean(catalog.config.enabledFeatures?.dynamicProcedureFields);
+        const activeFields = dynamicEnabled ? (catalog.procedureFields ?? []) : [];
+        const procReq = catalog.procedures.find((p) => p.name === (body.procedureName ?? existing.procedureName));
+        const prevCustom = existing.customFields && typeof existing.customFields === "object" ? { ...existing.customFields } : {};
+        if (body.customFields && typeof body.customFields === "object") {
+          for (const [k, v] of Object.entries(body.customFields as Record<string, string | null>)) {
+            if (v === null) delete prevCustom[k];
+            else if (typeof v === "string" && v.trim()) prevCustom[k] = v.trim();
+          }
+        }
+        const merged = {
+          ...existing,
+          date: body.date ?? existing.date,
+          group: body.procedureGroup ?? existing.group,
+          procedureGroup: body.procedureGroup ?? existing.procedureGroup,
+          procedureName: body.procedureName ?? existing.procedureName,
+          patientUhid: body.patientUhid ?? existing.patientUhid,
+          patientAge: body.patientAge ?? existing.patientAge,
+          age: body.patientAge ?? existing.age,
+          sex: body.sex ?? existing.sex,
+          diagnosis: body.diagnosis ?? existing.diagnosis,
+          setting: body.setting !== undefined ? body.setting : existing.setting,
+          competencyLevel: body.competencyLevel ?? existing.competencyLevel,
+          experience: body.competencyLevel ?? existing.experience,
+          supervisorId: body.supervisorId ? Number(body.supervisorId) : existing.supervisorId,
+          customFields: prevCustom,
+        };
+        if (dynamicEnabled) {
+          const err = validateDynamicProcedureLogFields({
+            requiredFields: procReq?.requiredLogFields ?? [],
+            fields: activeFields,
+            entry: merged,
+            previousEntry: existing,
+          });
+          if (err) throw new Error(err);
+        }
+        Object.assign(existing, merged, {
+          status: "pending",
+          facultyRemarks: null,
+          facultyVerifiedLevel: null,
+        });
+        playDemoSound("success");
+        return existing;
+      }
+    }
+
     if (path.includes("/procedure-logs") && body) {
       const resident = getDemoResident(requestedStudentId(path));
+      const catalog = demoData.departmentCatalog;
+      const dynamicEnabled = Boolean(catalog.config.enabledFeatures?.dynamicProcedureFields);
+      const activeFields = dynamicEnabled ? (catalog.procedureFields ?? []) : [];
+      const customFieldIds = new Set(activeFields.filter((f) => !isBuiltInProcedureField(f.id)).map((f) => f.id));
+      const cleanCustomFields = dynamicEnabled ? normalizeCustomProcedureFieldValues(body.customFields, customFieldIds) : {};
+      if (dynamicEnabled) {
+        const procReq = catalog.procedures.find((p) => p.name === body.procedureName);
+        const err = validateDynamicProcedureLogFields({
+          requiredFields: procReq?.requiredLogFields ?? [],
+          fields: activeFields,
+          entry: { ...body, customFields: cleanCustomFields },
+        });
+        if (err) throw new Error(err);
+      }
       const newProcedureLog = {
         id: Date.now(),
-        number: demoData.logs.procedures.length + 1,
+        number: resident.logs.procedures.length + 1,
         date: body.date,
         group: body.procedureGroup,
         procedureGroup: body.procedureGroup,
-        patientUhid: body.patientUhid,
+        patientUhid: body.patientUhid ?? "N/A",
         procedureName: body.procedureName,
+        patientAge: body.patientAge || "N/A",
         age: body.patientAge || "Unknown",
+        sex: body.sex || "",
+        diagnosis: body.diagnosis || "",
+        setting: body.setting ?? null,
+        competencyLevel: body.competencyLevel || "N/A",
         experience: body.competencyLevel || "assisted",
+        supervisorId: Number(body.supervisorId),
+        customFields: cleanCustomFields,
         verifiedCompetency: "No",
-        status: "pending"
+        status: "pending",
       };
       resident.logs.procedures.unshift(newProcedureLog as any);
       playDemoSound("success");
@@ -629,6 +846,34 @@ export async function handleDemoRequest(method: string, path: string, body?: any
     }
 
     return { success: true, id: Date.now() };
+  }
+
+  if (method === "DELETE") {
+    const procDeleteMatch = routePath.match(/^\/api\/students\/(\d+)\/procedure-logs\/(\d+)$/);
+    if (procDeleteMatch) {
+      const resident = getDemoResident(requestedStudentId(path));
+      const logId = Number(procDeleteMatch[2]);
+      const idx = resident.logs.procedures.findIndex((p: any) => p.id === logId);
+      if (idx >= 0) resident.logs.procedures.splice(idx, 1);
+      return { success: true };
+    }
+    const adminProcDeleteMatch = routePath.match(/^\/api\/admin\/department\/procedures\/(\d+)$/);
+    if (adminProcDeleteMatch) {
+      const procId = Number(adminProcDeleteMatch[1]);
+      const catalog = demoData.departmentCatalog;
+      const idx = catalog.procedures.findIndex((p) => p.id === procId);
+      if (idx >= 0) catalog.procedures.splice(idx, 1);
+      catalog.config.requiredProcedures = catalog.procedures.reduce((sum, p) => sum + p.required, 0);
+      return { success: true };
+    }
+    const adminGroupDeleteMatch = routePath.match(/^\/api\/admin\/department\/procedure-groups\/([^/]+)$/);
+    if (adminGroupDeleteMatch) {
+      const groupName = decodeURIComponent(adminGroupDeleteMatch[1]);
+      const catalog = demoData.departmentCatalog;
+      catalog.procedures = catalog.procedures.filter((p) => p.group !== groupName);
+      catalog.config.requiredProcedures = catalog.procedures.reduce((sum, p) => sum + p.required, 0);
+      return { success: true };
+    }
   }
 
   return { success: true };

@@ -8,8 +8,20 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LogbookSectionSettings } from "./LogbookSectionSettings";
-import { ProcedureFieldSelector, ProcedureFieldRequirementsEditor } from "./ProcedureFieldRequirements";
-import { PROCEDURE_LOG_FIELDS } from "@/lib/procedure-log-fields";
+import {
+  DepartmentProcedureFieldsCard,
+  DynamicProcedureFieldChecklist,
+  ProcedureFieldSelector,
+  ProcedureFieldRequirementsEditor,
+  type DynamicFieldEditorHandle,
+} from "./ProcedureFieldRequirements";
+import {
+  PROCEDURE_LOG_FIELDS,
+  getDefaultProcedureFieldDefinitions,
+  normalizeProcedureFieldDefinitions,
+  procedureFieldDefinitionsSchema,
+  type ProcedureFieldDefinition,
+} from "@/lib/procedure-log-fields";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -162,6 +174,22 @@ export function DepartmentSettings() {
     }), successMsg);
   };
 
+  const dynamicProcedureFields = Boolean(features.dynamicProcedureFields);
+  const activeDepartmentFields = React.useMemo(
+    () => (dynamicProcedureFields ? (data.procedureFields ?? getDefaultProcedureFieldDefinitions()) : []),
+    [dynamicProcedureFields, data.procedureFields],
+  );
+  const departmentFieldsSignature = React.useMemo(
+    () => (dynamicProcedureFields ? JSON.stringify(normalizeProcedureFieldDefinitions(activeDepartmentFields)) : ""),
+    [dynamicProcedureFields, activeDepartmentFields],
+  );
+  const defaultEntryLogFields = React.useMemo(
+    () => (dynamicProcedureFields
+      ? activeDepartmentFields.filter((f) => f.isRequired).map((f) => f.id)
+      : (features.procedureClinicalDetails ? [...PROCEDURE_LOG_FIELDS] : [])),
+    [dynamicProcedureFields, activeDepartmentFields, features.procedureClinicalDetails],
+  );
+
   const [isAdding, setIsAdding] = React.useState(false);
   const [entryName, setEntryName] = React.useState("");
   const [entryRequired, setEntryRequired] = React.useState("");
@@ -169,10 +197,13 @@ export function DepartmentSettings() {
   const [procedureGroup, setProcedureGroup] = React.useState("");
   const [isAddingNewGroup, setIsAddingNewGroup] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState("");
-  const [entryLogFields, setEntryLogFields] = React.useState<string[]>(features.procedureClinicalDetails ? [...PROCEDURE_LOG_FIELDS] : []);
+  const [draftProcedureFields, setDraftProcedureFields] = React.useState<ProcedureFieldDefinition[]>(activeDepartmentFields);
+  const [entryLogFields, setEntryLogFields] = React.useState<string[]>(defaultEntryLogFields);
+  const addFieldEditorRef = React.useRef<DynamicFieldEditorHandle>(null);
 
   const resetAddForm = () => {
-    setEntryLogFields(features.procedureClinicalDetails ? [...PROCEDURE_LOG_FIELDS] : []);
+    setDraftProcedureFields(activeDepartmentFields);
+    setEntryLogFields(defaultEntryLogFields);
     setEntryName("");
     setEntryRequired("");
     setEntryPeriod("total");
@@ -189,14 +220,51 @@ export function DepartmentSettings() {
     setProcedureGroup("");
     setIsAddingNewGroup(false);
     setSearchQuery("");
-    setEntryLogFields(features.procedureClinicalDetails ? [...PROCEDURE_LOG_FIELDS] : []);
-  }, [activeSectionId, features.procedureClinicalDetails]);
+    setDraftProcedureFields(activeDepartmentFields);
+    setEntryLogFields(defaultEntryLogFields);
+  }, [activeSectionId, features.procedureClinicalDetails, dynamicProcedureFields]);
+
+  React.useEffect(() => {
+    if (!isAdding) {
+      setDraftProcedureFields(activeDepartmentFields);
+      setEntryLogFields(defaultEntryLogFields);
+    }
+  }, [isAdding, departmentFieldsSignature]);
 
   const handleAddSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     void save(async () => {
       if (activeSection.kind === "procedure") {
-        await apiPost("/api/admin/department/procedures", { name: entryName, group: procedureGroup, required: Number(entryRequired), requiredLogFields: entryLogFields });
+        let nextRequiredFields = entryLogFields;
+        if (dynamicProcedureFields) {
+          const prevFieldIds = new Set(draftProcedureFields.map((f) => f.id));
+          const committed = addFieldEditorRef.current ? addFieldEditorRef.current.commitPending() : draftProcedureFields;
+          if (!committed) {
+            throw new Error("Please fix the highlighted procedure field details before saving.");
+          }
+          const normalized = normalizeProcedureFieldDefinitions(committed);
+          const parsed = procedureFieldDefinitionsSchema.safeParse(normalized);
+          if (!parsed.success) {
+            throw new Error(parsed.error.issues[0]?.message || "Invalid procedure field configuration");
+          }
+          const validIds = new Set(normalized.map((f) => f.id));
+          const newlyAddedRequired = normalized
+            .filter((f) => !prevFieldIds.has(f.id) && f.isRequired)
+            .map((f) => f.id);
+          nextRequiredFields = [...new Set([...entryLogFields, ...newlyAddedRequired])].filter((id) => validIds.has(id));
+          if (JSON.stringify(normalized) !== departmentFieldsSignature) {
+            await apiPatch("/api/admin/department/procedure-fields", {
+              fields: normalized,
+              applyRequiredToExisting: false,
+            });
+          }
+        }
+        await apiPost("/api/admin/department/procedures", {
+          name: entryName,
+          group: procedureGroup,
+          required: Number(entryRequired),
+          requiredLogFields: nextRequiredFields,
+        });
       } else {
         await apiPost("/api/admin/department/catalog", { 
           kind: activeSection.kind, 
@@ -343,8 +411,21 @@ export function DepartmentSettings() {
                   </div>
                 )}
 
-                {activeSection.kind === "procedure" && features.procedureClinicalDetails && <div className="w-full">
-                  <ProcedureFieldSelector value={entryLogFields} onChange={setEntryLogFields} disabled={busy} />
+                {activeSection.kind === "procedure" && (features.procedureClinicalDetails || dynamicProcedureFields) && <div className="w-full">
+                  {dynamicProcedureFields ? (
+                    <DynamicProcedureFieldChecklist
+                      ref={addFieldEditorRef}
+                      mode="procedure"
+                      fields={draftProcedureFields}
+                      onFieldsChange={setDraftProcedureFields}
+                      requiredIds={entryLogFields}
+                      onRequiredIdsChange={setEntryLogFields}
+                      disabled={busy}
+                      readOnlyConfig={data.readOnlyConfig}
+                    />
+                  ) : (
+                    <ProcedureFieldSelector value={entryLogFields} onChange={setEntryLogFields} disabled={busy} />
+                  )}
                 </div>}
                 <div className="flex gap-2 w-full justify-end mt-2">
                   <Button type="button" variant="outline" onClick={resetAddForm}>Cancel</Button>
@@ -352,6 +433,10 @@ export function DepartmentSettings() {
                 </div>
               </form>
             </div>
+          )}
+
+          {activeSection.kind === "procedure" && dynamicProcedureFields && (
+            <DepartmentProcedureFieldsCard />
           )}
 
           {activeSection.items.length > COLLAPSE_THRESHOLD && (

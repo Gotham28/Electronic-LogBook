@@ -1,4 +1,5 @@
 import { radiologyTemplate } from "./demoDepartmentTemplates/radiology";
+import { getDefaultProcedureFieldDefinitions, type ProcedureFieldDefinition } from "./procedure-log-fields";
 
 export const DEMO_DEPARTMENT_CHANGED_EVENT = "arogya-demo-department-changed";
 
@@ -20,8 +21,10 @@ type DemoProfileData = {
       requiredProcedures: number | null;
       requiredAcademic: number | null;
       enabledFeatures: Record<string, boolean>;
+      procedureLogFields?: ProcedureFieldDefinition[] | null;
     };
-    procedures: Array<{ id: number; name: string; group: string; required: number }>;
+    procedures: Array<{ id: number; name: string; group: string; required: number; requiredLogFields?: string[] }>;
+    procedureFields?: ProcedureFieldDefinition[];
     academics: DemoCatalogItem[];
     postings: DemoCatalogItem[];
     caseCategories: DemoCatalogItem[];
@@ -382,7 +385,62 @@ microbiologyProfile.data.assessments = [
   { number: 4, date: "2026-10-01", examName: "Annual Comprehensive Review", type: "annual", marks: 88, maximum: 100, assessorName: "Dr. Vivek Menon" },
 ];
 
-export const demoDepartmentProfiles: DemoDepartmentProfile[] = [pediatricsProfile, radiologyProfile, dermatologyProfile, microbiologyProfile];
+const surgeryProfile = createEmptyDepartmentProfile({
+  id: 19,
+  label: "Surgery",
+  name: "Surgery",
+  code: "SURG",
+  accent: "#0f766e",
+  enabledFeatures: {
+    procedureExperience: true,
+    procedureClinicalDetails: true,
+    dynamicProcedureFields: true,
+    freeTextProcedures: false,
+    hideProcedureAge: false,
+    hideProcedureLogs: false,
+  },
+});
+
+const defaultSurgeryFields = getDefaultProcedureFieldDefinitions();
+const defaultSurgeryReqIds = defaultSurgeryFields.map((field) => field.id);
+
+surgeryProfile.data.departmentCatalog.config.requiredCases = 120;
+surgeryProfile.data.departmentCatalog.config.requiredProcedures = 60;
+surgeryProfile.data.departmentCatalog.config.requiredAcademic = 40;
+surgeryProfile.data.departmentCatalog.config.procedureLogFields = defaultSurgeryFields;
+surgeryProfile.data.departmentCatalog.procedureFields = defaultSurgeryFields;
+surgeryProfile.data.departmentCatalog.competencyLevels = [
+  { id: 1, name: "O", value: "O", required: 0, period: "total" },
+  { id: 2, name: "A", value: "A", required: 0, period: "total" },
+  { id: 3, name: "PS", value: "PS", required: 0, period: "total" },
+  { id: 4, name: "PI", value: "PI", required: 0, period: "total" },
+];
+surgeryProfile.data.departmentCatalog.procedures = [
+  { id: 101, name: "Appendicectomy", group: "General & GI", required: 10, requiredLogFields: [...defaultSurgeryReqIds] },
+  { id: 102, name: "Inguinal Hernia Repair", group: "General & GI", required: 10, requiredLogFields: [...defaultSurgeryReqIds] },
+  { id: 103, name: "Exploratory Laparotomy", group: "Emergency & Trauma", required: 8, requiredLogFields: [...defaultSurgeryReqIds] },
+  { id: 104, name: "ICD / Tube Thoracostomy", group: "Emergency & Trauma", required: 8, requiredLogFields: [...defaultSurgeryReqIds] },
+  { id: 105, name: "Incision & Drainage / Wound Debridement", group: "Minor / Bedside", required: 15, requiredLogFields: [...defaultSurgeryReqIds] },
+  { id: 106, name: "Central Venous Line Insertion", group: "Minor / Bedside", required: 9, requiredLogFields: [...defaultSurgeryReqIds] },
+];
+surgeryProfile.data.departmentCatalog.postings = [
+  { id: 1, name: "Surgical Ward", value: "surgical-ward", required: 0, period: "total" },
+  { id: 2, name: "Casualty", value: "casualty", required: 0, period: "total" },
+  { id: 3, name: "OT", value: "ot", required: 0, period: "total" },
+  { id: 4, name: "SICU", value: "sicu", required: 0, period: "total" },
+];
+surgeryProfile.data.departmentCatalog.academics = [
+  { id: 1, name: "Journal club", value: "journal-club", required: 10, period: "total" },
+  { id: 2, name: "Surgical audit", value: "surgical-audit", required: 10, period: "total" },
+  { id: 3, name: "Case presentation", value: "case-presentation", required: 15, period: "total" },
+  { id: 4, name: "Seminar", value: "seminar", required: 5, period: "total" },
+];
+surgeryProfile.data.departmentCatalog.leaveTypes = [
+  { id: 1, name: "Casual leave", value: "casual", required: 20, period: "total" },
+  { id: 2, name: "Academic leave", value: "academic", required: 14, period: "total" },
+];
+
+export const demoDepartmentProfiles: DemoDepartmentProfile[] = [pediatricsProfile, radiologyProfile, dermatologyProfile, microbiologyProfile, surgeryProfile];
 const defaultFeatureFlags = new Map(demoDepartmentProfiles.map((profile) => [
   profile.id,
   { ...profile.data.departmentCatalog.config.enabledFeatures },
@@ -472,18 +530,28 @@ function buildYearOfActivity(profile: DemoDepartmentProfile) {
     const procedures = Array.from({ length: procedureCount }, (_, index) => {
       const item = catalog.procedures[index % Math.max(catalog.procedures.length, 1)];
       const genericName = features.freeTextProcedures ? "Sample procedure activity" : "Sample procedure entry";
+      const roleVal = catalog.competencyLevels[index % Math.max(catalog.competencyLevels.length, 1)]?.value ?? "assisted";
+      const settingOptions = ["Ward", "Casualty", "OT", "NICU"];
       return {
         id: profile.id * 200000 + seed.id * 100 + index + 1,
         number: index + 1,
         date: activityDate(index, procedureCount, random),
         group: item?.group ?? "Sample activity",
         procedureGroup: item?.group ?? "Sample activity",
-        patientUhid: "",
+        patientUhid: features.dynamicProcedureFields ? `SRG-DEMO-${seed.id}${String(index + 1).padStart(2, "0")}` : "",
         procedureName: item?.name ?? genericName,
-        age: "Sample",
-        experience: catalog.competencyLevels[0]?.value ?? "assisted",
+        patientAge: features.dynamicProcedureFields ? `${24 + (index * 7) % 45} years` : "Sample",
+        age: features.dynamicProcedureFields ? `${24 + (index * 7) % 45} years` : "Sample",
+        sex: features.dynamicProcedureFields ? (index % 2 === 0 ? "Male" : "Female") : undefined,
+        diagnosis: features.dynamicProcedureFields ? "Surgical presentation / indication (demo sample)" : undefined,
+        setting: features.dynamicProcedureFields ? settingOptions[index % settingOptions.length] : undefined,
+        competencyLevel: roleVal,
+        experience: roleVal,
+        supervisorId: professors[0].id,
+        supervisorName: professors[0].name,
         verifiedCompetency: "No",
-        status: activityStatus(index, seed.id + 3),
+        customFields: {},
+        status: activityStatus(index, seed.id + 3, residentIndex === 0 && index === procedureCount - 1),
       };
     });
 

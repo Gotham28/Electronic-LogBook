@@ -13,7 +13,16 @@ import { z } from "zod";
 import { dateOrRangeSchema, dateSchema, idSchema, nameSchema, validate } from "../lib/validation.js";
 import { resolveConfigDepartmentId } from "../lib/department-config-source.js";
 import { getDepartmentFeatures } from "../lib/department-features.js";
-import { PROCEDURE_SETTINGS, PROCEDURE_ROLE_CODES, validateProcedureLogFields } from "@workspace/api-zod";
+import {
+  PROCEDURE_SETTINGS,
+  PROCEDURE_ROLE_CODES,
+  procedureFieldIdSchema,
+  isBuiltInProcedureField,
+  normalizeCustomProcedureFieldValues,
+  resolveProcedureFieldDefinitions,
+  validateDynamicProcedureLogFields,
+  validateProcedureLogFields,
+} from "@workspace/api-zod";
 import { clinicalWorkTarget } from "../lib/clinical-work-progress.js";
 import { validateAcademicRecord, readAcademicRecord, writeAcademicRecord, academicSectionForRecord } from "@workspace/api-zod";
 import { getAcademicLogbook } from "../lib/academic-logbook.js";
@@ -1206,6 +1215,10 @@ router.patch("/:studentId/certifications/:certId/review", requireAuth, requireRo
 // POST LOGS
 
 const optionalText = z.string().max(8000).optional();
+const customFieldsInputSchema = z.record(procedureFieldIdSchema, z.string().max(8000).nullable()).refine(
+  (obj) => Object.keys(obj).length <= 40,
+  "Too many custom fields",
+).optional();
 router.post("/:studentId/case-logs", validate(z.object({ supervisorId: idSchema, date: dateSchema, patientAge: nameSchema,
   patientGender: z.enum(["male", "female", "other"]), diagnosisFinal: z.string().trim().min(1).max(8000),
   patientUhid: optionalText, chiefComplaints: optionalText, diagnosisProvisional: optionalText, history: optionalText,
@@ -1238,13 +1251,22 @@ router.post("/:studentId/case-logs", validate(z.object({ supervisorId: idSchema,
   }
 });
 
-router.post("/:studentId/procedure-logs", validate(z.object({ supervisorId: idSchema, procedureGroup: nameSchema.optional(),
-  procedureName: nameSchema, date: dateSchema, patientUhid: nameSchema, patientAge: nameSchema,
-  competencyLevel: nameSchema, diagnosis: optionalText, sex: optionalText,
-  setting: z.enum(PROCEDURE_SETTINGS).nullable().optional() }).strict()), async (req, res) => {
+router.post("/:studentId/procedure-logs", validate(z.object({
+  supervisorId: idSchema,
+  procedureGroup: nameSchema.optional(),
+  procedureName: nameSchema,
+  date: dateSchema,
+  patientUhid: z.string().trim().max(8000).nullable().optional(),
+  patientAge: z.string().trim().max(8000).nullable().optional(),
+  competencyLevel: z.string().trim().max(8000).nullable().optional(),
+  diagnosis: z.string().max(8000).nullable().optional(),
+  sex: z.string().max(8000).nullable().optional(),
+  setting: z.string().trim().max(8000).nullable().optional(),
+  customFields: customFieldsInputSchema,
+}).strict()), async (req, res) => {
   try {
     const studentId = parseInt(String(req.params.studentId), 10);
-    const { supervisorId, procedureGroup, procedureName, date, patientUhid, patientAge, competencyLevel, diagnosis, sex } = req.body;
+    const { supervisorId, procedureGroup, procedureName, date } = req.body;
     const supervisorIdNum = parseInt(supervisorId, 10);
     if (!(await validateSupervisor(supervisorIdNum, req.user!.departmentId!))) {
       res.status(400).json({ message: "Invalid supervisorId" });
@@ -1252,7 +1274,7 @@ router.post("/:studentId/procedure-logs", validate(z.object({ supervisorId: idSc
     }
 
     // Free-text procedures are typed in, not chosen from the department's procedure types.
-    const { configSourceId, features: enabledFeatures } = await getDepartmentFeatures(req.user!.departmentId!);
+    const { configSourceId, features: enabledFeatures, procedureLogFields } = await getDepartmentFeatures(req.user!.departmentId!);
     const freeTextProcedures = !!enabledFeatures.freeTextProcedures;
     const finalProcedureGroup = freeTextProcedures ? "N/A" : procedureGroup;
     let requiredLogFields: string[] = [];
@@ -1264,25 +1286,109 @@ router.post("/:studentId/procedure-logs", validate(z.object({ supervisorId: idSc
       requiredLogFields = option.requiredLogFields;
     }
 
-    const requiredError = validateProcedureLogFields(requiredLogFields, req.body, enabledFeatures.procedureClinicalDetails ? PROCEDURE_ROLE_CODES : undefined);
-    if (requiredError) { res.status(400).json({ message: requiredError }); return; }
-    const roleRequired = requiredLogFields.includes("competencyLevel");
-    
-    if (enabledFeatures.procedureExperience || roleRequired) {
-      if (competencyLevel !== "N/A" || roleRequired || !enabledFeatures.procedureClinicalDetails) {
-      const [compLevel] = await db.select({ id: departmentCatalogTable.id }).from(departmentCatalogTable).where(and(
-        eq(departmentCatalogTable.departmentId, configSourceId), eq(departmentCatalogTable.kind, "competency_level"), eq(departmentCatalogTable.value, competencyLevel))).limit(1);
-      if (!compLevel) { res.status(400).json({ message: "Invalid competency level for your department" }); return; }
+    const dynamicEnabled = !!enabledFeatures.dynamicProcedureFields;
+    let finalPatientUhid: string;
+    let finalPatientAge: string;
+    let finalCompetencyLevel: string;
+    let finalDiagnosis: string | null;
+    let finalSex: string | null;
+    let finalSetting: string | null;
+    let finalCustomFields: Record<string, string> = {};
+
+    if (!dynamicEnabled) {
+      if (req.body.customFields && Object.keys(req.body.customFields).length > 0) {
+        res.status(400).json({ message: "Custom procedure fields are not enabled for your department" });
+        return;
       }
+      const patientUhid = typeof req.body.patientUhid === "string" ? req.body.patientUhid.trim() : "";
+      const patientAge = typeof req.body.patientAge === "string" ? req.body.patientAge.trim() : "";
+      const competencyLevel = typeof req.body.competencyLevel === "string" ? req.body.competencyLevel.trim() : "";
+      if (!patientUhid || patientUhid.length > 160 || !patientAge || patientAge.length > 160 || !competencyLevel || competencyLevel.length > 160) {
+        res.status(400).json({ message: "patientUhid, patientAge, and competencyLevel are required" });
+        return;
+      }
+      if (req.body.setting !== undefined && req.body.setting !== null
+        && !(PROCEDURE_SETTINGS as readonly string[]).includes(req.body.setting)) {
+        res.status(400).json({ message: "Select a valid setting for this procedure" });
+        return;
+      }
+
+      const requiredError = validateProcedureLogFields(requiredLogFields, req.body, enabledFeatures.procedureClinicalDetails ? PROCEDURE_ROLE_CODES : undefined);
+      if (requiredError) { res.status(400).json({ message: requiredError }); return; }
+      const roleRequired = requiredLogFields.includes("competencyLevel");
+
+      if (enabledFeatures.procedureExperience || roleRequired) {
+        if (competencyLevel !== "N/A" || roleRequired || !enabledFeatures.procedureClinicalDetails) {
+          const [compLevel] = await db.select({ id: departmentCatalogTable.id }).from(departmentCatalogTable).where(and(
+            eq(departmentCatalogTable.departmentId, configSourceId), eq(departmentCatalogTable.kind, "competency_level"), eq(departmentCatalogTable.value, competencyLevel))).limit(1);
+          if (!compLevel) { res.status(400).json({ message: "Invalid competency level for your department" }); return; }
+        }
+      } else {
+        if (competencyLevel !== "N/A") {
+          res.status(400).json({ message: "Competency level is not enabled for your department" });
+          return;
+        }
+      }
+
+      finalPatientUhid = patientUhid;
+      finalPatientAge = patientAge;
+      finalCompetencyLevel = competencyLevel;
+      finalDiagnosis = req.body.diagnosis ?? null;
+      finalSex = req.body.sex ?? null;
+      finalSetting = req.body.setting || null;
     } else {
-      if (competencyLevel !== "N/A") {
+      const activeFields = resolveProcedureFieldDefinitions(procedureLogFields, true);
+      const roleField = activeFields.find((field) => field.id === "competencyLevel");
+      const rawCompetency = typeof req.body.competencyLevel === "string" ? req.body.competencyLevel.trim() : "";
+      if (!roleField && rawCompetency && rawCompetency.toUpperCase() !== "N/A") {
         res.status(400).json({ message: "Competency level is not enabled for your department" });
         return;
       }
+
+      const requiredError = validateDynamicProcedureLogFields({
+        requiredFields: requiredLogFields,
+        fields: activeFields,
+        entry: req.body,
+      });
+      if (requiredError) { res.status(400).json({ message: requiredError }); return; }
+
+      const cleanOrNa = (val: unknown) => {
+        if (typeof val !== "string") return "N/A";
+        const trimmed = val.trim();
+        return trimmed || "N/A";
+      };
+      const cleanOrNull = (val: unknown) => {
+        if (typeof val !== "string") return null;
+        const trimmed = val.trim();
+        if (!trimmed || trimmed.toUpperCase() === "N/A") return null;
+        return trimmed;
+      };
+
+      finalPatientUhid = cleanOrNa(req.body.patientUhid);
+      finalPatientAge = cleanOrNa(req.body.patientAge);
+      finalCompetencyLevel = roleField ? cleanOrNa(req.body.competencyLevel) : "N/A";
+      finalDiagnosis = cleanOrNull(req.body.diagnosis);
+      finalSex = cleanOrNull(req.body.sex);
+      finalSetting = cleanOrNull(req.body.setting);
+
+      const customFieldIds = new Set(activeFields.filter((f) => !isBuiltInProcedureField(f.id)).map((f) => f.id));
+      finalCustomFields = normalizeCustomProcedureFieldValues(req.body.customFields, customFieldIds);
     }
+
     const [inserted] = await db.insert(procedureLogsTable).values({
-      studentId, supervisorId: supervisorIdNum, procedureGroup: finalProcedureGroup, procedureName, date, 
-      patientUhid, patientAge, competencyLevel, diagnosis, sex, setting: req.body.setting || null, status: "pending"
+      studentId,
+      supervisorId: supervisorIdNum,
+      procedureGroup: finalProcedureGroup,
+      procedureName,
+      date,
+      patientUhid: finalPatientUhid,
+      patientAge: finalPatientAge,
+      competencyLevel: finalCompetencyLevel,
+      diagnosis: finalDiagnosis,
+      sex: finalSex,
+      setting: finalSetting,
+      customFields: finalCustomFields,
+      status: "pending",
     }).returning();
     res.status(201).json(inserted);
   } catch (error) {
@@ -1632,10 +1738,19 @@ router.patch("/:studentId/case-logs/:logId", requireAuth, validate(z.object({ su
 });
 
 // 2. Procedure Logs
-router.patch("/:studentId/procedure-logs/:logId", requireAuth, validate(z.object({ supervisorId: idSchema, procedureGroup: nameSchema.optional(),
-  procedureName: nameSchema, date: dateSchema, patientUhid: nameSchema, patientAge: nameSchema,
-  competencyLevel: nameSchema, diagnosis: optionalText, sex: optionalText,
-  setting: z.enum(PROCEDURE_SETTINGS).nullable().optional() }).strict().partial()), async (req, res) => {
+router.patch("/:studentId/procedure-logs/:logId", requireAuth, validate(z.object({
+  supervisorId: idSchema,
+  procedureGroup: nameSchema.optional(),
+  procedureName: nameSchema,
+  date: dateSchema,
+  patientUhid: z.string().trim().max(8000).nullable().optional(),
+  patientAge: z.string().trim().max(8000).nullable().optional(),
+  competencyLevel: z.string().trim().max(8000).nullable().optional(),
+  diagnosis: z.string().max(8000).nullable().optional(),
+  sex: z.string().max(8000).nullable().optional(),
+  setting: z.string().trim().max(8000).nullable().optional(),
+  customFields: customFieldsInputSchema,
+}).strict().partial()), async (req, res) => {
   try {
     const studentId = parseInt(String(req.params.studentId), 10);
     const logId = parseInt(String(req.params.logId), 10);
@@ -1649,7 +1764,7 @@ router.patch("/:studentId/procedure-logs/:logId", requireAuth, validate(z.object
       req.body.supervisorId = parseInt(req.body.supervisorId, 10);
     }
 
-    const { configSourceId, features: enabledFeatures } = await getDepartmentFeatures(guard.caller.departmentId!);
+    const { configSourceId, features: enabledFeatures, procedureLogFields } = await getDepartmentFeatures(guard.caller.departmentId!);
     const freeTextProcedures = !!enabledFeatures.freeTextProcedures;
     const resulting = { ...guard.log, ...req.body };
     let requiredLogFields: string[] = [];
@@ -1660,22 +1775,104 @@ router.patch("/:studentId/procedure-logs/:logId", requireAuth, validate(z.object
       requiredLogFields = option.requiredLogFields;
     }
     if (freeTextProcedures && (req.body.procedureName || req.body.procedureGroup)) req.body.procedureGroup = "N/A";
-    const requiredError = validateProcedureLogFields(requiredLogFields, resulting, enabledFeatures.procedureClinicalDetails ? PROCEDURE_ROLE_CODES : undefined);
-    if (requiredError) { res.status(400).json({ message: requiredError }); return; }
 
-    if (req.body.competencyLevel !== undefined || requiredLogFields.includes("competencyLevel")) {
-      if (enabledFeatures.procedureExperience || requiredLogFields.includes("competencyLevel")) {
-        if (resulting.competencyLevel !== "N/A" || requiredLogFields.includes("competencyLevel") || !enabledFeatures.procedureClinicalDetails) {
-        const [compLevel] = await db.select({ id: departmentCatalogTable.id }).from(departmentCatalogTable).where(and(
-          eq(departmentCatalogTable.departmentId, configSourceId), eq(departmentCatalogTable.kind, "competency_level"), eq(departmentCatalogTable.value, resulting.competencyLevel))).limit(1);
-        if (!compLevel) { res.status(400).json({ message: "Invalid competency level for your department" }); return; }
-        }
-      } else if (req.body.competencyLevel !== "N/A") {
-        res.status(400).json({ message: "Competency level is not enabled for your department" }); return;
+    const dynamicEnabled = !!enabledFeatures.dynamicProcedureFields;
+    let updateBody: Record<string, any>;
+
+    if (!dynamicEnabled) {
+      if (req.body.customFields && Object.keys(req.body.customFields).length > 0) {
+        res.status(400).json({ message: "Custom procedure fields are not enabled for your department" }); return;
       }
+      for (const fieldName of ["patientUhid", "patientAge", "competencyLevel"] as const) {
+        if (fieldName in req.body) {
+          const val = req.body[fieldName];
+          if (typeof val !== "string" || !val.trim() || val.trim().length > 160) {
+            res.status(400).json({ message: `${fieldName} must be 1-160 characters` }); return;
+          }
+        }
+      }
+      if (req.body.setting !== undefined && req.body.setting !== null
+        && !(PROCEDURE_SETTINGS as readonly string[]).includes(req.body.setting)) {
+        res.status(400).json({ message: "Select a valid setting for this procedure" }); return;
+      }
+
+      const requiredError = validateProcedureLogFields(requiredLogFields, resulting, enabledFeatures.procedureClinicalDetails ? PROCEDURE_ROLE_CODES : undefined);
+      if (requiredError) { res.status(400).json({ message: requiredError }); return; }
+
+      if (req.body.competencyLevel !== undefined || requiredLogFields.includes("competencyLevel")) {
+        if (enabledFeatures.procedureExperience || requiredLogFields.includes("competencyLevel")) {
+          if (resulting.competencyLevel !== "N/A" || requiredLogFields.includes("competencyLevel") || !enabledFeatures.procedureClinicalDetails) {
+            const [compLevel] = await db.select({ id: departmentCatalogTable.id }).from(departmentCatalogTable).where(and(
+              eq(departmentCatalogTable.departmentId, configSourceId), eq(departmentCatalogTable.kind, "competency_level"), eq(departmentCatalogTable.value, resulting.competencyLevel))).limit(1);
+            if (!compLevel) { res.status(400).json({ message: "Invalid competency level for your department" }); return; }
+          }
+        } else if (req.body.competencyLevel !== "N/A") {
+          res.status(400).json({ message: "Competency level is not enabled for your department" }); return;
+        }
+      }
+
+      const { customFields: _ignoredCustomFields, ...restBody } = req.body;
+      updateBody = { ...restBody, status: "pending", facultyRemarks: null, facultyVerifiedLevel: null };
+    } else {
+      const existingLog = guard.log!;
+      const activeFields = resolveProcedureFieldDefinitions(procedureLogFields, true);
+      const activeCustomIds = new Set(activeFields.filter((f) => !isBuiltInProcedureField(f.id)).map((f) => f.id));
+      const prevCustom = (existingLog.customFields && typeof existingLog.customFields === "object" && !Array.isArray(existingLog.customFields))
+        ? { ...(existingLog.customFields as Record<string, string>) }
+        : {};
+      const mergedCustom: Record<string, string> = { ...prevCustom };
+
+      if (req.body.customFields) {
+        for (const [key, rawVal] of Object.entries(req.body.customFields as Record<string, string | null>)) {
+          if (!activeCustomIds.has(key) && !(key in prevCustom)) {
+            res.status(400).json({ message: "Unknown procedure field in submission" }); return;
+          }
+          if (rawVal === null || rawVal.trim() === "") {
+            delete mergedCustom[key];
+          } else {
+            mergedCustom[key] = rawVal.trim();
+          }
+        }
+      }
+
+      const roleField = activeFields.find((f) => f.id === "competencyLevel");
+      if (!roleField && req.body.competencyLevel !== undefined && req.body.competencyLevel !== null) {
+        const trimmedRole = String(req.body.competencyLevel).trim();
+        if (trimmedRole && trimmedRole.toUpperCase() !== "N/A" && trimmedRole !== existingLog.competencyLevel) {
+          res.status(400).json({ message: "Competency level is not enabled for your department" }); return;
+        }
+      }
+
+      const requiredError = validateDynamicProcedureLogFields({
+        requiredFields: requiredLogFields,
+        fields: activeFields,
+        entry: { ...resulting, customFields: mergedCustom },
+        previousEntry: existingLog,
+      });
+      if (requiredError) { res.status(400).json({ message: requiredError }); return; }
+
+      const cleanOrNa = (val: unknown) => {
+        if (typeof val !== "string") return "N/A";
+        const trimmed = val.trim();
+        return trimmed || "N/A";
+      };
+      const cleanOrNull = (val: unknown) => {
+        if (typeof val !== "string") return null;
+        const trimmed = val.trim();
+        if (!trimmed || trimmed.toUpperCase() === "N/A") return null;
+        return trimmed;
+      };
+
+      updateBody = { ...req.body, status: "pending", facultyRemarks: null, facultyVerifiedLevel: null };
+      if ("patientUhid" in req.body) updateBody.patientUhid = cleanOrNa(req.body.patientUhid);
+      if ("patientAge" in req.body) updateBody.patientAge = cleanOrNa(req.body.patientAge);
+      if ("competencyLevel" in req.body) updateBody.competencyLevel = cleanOrNa(req.body.competencyLevel);
+      if ("diagnosis" in req.body) updateBody.diagnosis = cleanOrNull(req.body.diagnosis);
+      if ("sex" in req.body) updateBody.sex = cleanOrNull(req.body.sex);
+      if ("setting" in req.body) updateBody.setting = cleanOrNull(req.body.setting);
+      if (req.body.customFields !== undefined) updateBody.customFields = mergedCustom;
     }
 
-    const updateBody = { ...req.body, status: "pending", facultyRemarks: null, facultyVerifiedLevel: null };
     const [updated] = await db.update(procedureLogsTable).set(updateBody)
       .where(and(eq(procedureLogsTable.id, logId), eq(procedureLogsTable.studentId, studentId), isNull(procedureLogsTable.deletedAt))).returning();
     if (!updated) { res.status(400).json({ message: "Log not found" }); return; }

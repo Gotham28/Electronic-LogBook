@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, timestamp, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { studentsTable } from "./students.js";
 import { usersTable } from "./users.js";
@@ -50,6 +50,7 @@ export const procedureLogsTable = pgTable("procedure_logs", {
   sex: text("sex"),
   facultyVerifiedLevel: text("faculty_verified_level"),
   setting: text("setting"),
+  customFields: jsonb("custom_fields").$type<Record<string, string>>().notNull().default({}),
   status: text("status", { enum: ["pending", "verified", "rejected"] }).notNull().default("pending"),
   facultyRemarks: text("faculty_remarks"),
   reviewedBy: integer("reviewed_by").references(() => usersTable.id),
