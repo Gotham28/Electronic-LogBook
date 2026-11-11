@@ -190,9 +190,11 @@ export function PrintableLogbook() {
   const user = useCurrentUser();
   const hideUhid = isDemoMode();
   const shouldReduceMotion = useReducedMotion();
-  const { config, clinicalWorkCategories, clinicalWorkSubtypes, competencyLevels, department: dept, academicLogbook } = useDepartment();
+  const { config, clinicalWorkCategories, clinicalWorkSubtypes, competencyLevels, procedureFields, department: dept, academicLogbook } = useDepartment();
   const isRadiology = dept?.name?.toLowerCase().includes("radiology");
   const features = config?.enabledFeatures ?? {};
+  const dynamicProcedureFields = Boolean(features.dynamicProcedureFields);
+  const activeProcedureFields = dynamicProcedureFields ? (procedureFields ?? []) : undefined;
   const [data, setData] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -486,7 +488,9 @@ export function PrintableLogbook() {
                       <Td muted>{rows.length - i}</Td>
                       <Td>{formatLogbookDate(p.date)}</Td>
                       <Td><span className="font-medium">{p.procedureName}</span>
-                        {(features.procedureClinicalDetails || p.setting) && <ProcedureClinicalDetails entry={p} />}
+                        {((dynamicProcedureFields && (activeProcedureFields?.length ?? 0) > 0) || (!dynamicProcedureFields && (features.procedureClinicalDetails || p.setting))) && (
+                          <ProcedureClinicalDetails entry={p} fields={activeProcedureFields} />
+                        )}
                       </Td>
                       <Td>{p.procedureGroup ?? "—"}</Td>
                       {!hideUhid && <Td muted={!p.patientUhid}>{p.patientUhid || "—"}</Td>}

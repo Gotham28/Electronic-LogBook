@@ -5,7 +5,7 @@ import { requireAuth, requireDepartment, requireRole } from "../middlewares/auth
 import { completionPercent, idSchema } from "../lib/validation.js";
 import { resolveConfigDepartmentId } from "../lib/department-config-source.js";
 import { clinicalWorkTarget, verifiedClinicalWorkCounts } from "../lib/clinical-work-progress.js";
-import { PROCEDURE_ROLE_CODES } from "@workspace/api-zod";
+import { PROCEDURE_ROLE_CODES, resolveProcedureFieldDefinitions } from "@workspace/api-zod";
 import { getAcademicLogbook } from "../lib/academic-logbook.js";
 
 const router: IRouter = Router();
@@ -87,14 +87,36 @@ router.get("/:departmentId/catalog", async (req, res) => {
         updatedAt: new Date(),
       } as any;
     }
+    const dynamicProcedureFields = Boolean((resolvedConfig?.enabledFeatures as Record<string, boolean> | undefined)?.dynamicProcedureFields);
+    const procedureFields = resolveProcedureFieldDefinitions(resolvedConfig?.procedureLogFields, dynamicProcedureFields);
+    const roleField = dynamicProcedureFields ? procedureFields.find((field) => field.id === "competencyLevel") : undefined;
+    const rawCompetencyLevels = catalog.filter((item) => item.kind === "competency_level");
+    const competencyLevels = dynamicProcedureFields
+      ? (roleField && (roleField.type === "select" || roleField.type === "radio")
+        ? (roleField.options ?? []).map((opt, index) => {
+          const existing = rawCompetencyLevels.find((item) => item.value === opt);
+          return existing ?? {
+            id: -(index + 1),
+            departmentId: configSourceId,
+            kind: "competency_level" as const,
+            name: opt,
+            value: opt,
+            required: 0,
+            period: "total" as const,
+            parentValue: null,
+          };
+        })
+        : [])
+      : rawCompetencyLevels.filter((item) => !config[0]?.enabledFeatures?.procedureClinicalDetails || (PROCEDURE_ROLE_CODES as readonly string[]).includes(item.value));
+
     res.json({ department: deptInfo, hod: hod[0] || null, config: resolvedConfig, procedures,
+      procedureFields, readOnlyConfig: configSourceId !== departmentId,
       postings: catalog.filter((item) => item.kind === "posting"), academics: isMicro ? [
         { id: 1, departmentId: configSourceId, kind: "academic", name: "Journal club", value: "journal_club", required: 0, period: "total" as const, parentValue: null },
         { id: 2, departmentId: configSourceId, kind: "academic", name: "UG teaching", value: "ug_teaching", required: 0, period: "total" as const, parentValue: null },
         { id: 3, departmentId: configSourceId, kind: "academic", name: "Seminars", value: "seminars", required: 0, period: "total" as const, parentValue: null },
       ] as any : catalog.filter((item) => item.kind === "academic"), caseCategories: catalog.filter((item) => item.kind === "case_category"),
-      competencyLevels: catalog.filter((item) => item.kind === "competency_level"
-        && (!config[0]?.enabledFeatures?.procedureClinicalDetails || (PROCEDURE_ROLE_CODES as readonly string[]).includes(item.value))),
+      competencyLevels,
       leaveTypes: catalog.filter((item) => item.kind === "leave_type"),
       conferenceLevels: isMicro ? [
         { id: 1, departmentId: configSourceId, kind: "conference_level", name: "National", value: "national", required: 0, period: "total" as const, parentValue: null },

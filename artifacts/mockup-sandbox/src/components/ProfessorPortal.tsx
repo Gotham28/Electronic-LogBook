@@ -138,9 +138,13 @@ type LogFilter =
 export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; embedded?: boolean }) {
   const currentUser = useCurrentUser();
   const hideUhid = isDemoMode();
-  const { config, department, competencyLevels, caseCategories: deptCaseCategories, procedures: deptProcedures, academics: deptAcademics,
+  const { config, department, competencyLevels, caseCategories: deptCaseCategories, procedures: deptProcedures, procedureFields, academics: deptAcademics,
     clinicalWorkCategories, clinicalWorkSubtypes, academicLogbook } = useDepartment();
-  const showProcedureDetails = !!config?.enabledFeatures?.procedureClinicalDetails || deptProcedures.some((item) => item.requiredLogFields?.length);
+  const dynamicProcedureFields = Boolean(config?.enabledFeatures?.dynamicProcedureFields);
+  const activeProcedureFields = dynamicProcedureFields ? (procedureFields ?? []) : undefined;
+  const showProcedureDetails = dynamicProcedureFields || !!config?.enabledFeatures?.procedureClinicalDetails || deptProcedures.some((item) => item.requiredLogFields?.length);
+  const canVerifyCompetency = Boolean(config?.enabledFeatures?.procedureExperience)
+    && (!dynamicProcedureFields || Boolean(activeProcedureFields?.some((f) => f.id === "competencyLevel") && competencyLevels.length > 0));
   const isMicroDept = department?.code?.toLowerCase() === "microbiology" || department?.name?.toLowerCase().includes("microbiology");
   const microbiologyCaseFields = Boolean(config?.enabledFeatures?.microbiologyCaseFields || isMicroDept);
   const isHodUser = Boolean(embedded || currentUser?.role === "hod");
@@ -287,12 +291,10 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
     }
   }, [reviews.length, currentIndex]);
 
-  // Reset competencyOverride to default level only when navigating to a new queue item
+  // Reset competencyOverride to default level when navigating to a new queue item or active competency list changes
   React.useEffect(() => {
-    if (competencyLevels.length > 0) {
-      setCompetencyOverride(competencyLevels[0].value);
-    }
-  }, [currentIndex]);
+    setCompetencyOverride(competencyLevels[0]?.value ?? "");
+  }, [currentIndex, competencyLevels]);
 
   // ── Fetch /logs and /progress in parallel when selectedMentee changes ────────
   React.useEffect(() => {
@@ -416,7 +418,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
       await apiPatch(`/api/logs/${currentItem.logType}/${currentItem.dbId}/review`, {
         status,
         comments: remarks,
-        ...(currentItem.logType === "procedure" && competencyOverride
+        ...(currentItem.logType === "procedure" && canVerifyCompetency && competencyOverride
           ? { facultyVerifiedLevel: competencyOverride }
           : {}),
         ...(currentItem.logType === "academic" && grade
@@ -572,11 +574,20 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                           <AcademicRecordDetails activityType={currentItem.activityType || ""}
                             description={currentItem.description} presentationType={currentItem.presentationType} />
                         )}
-                        {currentItem.type === "Procedure" && showProcedureDetails && <ProcedureClinicalDetails entry={{
-                          patientAge: currentItem.patientAge || currentItem.patientInfo, patientUhid: currentItem.patientUhid,
-                          sex: currentItem.sex, diagnosis: currentItem.diagnosis, setting: currentItem.setting,
-                          competencyLevel: currentItem.declaredCompetency,
-                        }} />}
+                        {currentItem.type === "Procedure" && showProcedureDetails && (!dynamicProcedureFields || (activeProcedureFields?.length ?? 0) > 0) && (
+                          <ProcedureClinicalDetails
+                            entry={{
+                              patientAge: currentItem.patientAge || currentItem.patientInfo,
+                              patientUhid: currentItem.patientUhid,
+                              sex: currentItem.sex,
+                              diagnosis: currentItem.diagnosis,
+                              setting: currentItem.setting,
+                              competencyLevel: currentItem.declaredCompetency,
+                              customFields: currentItem.customFields,
+                            }}
+                            fields={activeProcedureFields}
+                          />
+                        )}
                         {currentItem.type === "Procedure" && !showProcedureDetails && (config?.enabledFeatures?.freeTextProcedures || isMicroDept) && (
                           <>
                             {currentItem.diagnosis && <p className="text-xs text-slate-600 font-medium">{isMicroDept ? "Details" : "Diagnosis"}: {currentItem.diagnosis}</p>}
@@ -608,7 +619,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-4 space-y-4">
-                    {currentItem.type === "Procedure" && config?.enabledFeatures?.procedureExperience && (
+                    {currentItem.type === "Procedure" && canVerifyCompetency && (
                       <div className="space-y-2">
                         <label className="text-xs font-semibold text-slate-700">Verified Competency Level</label>
                         <Select value={competencyOverride} onValueChange={setCompetencyOverride}>
@@ -1250,7 +1261,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                                                 <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">{log.diagnosis || <span className="text-slate-400">Not recorded</span>}</dd>
                                               </div>
                                             </dl>
-                                          ) : showProcedureDetails ? <ProcedureClinicalDetails entry={log} /> : (
+                                          ) : showProcedureDetails ? ((!dynamicProcedureFields || (activeProcedureFields?.length ?? 0) > 0) ? <ProcedureClinicalDetails entry={log} fields={activeProcedureFields} /> : null) : (
                                             <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                                               <div className="min-w-0">
                                                 <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Date</dt>
@@ -1323,7 +1334,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                                             logId={log.id}
                                             studentId={selectedMentee.id}
                                             competencyLevels={competencyLevels}
-                                            procedureExperience={Boolean(config?.enabledFeatures?.procedureExperience)}
+                                            procedureExperience={canVerifyCompetency}
                                             initialCompetency={log.competencyLevel ?? log.competencyDeclared}
                                             onDone={async () => {
                                               setMenteeLogsLoading(true);
@@ -2735,7 +2746,16 @@ function ProcedureLogReviewForm({
   onDone: () => void;
 }) {
   const [remarks, setRemarks] = React.useState("");
-  const [competencyOverride, setCompetencyOverride] = React.useState(initialCompetency || competencyLevels?.[0]?.value || "");
+  const defaultCompetency = React.useMemo(() => {
+    if (initialCompetency && competencyLevels?.some((c) => c.value === initialCompetency)) {
+      return initialCompetency;
+    }
+    return competencyLevels?.[0]?.value || "";
+  }, [initialCompetency, competencyLevels]);
+  const [competencyOverride, setCompetencyOverride] = React.useState(defaultCompetency);
+  React.useEffect(() => {
+    setCompetencyOverride(defaultCompetency);
+  }, [defaultCompetency]);
   const [submitting, setSubmitting] = React.useState(false);
 
   async function submit(status: "verified" | "rejected") {

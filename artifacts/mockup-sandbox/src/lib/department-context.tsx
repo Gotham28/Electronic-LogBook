@@ -4,10 +4,12 @@ import { clearSession } from "./session";
 import { isDemoMode } from "./session";
 import { Button } from "@/components/ui/button";
 import type { AcademicLogbookProfile } from "./academic-logbook";
+import { resolveProcedureFieldDefinitions, type ProcedureFieldDefinition } from "./procedure-log-fields";
 
 export type DepartmentConfig = {
   requiredCases: number | null; requiredProcedures: number | null; requiredAcademic: number | null;
   enabledFeatures: Record<string, boolean>;
+  procedureLogFields?: ProcedureFieldDefinition[] | null;
 };
 export type CatalogItem = { id: number; name: string; value: string; required: number; period: "total" | "month"; parentValue?: string | null };
 export type PostingScheduleRow = { trainingYear: number; postingValue: string; months: number };
@@ -16,6 +18,8 @@ export type DepartmentData = {
   hod: { id: number; name: string } | null;
   config: DepartmentConfig | null;
   procedures: Array<{ id: number; name: string; group: string; required: number; requiredLogFields?: string[] }>;
+  procedureFields?: ProcedureFieldDefinition[];
+  readOnlyConfig?: boolean;
   postings: CatalogItem[]; academics: CatalogItem[]; caseCategories: CatalogItem[]; competencyLevels: CatalogItem[]; leaveTypes: CatalogItem[]; conferenceLevels: CatalogItem[];
   clinicalWorkCategories: CatalogItem[]; clinicalWorkSubtypes: CatalogItem[]; postingSchedule: PostingScheduleRow[];
   academicLogbook?: AcademicLogbookProfile | null;
@@ -80,7 +84,11 @@ export function DepartmentProvider({ departmentId, children }: { departmentId: n
         clinicalWorkCategories: result.clinicalWorkCategories || [],
         clinicalWorkSubtypes: result.clinicalWorkSubtypes || [],
         postingSchedule: result.postingSchedule || [],
-        procedures: result.procedures || []
+        procedures: result.procedures || [],
+        procedureFields: result.procedureFields !== undefined
+          ? result.procedureFields
+          : resolveProcedureFieldDefinitions(resolvedConfig?.procedureLogFields, Boolean(resolvedConfig?.enabledFeatures?.dynamicProcedureFields)),
+        readOnlyConfig: Boolean(result.readOnlyConfig),
       });
       setError("");
     } catch (err) { setError(err instanceof Error ? err.message : "Unable to load your department"); }

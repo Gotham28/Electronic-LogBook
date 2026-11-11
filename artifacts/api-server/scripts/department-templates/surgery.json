@@ -2,6 +2,7 @@
   "features": {
     "procedureExperience": true,
     "procedureClinicalDetails": true,
+    "dynamicProcedureFields": true,
     "freeTextProcedures": false,
     "hideProcedureAge": false,
     "hideProcedureLogs": false

@@ -13,7 +13,14 @@ import { clinicalWorkTarget, verifiedClinicalWorkCounts } from "../lib/clinical-
 import { getEmailFailure, sendAccountCreatedEmail, sendStudentApprovalEmail } from "../lib/mailer.js";
 import { hardDeleteUserCascade } from "../lib/hard-delete-user.js";
 import { departmentLogbookSectionsTable } from "@workspace/db";
-import { PROCEDURE_LOG_FIELDS } from "@workspace/api-zod";
+import { getDepartmentFeatures } from "../lib/department-features.js";
+import {
+  PROCEDURE_LOG_FIELDS,
+  procedureFieldIdSchema,
+  procedureFieldDefinitionsSchema,
+  normalizeProcedureFieldDefinitions,
+  resolveProcedureFieldDefinitions,
+} from "@workspace/api-zod";
 
 const router = Router();
 
@@ -527,6 +534,128 @@ router.post("/department/config", validate(configSchema), async (req, res) => {
   }
 });
 
+// GET /api/admin/department/procedure-fields
+router.get("/department/procedure-fields", async (req, res) => {
+  try {
+    const departmentId = req.user?.departmentId;
+    if (!departmentId) {
+      res.status(400).json({ message: "No department assigned" });
+      return;
+    }
+    const [dept] = await db.select({ configSourceDepartmentId: departmentsTable.configSourceDepartmentId })
+      .from(departmentsTable).where(eq(departmentsTable.id, departmentId)).limit(1);
+    const { features, procedureLogFields } = await getDepartmentFeatures(departmentId);
+    const dynamicEnabled = Boolean(features.dynamicProcedureFields);
+    const fields = resolveProcedureFieldDefinitions(procedureLogFields, dynamicEnabled);
+    res.json({
+      enabled: dynamicEnabled,
+      readOnlyConfig: dept?.configSourceDepartmentId !== null,
+      fields,
+    });
+  } catch (error) {
+    req.log.error({ departmentId: req.user!.departmentId, status: 500 }, "Error fetching procedure fields");
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// PATCH /api/admin/department/procedure-fields
+router.patch("/department/procedure-fields", validate(z.object({
+  fields: procedureFieldDefinitionsSchema,
+  applyRequiredToExisting: z.boolean().optional(),
+  syncAllExisting: z.boolean().optional(),
+  toggledRequiredIds: z.array(procedureFieldIdSchema).max(40).optional(),
+}).strict()), async (req, res) => {
+  try {
+    const departmentId = req.user?.departmentId;
+    if (!departmentId) {
+      res.status(400).json({ message: "No department assigned" });
+      return;
+    }
+
+    const [dept] = await db.select({ configSourceDepartmentId: departmentsTable.configSourceDepartmentId })
+      .from(departmentsTable).where(eq(departmentsTable.id, departmentId)).limit(1);
+    if (dept?.configSourceDepartmentId !== null) {
+      res.status(403).json({ message: "Test departments cannot modify mirrored settings" });
+      return;
+    }
+
+    const { features, procedureLogFields: currentRawFields } = await getDepartmentFeatures(departmentId);
+    if (!features.dynamicProcedureFields) {
+      res.status(403).json({ message: "Dynamic procedure fields are not enabled for this department" });
+      return;
+    }
+
+    const prevFields = resolveProcedureFieldDefinitions(currentRawFields, true);
+    const prevMap = new Map(prevFields.map((field) => [field.id, field]));
+    const nextFields = normalizeProcedureFieldDefinitions(req.body.fields);
+    const activeIdSet = new Set(nextFields.map((field) => field.id));
+    const toggledSet = new Set<string>(req.body.toggledRequiredIds ?? []);
+    const applyRequiredToExisting = req.body.applyRequiredToExisting !== false;
+    const syncAllExisting = Boolean(req.body.syncAllExisting);
+
+    await db.transaction(async (tx) => {
+      const [existingConfig] = await tx.select({ id: departmentConfigsTable.id })
+        .from(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, departmentId)).limit(1);
+      if (existingConfig) {
+        await tx.update(departmentConfigsTable)
+          .set({ procedureLogFields: nextFields })
+          .where(eq(departmentConfigsTable.departmentId, departmentId));
+      } else {
+        await tx.insert(departmentConfigsTable).values({
+          departmentId,
+          enabledFeatures: features,
+          procedureLogFields: nextFields,
+        });
+      }
+
+      const existingProcedures = await tx.select({
+        id: procedureTypesTable.id,
+        requiredLogFields: procedureTypesTable.requiredLogFields,
+      }).from(procedureTypesTable).where(eq(procedureTypesTable.departmentId, departmentId));
+
+      for (const proc of existingProcedures) {
+        let updatedReq: string[];
+        if (syncAllExisting) {
+          updatedReq = nextFields.filter((field) => field.isRequired).map((field) => field.id);
+        } else {
+          const pruned = proc.requiredLogFields.filter((id) => activeIdSet.has(id));
+          if (applyRequiredToExisting) {
+            for (const field of nextFields) {
+              const prev = prevMap.get(field.id);
+              const isNew = !prev;
+              const isToggled = toggledSet.has(field.id) || (prev !== undefined && prev.isRequired !== field.isRequired);
+              if (!isNew && !isToggled) continue;
+              if (field.isRequired) {
+                if (!pruned.includes(field.id)) pruned.push(field.id);
+              } else {
+                const idx = pruned.indexOf(field.id);
+                if (idx !== -1) pruned.splice(idx, 1);
+              }
+            }
+          }
+          updatedReq = [...new Set<string>(pruned)];
+        }
+        const changed = updatedReq.length !== proc.requiredLogFields.length
+          || updatedReq.some((id, idx) => proc.requiredLogFields[idx] !== id);
+        if (changed) {
+          await tx.update(procedureTypesTable)
+            .set({ requiredLogFields: updatedReq })
+            .where(and(eq(procedureTypesTable.id, proc.id), eq(procedureTypesTable.departmentId, departmentId)));
+        }
+      }
+    });
+
+    res.json({
+      enabled: true,
+      readOnlyConfig: false,
+      fields: nextFields,
+    });
+  } catch (error) {
+    req.log.error({ departmentId: req.user!.departmentId, status: 500 }, "Error updating procedure fields");
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
 // GET /api/admin/department/procedures
 router.get("/department/procedures", async (req, res) => {
   try {
@@ -547,7 +676,7 @@ router.get("/department/procedures", async (req, res) => {
 
 // POST /api/admin/department/procedures
 router.post("/department/procedures", validate(z.object({ name: nameSchema, group: nameSchema, required: targetSchema,
-  requiredLogFields: z.array(z.enum(PROCEDURE_LOG_FIELDS)).max(PROCEDURE_LOG_FIELDS.length).optional() }).strict()), async (req, res) => {
+  requiredLogFields: z.array(procedureFieldIdSchema).max(40).optional() }).strict()), async (req, res) => {
   try {
     const departmentId = req.user?.departmentId;
     if (!departmentId) {
@@ -567,10 +696,33 @@ router.post("/department/procedures", validate(z.object({ name: nameSchema, grou
       return;
     }
 
-    const [config] = await db.select({ enabledFeatures: departmentConfigsTable.enabledFeatures })
-      .from(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, departmentId)).limit(1);
-    const requiredLogFields = req.body.requiredLogFields
-      ?? (config?.enabledFeatures?.procedureClinicalDetails ? [...PROCEDURE_LOG_FIELDS] : []);
+    const { features, procedureLogFields } = await getDepartmentFeatures(departmentId);
+    let requiredLogFields: string[];
+    if (features.dynamicProcedureFields) {
+      const activeFields = resolveProcedureFieldDefinitions(procedureLogFields, true);
+      const activeIdSet = new Set(activeFields.map((field) => field.id));
+      if (req.body.requiredLogFields !== undefined) {
+        const invalid = (req.body.requiredLogFields as string[]).find((id) => !activeIdSet.has(id));
+        if (invalid) {
+          res.status(400).json({ message: "Unknown procedure field in requiredLogFields" });
+          return;
+        }
+        requiredLogFields = req.body.requiredLogFields;
+      } else {
+        requiredLogFields = activeFields.filter((field) => field.isRequired).map((field) => field.id);
+      }
+    } else {
+      if (req.body.requiredLogFields !== undefined) {
+        const invalid = (req.body.requiredLogFields as string[]).find((id) => !(PROCEDURE_LOG_FIELDS as readonly string[]).includes(id));
+        if (invalid) {
+          res.status(400).json({ message: "Invalid procedure field" });
+          return;
+        }
+      }
+      requiredLogFields = req.body.requiredLogFields
+        ?? (features.procedureClinicalDetails ? [...PROCEDURE_LOG_FIELDS] : []);
+    }
+
     const [inserted] = await db.insert(procedureTypesTable).values({
       departmentId,
       name,
@@ -698,10 +850,22 @@ router.post("/department/catalog", validate(z.object({ kind: z.enum(["posting", 
 });
 
 router.patch("/department/procedures/:id", validate(z.object({ required: targetSchema.optional(),
-  requiredLogFields: z.array(z.enum(PROCEDURE_LOG_FIELDS)).max(PROCEDURE_LOG_FIELDS.length).optional() }).strict()
+  requiredLogFields: z.array(procedureFieldIdSchema).max(40).optional() }).strict()
   .refine((body) => body.required !== undefined || body.requiredLogFields !== undefined, "Select a field to update")), async (req, res) => {
   const [dept] = await db.select({ configSourceDepartmentId: departmentsTable.configSourceDepartmentId }).from(departmentsTable).where(eq(departmentsTable.id, req.user!.departmentId!));
   if (dept?.configSourceDepartmentId !== null) { res.status(403).json({ message: "Test departments cannot modify mirrored settings" }); return; }
+  if (req.body.requiredLogFields !== undefined) {
+    const { features, procedureLogFields } = await getDepartmentFeatures(req.user!.departmentId!);
+    if (features.dynamicProcedureFields) {
+      const activeFields = resolveProcedureFieldDefinitions(procedureLogFields, true);
+      const activeIdSet = new Set(activeFields.map((field) => field.id));
+      const invalid = (req.body.requiredLogFields as string[]).find((id) => !activeIdSet.has(id));
+      if (invalid) { res.status(400).json({ message: "Unknown procedure field in requiredLogFields" }); return; }
+    } else {
+      const invalid = (req.body.requiredLogFields as string[]).find((id) => !(PROCEDURE_LOG_FIELDS as readonly string[]).includes(id));
+      if (invalid) { res.status(400).json({ message: "Invalid procedure field" }); return; }
+    }
+  }
   const [row] = await db.update(procedureTypesTable).set({
     ...(req.body.required !== undefined ? { required: req.body.required } : {}),
     ...(req.body.requiredLogFields !== undefined ? { requiredLogFields: [...new Set<string>(req.body.requiredLogFields)] } : {}),

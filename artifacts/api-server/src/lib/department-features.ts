@@ -6,10 +6,10 @@ export async function getDepartmentFeatures(departmentId: number) {
   const configSourceId = await resolveConfigDepartmentId(departmentId);
   const [[dept], [config]] = await Promise.all([
     db.select({ name: departmentsTable.name, code: departmentsTable.code }).from(departmentsTable).where(eq(departmentsTable.id, configSourceId)).limit(1),
-    db.select({ enabledFeatures: departmentConfigsTable.enabledFeatures })
+    db.select({ enabledFeatures: departmentConfigsTable.enabledFeatures, procedureLogFields: departmentConfigsTable.procedureLogFields })
       .from(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, configSourceId)).limit(1),
   ]);
-  const features = ((config?.enabledFeatures ?? {}) as Record<string, boolean>);
+  const features = ({ ...(config?.enabledFeatures ?? {}) } as Record<string, boolean>);
   const isMicro = dept?.code?.toLowerCase() === "microbiology" || dept?.name?.toLowerCase().includes("microbiology");
   if (isMicro) {
     if (features.microbiologyCaseFields === undefined) features.microbiologyCaseFields = true;
@@ -25,5 +25,5 @@ export async function getDepartmentFeatures(departmentId: number) {
     if (features.conferenceDateRange === undefined) features.conferenceDateRange = true;
     if (features.hideHodQuarterlyAppraisal === undefined) features.hideHodQuarterlyAppraisal = true;
   }
-  return { configSourceId, features };
+  return { configSourceId, features, procedureLogFields: config?.procedureLogFields ?? null };
 }

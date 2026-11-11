@@ -6,7 +6,7 @@ specialties. Surgery does not need separate copies of these tables.
 DATABASE COMMANDS
 
 In the existing application's database editor, run the full contents of these
-two SQL files, in this order:
+three SQL files, in this order:
 
 1. lib/db/migrations/0027_procedure_log_fields.sql
 
@@ -14,13 +14,20 @@ two SQL files, in this order:
    Both additions are safe to repeat. Existing procedure types receive an empty
    requirement list; existing procedure entries receive a NULL setting.
 
-2. artifacts/api-server/scripts/department-templates/surgery-setup.sql
+2. lib/db/migrations/0028_surgery_dynamic_procedure_fields.sql
+
+   This adds nullable procedure_log_fields (jsonb) to department_configs and
+   custom_fields (jsonb) to procedure_logs for department-level custom fields.
+   Both additions are safe to repeat.
+
+3. artifacts/api-server/scripts/department-templates/surgery-setup.sql
 
    This creates a real department named Surgery with code SURG if none exists.
    If Surgery already exists, it keeps that department's ID and current code.
-   It creates/updates the department configuration and adds role codes O, A, PS,
-   and PI. It preserves unrelated feature flags and existing target counts.
-   It stops on duplicate real Surgery departments or a conflicting SURG code.
+   It creates/updates the department configuration (including dynamicProcedureFields)
+   and adds role codes O, A, PS, and PI. It preserves unrelated feature flags,
+   custom procedure field schemas and existing target counts. It stops on duplicate
+   real Surgery departments or a conflicting SURG code.
 
 The scripts contain no department-ID placeholders and create no user credentials
 or patient records. Run them on the existing app database, not an empty database.

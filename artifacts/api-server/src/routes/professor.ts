@@ -498,6 +498,7 @@ router.get("/:professorId/review-queue", async (req, res) => {
         declaredCompetency: p.log.competencyLevel,
         diagnosis: (p.log as any).diagnosis,
         sex: (p.log as any).sex,
+        customFields: (p.log as any).customFields ?? {},
         status: p.log.status
       })),
       ...academics.map(a => ({

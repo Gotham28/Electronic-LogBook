@@ -5,7 +5,7 @@ import { requireAuth, requireRole, requireDepartment } from "../middlewares/auth
 import { z } from "zod";
 import { validate } from "../lib/validation.js";
 import { resolveConfigDepartmentId } from "../lib/department-config-source.js";
-import { PROCEDURE_ROLE_CODES } from "@workspace/api-zod";
+import { PROCEDURE_ROLE_CODES, resolveProcedureFieldDefinitions } from "@workspace/api-zod";
 
 const router: IRouter = Router();
 
@@ -94,13 +94,28 @@ router.patch("/:logType/:logId/review", requireAuth, requireRole(["professor", "
     const procedureUpdateData: any = { ...updateData };
     if (logType === "procedure") {
       const configSourceId = await resolveConfigDepartmentId(reviewer.departmentId!);
-      const [config] = await db.select({ enabledFeatures: departmentConfigsTable.enabledFeatures })
+      const [config] = await db.select({
+        enabledFeatures: departmentConfigsTable.enabledFeatures,
+        procedureLogFields: departmentConfigsTable.procedureLogFields,
+      })
         .from(departmentConfigsTable)
         .where(eq(departmentConfigsTable.departmentId, configSourceId))
         .limit(1);
       
       const enabledFeatures = config?.enabledFeatures as Record<string, boolean> | undefined;
-      if (enabledFeatures?.procedureClinicalDetails && facultyVerifiedLevel !== undefined
+      if (enabledFeatures?.dynamicProcedureFields) {
+        if (facultyVerifiedLevel !== undefined && facultyVerifiedLevel !== "") {
+          const activeFields = resolveProcedureFieldDefinitions(config?.procedureLogFields, true);
+          const roleField = activeFields.find((field) => field.id === "competencyLevel");
+          if (!roleField) {
+            res.status(400).json({ message: "Role level verification is not active for this department" }); return;
+          }
+          if ((roleField.type === "select" || roleField.type === "radio")
+            && !(roleField.options ?? []).includes(facultyVerifiedLevel)) {
+            res.status(400).json({ message: "Select a valid verified role level" }); return;
+          }
+        }
+      } else if (enabledFeatures?.procedureClinicalDetails && facultyVerifiedLevel !== undefined
         && !(PROCEDURE_ROLE_CODES as readonly string[]).includes(facultyVerifiedLevel)) {
         res.status(400).json({ message: "Select a valid verified role level" }); return;
       }
