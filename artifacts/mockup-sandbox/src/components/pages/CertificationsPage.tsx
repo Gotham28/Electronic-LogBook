@@ -8,10 +8,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatLogbookDate } from "@/lib/logbook-config";
-import { apiGet, apiPost, apiPatch } from "@/lib/apiClient";
+import { apiGet, apiPost, apiPatch, apiPutFile, openCertificateFile } from "@/lib/apiClient";
+import { compressImage, MAX_PDF_BYTES } from "@/lib/compressImage";
 import { getCurrentUser } from "@/lib/session";
 
-type Certificate = { id: string; title: string; provider: string | null; issueDate: string; expiryDate: string; certificateUrl: string };
+type Certificate = { id: string; title: string; provider: string | null; issueDate: string; expiryDate: string; certificateUrl: string | null; certificateFileType?: string | null; certificateFileName?: string | null };
 const emptyCertificate = { title: "", provider: "", issueDate: "", expiryDate: "", certificateUrl: "" };
 
 export function CertificationsPage() {
@@ -35,18 +36,63 @@ export function CertificationsPage() {
   }, [base]);
   React.useEffect(() => { void load(); }, [load]);
 
-  async function saveCertificate(event: React.FormEvent) {
-    event.preventDefault(); setBusy(true);
+  const [mode, setMode] = React.useState<"file" | "link">("file");
+  const [file, setFile] = React.useState<{ blob: Blob; name: string; size: number } | null>(null);
+  const [fileError, setFileError] = React.useState("");
+  React.useEffect(() => { if (!certificateOpen) { setFile(null); setFileError(""); setMode("file"); } }, [certificateOpen]);
+
+  const [preparing, setPreparing] = React.useState(false);
+  const storedFileOnEdit = Boolean(editId && certificates.find((item) => item.id === editId)?.certificateFileType);
+  React.useEffect(() => { if (storedFileOnEdit) setMode("file"); }, [storedFileOnEdit]);
+
+  async function chooseFile(input: File | undefined) {
+    setFileError(""); setFile(null);
+    if (!input) return;
+    setPreparing(true);
     try {
-      if (editId) {
-        await apiPatch(`${base}/certifications/${editId}`, certificate);
-      } else {
-        await apiPost(`${base}/certifications`, certificate);
+      if (input.type === "application/pdf") {
+        if (input.size > MAX_PDF_BYTES) throw new Error("A PDF must be 2 MB or smaller");
+        setFile({ blob: input, name: input.name, size: input.size });
+      } else if (["image/jpeg", "image/png", "image/webp"].includes(input.type)) {
+        const { blob, size } = await compressImage(input);
+        setFile({ blob, name: input.name.replace(/\.[^.]+$/, "") + ".jpg", size });
+      } else throw new Error("Choose a JPG, PNG, WebP or PDF file");
+    } catch (err) { setFileError(err instanceof Error ? err.message : "Could not read this file"); }
+    finally { setPreparing(false); }
+  }
+
+  function viewFile(certId: string) {
+    openCertificateFile(user.studentProfileId!, certId).catch((err) => toast.error(err instanceof Error ? err.message : "Unable to open certificate"));
+  }
+
+  async function saveCertificate(event: React.FormEvent) {
+    event.preventDefault();
+    if (preparing) return;
+    const hasStoredFile = Boolean(editId && certificates.find((item) => item.id === editId)?.certificateFileType);
+    if (mode === "file" && !file && !hasStoredFile) { setFileError("Choose a file to upload"); return; }
+    const { certificateUrl: _url, ...fields } = certificate;
+    const payload = mode === "link" ? certificate : fields;
+    setBusy(true);
+    try {
+      let savedId = editId;
+      try {
+        if (editId) {
+          await apiPatch(`${base}/certifications/${editId}`, payload);
+        } else {
+          const created = await apiPost(`${base}/certifications`, payload);
+          savedId = created.id; setEditId(created.id);
+        }
+      } catch (err) { toast.error(err instanceof Error ? err.message : "Unable to save certificate"); return; }
+      if (mode === "file" && file) {
+        try { await apiPutFile(`${base}/certifications/${savedId}/file`, file.blob, file.name); }
+        catch (err) {
+          setFileError(`Certificate saved, but the file was not uploaded${err instanceof Error ? ` (${err.message})` : ""}. Press Save to try again.`);
+          await load(); return;
+        }
       }
       setCertificateOpen(false); setCertificate(emptyCertificate); toast.success("Certificate saved"); await load();
       setEditId(null);
-    } catch (err) { toast.error(err instanceof Error ? err.message : "Unable to save certificate"); }
-    finally { setBusy(false); }
+    } finally { setBusy(false); }
   }
   return <div className="space-y-6 pb-12">
     <div><p className="page-eyebrow">Training</p><h2 className="page-title mt-1">Certifications</h2>
@@ -62,7 +108,15 @@ export function CertificationsPage() {
           {!certificates.length ? <p className="text-sm text-slate-500">No certificates recorded yet.</p> : <Table>
             <TableHeader><TableRow>{["Certificate", "Issuing body", "Date issued", "Expiry", "Status", ""].map((label) => <TableHead key={label}>{label}</TableHead>)}</TableRow></TableHeader>
             <TableBody>{certificates.map((item) => <TableRow key={item.id}>
-              <TableCell className="font-semibold">{item.title}</TableCell><TableCell>{item.provider || "Not recorded"}</TableCell>
+              <TableCell className="font-semibold">{item.title}
+                <div className="mt-0.5 text-xs font-normal">
+                  {item.certificateFileType
+                    ? <button type="button" className="text-teal-600 hover:underline" onClick={() => viewFile(item.id)}>View certificate ↗</button>
+                    : item.certificateUrl
+                      ? <a href={item.certificateUrl} target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline">View certificate ↗</a>
+                      : <span className="text-slate-500">No file attached</span>}
+                </div>
+              </TableCell><TableCell>{item.provider || "Not recorded"}</TableCell>
               <TableCell>{formatLogbookDate(item.issueDate)}</TableCell><TableCell>{formatLogbookDate(item.expiryDate)}</TableCell>
               <TableCell>
                 <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
@@ -80,6 +134,7 @@ export function CertificationsPage() {
                 {(item as any).status === "pending" && (
                   <Button variant="ghost" size="sm" className="text-teal-600 hover:text-teal-800 hover:bg-teal-50" onClick={() => {
                     setEditId(item.id);
+                    setMode(!item.certificateFileType && item.certificateUrl ? "link" : "file");
                     setCertificate({ title: item.title, provider: item.provider || "", issueDate: item.issueDate.split('T')[0], expiryDate: item.expiryDate.split('T')[0], certificateUrl: item.certificateUrl || "" });
                     setCertificateOpen(true);
                   }}>
@@ -94,12 +149,23 @@ export function CertificationsPage() {
     </>}
     <Dialog open={certificateOpen} onOpenChange={(open) => { if (!busy) { setCertificateOpen(open); if (!open) { setCertificate(emptyCertificate); setEditId(null); } } }}>
       <DialogContent onInteractOutside={(event) => event.preventDefault()} className="max-h-[90vh] overflow-y-auto bg-white">
-        <DialogHeader><DialogTitle>{editId ? "Edit certificate" : "Add certificate"}</DialogTitle><DialogDescription>Record a completed course and a secure link to its certificate.</DialogDescription></DialogHeader>
+        <DialogHeader><DialogTitle>{editId ? "Edit certificate" : "Add certificate"}</DialogTitle><DialogDescription>Record a completed course and attach a photo or PDF of its certificate, or paste a secure link.</DialogDescription></DialogHeader>
         <form onSubmit={saveCertificate} className="space-y-4">
-          {(["title", "provider", "issueDate", "expiryDate", "certificateUrl"] as const).map((key) => <Field key={key} label={{ title: "Certificate", provider: "Issuing body", issueDate: "Date issued", expiryDate: "Expiry date", certificateUrl: "Certificate URL (HTTPS)" }[key]}>
-            <Input required maxLength={key === "certificateUrl" ? 2000 : 160} type={key.endsWith("Date") ? "date" : key === "certificateUrl" ? "url" : "text"} value={certificate[key]} onChange={(e) => setCertificate({ ...certificate, [key]: e.target.value })} />
+          {(["title", "provider", "issueDate", "expiryDate"] as const).map((key) => <Field key={key} label={{ title: "Certificate", provider: "Issuing body", issueDate: "Date issued", expiryDate: "Expiry date" }[key]}>
+            <Input required maxLength={160} type={key.endsWith("Date") ? "date" : "text"} value={certificate[key]} onChange={(e) => setCertificate({ ...certificate, [key]: e.target.value })} />
           </Field>)}
-          <DialogFooter><Button type="button" variant="outline" disabled={busy} onClick={() => setCertificateOpen(false)}>Cancel</Button><Button disabled={busy}>{busy ? "Saving…" : "Save certificate"}</Button></DialogFooter>
+          <div className="flex gap-2" role="group" aria-label="Certificate source">
+            <Button type="button" size="sm" variant={mode === "file" ? "default" : "outline"} onClick={() => setMode("file")}>Upload file</Button>
+            <Button type="button" size="sm" variant={mode === "link" ? "default" : "outline"} disabled={storedFileOnEdit} onClick={() => setMode("link")}>Paste link</Button>
+          </div>
+          {storedFileOnEdit && <p className="text-xs text-slate-600">This certificate already has a stored file, so the stored file is what will be shown. Pasting a link is not available. Choose a new file below to replace it.</p>}
+          {mode === "link"
+            ? <Field label="Certificate URL (HTTPS)"><Input required maxLength={2000} type="url" value={certificate.certificateUrl} onChange={(e) => setCertificate({ ...certificate, certificateUrl: e.target.value })} /></Field>
+            : <Field label="Certificate file (JPG, PNG, WebP or PDF)"><Input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" onChange={(e) => void chooseFile(e.target.files?.[0])} /></Field>}
+          {mode === "file" && preparing && <p role="status" className="text-xs text-slate-600">Preparing file…</p>}
+          {mode === "file" && file && !preparing && <p className="text-xs text-slate-600">{file.name} — {(file.size / 1024).toFixed(0)} KB{file.blob.type === "application/pdf" ? "" : " after compression"}</p>}
+          {fileError && <p role="alert" className="text-sm text-rose-700">{fileError}</p>}
+          <DialogFooter><Button type="button" variant="outline" disabled={busy} onClick={() => setCertificateOpen(false)}>Cancel</Button><Button disabled={busy || preparing}>{busy ? "Saving…" : preparing ? "Preparing file…" : "Save certificate"}</Button></DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

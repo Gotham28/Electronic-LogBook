@@ -14,6 +14,12 @@ export const mail = new Map<string, string>();
 export const sentEmails: Array<{ to: string; subject: string; text: string; html: string; idempotencyKey?: string }> = [];
 export const simulateFailure = { enabled: false };
 
+// Dummy storage settings: src/lib/file-storage.ts fails closed at import when any is missing.
+process.env.R2_ACCOUNT_ID = "test-account";
+process.env.R2_ACCESS_KEY_ID = "test-access-key";
+process.env.R2_SECRET_ACCESS_KEY = "test-secret-key";
+process.env.R2_BUCKET_NAME = "test-bucket";
+
 process.env.RESEND_API_KEY = "test-only-resend-key";
 process.env.EMAIL_FROM = "noreply@elogbookgothos.test";
 

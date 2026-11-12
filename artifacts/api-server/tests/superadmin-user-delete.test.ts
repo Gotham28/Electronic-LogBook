@@ -3,8 +3,9 @@ import assert from "node:assert/strict";
 import { setup, request, accounts as a, departmentIds, password } from "./support.js";
 import {
   engine, db, usersTable, studentsTable, caseLogsTable, assignmentTypesTable,
-  auditTable, departmentNameChangeNotificationsTable, nameChangeEmailOutboxTable,
+  auditTable, departmentNameChangeNotificationsTable, nameChangeEmailOutboxTable, certificationsTable,
 } from "./database.js";
+import { setFileStorageForTests } from "../src/lib/file-storage.js";
 import { and, eq, sql } from "drizzle-orm";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
@@ -129,6 +130,38 @@ test("admin hard-delete: admin permanently deletes a resident and their records 
   const again = await call(path, "admin", "DELETE");
   evidence(t, "nonexistent row (already deleted)", "DELETE", path, "admin", again);
   assert.equal(again.status, 404);
+});
+
+test("admin hard-delete: certificate files are removed after commit; a storage failure still returns 200", async (t) => {
+  const insertCert = (studentId: number, key: string) => db.insert(certificationsTable).values({ studentId, title: "Synthetic cert",
+    issueDate: new Date("2026-01-01"), expiryDate: new Date("2027-01-01"), certificateFileKey: key, certificateFileType: "application/pdf", certificateFileSize: 10 });
+  const objects = new Set(["certificates/sa-a", "certificates/sa-b", "certificates/sa-keep"]);
+  const rowGoneAtDeleteTime: boolean[] = [];
+  setFileStorageForTests({ async put() {}, async get() { return null; },
+    async delete(key) {
+      rowGoneAtDeleteTime.push((await db.select().from(certificationsTable).where(eq(certificationsTable.certificateFileKey, key))).length === 0);
+      objects.delete(key);
+    } });
+  try {
+    await insertCert(a.student20.studentId!, "certificates/sa-a");
+    await insertCert(a.student20.studentId!, "certificates/sa-b");
+    const path = `/superadmin/users/${a.student20.id}/hard`;
+    const res = await call(path, "admin", "DELETE");
+    evidence(t, "files removed after delete", "DELETE", path, "admin", res);
+    assert.equal(res.status, 200);
+    assert.deepEqual([...objects], ["certificates/sa-keep"]);
+    assert.deepEqual(rowGoneAtDeleteTime, [true, true]);
+    assert.equal(JSON.stringify(res.body).includes("certificates/"), false, "no storage key in the response");
+
+    setFileStorageForTests({ async put() {}, async get() { return null; }, async delete() { throw new Error("storage down certificates/sa-fail"); } });
+    await insertCert(a.student22.studentId!, "certificates/sa-fail");
+    const failPath = `/superadmin/users/${a.student22.id}/hard`;
+    const failed = await call(failPath, "admin", "DELETE");
+    evidence(t, "storage failure", "DELETE", failPath, "admin", failed);
+    assert.equal(failed.status, 200, "normal status despite the storage failure");
+    assert.equal(JSON.stringify(failed.body).includes("certificates/"), false);
+    assert.equal((await db.select().from(usersTable).where(eq(usersTable.id, a.student22.id))).length, 0, "the delete was not undone");
+  } finally { setFileStorageForTests(undefined); }
 });
 
 test("admin hard-delete: faculty's assignment types pass to their department's HOD", async (t) => {

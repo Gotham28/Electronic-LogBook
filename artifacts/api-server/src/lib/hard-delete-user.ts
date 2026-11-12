@@ -11,8 +11,13 @@ import { usersTable, studentsTable, caseLogsTable, procedureLogsTable, academicL
 // (assignment_types.created_by is NOT NULL).
 // The caller must already have checked that the target is a student or professor the
 // acting user is allowed to delete.
-export async function hardDeleteUserCascade(tx: any, targetUserId: number, role: "student" | "professor", reassignTo: number): Promise<Record<string, number>> {
+//
+// Also returns the storage keys of any certificate files the deleted rows pointed at. The
+// caller removes those objects only AFTER its transaction commits (a rolled-back delete must
+// not lose files); this function never touches object storage itself.
+export async function hardDeleteUserCascade(tx: any, targetUserId: number, role: "student" | "professor", reassignTo: number): Promise<{ deletedCounts: Record<string, number>; certificateFileKeys: string[] }> {
   const deletedCounts: Record<string, number> = {};
+  const certificateFileKeys: string[] = [];
   if (role === "student") {
     const [student] = await tx.select({ id: studentsTable.id }).from(studentsTable).where(eq(studentsTable.userId, targetUserId)).limit(1);
     if (student) {
@@ -54,8 +59,9 @@ export async function hardDeleteUserCascade(tx: any, targetUserId: number, role:
       const _att = await tx.delete(attendanceLogsTable).where(eq(attendanceLogsTable.studentId, studentId)).returning({ id: attendanceLogsTable.id });
       deletedCounts.attendanceLogs = _att.length;
 
-      const _cert = await tx.delete(certificationsTable).where(eq(certificationsTable.studentId, studentId)).returning({ id: certificationsTable.id });
+      const _cert = await tx.delete(certificationsTable).where(eq(certificationsTable.studentId, studentId)).returning({ id: certificationsTable.id, fileKey: certificationsTable.certificateFileKey });
       deletedCounts.certifications = _cert.length;
+      for (const row of _cert as { fileKey: string | null }[]) if (row.fileKey) certificateFileKeys.push(row.fileKey);
 
       const _post = await tx.delete(postingsTable).where(eq(postingsTable.studentId, studentId)).returning({ id: postingsTable.id });
       deletedCounts.postings = _post.length;
@@ -151,5 +157,5 @@ export async function hardDeleteUserCascade(tx: any, targetUserId: number, role:
   const _users = await tx.delete(usersTable).where(eq(usersTable.id, targetUserId)).returning({ id: usersTable.id });
   deletedCounts.users = _users.length;
 
-  return deletedCounts;
+  return { deletedCounts, certificateFileKeys };
 }

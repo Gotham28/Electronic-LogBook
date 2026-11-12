@@ -67,7 +67,7 @@ import {
 } from "lucide-react";
 import { formatLogbookDate, todayForInput } from "@/lib/logbook-config";
 import { CaseLogDetails, type CaseLogDetailRecord } from "@/components/CaseLogDetails";
-import { apiGet, apiPatch, apiPost, apiDelete } from "@/lib/apiClient";
+import { apiGet, apiPatch, apiPost, apiDelete, openCertificateFile } from "@/lib/apiClient";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { getCurrentUser, isDemoMode } from "@/lib/session";
 import { useCurrentUser } from "@/hooks/use-current-user";
@@ -1570,7 +1570,14 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                             <div>
                               <p className="font-semibold text-slate-900 text-sm">{cert.title}</p>
                               <p className="text-xs text-slate-500 mt-0.5">{cert.provider} · Issued {formatLogbookDate(cert.issueDate)}</p>
-                              <a href={cert.certificateUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-teal-600 hover:underline mt-0.5 inline-block">View certificate ↗</a>
+                              {cert.certificateFileType ? (
+                                <button type="button" className="text-xs text-teal-600 hover:underline mt-0.5 inline-block"
+                                  onClick={() => openCertificateFile(selectedMentee.id, cert.id).catch((err: any) => toast.error(err?.message || "Unable to open certificate"))}>View certificate ↗</button>
+                              ) : cert.certificateUrl ? (
+                                <a href={cert.certificateUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-teal-600 hover:underline mt-0.5 inline-block">View certificate ↗</a>
+                              ) : (
+                                <span className="text-xs text-slate-500 mt-0.5 inline-block">No file attached</span>
+                              )}
                               {cert.facultyRemarks && (
                                 <p className="mt-1 text-xs text-slate-600 italic">Remarks: {cert.facultyRemarks}</p>
                               )}

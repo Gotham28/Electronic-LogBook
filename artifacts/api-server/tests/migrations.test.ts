@@ -13,7 +13,7 @@ test("fresh installation and rerunning migrations are safe and checksum-tracked"
   try {
     await applyMigrations(migrationConnection(database));
     await applyMigrations(migrationConnection(database));
-    assert.equal((await database.query("SELECT * FROM elogbook_migrations")).rows.length, 28);
+    assert.equal((await database.query("SELECT * FROM elogbook_migrations")).rows.length, 29);
     assert.equal((await database.query<any>("SELECT is_nullable FROM information_schema.columns WHERE table_name = 'procedure_types' AND column_name = 'required_log_fields'")).rows[0].is_nullable, "NO");
     assert.equal((await database.query<any>("SELECT is_nullable FROM information_schema.columns WHERE table_name = 'procedure_logs' AND column_name = 'setting'")).rows[0].is_nullable, "YES");
     assert.equal((await database.query<any>("SELECT is_nullable, data_type FROM information_schema.columns WHERE table_name = 'department_configs' AND column_name = 'procedure_log_fields'")).rows[0].is_nullable, "YES");
