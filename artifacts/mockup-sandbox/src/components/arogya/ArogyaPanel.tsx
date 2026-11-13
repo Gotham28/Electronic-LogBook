@@ -327,7 +327,7 @@ export function ArogyaPanel({ open, onOpenChange, role, actorKey, workflowId, st
         <header className="flex shrink-0 items-center justify-between border-b border-white/80 bg-white/55 px-4 py-3 backdrop-blur-xl">
           <div className="flex min-w-0 items-center gap-3">
             <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-teal-100/80 bg-teal-50/80">
-              <ArogyaCharacter state={characterState} size={36} />
+              <img src={`${import.meta.env.BASE_URL}gothos-owl.svg`} alt="" width={32} height={32} />
             </div>
             <div className="min-w-0">
               <h2 id="arogya-panel-heading" className="font-display text-base font-bold leading-tight text-teal-950">Arogya</h2>
@@ -496,7 +496,7 @@ export function ArogyaPanel({ open, onOpenChange, role, actorKey, workflowId, st
                 <SendHorizontal className="h-4 w-4" aria-hidden="true" />
               </Button>
             </div>
-            <span className="ml-1 text-xs font-medium text-slate-500">Don't type patient details.</span>
+            <p className="mt-1 text-center text-xs text-slate-500">Powered by Gothos Labs</p>
           </form>
         </footer>
       </PopoverContent>
