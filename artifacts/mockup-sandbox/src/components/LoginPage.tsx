@@ -1,6 +1,6 @@
 import * as React from "react";
 import {
-  BookOpenCheck, KeyRound, ShieldCheck, UserPlus, Loader2,
+  KeyRound, ShieldCheck, UserPlus, Loader2,
   Sparkles, LogIn, ChevronLeft, ArrowRight, VolumeX, Play,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -228,8 +228,9 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
           <div className="absolute -bottom-24 -left-20 h-64 w-64 rounded-full bg-cyan-300/15 blur-2xl" />
           <div className="relative flex flex-col h-full justify-between">
             <div>
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/16 shadow-lg ring-1 ring-white/25">
-                <BookOpenCheck className="h-7 w-7" />
+              <div className="inline-flex items-center gap-3 font-semibold text-white">
+                <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white shadow-sm"><img src={`${import.meta.env.BASE_URL}gothos-owl.svg`} alt="" width={32} height={32} /></span>
+                <span>Gothos Labs</span>
               </div>
               <h1 className="mt-10 max-w-xl text-4xl font-bold leading-[1.05] md:text-5xl">
                 Clinical training, clearly organised.
