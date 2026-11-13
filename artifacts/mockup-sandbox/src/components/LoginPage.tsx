@@ -246,14 +246,6 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
         {/* Right panel */}
         <section className="bg-white/80 p-8 md:p-12 flex items-center">
           <div className="mx-auto w-full max-w-sm">
-            <img
-              src={`${import.meta.env.BASE_URL}hoot-body.png`}
-              alt="Gothos Labs owl"
-              width={72}
-              height={72}
-              className="mb-4 object-contain"
-            />
-
             {/* ── MODE: Picker ─────────────────────────────────────────── */}
             {mode === "picker" && (
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">

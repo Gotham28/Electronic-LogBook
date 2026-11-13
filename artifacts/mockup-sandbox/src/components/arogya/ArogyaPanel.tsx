@@ -308,7 +308,7 @@ export function ArogyaPanel({ open, onOpenChange, role, actorKey, workflowId, st
           type="button"
           data-tour="arogya-launcher"
           aria-label={open ? "Close Arogya assistant" : "Open Arogya assistant"}
-          className="print:hidden fixed bottom-[calc(76px+env(safe-area-inset-bottom))] right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full border border-teal-100 bg-white shadow-[0_12px_24px_rgba(15,23,42,0.12)] transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2 sm:bottom-6 sm:right-6"
+          className="print:hidden fixed bottom-[calc(76px+env(safe-area-inset-bottom))] right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full border-[3px] border-[#009689] bg-white shadow-[0_12px_24px_rgba(15,23,42,0.12)] transition-colors hover:bg-teal-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2 sm:bottom-6 sm:right-6"
         >
           <ArogyaCharacter state={characterState} size={36} />
         </button>
@@ -316,15 +316,34 @@ export function ArogyaPanel({ open, onOpenChange, role, actorKey, workflowId, st
       <PopoverContent
         side="top"
         align="end"
-        sideOffset={12}
+        avoidCollisions={false}
+        sideOffset={-56}
         collisionPadding={12}
         aria-labelledby="arogya-panel-heading"
         aria-describedby="arogya-panel-description"
         data-tour="arogya-panel"
         data-demo-assistant-state={characterState}
-        className="flex h-[min(68dvh,38rem)] min-h-[min(24rem,calc(100dvh-2rem))] w-[min(26rem,calc(100vw-1.5rem))] max-h-[calc(100dvh-1.5rem)] flex-col gap-0 overflow-hidden rounded-[1.5rem] border border-white/80 bg-white/85 p-0 text-slate-800 shadow-[0_28px_80px_rgba(15,23,42,0.2)] backdrop-blur-2xl motion-reduce:animate-none supports-[backdrop-filter]:bg-white/70"
+        className="arogya-chat-surface flex h-[min(68dvh,38rem)] min-h-0 w-[min(26rem,calc(100vw-1.5rem))] max-h-[calc(100dvh-1.5rem)] flex-col gap-0 overflow-hidden rounded-[1.5rem] border border-teal-900/10 bg-slate-50 p-0 text-slate-800 shadow-[0_24px_70px_rgba(15,23,42,0.22)]"
       >
-        <header className="flex shrink-0 items-center justify-between border-b border-white/80 bg-white/55 px-4 py-3 backdrop-blur-xl">
+        <style>{`
+          @keyframes arogya-expand {
+            from { clip-path: inset(calc(100% - 56px) 0 0 calc(100% - 56px) round 28px); }
+            to { clip-path: inset(0 round 24px); }
+          }
+
+          .arogya-chat-surface[data-state="open"] {
+            animation: arogya-expand 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+          }
+
+          .arogya-chat-surface[data-state="closed"] {
+            animation: arogya-expand 220ms ease-in reverse both;
+          }
+
+          @media (prefers-reduced-motion: reduce) {
+            .arogya-chat-surface[data-state] { animation: none; }
+          }
+        `}</style>
+        <header className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 py-3">
           <div className="flex min-w-0 items-center gap-3">
             <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-teal-100/80 bg-teal-50/80">
               <img src={`${import.meta.env.BASE_URL}gothos-owl.svg`} alt="" width={32} height={32} />
@@ -467,7 +486,7 @@ export function ArogyaPanel({ open, onOpenChange, role, actorKey, workflowId, st
           </div>
         </div>
 
-        <footer className="shrink-0 border-t border-white/80 bg-white/70 p-3.5 backdrop-blur-xl">
+        <footer className="shrink-0 border-t border-slate-200 bg-white px-4 pb-3 pt-3.5">
           {messages.length > 0 && <div className="mb-2 flex justify-end"><button type="button" onClick={() => {
             requestSequence.current++;
             setMessages([]);
@@ -484,7 +503,7 @@ export function ArogyaPanel({ open, onOpenChange, role, actorKey, workflowId, st
                 onChange={(e) => setQuestion(e.target.value)}
                 disabled={characterState === "thinking" || assistantContext === null}
                 placeholder="Write a prompt..."
-                className="h-12 rounded-xl border-slate-200 bg-white/90 pr-14 text-sm shadow-inner focus-visible:ring-teal-600"
+                className="h-12 rounded-2xl border-slate-200 bg-slate-50 pr-14 text-sm focus-visible:ring-teal-600"
               />
               <Button
                 type="submit"
