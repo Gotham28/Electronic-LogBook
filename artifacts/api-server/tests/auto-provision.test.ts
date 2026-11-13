@@ -1,7 +1,7 @@
 import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { setup, mail, simulateFailure, sentEmails } from "./support.js";
-import { db, departmentsTable, usersTable, departmentConfigsTable, procedureTypesTable, studentsTable } from "./database.js";
+import { db, departmentsTable, usersTable, departmentConfigsTable, procedureTypesTable, studentsTable, getTestCollegeId } from "./database.js";
 import { provisionDepartment } from "../src/lib/department-provisioning.js";
 import { eq, and } from "drizzle-orm";
 
@@ -19,6 +19,7 @@ describe("Auto-provision Mirror Department", () => {
 
   it("provisionDepartment creates a real department and an auto-provisioned test mirror", async () => {
     const input = {
+      collegeId: await getTestCollegeId(),
       name: "New Real Dept",
       code: "NEWREAL123",
       description: "Real dept description",
@@ -99,6 +100,7 @@ describe("Auto-provision Mirror Department", () => {
     await db.update(usersTable).set({ status: "pending" }).where(and(eq(usersTable.departmentId, realDept.id), eq(usersTable.role, "hod")));
 
     const input = {
+      collegeId: await getTestCollegeId(),
       name: "New Real Dept",
       code: "NEWREAL123",
       hod: {
@@ -124,7 +126,7 @@ describe("Auto-provision Mirror Department", () => {
     const originalWarn = console.warn;
     console.warn = (...args: unknown[]) => { warnings.push(args.map(String).join(" ")); };
     try {
-      const result = await provisionDepartment({ name: "Mail Fail Dept", code: "MAILFAIL1",
+      const result = await provisionDepartment({ collegeId: await getTestCollegeId(), name: "Mail Fail Dept", code: "MAILFAIL1",
         hod: { fullName: "Mail Fail HOD", email: "mail-fail-hod@example.com" } }, "SecurePass123!");
       assert.equal(result.emailAccepted, false);
       const line = warnings.find((w) => w.includes("welcome email"));

@@ -41,14 +41,16 @@ export function RegistrationPage({
 
   const [emailVerified, setEmailVerified] = React.useState(false);
   const [verificationToken, setVerificationToken] = React.useState("");
-  const [departments, setDepartments] = React.useState<Array<{ id: number; name: string }>>([]);
+  const [departments, setDepartments] = React.useState<Array<{ id: number; name: string; collegeId: number; collegeName: string }>>([]);
+  const [selectedCollegeId, setSelectedCollegeId] = React.useState<number | null>(null);
   const [departmentError, setDepartmentError] = React.useState("");
   const [departmentsLoading, setDepartmentsLoading] = React.useState(true);
   const loadDepartments = React.useCallback(async () => {
     setDepartmentsLoading(true); setDepartmentError("");
     try {
-      const list = await apiGet<Array<{ id: number; name: string }>>("/api/departments");
+      const list = await apiGet<Array<{ id: number; name: string; collegeId: number; collegeName: string }>>("/api/departments");
       setDepartments(list.map((d) => ({ ...d, name: /microbiology/i.test(d.name) ? d.name.replace(/microbiology/i, "Microbiology") : d.name })));
+      if (list.length) setSelectedCollegeId(list[0].collegeId);
     }
     catch (err) { setDepartmentError(err instanceof Error ? err.message : "Could not load departments"); }
     finally { setDepartmentsLoading(false); }
@@ -228,10 +230,20 @@ export function RegistrationPage({
                     )}
                   </Field>
 
+                  <Field label="College" htmlFor="registration-college">
+                    <Select value={selectedCollegeId === null ? "" : String(selectedCollegeId)} onValueChange={(value) => {
+                      setSelectedCollegeId(Number(value));
+                      setForm((current) => ({ ...current, department: "" }));
+                    }}>
+                      <SelectTrigger id="registration-college"><SelectValue /></SelectTrigger>
+                      <SelectContent>{Array.from(new Map(departments.map((d) => [d.collegeId, { id: d.collegeId, name: d.collegeName }])).values())
+                        .map((college) => <SelectItem key={college.id} value={String(college.id)}>{college.name}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </Field>
                   <Field label="Department" htmlFor="registration-department">
                     <Select value={form.department} onValueChange={(department) => setForm({ ...form, department })}>
                       <SelectTrigger id="registration-department"><SelectValue /></SelectTrigger>
-                      <SelectContent>{departments.map((department) => <SelectItem key={department.id} value={String(department.id)}>{department.name}</SelectItem>)}</SelectContent>
+                      <SelectContent>{departments.filter((department) => department.collegeId === selectedCollegeId).map((department) => <SelectItem key={department.id} value={String(department.id)}>{department.name}</SelectItem>)}</SelectContent>
                     </Select>
                   </Field>
                   {departmentsLoading && <p role="status" className="text-sm text-slate-500">Loading departments…</p>}

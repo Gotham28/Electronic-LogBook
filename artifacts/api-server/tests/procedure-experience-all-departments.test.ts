@@ -16,7 +16,7 @@ import { readFile } from "node:fs/promises";
 import { PGlite } from "@electric-sql/pglite";
 import { applyMigrations } from "../../../lib/db/src/migrations.js";
 import { setup, request, accounts as a } from "./support.js";
-import { engine, db, migrationConnection, departmentsTable, departmentConfigsTable, departmentCatalogTable } from "./database.js";
+import { engine, db, migrationConnection, departmentsTable, departmentConfigsTable, departmentCatalogTable, getTestCollegeId } from "./database.js";
 import { eq } from "drizzle-orm";
 import { provisionDepartment } from "../src/lib/department-provisioning.js";
 
@@ -237,6 +237,7 @@ describe("provisioning: procedureExperience default behaviour", () => {
 
   test("department provisioned without setup.config gets procedureExperience:true from column default", async () => {
     const input = {
+      collegeId: await getTestCollegeId(),
       name: "Prov No Config",
       code: "PROV-NC",
       hod: { fullName: "HOD NC", email: "nc-hod@example.com" }
@@ -258,6 +259,7 @@ describe("provisioning: procedureExperience default behaviour", () => {
 
   test("setup.config omitting procedureExperience key gets true from merge", async () => {
     const input = {
+      collegeId: await getTestCollegeId(),
       name: "Prov Omit Key",
       code: "PROV-OK",
       hod: { fullName: "HOD OK", email: "ok-hod@example.com" },
@@ -277,6 +279,7 @@ describe("provisioning: procedureExperience default behaviour", () => {
 
   test("setup.config with explicit procedureExperience:false stays false (spread overrides default)", async () => {
     const input = {
+      collegeId: await getTestCollegeId(),
       name: "Prov Explicit False",
       code: "PROV-EF",
       hod: { fullName: "HOD EF", email: "ef-hod@example.com" },

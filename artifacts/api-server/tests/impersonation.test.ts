@@ -1,7 +1,7 @@
 import { before, after, test } from "node:test";
 import assert from "node:assert/strict";
 import { setup, request, accounts as a, departmentIds, password } from "./support.js";
-import { engine, db, usersTable, departmentsTable } from "./database.js";
+import { engine, db, usersTable, departmentsTable, getTestCollegeId } from "./database.js";
 import { eq, sql } from "drizzle-orm";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
@@ -69,7 +69,7 @@ test("admin targeting a user in a real (non-isTest) department is denied with 40
 test("admin can impersonate a user in an isTest department", async () => {
   // Create an isTest department
   const [testDept] = await db.insert(departmentsTable).values({
-    name: "Mirror Dept", code: "MIRROR", isTest: true, configSourceDepartmentId: departmentIds[0]
+    name: "Mirror Dept", code: "MIRROR", isTest: true, configSourceDepartmentId: departmentIds[0], collegeId: await getTestCollegeId()
   }).returning();
 
   // Create a student in the test department
@@ -113,7 +113,7 @@ test("admin targeting a nonexistent user gets 404", async () => {
 test("impersonation token has 20-minute expiry", async () => {
   // Create an isTest department
   const [testDept] = await db.insert(departmentsTable).values({
-    name: "Mirror Dept 2", code: "MIRROR2", isTest: true
+    name: "Mirror Dept 2", code: "MIRROR2", isTest: true, collegeId: await getTestCollegeId()
   }).returning();
 
   const hash = await bcrypt.hash(password, 10);
@@ -139,7 +139,7 @@ test("impersonation token has 20-minute expiry", async () => {
 test("impersonation token dies if target sessionVersion changes", async () => {
   // Create an isTest department
   const [testDept] = await db.insert(departmentsTable).values({
-    name: "Mirror Dept 3", code: "MIRROR3", isTest: true
+    name: "Mirror Dept 3", code: "MIRROR3", isTest: true, collegeId: await getTestCollegeId()
   }).returning();
 
   const hash = await bcrypt.hash(password, 10);

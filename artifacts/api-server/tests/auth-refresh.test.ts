@@ -4,7 +4,7 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { eq, sql } from "drizzle-orm";
 import { setup, request, accounts as a, password } from "./support.js";
-import { engine, db, usersTable, departmentsTable } from "./database.js";
+import { engine, db, usersTable, departmentsTable, getTestCollegeId } from "./database.js";
 
 let runtime: Awaited<ReturnType<typeof setup>>;
 let admin: { id: number; token: string };
@@ -21,7 +21,7 @@ before(async () => {
   const [adminRow] = await db.insert(usersTable).values({ fullName: "Refresh Admin", email: "refresh-admin@example.test",
     role: "admin", status: "approved", departmentId: null, passwordHash: hash }).returning();
   admin = { id: adminRow.id, token: jwt.sign({ id: adminRow.id, sessionVersion: 0 }, secret(), { expiresIn: "1h" }) };
-  const [testDept] = await db.insert(departmentsTable).values({ name: "Refresh Test Dept", code: "REFRESH-T", isTest: true }).returning();
+  const [testDept] = await db.insert(departmentsTable).values({ name: "Refresh Test Dept", code: "REFRESH-T", isTest: true, collegeId: await getTestCollegeId() }).returning();
   const [student] = await db.insert(usersTable).values({ fullName: "Refresh Test Student", email: "refresh-student@example.test",
     role: "student", status: "approved", departmentId: testDept.id, passwordHash: hash }).returning();
   testStudentId = student.id;

@@ -139,7 +139,7 @@ export function MaintenanceAnnouncements() {
       <div className="flex items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-slate-900">Maintenance Notices</h2>
-          <p className="text-slate-500">Schedule an ELogbook service notice for selected roles.</p>
+          <p className="text-slate-500">Schedule a platform-wide ELogbook service notice across all colleges for selected roles.</p>
         </div>
         <Button onClick={openNew}><Plus className="mr-2 h-4 w-4" /> Schedule</Button>
       </div>

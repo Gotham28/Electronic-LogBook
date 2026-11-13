@@ -1,7 +1,7 @@
 import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { setup, request, accounts, departmentIds, Account } from "./support.js";
-import { db, departmentsTable, departmentConfigsTable, studentsTable } from "./database.js";
+import { db, departmentsTable, departmentConfigsTable, studentsTable, getTestCollegeId } from "./database.js";
 import { resolveConfigDepartmentId } from "../src/lib/department-config-source.js";
 import { eq } from "drizzle-orm";
 import jwt from "jsonwebtoken";
@@ -30,7 +30,8 @@ describe("Mirror Test Department (AGENTS.md §3, §6, §11)", () => {
       name: "Pediatrics (Test)",
       code: "TEST-MIRROR",
       isTest: true,
-      configSourceDepartmentId: sourceDepartmentId
+      configSourceDepartmentId: sourceDepartmentId,
+      collegeId: await getTestCollegeId()
     }).returning();
     mirrorDepartmentId = mirror.id;
 
@@ -158,7 +159,7 @@ describe("Mirror Test Department (AGENTS.md §3, §6, §11)", () => {
 
     // Create a chain (mirror of a mirror)
     const [chainMirror] = await db.insert(departmentsTable).values({
-      name: "Chain Mirror", code: "CHAIN", isTest: true, configSourceDepartmentId: mirrorDepartmentId
+      name: "Chain Mirror", code: "CHAIN", isTest: true, configSourceDepartmentId: mirrorDepartmentId, collegeId: await getTestCollegeId()
     }).returning();
 
     await assert.rejects(async () => {

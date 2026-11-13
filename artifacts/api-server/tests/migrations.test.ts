@@ -13,7 +13,7 @@ test("fresh installation and rerunning migrations are safe and checksum-tracked"
   try {
     await applyMigrations(migrationConnection(database));
     await applyMigrations(migrationConnection(database));
-    assert.equal((await database.query("SELECT * FROM elogbook_migrations")).rows.length, 29);
+    assert.equal((await database.query("SELECT * FROM elogbook_migrations")).rows.length, 30);
     assert.equal((await database.query<any>("SELECT is_nullable FROM information_schema.columns WHERE table_name = 'procedure_types' AND column_name = 'required_log_fields'")).rows[0].is_nullable, "NO");
     assert.equal((await database.query<any>("SELECT is_nullable FROM information_schema.columns WHERE table_name = 'procedure_logs' AND column_name = 'setting'")).rows[0].is_nullable, "YES");
     assert.equal((await database.query<any>("SELECT is_nullable, data_type FROM information_schema.columns WHERE table_name = 'department_configs' AND column_name = 'procedure_log_fields'")).rows[0].is_nullable, "YES");
@@ -22,6 +22,8 @@ test("fresh installation and rerunning migrations are safe and checksum-tracked"
     assert.equal((await database.query("SELECT to_regclass('department_logbook_sections') AS table_name")).rows[0].table_name, "department_logbook_sections");
     assert.equal((await database.query("SELECT to_regclass('maintenance_announcements') AS table_name")).rows[0].table_name, "maintenance_announcements");
     assert.equal((await database.query("SELECT * FROM departments")).rows.length, 0);
+    assert.equal((await database.query<any>("SELECT name, code FROM colleges")).rows[0].name, "Kannur Medical College");
+    assert.equal((await database.query<any>("SELECT is_nullable FROM information_schema.columns WHERE table_name = 'departments' AND column_name = 'college_id'")).rows[0].is_nullable, "NO");
     assert.equal((await database.query("SELECT * FROM assignment_recipients")).rows.length, 0);
     assert.equal((await database.query<any>("SELECT column_default, is_nullable FROM information_schema.columns WHERE table_name = 'students' AND column_name = 'admin_provisioned'")).rows[0].column_default, "false");
     assert.equal((await database.query<any>("SELECT is_nullable FROM information_schema.columns WHERE table_name = 'students' AND column_name = 'admin_provisioned'")).rows[0].is_nullable, "NO");
@@ -57,6 +59,9 @@ test("legacy migration preserves users, requirements and logs and backfills cata
     await applyMigrations(migrationConnection(database), true);
     assert.equal((await database.query("SELECT * FROM users")).rows.length, 3);
     assert.equal((await database.query<any>("SELECT * FROM users WHERE id=1")).rows[0].email, "hod@example.test");
+    const mappedDepartment = (await database.query<any>("SELECT departments.id, colleges.code FROM departments JOIN colleges ON colleges.id = departments.college_id")).rows[0];
+    assert.equal(mappedDepartment.id, 1);
+    assert.equal(mappedDepartment.code, "kannur-medical-college");
     assert.equal((await database.query<any>("SELECT admin_provisioned FROM students WHERE user_id=3")).rows[0].admin_provisioned, false);
     assert.equal((await database.query<any>("SELECT status FROM users WHERE id=3")).rows[0].status, "approved");
     assert.equal((await database.query<any>("SELECT * FROM department_configs")).rows[0].required_cases, 99);

@@ -1,7 +1,7 @@
 import { before, after, test } from "node:test";
 import assert from "node:assert/strict";
 import { setup, request, accounts as a, departmentIds, mail, password, simulateFailure, sentEmails } from "./support.js";
-import { engine, db, usersTable, studentsTable, assignmentsTable, assignmentRecipientsTable, auditTable, subscriptionPlansTable, paymentsTable } from "./database.js";
+import { engine, db, usersTable, studentsTable, assignmentsTable, assignmentRecipientsTable, auditTable, subscriptionPlansTable, paymentsTable, getTestCollegeId } from "./database.js";
 import { eq, and } from "drizzle-orm";
 import jwt from "jsonwebtoken";
 import { provisionDepartment } from "../src/lib/department-provisioning.js";
@@ -17,7 +17,7 @@ test("public directory exposes only registration metadata, never staff or studen
   const directory = await call("/departments");
   assert.equal(directory.status, 200);
   assert.deepEqual(directory.body.map((d: any) => d.name).sort(), ["Cardiology", "Dermatology", "Pediatrics"]);
-  assert.ok(directory.body.every((d: any) => Object.keys(d).sort().join(",") === "code,id,name"));
+  assert.ok(directory.body.every((d: any) => Object.keys(d).sort().join(",") === "code,collegeId,collegeName,id,name"));
   for (const path of ["/admin/roster", "/admin/students/pending", "/assignments", "/assignments/types",
     "/departments/1/catalog", "/departments/1/professors", "/departments/1/analytics", "/students/1/postings", "/student/1/thesis"]) {
     assert.equal((await call(path)).status, 401, path);
@@ -405,7 +405,7 @@ test("write requests reject untrusted origins and non-JSON input", async () => {
 });
 
 test("backend provisioning creates generic department/HOD records and refuses duplicate HODs", async () => {
-  const input = { name: "Additional test department", code: "ADDITIONAL-TEST", hod: { fullName: "Provisioned HOD", email: "provisioned@example.test" } };
+  const input = { collegeId: await getTestCollegeId(), name: "Additional test department", code: "ADDITIONAL-TEST", hod: { fullName: "Provisioned HOD", email: "provisioned@example.test" } };
   const result = await provisionDepartment(input, password);
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, result.hodId));
   assert.equal(user.role, "hod");

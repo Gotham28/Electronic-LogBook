@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { randomInt } from "node:crypto";
 import { z } from "zod";
-import { db, usersTable, studentsTable, departmentsTable, registrationOtpsTable, passwordResetsTable, paymentsTable } from "@workspace/db";
+import { db, usersTable, studentsTable, departmentsTable, collegesTable, registrationOtpsTable, passwordResetsTable, paymentsTable } from "@workspace/db";
 import { eq, and, desc, gt, lt, sql } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -152,11 +152,15 @@ router.post("/register", validate(registrationBody), async (req, res) => {
   const body = req.body as z.infer<typeof registrationBody>;
   const [department] = await db.select({ 
     id: departmentsTable.id, 
-    name: departmentsTable.name
+    name: departmentsTable.name,
+    collegeId: departmentsTable.collegeId,
   }).from(departmentsTable)
     .innerJoin(usersTable, and(eq(usersTable.departmentId, departmentsTable.id), eq(usersTable.role, "hod"), eq(usersTable.status, "approved")))
     .where(and(eq(departmentsTable.id, body.departmentId), eq(departmentsTable.isTest, false))).limit(1);
-  if (!department) { res.status(400).json({ message: "Choose an available department" }); return; }
+  if (!department?.collegeId) { res.status(400).json({ message: "Choose an available department" }); return; }
+  const [college] = await db.select({ acceptingRegistrations: collegesTable.acceptingRegistrations }).from(collegesTable)
+    .where(and(eq(collegesTable.id, department.collegeId), eq(collegesTable.acceptingRegistrations, true))).limit(1);
+  if (!college) { res.status(400).json({ message: "Choose an available department" }); return; }
   const [code] = await db.select().from(registrationOtpsTable).where(and(eq(registrationOtpsTable.email, body.email),
     eq(registrationOtpsTable.verified, true), gt(registrationOtpsTable.expiresAt, new Date()))).orderBy(desc(registrationOtpsTable.createdAt)).limit(1);
   if (!code || !proofMatches(body.verificationToken, "registration", body.email, code.id)) {
@@ -180,8 +184,10 @@ router.post("/register", validate(registrationBody), async (req, res) => {
 
 export async function sessionProfile(id: number) {
   const [row] = await db.select({ id: usersTable.id, name: usersTable.fullName, role: usersTable.role,
-    departmentId: usersTable.departmentId, departmentName: departmentsTable.name, studentProfileId: studentsTable.id })
+    departmentId: usersTable.departmentId, departmentName: departmentsTable.name, collegeId: collegesTable.id,
+    collegeName: collegesTable.name, studentProfileId: studentsTable.id })
     .from(usersTable).leftJoin(departmentsTable, eq(usersTable.departmentId, departmentsTable.id))
+    .leftJoin(collegesTable, eq(collegesTable.id, departmentsTable.collegeId))
     .leftJoin(studentsTable, eq(studentsTable.userId, usersTable.id)).where(eq(usersTable.id, id)).limit(1);
   return row;
 }

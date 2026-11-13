@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, usersTable, departmentsTable, studentsTable, departmentConfigsTable, departmentCatalogTable, procedureTypesTable, assignmentTypesTable, assignmentsTable, assignmentRecipientsTable, caseLogsTable, procedureLogsTable, academicLogsTable, leaveRecordsTable, postingsTable, researchTable, assessmentsTable, attendanceLogsTable, leaveApplicationsTable, thesisMilestonesTable, appraisalsTable, auditTable, clinicalWorkLogsTable, departmentPostingScheduleTable, conferencesTable, awardsTable, certificationsTable } from "@workspace/db";
+import { db, usersTable, collegesTable, departmentsTable, studentsTable, departmentConfigsTable, departmentCatalogTable, procedureTypesTable, assignmentTypesTable, assignmentsTable, assignmentRecipientsTable, caseLogsTable, procedureLogsTable, academicLogsTable, leaveRecordsTable, postingsTable, researchTable, assessmentsTable, attendanceLogsTable, leaveApplicationsTable, thesisMilestonesTable, appraisalsTable, auditTable, clinicalWorkLogsTable, departmentPostingScheduleTable, conferencesTable, awardsTable, certificationsTable } from "@workspace/db";
 import { eq, and, sql, inArray, or, gt, isNull } from "drizzle-orm";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
@@ -20,17 +20,155 @@ import { changeUserName } from "../lib/profile-name-changes.js";
 
 const router = Router();
 
+declare global {
+  namespace Express {
+    interface Request { adminCollegeId?: number; }
+  }
+}
+
 // Only admin accounts can access these routes. No requireDepartment — admin
 // accounts are not bound to a single department by design (§3 note in
 // CURRENT_TASK.md: this role intentionally crosses department boundaries).
 router.use(requireAuth, requireRole(["admin"]));
+
+router.use((req, res, next) => {
+  if (req.path === "/colleges" || req.path.startsWith("/colleges/") || req.path === "/configuration-sources" || req.path.startsWith("/announcements")) { next(); return; }
+  const rawCollegeIds = [req.query.collegeId, req.body?.collegeId, req.body?.setup?.collegeId].filter((value) => value !== undefined && value !== null);
+  const collegeIds = rawCollegeIds.map(Number);
+  if (!collegeIds.length || collegeIds.some((collegeId) => !Number.isSafeInteger(collegeId) || collegeId <= 0)) {
+    res.status(400).json({ message: "Select a college" }); return;
+  }
+  if (new Set(collegeIds).size > 1) { res.status(403).json({ message: "Selected college does not match the requested operation" }); return; }
+  const collegeId = collegeIds[0];
+  req.adminCollegeId = collegeId;
+  next();
+});
+
 router.param("id", (req, res, next, value) => {
   if (!Number.isSafeInteger(Number(value)) || Number(value) <= 0) { res.status(400).json({ message: "Invalid record ID" }); return; }
-  next();
+  if (req.path.startsWith("/announcements/")) { next(); return; }
+  const id = Number(value);
+  const load = req.path.startsWith("/departments/")
+    ? db.select({ collegeId: departmentsTable.collegeId }).from(departmentsTable).where(eq(departmentsTable.id, id)).limit(1)
+    : db.select({ collegeId: departmentsTable.collegeId, role: usersTable.role }).from(usersTable)
+      .leftJoin(departmentsTable, eq(usersTable.departmentId, departmentsTable.id)).where(eq(usersTable.id, id)).limit(1);
+  load.then(([target]) => {
+    if (!target) { res.status(404).json({ message: "Record not found" }); return; }
+    // Platform admins have no college affiliation. Let each user action apply its
+    // own role rules (for example, refusing to deactivate another admin).
+    if ("role" in target && target.role === "admin") { next(); return; }
+    if (target.collegeId === null) { res.status(403).json({ message: "User is outside the selected college" }); return; }
+    if (target.collegeId !== req.adminCollegeId) { res.status(403).json({ message: "Record is outside the selected college" }); return; }
+    next();
+  }).catch(() => { req.log.error({ userId: req.user!.id, status: 500 }, "Error checking selected college scope"); res.status(500).json({ message: "Internal server error" }); });
 });
 router.param("userId", (req, res, next, value) => {
   if (!Number.isSafeInteger(Number(value)) || Number(value) <= 0) { res.status(400).json({ message: "Invalid record ID" }); return; }
+  db.select({ collegeId: departmentsTable.collegeId }).from(usersTable)
+    .innerJoin(departmentsTable, eq(usersTable.departmentId, departmentsTable.id)).where(eq(usersTable.id, Number(value))).limit(1)
+    .then(([target]) => {
+      if (!target) { res.status(404).json({ message: "User not found" }); return; }
+      if (target.collegeId !== req.adminCollegeId) { res.status(403).json({ message: "User is outside the selected college" }); return; }
+      next();
+    }).catch(() => { req.log.error({ userId: req.user!.id, status: 500 }, "Error checking selected college scope"); res.status(500).json({ message: "Internal server error" }); });
+});
+router.param("collegeId", (req, res, next, value) => {
+  if (!Number.isSafeInteger(Number(value)) || Number(value) <= 0) { res.status(400).json({ message: "Invalid college ID" }); return; }
   next();
+});
+
+router.get("/colleges", async (req, res) => {
+  try {
+    res.json(await db.select({ id: collegesTable.id, name: collegesTable.name,
+      acceptingRegistrations: collegesTable.acceptingRegistrations }).from(collegesTable).orderBy(collegesTable.name));
+  } catch {
+    req.log.error({ userId: req.user!.id, status: 500 }, "Error listing colleges");
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// Platform-wide source list for settings-only copies. It deliberately excludes HODs,
+// staff, residents, records and the configuration contents themselves.
+router.get("/configuration-sources", async (req, res) => {
+  try {
+    return res.json(await db.select({ id: departmentsTable.id, name: departmentsTable.name, code: departmentsTable.code,
+      collegeId: collegesTable.id, collegeName: collegesTable.name }).from(departmentsTable)
+      .innerJoin(collegesTable, eq(collegesTable.id, departmentsTable.collegeId))
+      .where(eq(departmentsTable.isTest, false)).orderBy(collegesTable.name, departmentsTable.name));
+  } catch {
+    req.log.error({ userId: req.user!.id, status: 500 }, "Error listing settings sources");
+    return res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+const createCollegeBody = z.object({ name: nameSchema, acceptingRegistrations: z.boolean().optional() }).strict();
+
+async function generateCollegeCode(name: string): Promise<string> {
+  const base = name.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "college";
+  const existingCodes = new Set((await db.select({ code: collegesTable.code }).from(collegesTable)).map(({ code }) => code));
+  if (!existingCodes.has(base)) return base;
+  for (let suffix = 2; ; suffix++) {
+    const candidate = `${base}-${suffix}`;
+    if (!existingCodes.has(candidate)) return candidate;
+  }
+}
+
+router.post("/colleges", validate(createCollegeBody), async (req, res) => {
+  try {
+    const code = await generateCollegeCode(req.body.name);
+    const [college] = await db.insert(collegesTable).values({ ...req.body, code,
+      acceptingRegistrations: req.body.acceptingRegistrations ?? false }).returning({ id: collegesTable.id,
+      name: collegesTable.name, acceptingRegistrations: collegesTable.acceptingRegistrations });
+    return res.status(201).json(college);
+  } catch (error: any) {
+    const code = error?.code ?? error?.cause?.code;
+    if (code === "23505") return res.status(409).json({ message: "A similar college was added at the same time. Please retry." });
+    req.log.error({ userId: req.user!.id, status: 500 }, "Error creating college");
+    return res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+router.delete("/colleges/:collegeId", async (req, res) => {
+  const collegeId = Number(req.params.collegeId);
+  try {
+    const [college] = await db.select({ id: collegesTable.id }).from(collegesTable)
+      .where(eq(collegesTable.id, collegeId)).limit(1);
+    if (!college) return res.status(404).json({ message: "College not found" });
+
+    const [department] = await db.select({ id: departmentsTable.id }).from(departmentsTable)
+      .where(eq(departmentsTable.collegeId, collegeId)).limit(1);
+    if (department) return res.status(409).json({ message: "Delete all departments before deleting this college" });
+
+    const [deleted] = await db.delete(collegesTable).where(eq(collegesTable.id, collegeId)).returning({ id: collegesTable.id });
+    if (!deleted) return res.status(404).json({ message: "College not found" });
+    return res.json({ message: "College deleted" });
+  } catch (error: any) {
+    const code = error?.code ?? error?.cause?.code;
+    if (code === "23503") return res.status(409).json({ message: "Delete all departments before deleting this college" });
+    req.log.error({ userId: req.user!.id, status: 500 }, "Error deleting college");
+    return res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+const updateCollegeBody = z.object({ name: nameSchema, acceptingRegistrations: z.boolean() }).strict();
+
+router.patch("/colleges/:collegeId", validate(updateCollegeBody), async (req, res) => {
+  try {
+    const [college] = await db.update(collegesTable).set({
+      name: req.body.name,
+      acceptingRegistrations: req.body.acceptingRegistrations,
+      updatedAt: new Date(),
+    }).where(eq(collegesTable.id, Number(req.params.collegeId))).returning({
+      id: collegesTable.id, name: collegesTable.name,
+      acceptingRegistrations: collegesTable.acceptingRegistrations,
+    });
+    if (!college) return res.status(404).json({ message: "College not found" });
+    return res.json(college);
+  } catch {
+    req.log.error({ userId: req.user!.id, status: 500 }, "Error updating college");
+    return res.status(500).json({ message: "Internal server error" });
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -38,37 +176,40 @@ router.param("userId", (req, res, next, value) => {
 // ---------------------------------------------------------------------------
 router.get("/departments", async (req, res) => {
   try {
+    const collegeId = Number(req.query.collegeId);
+    if (!Number.isSafeInteger(collegeId) || collegeId <= 0) return res.status(400).json({ message: "Select a college" });
     const departments = await db.select({
       id: departmentsTable.id,
       name: departmentsTable.name,
       code: departmentsTable.code,
       description: departmentsTable.description,
-    }).from(departmentsTable).where(eq(departmentsTable.isTest, false)).orderBy(departmentsTable.name);
-
-    // Fetch the current approved HOD for each department. This is a separate
-    // query to keep the department list clean — a department without an HOD
-    // still appears in the list (it just has hod: null).
-    const hods = await db.select({
-      id: usersTable.id,
-      fullName: usersTable.fullName,
-      email: usersTable.email,
-      departmentId: usersTable.departmentId,
-    }).from(usersTable).where(and(eq(usersTable.role, "hod"), eq(usersTable.status, "approved")));
-
-    const hodByDept = new Map(hods.map((h) => [h.departmentId, { id: h.id, fullName: h.fullName, email: h.email }]));
+      collegeId: departmentsTable.collegeId,
+    }).from(departmentsTable).where(and(eq(departmentsTable.isTest, false), eq(departmentsTable.collegeId, collegeId))).orderBy(departmentsTable.name);
 
     const mirrors = await db.select({
       id: departmentsTable.id,
       name: departmentsTable.name,
       code: departmentsTable.code,
       configSourceDepartmentId: departmentsTable.configSourceDepartmentId,
-    }).from(departmentsTable).where(eq(departmentsTable.isTest, true));
+    }).from(departmentsTable).where(and(eq(departmentsTable.isTest, true),
+      inArray(departmentsTable.configSourceDepartmentId, departments.map((department) => department.id))));
+
+    // Fetch HODs only for the selected college's real departments and mirrors.
+    const hods = await db.select({
+      id: usersTable.id,
+      fullName: usersTable.fullName,
+      email: usersTable.email,
+      departmentId: usersTable.departmentId,
+    }).from(usersTable).where(and(eq(usersTable.role, "hod"), eq(usersTable.status, "approved"),
+      inArray(usersTable.departmentId, [...departments.map((department) => department.id), ...mirrors.map((mirror) => mirror.id)])));
+
+    const hodByDept = new Map(hods.map((h) => [h.departmentId, { id: h.id, fullName: h.fullName, email: h.email }]));
 
     const mirrorByRealDeptId = new Map(mirrors.filter(m => m.configSourceDepartmentId !== null).map((m) => [m.configSourceDepartmentId!, {
       id: m.id, name: m.name, code: m.code, hod: hodByDept.get(m.id) || null,
     }]));
 
-    res.json(departments.map((d) => ({
+    return res.json(departments.map((d) => ({
       ...d,
       name: /microbiology/i.test(d.name) ? d.name.replace(/microbiology/i, "Microbiology") : d.name,
       hod: hodByDept.get(d.id) || null,
@@ -89,6 +230,8 @@ router.get("/departments", async (req, res) => {
 // ---------------------------------------------------------------------------
 const createDepartmentBody = z.object({
   setup: z.object({
+    collegeId: z.number().int().positive(),
+    copyFromDepartmentId: z.number().int().positive().optional(),
     name: nameSchema,
     code: z.string().trim().min(1).max(32).regex(/^[a-zA-Z0-9_-]+$/),
     description: z.string().max(1000).optional(),
@@ -99,6 +242,10 @@ const createDepartmentBody = z.object({
 router.post("/departments", validate(createDepartmentBody), async (req, res) => {
   try {
     const { setup } = req.body;
+    if (setup.collegeId !== req.adminCollegeId) return res.status(403).json({ message: "Department college does not match the selected college" });
+    const [college] = await db.select({ id: collegesTable.id }).from(collegesTable)
+      .where(eq(collegesTable.id, setup.collegeId)).limit(1);
+    if (!college) return res.status(404).json({ message: "College not found" });
     const initialPassword = randomBytes(24).toString("base64url");
     const result = await provisionDepartment(setup, initialPassword);
     req.log.info({ departmentId: result.departmentId, hodId: result.hodId, status: 201 }, "Department provisioned");
@@ -121,11 +268,13 @@ router.post("/departments", validate(createDepartmentBody), async (req, res) => 
 // ---------------------------------------------------------------------------
 router.post("/departments/backfill-test-departments", async (req, res) => {
   try {
+    const collegeId = Number(req.body?.collegeId);
+    if (!Number.isSafeInteger(collegeId) || collegeId <= 0) return res.status(400).json({ message: "Select a college" });
     const realDepartments = await db.select({
       id: departmentsTable.id,
       name: departmentsTable.name,
       description: departmentsTable.description,
-    }).from(departmentsTable).where(eq(departmentsTable.isTest, false));
+    }).from(departmentsTable).where(and(eq(departmentsTable.isTest, false), eq(departmentsTable.collegeId, collegeId)));
 
     const provisioned: number[] = [];
     const skipped: number[] = [];
@@ -151,7 +300,7 @@ router.post("/departments/backfill-test-departments", async (req, res) => {
       failedCount: failed.length
     }, "Backfilled mirror test departments");
 
-    res.json({ provisioned, skipped, failed });
+    return res.json({ provisioned, skipped, failed });
   } catch (error) {
     req.log.error({ userId: req.user!.id, status: 500 }, "Error backfilling mirror test departments");
     return res.status(500).json({ message: "Internal server error" });
@@ -178,13 +327,15 @@ router.post("/departments/:id/reset-test-credentials", async (req, res) => {
       return;
     }
 
-    const [source] = await db.select({ name: departmentsTable.name })
+    const [source] = await db.select({ id: departmentsTable.id, name: departmentsTable.name, collegeId: departmentsTable.collegeId })
       .from(departmentsTable).where(eq(departmentsTable.id, realDepartmentId)).limit(1);
+    const [college] = source?.collegeId
+      ? await db.select({ code: collegesTable.code }).from(collegesTable).where(eq(collegesTable.id, source.collegeId)).limit(1)
+      : [undefined];
 
     const newPasswordHash = await bcrypt.hash(mirror.code, 12);
-    const safeName = source
-      ? source.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")
-      : mirror.code.toLowerCase();
+    const safeName = [college?.code, source?.id].filter(Boolean).join("-")
+      .toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || mirror.code.toLowerCase();
 
     // Update password and email for each role to the clean, readable format
     await db.update(usersTable)
@@ -200,7 +351,7 @@ router.post("/departments/:id/reset-test-credentials", async (req, res) => {
       .where(and(eq(usersTable.departmentId, mirror.id), eq(usersTable.role, "student")));
 
     req.log.info({ adminId: req.user!.id, mirrorDepartmentId: mirror.id }, "Test credentials reset");
-    res.json({ mirrorCode: mirror.code });
+    return res.json({ mirrorCode: mirror.code });
   } catch (error) {
     req.log.error({ userId: req.user!.id, status: 500 }, "Error resetting test credentials");
     return res.status(500).json({ message: "Internal server error" });
@@ -483,7 +634,7 @@ router.delete("/departments/:id", async (req, res) => {
     });
 
     req.log.info({ departmentId, status: 200 }, "Department deleted");
-    res.json({ message: "Department and all associated data deleted" });
+    return res.json({ message: "Department and all associated data deleted" });
   } catch (error: any) {
     if (error.statusOverride === 404) {
       req.log.info({ departmentId, status: 404 }, "Department delete: not found");
@@ -534,7 +685,7 @@ router.get("/departments/:id/roster", async (req, res) => {
       .where(eq(usersTable.departmentId, departmentId))
       .orderBy(usersTable.fullName);
 
-    res.json(users);
+    return res.json(users);
   } catch (error) {
     req.log.error({ departmentId, userId: req.user!.id, status: 500 }, "Error fetching roster");
     return res.status(500).json({ message: "Internal server error" });
@@ -693,7 +844,7 @@ router.post("/departments/:id/students", validate(createStudentBody), async (req
 
     const fallback = approvalMode === "hod" && created.status === "approved" ? "no_active_hod" : null;
     req.log.info({ createdId: created.id, departmentId, status: 201 }, "Student created by admin");
-    res.status(201).json({
+    return res.status(201).json({
       message: created.status === "pending" ? "Resident account created and is awaiting HOD approval"
         : fallback ? "Resident account created and automatically approved because no active HOD is assigned"
           : "Resident account created and approved",
@@ -750,7 +901,7 @@ router.post("/users/:id/deactivate", validate(z.object({}).strict()), async (req
     }
 
     req.log.info({ targetId, status: 200 }, "Account deactivated by admin");
-    res.json({ message: "Account deactivated; records retained" });
+    return res.json({ message: "Account deactivated; records retained" });
   } catch (error) {
     req.log.error({ targetId, userId: req.user!.id, status: 500 }, "Error deactivating account");
     return res.status(500).json({ message: "Internal server error" });
@@ -783,7 +934,7 @@ router.post("/users/:id/reactivate", validate(z.object({}).strict()), async (req
       .where(and(eq(usersTable.id, targetId), eq(usersTable.status, "rejected"), inArray(usersTable.role, ["student", "professor"])));
 
     req.log.info({ targetId, status: 200 }, "Account reactivated by admin");
-    res.json({ message: "Account reactivated. The user must sign in again." });
+    return res.json({ message: "Account reactivated. The user must sign in again." });
   } catch (error) {
     req.log.error({ targetId, userId: req.user!.id, status: 500 }, "Error reactivating account");
     return res.status(500).json({ message: "Internal server error" });
@@ -823,7 +974,7 @@ router.delete("/users/:id/hard", async (req, res) => {
     await deleteStoredFilesBestEffort(certificateFileKeys, req.log);
 
     req.log.info({ targetId, departmentId: target.departmentId, status: 200 }, "Account hard-deleted by admin");
-    res.json({ message: "Account and associated records permanently deleted", deletedRecords: deletedCounts });
+    return res.json({ message: "Account and associated records permanently deleted", deletedRecords: deletedCounts });
   } catch (error: any) {
     const pgErrorCode = error.code ?? error.cause?.code;
     if (pgErrorCode === "23503") {
@@ -896,7 +1047,7 @@ router.post("/users/:id/impersonate", validate(z.object({}).strict()), async (re
 
     req.log.info({ adminId, targetId: target.id, role: target.role, departmentId: target.departmentId, status: target.status }, "Admin impersonated user");
 
-    res.json({ ...await sessionProfile(target.id), token });
+    return res.json({ ...await sessionProfile(target.id), token });
   } catch (error) {
     req.log.error({ targetId, adminId, status: 500 }, "Error impersonating user");
     return res.status(500).json({ message: "Internal server error" });

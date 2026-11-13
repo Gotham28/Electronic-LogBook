@@ -7,7 +7,7 @@
 import { before, after, test } from "node:test";
 import assert from "node:assert/strict";
 import { setup, request, accounts as a, password } from "./support.js";
-import { engine, db, departmentsTable, usersTable } from "./database.js";
+import { engine, db, departmentsTable, usersTable, getTestCollegeId } from "./database.js";
 import { sql } from "drizzle-orm";
 import pino from "pino";
 import jwt from "jsonwebtoken";
@@ -58,8 +58,9 @@ test("a missing table (the missing-migration case) logs step load-catalog and co
 
 test("a test department whose source is itself a test department logs step resolve-config-source", async (t) => {
   lines.length = 0;
-  const [source] = await db.insert(departmentsTable).values({ name: "Log test source", code: "LOG-SRC", isTest: true }).returning();
-  const [mirror] = await db.insert(departmentsTable).values({ name: "Log test mirror", code: "LOG-MIR", isTest: true, configSourceDepartmentId: source.id }).returning();
+  const collegeId = await getTestCollegeId();
+  const [source] = await db.insert(departmentsTable).values({ name: "Log test source", code: "LOG-SRC", isTest: true, collegeId }).returning();
+  const [mirror] = await db.insert(departmentsTable).values({ name: "Log test mirror", code: "LOG-MIR", isTest: true, configSourceDepartmentId: source.id, collegeId }).returning();
   const [user] = await db.insert(usersTable).values({ fullName: "Log test professor", email: "log-test-prof@example.test", role: "professor",
     status: "approved", departmentId: mirror.id, passwordHash: await bcrypt.hash(password, 10) }).returning();
   const account = { id: user.id, token: jwt.sign({ id: user.id, sessionVersion: 0 }, process.env.JWT_SECRET!, { expiresIn: "1h" }) } as any;

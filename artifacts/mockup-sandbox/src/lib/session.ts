@@ -8,6 +8,8 @@ export interface UserSession {
   role: string;
   departmentId: number | null;
   departmentName: string | null;
+  collegeId?: number | null;
+  collegeName?: string | null;
   studentProfileId: number | null;
   isDemoMode?: boolean;
 }
@@ -34,6 +36,8 @@ export function saveCurrentUser(session: Omit<UserSession, 'isDemoMode'> & Parti
     role: session.role,
     departmentId: session.departmentId,
     departmentName: session.departmentName,
+    collegeId: session.collegeId !== undefined ? session.collegeId : previous?.collegeId ?? null,
+    collegeName: session.collegeName !== undefined ? session.collegeName : previous?.collegeName ?? null,
     studentProfileId: session.studentProfileId,
     ...(session.isDemoMode ?? previous?.isDemoMode ? { isDemoMode: true } : {}),
   };

@@ -7,14 +7,14 @@ import assert from "node:assert/strict";
 import jwt from "jsonwebtoken";
 import { eq } from "drizzle-orm";
 import { setup, request, accounts as a, type Account } from "./support.js";
-import { engine, db, departmentsTable, departmentConfigsTable, usersTable, studentsTable, postingsTable } from "./database.js";
+import { engine, db, departmentsTable, departmentConfigsTable, usersTable, studentsTable, postingsTable, getTestCollegeId } from "./database.js";
 
 let runtime: Awaited<ReturnType<typeof setup>>;
 const derm: Record<"owner" | "other" | "faculty", Account> = {} as any;
 
 before(async () => {
   runtime = await setup();
-  const [department] = await db.insert(departmentsTable).values({ name: "Free-text postings fixture", code: "DERM-FIXTURE" }).returning();
+  const [department] = await db.insert(departmentsTable).values({ name: "Free-text postings fixture", code: "DERM-FIXTURE", collegeId: await getTestCollegeId() }).returning();
   await db.insert(departmentConfigsTable).values({ departmentId: department.id, enabledFeatures: { freeTextPostingUnit: true, freeTextProcedures: true } });
   for (const kind of ["owner", "other", "faculty"] as const) {
     const role = kind === "faculty" ? "professor" : "student";
@@ -86,7 +86,7 @@ test("without the setting a verified posting stays locked even with no superviso
 
 test("department id 15 without the setting follows the normal rules", async () => {
   // Dermatology's live id. Before this change the id alone switched the free-text rules on.
-  await db.insert(departmentsTable).values({ id: 15, name: "Id 15 fixture", code: "ID-15-FIXTURE" });
+  await db.insert(departmentsTable).values({ id: 15, name: "Id 15 fixture", code: "ID-15-FIXTURE", collegeId: await getTestCollegeId() });
   await db.insert(departmentConfigsTable).values({ departmentId: 15 });
   const [user] = await db.insert(usersTable).values({ fullName: "Id 15 resident", email: "id15@example.test", role: "student",
     status: "approved", departmentId: 15, passwordHash: "unused: this test signs tokens directly" }).returning();

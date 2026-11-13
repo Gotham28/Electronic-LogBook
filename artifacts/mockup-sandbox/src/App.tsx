@@ -280,6 +280,7 @@ function App() {
         const stored = getCurrentUser();
         if (!stored || stored.name !== fresh.name || stored.role !== fresh.role
           || stored.departmentId !== fresh.departmentId || stored.departmentName !== fresh.departmentName
+          || stored.collegeId !== fresh.collegeId || stored.collegeName !== fresh.collegeName
           || stored.studentProfileId !== fresh.studentProfileId) {
           saveCurrentUser(fresh);
         }

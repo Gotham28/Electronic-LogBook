@@ -264,6 +264,7 @@ export type AdminDepartment = {
   id: number;
   name: string;
   code: string;
+  collegeId: number;
   hod: { id: number; fullName: string; email: string } | null;
   facultyCount?: number;
   residentCount?: number;
@@ -282,28 +283,57 @@ export type AdminUserRow = {
   status: string;
 };
 
-export function getAdminDepartments(): Promise<AdminDepartment[]> {
-  return apiGet("/api/superadmin/departments");
+export type AdminCollege = { id: number; name: string; acceptingRegistrations: boolean };
+export type AdminConfigurationSource = { id: number; name: string; code: string; collegeId: number; collegeName: string };
+
+function adminCollegePath(path: string): string {
+  const collegeId = Number(sessionStorage.getItem("admin.selectedCollegeId"));
+  if (!Number.isSafeInteger(collegeId) || collegeId <= 0) throw new Error("Select a college before managing its departments");
+  return `${path}${path.includes("?") ? "&" : "?"}collegeId=${collegeId}`;
 }
 
-export function createAdminDepartment(data: { setup: { name: string; code: string; description?: string; hod: { fullName: string; email: string } } }) {
+export function getAdminColleges(): Promise<AdminCollege[]> {
+  return apiGet("/api/superadmin/colleges");
+}
+
+export function getAdminConfigurationSources(): Promise<AdminConfigurationSource[]> {
+  return apiGet("/api/superadmin/configuration-sources");
+}
+
+export function createAdminCollege(data: { name: string; acceptingRegistrations: boolean }) {
+  return apiPost<AdminCollege>("/api/superadmin/colleges", data);
+}
+
+export function deleteAdminCollege(id: number): Promise<{ message: string }> {
+  return apiDelete(`/api/superadmin/colleges/${id}`);
+}
+
+export function updateAdminCollege(id: number, data: { name: string; acceptingRegistrations: boolean }) {
+  return apiPatch<AdminCollege>(`/api/superadmin/colleges/${id}`, data);
+}
+
+export function getAdminDepartments(collegeId: number): Promise<AdminDepartment[]> {
+  return apiGet(`/api/superadmin/departments?collegeId=${collegeId}`);
+}
+
+export function createAdminDepartment(data: { setup: { collegeId: number; copyFromDepartmentId?: number; name: string; code: string; description?: string; hod: { fullName: string; email: string } } }) {
   return apiPost("/api/superadmin/departments", data);
 }
 
 export function getAdminDepartmentRoster(id: number): Promise<AdminUserRow[]> {
-  return apiGet(`/api/superadmin/departments/${id}/roster`);
+  return apiGet(adminCollegePath(`/api/superadmin/departments/${id}/roster`));
 }
 
 export function updateAdminDepartmentUserName(departmentId: number, userId: number, fullName: string): Promise<AdminUserRow> {
-  return apiPatch(`/api/superadmin/departments/${departmentId}/users/${userId}/name`, { fullName });
+  return apiPatch(adminCollegePath(`/api/superadmin/departments/${departmentId}/users/${userId}/name`), { fullName });
 }
 
 export function replaceAdminHod(departmentId: number, incomingUserId: number) {
-  return apiPost(`/api/superadmin/departments/${departmentId}/replace-hod`, { incomingUserId });
+  return apiPost(adminCollegePath(`/api/superadmin/departments/${departmentId}/replace-hod`), { incomingUserId });
 }
 
 export function createAdminFaculty(departmentId: number, data: { fullName: string; email: string }) {
-  return apiPost(`/api/superadmin/departments/${departmentId}/faculty`, data);
+  return apiPost(adminCollegePath(`/api/superadmin/departments/${departmentId}/faculty`), data);
 }
 
 export function createAdminStudent(departmentId: number, data: { fullName: string; email: string; password: string; registrationNumber: string; batch: string; dateOfJoining: string; kuhsId: string; approvalMode: "hod" | "automatic" }): Promise<{
@@ -313,33 +343,33 @@ export function createAdminStudent(departmentId: number, data: { fullName: strin
   approvalFallback: "no_active_hod" | null;
   hodEmailAccepted: boolean | null;
 }> {
-  return apiPost(`/api/superadmin/departments/${departmentId}/students`, data);
+  return apiPost(adminCollegePath(`/api/superadmin/departments/${departmentId}/students`), data);
 }
 
 export function deactivateAdminUser(userId: number) {
-  return apiPost(`/api/superadmin/users/${userId}/deactivate`);
+  return apiPost(adminCollegePath(`/api/superadmin/users/${userId}/deactivate`));
 }
 
 export function reactivateAdminUser(userId: number) {
-  return apiPost(`/api/superadmin/users/${userId}/reactivate`, {});
+  return apiPost(adminCollegePath(`/api/superadmin/users/${userId}/reactivate`), {});
 }
 
 export function hardDeleteAdminUser(userId: number): Promise<{ message: string; deletedRecords?: Record<string, number> }> {
-  return apiDelete(`/api/superadmin/users/${userId}/hard`);
+  return apiDelete(adminCollegePath(`/api/superadmin/users/${userId}/hard`));
 }
 
 export function impersonateAdminUser(userId: number) {
-  return apiPost(`/api/superadmin/users/${userId}/impersonate`);
+  return apiPost(adminCollegePath(`/api/superadmin/users/${userId}/impersonate`));
 }
 
-export function backfillTestDepartments(): Promise<{ provisioned: number[]; skipped: number[]; failed: { departmentId: number; message: string }[] }> {
-  return apiPost("/api/superadmin/departments/backfill-test-departments");
+export function backfillTestDepartments(collegeId: number): Promise<{ provisioned: number[]; skipped: number[]; failed: { departmentId: number; message: string }[] }> {
+  return apiPost("/api/superadmin/departments/backfill-test-departments", { collegeId });
 }
 
 export function resetTestCredentials(departmentId: number): Promise<{ mirrorCode: string }> {
-  return apiPost(`/api/superadmin/departments/${departmentId}/reset-test-credentials`);
+  return apiPost(adminCollegePath(`/api/superadmin/departments/${departmentId}/reset-test-credentials`));
 }
 
 export function deleteAdminDepartment(id: number) {
-  return apiDelete(`/api/superadmin/departments/${id}`);
+  return apiDelete(adminCollegePath(`/api/superadmin/departments/${id}`));
 }

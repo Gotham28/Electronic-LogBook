@@ -1,15 +1,17 @@
 import { before, after, test } from "node:test";
 import assert from "node:assert/strict";
 import { setup, request, accounts as a, departmentIds, password, sentEmails, simulateFailure } from "./support.js";
-import { engine, db, usersTable, studentsTable, caseLogsTable, departmentsTable, departmentConfigsTable, departmentCatalogTable, procedureTypesTable, assignmentTypesTable, assignmentsTable, assignmentRecipientsTable } from "./database.js";
+import { engine, db, collegesTable, usersTable, studentsTable, caseLogsTable, departmentsTable, departmentConfigsTable, departmentCatalogTable, procedureTypesTable, assignmentTypesTable, assignmentsTable, assignmentRecipientsTable, departmentPostingScheduleTable, departmentLogbookSectionsTable } from "./database.js";
 import { eq, and, sql } from "drizzle-orm";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 
 let runtime: Awaited<ReturnType<typeof setup>>;
 let adminAccount: { id: number; token: string };
+let testCollegeId: number;
 before(async () => {
   runtime = await setup();
+  testCollegeId = (await db.select({ id: collegesTable.id }).from(collegesTable))[0].id;
   // Create an admin account for testing. This mirrors what provision-admin.ts
   // would do in production but uses the test database directly.
   const hash = await bcrypt.hash(password, 10);
@@ -28,7 +30,16 @@ const call = (path: string, who?: keyof typeof a | "admin", method?: string, bod
   const account = who === "admin"
     ? { ...adminAccount, role: "admin", email: "admin@example.test", departmentId: 0 }
     : who ? a[who] : undefined;
-  return request(runtime.base, path, account as any, method, body);
+  const scopedPath = path.startsWith("/superadmin/") && !path.startsWith("/superadmin/colleges") && !path.startsWith("/superadmin/announcements")
+    ? `${path}${path.includes("?") ? "&" : "?"}collegeId=${testCollegeId}` : path;
+  let scopedBody = body as any;
+  if (scopedPath.includes("/superadmin/departments/backfill-test-departments")) scopedBody = { ...(scopedBody ?? {}), collegeId: testCollegeId };
+  if (path === "/superadmin/departments" && scopedBody?.setup) scopedBody = { ...scopedBody, setup: { ...scopedBody.setup, collegeId: testCollegeId } };
+  return request(runtime.base, scopedPath, account as any, method, scopedBody);
+};
+
+const reportScopeCase = (label: string, method: string, path: string, response: { status: number; body: unknown }) => {
+  console.log(`${label}: ${method} ${path} -> ${response.status} ${JSON.stringify(response.body)}`);
 };
 
 // =========================================================================
@@ -52,6 +63,125 @@ test("HOD, professor, and student accounts get 403 on every superadmin route", a
       assert.equal(res.status, 403, `${role} on ${method} ${path} should be 403, got ${res.status}`);
     }
   }
+});
+
+test("selected college scope returns 401, 403, 200 and 404 for the four roster cases", async () => {
+  const collegeCreated = await call("/superadmin/colleges", "admin", "POST", {
+    name: "Scope Test College", acceptingRegistrations: false,
+  });
+  assert.equal(collegeCreated.status, 201);
+  const collegeB = collegeCreated.body as { id: number; name: string; acceptingRegistrations: boolean };
+  const [collegeBRow] = await db.select({ code: collegesTable.code }).from(collegesTable).where(eq(collegesTable.id, collegeB.id));
+  assert.equal(collegeBRow.code, "scope-test-college", "the internal code is generated from the college name");
+  const collegeUpdated = await call(`/superadmin/colleges/${collegeB.id}`, "admin", "PATCH", {
+    name: "Scope Test College Updated", acceptingRegistrations: true,
+  });
+  assert.equal(collegeUpdated.status, 200);
+  assert.equal(collegeUpdated.body.acceptingRegistrations, true);
+  const [departmentB] = await db.insert(departmentsTable).values({ name: "Scope Test Department", code: "SCOPE-TEST", collegeId: collegeB.id }).returning();
+  const blockedCollegeDelete = await call(`/superadmin/colleges/${collegeB.id}`, "admin", "DELETE");
+  reportScopeCase("Admin attempts to delete a college with departments", "DELETE", `/superadmin/colleges/${collegeB.id}`, blockedCollegeDelete);
+  assert.equal(blockedCollegeDelete.status, 409);
+  assert.match(blockedCollegeDelete.body.message, /delete all departments/i);
+  const path = `/superadmin/departments/${departmentB.id}/roster`;
+
+  const unauthenticated = await request(runtime.base, `${path}?collegeId=${collegeB.id}`, undefined, "GET");
+  reportScopeCase("Unauthenticated roster request", "GET", `${path}?collegeId=${collegeB.id}`, unauthenticated);
+  assert.equal(unauthenticated.status, 401);
+
+  const wrongCollege = await request(runtime.base, `${path}?collegeId=${testCollegeId}`, adminAccount as any, "GET");
+  reportScopeCase("Admin selected a different college", "GET", `${path}?collegeId=${testCollegeId}`, wrongCollege);
+  assert.equal(wrongCollege.status, 403);
+
+  const correctCollege = await request(runtime.base, `${path}?collegeId=${collegeB.id}`, adminAccount as any, "GET");
+  reportScopeCase("Admin selected the department's college", "GET", `${path}?collegeId=${collegeB.id}`, correctCollege);
+  assert.equal(correctCollege.status, 200);
+
+  const nonexistentPath = `/superadmin/departments/999999/roster?collegeId=${collegeB.id}`;
+  const nonexistentDepartment = await request(runtime.base, nonexistentPath, adminAccount as any, "GET");
+  reportScopeCase("Admin requested a nonexistent department", "GET", nonexistentPath, nonexistentDepartment);
+  assert.equal(nonexistentDepartment.status, 404);
+
+  const [userB] = await db.insert(usersTable).values({
+    fullName: "Scoped College User", email: "scoped-college-user@example.test", passwordHash: "test-hash",
+    role: "professor", status: "approved", departmentId: departmentB.id,
+  }).returning({ id: usersTable.id });
+  const userPath = `/superadmin/users/${userB.id}/deactivate`;
+  const userUnauthenticatedPath = `${userPath}?collegeId=${collegeB.id}`;
+  const userUnauthenticated = await request(runtime.base, userUnauthenticatedPath, undefined, "POST", {});
+  reportScopeCase("Unauthenticated user action", "POST", userUnauthenticatedPath, userUnauthenticated);
+  assert.equal(userUnauthenticated.status, 401);
+  const userWrongCollegePath = `${userPath}?collegeId=${testCollegeId}`;
+  const userWrongCollege = await request(runtime.base, userWrongCollegePath, adminAccount as any, "POST", {});
+  reportScopeCase("Admin selected a different college for a user action", "POST", userWrongCollegePath, userWrongCollege);
+  assert.equal(userWrongCollege.status, 403);
+  const userCorrectCollegePath = `${userPath}?collegeId=${collegeB.id}`;
+  const userCorrectCollege = await request(runtime.base, userCorrectCollegePath, adminAccount as any, "POST", {});
+  reportScopeCase("Admin selected the user's college", "POST", userCorrectCollegePath, userCorrectCollege);
+  assert.equal(userCorrectCollege.status, 200);
+  const missingUserPath = `/superadmin/users/999999/deactivate?collegeId=${collegeB.id}`;
+  const missingUser = await request(runtime.base, missingUserPath, adminAccount as any, "POST", {});
+  reportScopeCase("Admin requested a nonexistent user", "POST", missingUserPath, missingUser);
+  assert.equal(missingUser.status, 404);
+
+  const mismatchedCreate = await request(runtime.base, `/superadmin/departments?collegeId=${collegeB.id}`, adminAccount as any, "POST", {
+    setup: { collegeId: testCollegeId, name: "Mismatched Department", code: "MISMATCHED", hod: { fullName: "Test HOD", email: "mismatch@example.test" } },
+  });
+  assert.equal(mismatchedCreate.status, 403);
+
+  await db.insert(departmentPostingScheduleTable).values({ departmentId: departmentIds[0], trainingYear: 1, postingValue: "test-unit", months: 2 });
+  await db.insert(departmentLogbookSectionsTable).values({ departmentId: departmentIds[0], value: "test-section", definition: { fields: [] } });
+  const sourceConfig = (await db.select().from(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, departmentIds[0])))[0];
+  const sourceCatalogCount = (await db.select().from(departmentCatalogTable).where(eq(departmentCatalogTable.departmentId, departmentIds[0]))).length;
+  const sourceProcedureCount = (await db.select().from(procedureTypesTable).where(eq(procedureTypesTable.departmentId, departmentIds[0]))).length;
+  const copied = await request(runtime.base, `/superadmin/departments?collegeId=${collegeB.id}`, adminAccount as any, "POST", {
+    setup: { collegeId: collegeB.id, copyFromDepartmentId: departmentIds[0], name: "Copied Settings Department", code: "COPIED-SETTINGS",
+      hod: { fullName: "Copied Test HOD", email: "copied-settings-hod@example.test" } },
+  });
+  assert.equal(copied.status, 201);
+  const copiedDepartmentId = copied.body.departmentId as number;
+  const copiedConfig = (await db.select().from(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, copiedDepartmentId)))[0];
+  assert.equal(copiedConfig.requiredCases, sourceConfig.requiredCases);
+  assert.equal(copiedConfig.requiredProcedures, sourceConfig.requiredProcedures);
+  assert.deepEqual(copiedConfig.enabledFeatures, sourceConfig.enabledFeatures);
+  assert.equal((await db.select().from(departmentCatalogTable).where(eq(departmentCatalogTable.departmentId, copiedDepartmentId))).length, sourceCatalogCount);
+  assert.equal((await db.select().from(procedureTypesTable).where(eq(procedureTypesTable.departmentId, copiedDepartmentId))).length, sourceProcedureCount);
+  assert.equal((await db.select().from(departmentPostingScheduleTable).where(eq(departmentPostingScheduleTable.departmentId, copiedDepartmentId))).length, 1);
+  assert.equal((await db.select().from(departmentLogbookSectionsTable).where(eq(departmentLogbookSectionsTable.departmentId, copiedDepartmentId))).length, 1);
+  assert.equal((await db.select().from(usersTable).where(eq(usersTable.departmentId, copiedDepartmentId))).length, 1);
+  await db.update(departmentConfigsTable).set({ requiredCases: 999 }).where(eq(departmentConfigsTable.departmentId, departmentIds[0]));
+  assert.equal((await db.select().from(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, copiedDepartmentId)))[0].requiredCases,
+    sourceConfig.requiredCases, "later source edits must not affect copied settings");
+  await db.update(departmentConfigsTable).set({ requiredCases: sourceConfig.requiredCases }).where(eq(departmentConfigsTable.departmentId, departmentIds[0]));
+});
+
+test("college deletion requires platform admin access and an empty college", async () => {
+  const first = await call("/superadmin/colleges", "admin", "POST", { name: "Delete Ready College" });
+  assert.equal(first.status, 201);
+  const [firstRow] = await db.select({ code: collegesTable.code }).from(collegesTable).where(eq(collegesTable.id, first.body.id));
+  assert.equal(firstRow.code, "delete-ready-college");
+  const second = await call("/superadmin/colleges", "admin", "POST", { name: "Delete Ready College" });
+  assert.equal(second.status, 201);
+  const [secondRow] = await db.select({ code: collegesTable.code }).from(collegesTable).where(eq(collegesTable.id, second.body.id));
+  assert.equal(secondRow.code, "delete-ready-college-2", "same-name colleges receive a unique generated code");
+
+  const path = `/superadmin/colleges/${second.body.id}`;
+  const unauthenticated = await request(runtime.base, path, undefined, "DELETE");
+  reportScopeCase("Unauthenticated college deletion", "DELETE", path, unauthenticated);
+  assert.equal(unauthenticated.status, 401);
+  const wrongRole = await call(path, "hod0", "DELETE");
+  reportScopeCase("Non-admin college deletion", "DELETE", path, wrongRole);
+  assert.equal(wrongRole.status, 403);
+  const allowed = await call(path, "admin", "DELETE");
+  reportScopeCase("Admin deletes an empty college", "DELETE", path, allowed);
+  assert.equal(allowed.status, 200);
+  const missing = await call("/superadmin/colleges/999999", "admin", "DELETE");
+  reportScopeCase("Admin deletes a nonexistent college", "DELETE", "/superadmin/colleges/999999", missing);
+  assert.equal(missing.status, 404);
+
+  const [stillPresent] = await db.select({ id: collegesTable.id }).from(collegesTable).where(eq(collegesTable.id, first.body.id));
+  assert.ok(stillPresent, "deleting one college must not affect another college");
+  assert.equal((await call(`/superadmin/colleges/${first.body.id}`, "admin", "DELETE")).status, 200);
 });
 
 // =========================================================================
