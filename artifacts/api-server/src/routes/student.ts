@@ -1072,7 +1072,7 @@ router.post("/:studentId/certifications", validate(z.object({ title: nameSchema,
 });
 
 // ── Certificate files (private R2 object, proxied through this API) ──────────
-const CERT_IMAGE_MAX_BYTES = 1024 * 1024;
+const CERT_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 const CERT_PDF_MAX_BYTES = 2 * 1024 * 1024;
 const CERT_STORAGE_LIMIT_BYTES = 8 * 1024 * 1024 * 1024; // 80% of the 10 GB R2 free allowance
 
@@ -1093,7 +1093,7 @@ function sanitiseCertificateFileName(raw: unknown, ext: string): string {
   return name || `certificate.${ext}`;
 }
 
-router.put("/:studentId/certifications/:certId/file", requireAuth, express.raw({ type: () => true, limit: "2mb" }), async (req, res) => {
+router.put("/:studentId/certifications/:certId/file", requireAuth, express.raw({ type: () => true, limit: "5mb" }), async (req, res) => {
   const certId = String(req.params.certId);
   try {
     const studentId = parseInt(String(req.params.studentId), 10);
