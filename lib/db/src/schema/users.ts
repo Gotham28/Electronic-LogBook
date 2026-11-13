@@ -1,15 +1,28 @@
-import { pgTable, serial, text, integer, timestamp, uniqueIndex, check, boolean, AnyPgColumn } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, timestamp, uniqueIndex, check, boolean, AnyPgColumn, foreignKey } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
+
+export const collegesTable = pgTable("colleges", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  code: text("code").notNull().unique(),
+  acceptingRegistrations: boolean("accepting_registrations").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
 
 export const departmentsTable = pgTable("departments", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
-  code: text("code").notNull().unique(),
+  code: text("code").notNull(),
   description: text("description"),
+  collegeId: integer("college_id").notNull().references(() => collegesTable.id),
   isTest: boolean("is_test").notNull().default(false),
   configSourceDepartmentId: integer("config_source_department_id").references((): AnyPgColumn => departmentsTable.id),
 }, (table) => [
+  uniqueIndex("departments_college_code_unique").on(table.collegeId, table.code),
+  uniqueIndex("departments_college_id_unique").on(table.collegeId, table.id),
+  foreignKey({ columns: [table.collegeId, table.configSourceDepartmentId], foreignColumns: [table.collegeId, table.id], name: "departments_mirror_same_college_fk" }),
   check("mirror_test_dept_source_requires_test", sql`${table.configSourceDepartmentId} IS NULL OR ${table.isTest} = true`),
   check("mirror_test_dept_not_self", sql`${table.configSourceDepartmentId} <> ${table.id}`),
 ]);

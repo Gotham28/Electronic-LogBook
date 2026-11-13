@@ -8,7 +8,7 @@ import {
   assessmentsTable, attendanceLogsTable, leaveApplicationsTable,
   thesisMilestonesTable, appraisalsTable, auditTable,
   departmentCatalogTable, procedureTypesTable, conferencesTable, awardsTable, certificationsTable,
-  departmentNameChangeNotificationsTable, nameChangeEmailOutboxTable,
+  departmentNameChangeNotificationsTable, nameChangeEmailOutboxTable, getTestCollegeId,
 } from "./database.js";
 import { eq, and, sql } from "drizzle-orm";
 import { deleteDepartmentCascade } from "../src/routes/superadmin.js";
@@ -374,8 +374,8 @@ test("department with configSourceDepartmentId set but isTest=false is refused r
   // isTest=false must be rejected by the mirror_test_dept_source_requires_test
   // CHECK constraint — this is the schema-level defence.
   await assert.rejects(
-    () => db.insert(departmentsTable).values({
-      name: "Rogue Non-Test Mirror", code: "ROGUE-NTM",
+    async () => db.insert(departmentsTable).values({
+      name: "Rogue Non-Test Mirror", code: "ROGUE-NTM", collegeId: await getTestCollegeId(),
       isTest: false,
       configSourceDepartmentId: realDeptId,
     }).returning(),

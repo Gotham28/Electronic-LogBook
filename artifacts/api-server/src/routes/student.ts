@@ -3,7 +3,7 @@ import { getFileStorage, newCertificateFileKey } from "../lib/file-storage.js";
 import crypto from "crypto";
 import { 
   db, studentsTable, caseLogsTable, procedureLogsTable, 
-  academicLogsTable, usersTable, departmentsTable, departmentConfigsTable,
+  academicLogsTable, usersTable, collegesTable, departmentsTable, departmentConfigsTable,
   postingsTable, leaveRecordsTable, appraisalsTable, researchTable, assessmentsTable, procedureTypesTable, departmentCatalogTable, certificationsTable, conferencesTable, awardsTable, clinicalWorkLogsTable, attendanceLogsTable
 } from "@workspace/db";
 import { eq, and, or, desc, count, sql, isNull, aliasedTable, inArray } from "drizzle-orm";
@@ -70,11 +70,13 @@ router.get("/:studentId/dashboard", requireAuth, async (req, res) => {
       dateOfJoining: studentsTable.dateOfJoining,
       batch: studentsTable.batch,
       department: departmentsTable.name,
+      collegeName: collegesTable.name,
       departmentId: usersTable.departmentId,
     })
     .from(studentsTable)
     .innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
     .leftJoin(departmentsTable, eq(usersTable.departmentId, departmentsTable.id))
+    .leftJoin(collegesTable, eq(collegesTable.id, departmentsTable.collegeId))
     .where(eq(studentsTable.id, studentId))
     .limit(1);
 
@@ -181,6 +183,7 @@ router.get("/:studentId/logs", requireAuth, async (req, res) => {
       dateOfJoining: studentsTable.dateOfJoining,
       batch: studentsTable.batch,
       department: departmentsTable.name,
+      collegeName: collegesTable.name,
       departmentId: usersTable.departmentId,
       mentorName: mentorsTable.fullName,
       mentorRole: mentorsTable.role,
@@ -189,6 +192,7 @@ router.get("/:studentId/logs", requireAuth, async (req, res) => {
     .from(studentsTable)
     .innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
     .leftJoin(departmentsTable, eq(usersTable.departmentId, departmentsTable.id))
+    .leftJoin(collegesTable, eq(collegesTable.id, departmentsTable.collegeId))
     .leftJoin(mentorsTable, eq(studentsTable.mentorId, mentorsTable.id))
     .where(eq(studentsTable.id, studentId))
     .limit(1) as unknown as Array<{
@@ -199,6 +203,7 @@ router.get("/:studentId/logs", requireAuth, async (req, res) => {
       dateOfJoining: string | null;
       batch: number | null;
       department: string | null;
+      collegeName: string | null;
       departmentId: number | null;
       mentorName: string | null;
       mentorRole: string | null;
@@ -258,6 +263,7 @@ router.get("/:studentId/logs", requireAuth, async (req, res) => {
 
     res.json({
       profile: {
+        collegeName: studentMatch[0].collegeName,
         department: studentMatch[0].department || "Unassigned",
         registrationNumber: studentMatch[0].registrationNumber,
         dateOfJoining: studentMatch[0].dateOfJoining,

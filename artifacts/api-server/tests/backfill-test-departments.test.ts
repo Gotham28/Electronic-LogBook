@@ -1,7 +1,7 @@
 import { before, after, test } from "node:test";
 import assert from "node:assert/strict";
 import { setup, request, accounts as a, password } from "./support.js";
-import { engine, db, usersTable, studentsTable, departmentsTable } from "./database.js";
+import { engine, db, usersTable, studentsTable, departmentsTable, getTestCollegeId } from "./database.js";
 import { eq, and } from "drizzle-orm";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
@@ -37,7 +37,7 @@ const call = (path: string, who?: keyof typeof a | "admin", method?: string, bod
 test("backfilling a real department with no existing mirror creates exactly one mirror with 3 approved test accounts", async () => {
   // Create a real department directly in DB (simulating pre-existing)
   const [realDept] = await db.insert(departmentsTable).values({
-    name: "Legacy Real Dept", code: "LEGACY1", isTest: false
+    name: "Legacy Real Dept", code: "LEGACY1", isTest: false, collegeId: await getTestCollegeId()
   }).returning();
 
   const res = await call("/superadmin/departments/backfill-test-departments", "admin", "POST");
@@ -76,7 +76,7 @@ test("backfilling a real department with no existing mirror creates exactly one 
 
 test("calling the backfill route twice in a row is idempotent", async () => {
   const [realDept2] = await db.insert(departmentsTable).values({
-    name: "Legacy Real Dept 2", code: "LEGACY2", isTest: false
+    name: "Legacy Real Dept 2", code: "LEGACY2", isTest: false, collegeId: await getTestCollegeId()
   }).returning();
 
   const res1 = await call("/superadmin/departments/backfill-test-departments", "admin", "POST");
@@ -95,7 +95,7 @@ test("calling the backfill route twice in a row is idempotent", async () => {
 
 test("a department that is itself a mirror is never selected as a candidate", async () => {
   const [mirrorDept] = await db.insert(departmentsTable).values({
-    name: "Existing Mirror", code: "TEST-LEGACY3", isTest: true
+    name: "Existing Mirror", code: "TEST-LEGACY3", isTest: true, collegeId: await getTestCollegeId()
   }).returning();
 
   const res = await call("/superadmin/departments/backfill-test-departments", "admin", "POST");
@@ -117,16 +117,16 @@ test("non-admin callers get 403", async () => {
 test("one department's provisioning failure does not prevent others from being provisioned", async () => {
   // Create a bad department that will cause unique constraint failure for testCode
   const [goodDept] = await db.insert(departmentsTable).values({
-    name: "Good Dept", code: "GOOD1", isTest: false
+    name: "Good Dept", code: "GOOD1", isTest: false, collegeId: await getTestCollegeId()
   }).returning();
 
   const [badDept] = await db.insert(departmentsTable).values({
-    name: "Bad Dept", code: "BAD1", isTest: false
+    name: "Bad Dept", code: "BAD1", isTest: false, collegeId: await getTestCollegeId()
   }).returning();
 
   // Sabotage the badDept by pre-creating a mirror with its expected TEST code
   await db.insert(departmentsTable).values({
-    name: "Blocking Dept", code: `TEST-${badDept.id}`, isTest: true
+    name: "Blocking Dept", code: `TEST-${badDept.id}`, isTest: true, collegeId: await getTestCollegeId()
   }); // Note: no configSourceDepartmentId set, so it won't be caught by the existingMirror check, but will fail the unique constraint on code
 
   const res = await call("/superadmin/departments/backfill-test-departments", "admin", "POST");

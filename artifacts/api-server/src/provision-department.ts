@@ -6,6 +6,7 @@ import { provisionDepartment } from "./lib/department-provisioning.js";
 async function provision() {
   if (!process.env.DEPARTMENT_SETUP_FILE) throw new Error("Set DEPARTMENT_SETUP_FILE to a department configuration JSON file");
   const input = JSON.parse(await readFile(process.env.DEPARTMENT_SETUP_FILE, "utf8"));
+  if (!Number.isSafeInteger(input?.collegeId) || input.collegeId <= 0) throw new Error("Setup file must include the target collegeId");
   const result = await provisionDepartment(input, process.env.HOD_INITIAL_PASSWORD);
   console.log("Department and HOD provisioned:", result);
 }

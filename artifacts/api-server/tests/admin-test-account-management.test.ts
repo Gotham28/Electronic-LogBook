@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { eq } from "drizzle-orm";
 import { setup, request, accounts as a, departmentIds, password } from "./support.js";
-import { engine, db, assignmentTypesTable, caseLogsTable, departmentsTable, studentsTable, usersTable } from "./database.js";
+import { engine, db, assignmentTypesTable, caseLogsTable, departmentsTable, studentsTable, usersTable, getTestCollegeId } from "./database.js";
 
 let runtime: Awaited<ReturnType<typeof setup>>;
 let admin: { id: number; token: string; role: string; departmentId: number | null };
@@ -24,7 +24,7 @@ before(async () => {
 
   const [mirror] = await db.insert(departmentsTable).values({
     name: "Pediatrics (Management Test)", code: "TEST-MANAGEMENT-ONE", isTest: true,
-    configSourceDepartmentId: departmentIds[0],
+    configSourceDepartmentId: departmentIds[0], collegeId: await getTestCollegeId(),
   }).returning();
   mirrorId = mirror.id;
   const [hod] = await db.insert(usersTable).values({
@@ -182,7 +182,7 @@ test("admin can delete a professor added by the test HOD and the cascade stays o
 test("hard-delete uses the acting admin if the target mirror has no active HOD", async () => {
   const [mirrorWithoutHod] = await db.insert(departmentsTable).values({
     name: "Mirror Without HOD", code: "TEST-MANAGEMENT-NO-HOD", isTest: true,
-    configSourceDepartmentId: departmentIds[1],
+    configSourceDepartmentId: departmentIds[1], collegeId: await getTestCollegeId(),
   }).returning();
   const passwordHash = await bcrypt.hash(password, 10);
   const [professor] = await db.insert(usersTable).values({

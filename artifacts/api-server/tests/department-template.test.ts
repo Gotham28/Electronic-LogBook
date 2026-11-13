@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { and, eq } from "drizzle-orm";
 import { setup, departmentIds } from "./support.js";
-import { engine, db, departmentsTable, departmentConfigsTable, departmentCatalogTable, departmentPostingScheduleTable } from "./database.js";
+import { engine, db, departmentsTable, departmentConfigsTable, departmentCatalogTable, departmentPostingScheduleTable, getTestCollegeId } from "./database.js";
 import { applyDepartmentTemplate, departmentTemplateSchema } from "../src/lib/department-template.js";
 
 let runtime: Awaited<ReturnType<typeof setup>>;
@@ -13,7 +13,7 @@ let radiologyId: number;
 before(async () => {
   runtime = await setup();
   radiology = departmentTemplateSchema.parse(JSON.parse(await readFile(new URL("../scripts/department-templates/radiology.json", import.meta.url), "utf8")));
-  const [department] = await db.insert(departmentsTable).values({ name: "Radiology", code: "TEST-RAD" }).returning();
+  const [department] = await db.insert(departmentsTable).values({ name: "Radiology", code: "TEST-RAD", collegeId: await getTestCollegeId() }).returning();
   radiologyId = department.id;
   await db.insert(departmentConfigsTable).values({ departmentId: radiologyId, enabledFeatures: { procedureExperience: true, keepMe: true } });
 });
@@ -61,7 +61,7 @@ test("applying merges flags without dropping existing ones and loads the catalog
 });
 
 test("applying a template sets the department totals from its targets", async () => {
-  const [department] = await db.insert(departmentsTable).values({ name: "Targets", code: "TEST-TARGETS" }).returning();
+  const [department] = await db.insert(departmentsTable).values({ name: "Targets", code: "TEST-TARGETS", collegeId: await getTestCollegeId() }).returning();
   const template = departmentTemplateSchema.parse({ catalog: [
     { kind: "academic", name: "Seminar", required: 4 }, { kind: "academic", name: "Journal club", required: 6 },
     { kind: "clinical_work_category", name: "CT scan", required: 9 }] });
@@ -97,7 +97,8 @@ test("a wrong expected name aborts and changes nothing", async () => {
 });
 
 test("a test department that mirrors another is refused", async () => {
-  const [mirror] = await db.insert(departmentsTable).values({ name: "Radiology Test", code: "TEST-RAD-M", isTest: true, configSourceDepartmentId: radiologyId }).returning();
+  const [mirror] = await db.insert(departmentsTable).values({ name: "Radiology Test", code: "TEST-RAD-M", isTest: true,
+    configSourceDepartmentId: radiologyId, collegeId: await getTestCollegeId() }).returning();
   await assert.rejects(applyDepartmentTemplate({ departmentId: mirror.id, expectName: "Radiology Test", template: radiology, apply: true }), /mirrors another/);
 });
 

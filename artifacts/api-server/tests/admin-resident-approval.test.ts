@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { and, eq } from "drizzle-orm";
 import { setup, request, accounts as a, departmentIds, password } from "./support.js";
-import { engine, db, departmentsTable, paymentsTable, studentsTable, usersTable } from "./database.js";
+import { engine, db, departmentsTable, paymentsTable, studentsTable, usersTable, getTestCollegeId } from "./database.js";
 
 let runtime: Awaited<ReturnType<typeof setup>>;
 let admin: { id: number; token: string; role: string; departmentId: number | null };
@@ -109,7 +109,7 @@ test("an admin-created pending resident cannot enter the payment flow", async ()
 });
 
 test("no active HOD in the actual target department falls back to approved without payment", async () => {
-  const [department] = await db.insert(departmentsTable).values({ name: "No HOD Fixture", code: "NO-HOD-APPROVAL" }).returning();
+  const [department] = await db.insert(departmentsTable).values({ name: "No HOD Fixture", code: "NO-HOD-APPROVAL", collegeId: await getTestCollegeId() }).returning();
   const created = await createResident(department.id, "hod");
   assert.equal(created.status, 201);
   assert.equal(created.body.student.departmentId, department.id);
@@ -139,7 +139,7 @@ test("self-registered residents retain the existing paid-payment requirement", a
 test("HOD queues and approval use the mirror department, not its parent department", async () => {
   const [mirror] = await db.insert(departmentsTable).values({
     name: "Pediatrics (Test Fixture)", code: "TEST-APPROVAL-MIRROR", isTest: true,
-    configSourceDepartmentId: departmentIds[0],
+    configSourceDepartmentId: departmentIds[0], collegeId: await getTestCollegeId(),
   }).returning();
   const passwordHash = await bcrypt.hash(password, 10);
   const [hod] = await db.insert(usersTable).values({

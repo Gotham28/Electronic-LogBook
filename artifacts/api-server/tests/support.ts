@@ -2,8 +2,9 @@ import { randomBytes } from "node:crypto";
 import { once } from "node:events";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import { eq } from "drizzle-orm";
 import { applyMigrations } from "../../../lib/db/src/migrations.js";
-import { engine, migrationConnection, db, departmentsTable, usersTable, studentsTable, departmentConfigsTable,
+import { engine, migrationConnection, db, collegesTable, departmentsTable, usersTable, studentsTable, departmentConfigsTable, getTestCollegeId,
   procedureTypesTable, departmentCatalogTable } from "./database.js";
 
 process.env.JWT_SECRET = randomBytes(48).toString("hex");
@@ -48,10 +49,11 @@ export const departmentIds: number[] = [];
 
 export async function setup() {
   await applyMigrations(migrationConnection(engine));
+  const collegeId = await getTestCollegeId();
   const hash = await bcrypt.hash(password, 10);
   // Synthetic data only. Names are test fixtures, never application defaults.
   for (const [index, name] of ["Pediatrics", "Dermatology", "Cardiology"].entries()) {
-    const [department] = await db.insert(departmentsTable).values({ name, code: "TEST-" + index }).returning();
+    const [department] = await db.insert(departmentsTable).values({ name, code: "TEST-" + index, collegeId }).returning();
     departmentIds.push(department.id);
     await db.insert(departmentConfigsTable).values({ departmentId: department.id, requiredCases: 7 + index,
       requiredProcedures: 11 + index, requiredAcademic: 3 + index });
@@ -90,10 +92,21 @@ export async function setup() {
 }
 
 export async function request(base: string, path: string, account?: Account, method = "GET", body?: unknown, extraHeaders = {}): Promise<{ status: number; body: any; headers: Headers }> {
-  const response = await fetch(base + "/api" + path, {
+  let scopedPath = path;
+  let scopedBody = body as any;
+  if (path.startsWith("/superadmin/") && !path.startsWith("/superadmin/colleges") && !path.startsWith("/superadmin/announcements")) {
+    const collegeId = (await db.select({ id: collegesTable.id }).from(collegesTable)
+      .where(eq(collegesTable.code, "kannur-medical-college")).limit(1))[0]?.id;
+    if (collegeId && !/[?&]collegeId=/.test(scopedPath)) scopedPath += `${scopedPath.includes("?") ? "&" : "?"}collegeId=${collegeId}`;
+    if (path === "/superadmin/departments" && method === "POST" && scopedBody?.setup && !scopedBody.setup.collegeId) {
+      scopedBody = { ...scopedBody, setup: { ...scopedBody.setup, collegeId } };
+    }
+    if (path.startsWith("/superadmin/departments/backfill-test-departments")) scopedBody = { ...(scopedBody ?? {}), collegeId };
+  }
+  const response = await fetch(base + "/api" + scopedPath, {
     method, headers: { ...(account ? { Authorization: "Bearer " + account.token } : {}),
       ...(method !== "GET" ? { "Content-Type": "application/json" } : {}), ...extraHeaders },
-    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    ...(scopedBody === undefined ? {} : { body: JSON.stringify(scopedBody) }),
   });
   return { status: response.status, body: await response.json() as any, headers: response.headers };
 }

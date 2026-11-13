@@ -4,7 +4,7 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 import { setup, request, accounts as a, departmentIds, password } from "./support.js";
-import { engine, db, departmentsTable, usersTable, departmentPostingScheduleTable } from "./database.js";
+import { engine, db, departmentsTable, usersTable, departmentPostingScheduleTable, getTestCollegeId } from "./database.js";
 
 let runtime: Awaited<ReturnType<typeof setup>>;
 let admin: { id: number; token: string };
@@ -38,7 +38,7 @@ test("catalog returns the schedule ordered by year then sort order, and only for
 
 test("a test department sees its source department's schedule", async () => {
   const [mirror] = await db.insert(departmentsTable).values({ name: "Schedule Mirror", code: "SCHED-MIRROR", isTest: true,
-    configSourceDepartmentId: departmentIds[1] }).returning();
+    configSourceDepartmentId: departmentIds[1], collegeId: await getTestCollegeId() }).returning();
   const hash = await bcrypt.hash(password, 10);
   const [student] = await db.insert(usersTable).values({ fullName: "Mirror Student", email: "sched-mirror@example.test",
     role: "student", status: "approved", departmentId: mirror.id, passwordHash: hash }).returning();

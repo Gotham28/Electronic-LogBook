@@ -1,6 +1,6 @@
 import { MaintenanceAnnouncements } from './MaintenanceAnnouncements';
 import { Link } from "wouter";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { toast } from "sonner";
 import { Building2, Users, UserCheck, UserX, Plus, GraduationCap, ArrowRight, XCircle, ChevronDown, ChevronRight, Info, UserPlus, Trash2, AlertTriangle, Pencil } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -13,6 +13,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { 
   getAdminDepartments, 
+  getAdminColleges,
+  getAdminConfigurationSources,
+  createAdminCollege,
+  updateAdminCollege,
   createAdminDepartment, 
   getAdminDepartmentRoster, 
   replaceAdminHod, 
@@ -27,6 +31,7 @@ import {
   hardDeleteAdminUser,
   updateAdminDepartmentUserName,
   type AdminDepartment,
+  type AdminCollege,
   type AdminUserRow
 } from "@/lib/apiClient";
 
@@ -43,30 +48,75 @@ function generateDefaultResidentForm() {
 }
 
 export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
+  const [colleges, setColleges] = useState<AdminCollege[]>([]);
+  const [selectedCollegeId, setSelectedCollegeId] = useState<number | null>(null);
   const [departments, setDepartments] = useState<AdminDepartment[]>([]);
+  const [copySourceDepartments, setCopySourceDepartments] = useState<Array<{ id: number; name: string; code: string; collegeId: number; collegeName: string }>>([]);
+  const [loadingCopySources, setLoadingCopySources] = useState(false);
+  const [copySourceError, setCopySourceError] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const [selectedDeptId, setSelectedDeptId] = useState<number | null>(null);
   const [showNewDeptPanel, setShowNewDeptPanel] = useState(false);
+  const [showNewCollegePanel, setShowNewCollegePanel] = useState(false);
+  const [newCollegeForm, setNewCollegeForm] = useState({ name: "", code: "", acceptingRegistrations: false });
+  const [collegeSettings, setCollegeSettings] = useState({ name: "", acceptingRegistrations: false });
+  const [savingCollegeSettings, setSavingCollegeSettings] = useState(false);
 
   const [deptCounts, setDeptCounts] = useState<Map<number, { facultyCount: number, residentCount: number, pendingCount: number }>>(new Map());
   const [failedDepts, setFailedDepts] = useState<Set<number>>(new Set());
   const [loadingCounts, setLoadingCounts] = useState(true);
+  const departmentLoadVersion = useRef(0);
 
   // New department form state
-  const [newDeptForm, setNewDeptForm] = useState({ name: "", code: "", hodFullName: "", hodEmail: "" });
+  const [newDeptForm, setNewDeptForm] = useState({ name: "", code: "", hodFullName: "", hodEmail: "", copyFromDepartmentId: "" });
   const [creatingDept, setCreatingDept] = useState(false);
 
   useEffect(() => {
-    fetchDepartments();
+    getAdminColleges().then((data) => {
+      setColleges(data);
+      if (data.length) {
+        sessionStorage.setItem("admin.selectedCollegeId", String(data[0].id));
+        setSelectedCollegeId(data[0].id);
+      }
+      else setLoading(false);
+    }).catch((err: any) => {
+      setError(err.message || "Failed to load colleges.");
+      setLoading(false);
+    });
   }, []);
 
-  const fetchDepartments = async () => {
+  useEffect(() => {
+    if (selectedCollegeId !== null) void fetchDepartments(selectedCollegeId);
+  }, [selectedCollegeId]);
+
+  useEffect(() => {
+    const college = colleges.find((item) => item.id === selectedCollegeId);
+    if (college) setCollegeSettings({ name: college.name, acceptingRegistrations: college.acceptingRegistrations });
+  }, [colleges, selectedCollegeId]);
+
+  useEffect(() => {
+    if (!showNewDeptPanel || !colleges.length) return;
+    let current = true;
+    setLoadingCopySources(true);
+    setCopySourceError("");
+    setCopySourceDepartments([]);
+    getAdminConfigurationSources()
+      .then((sources) => { if (current) setCopySourceDepartments(sources); })
+      .catch((err: any) => { if (current) setCopySourceError(err.message || "Could not load settings sources"); })
+      .finally(() => { if (current) setLoadingCopySources(false); });
+    return () => { current = false; };
+  }, [colleges, showNewDeptPanel]);
+
+  const fetchDepartments = async (collegeId = selectedCollegeId) => {
+    if (collegeId === null) return;
+    const loadVersion = ++departmentLoadVersion.current;
     setLoading(true);
     setError(null);
     try {
-      const data = await getAdminDepartments();
+      const data = await getAdminDepartments(collegeId);
+      if (loadVersion !== departmentLoadVersion.current) return;
       const normalized = data.map((d: any) => ({
         ...d,
         name: /microbiology/i.test(d.name) ? d.name.replace(/microbiology/i, "Microbiology") : d.name,
@@ -91,6 +141,7 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
           }
         })
       );
+      if (loadVersion !== departmentLoadVersion.current) return;
       setFailedDepts(newFailed);
       
       const countsMap = new Map();
@@ -119,10 +170,12 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
       });
 
     } catch (err: any) {
-      setError(err.message || "Failed to load departments.");
+      if (loadVersion === departmentLoadVersion.current) setError(err.message || "Failed to load departments.");
     } finally {
-      setLoading(false);
-      setLoadingCounts(false);
+      if (loadVersion === departmentLoadVersion.current) {
+        setLoading(false);
+        setLoadingCounts(false);
+      }
     }
   };
 
@@ -134,8 +187,11 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
     }
     setCreatingDept(true);
     try {
+      if (selectedCollegeId === null) throw new Error("Select a college first");
       const result = await createAdminDepartment({
         setup: {
+          collegeId: selectedCollegeId,
+          ...(newDeptForm.copyFromDepartmentId ? { copyFromDepartmentId: Number(newDeptForm.copyFromDepartmentId) } : {}),
           name: newDeptForm.name,
           code: newDeptForm.code,
           hod: {
@@ -147,7 +203,7 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
       toast.success("Department and HOD created successfully");
       if (!result.emailAccepted) toast.warning("The HOD account was created, but the onboarding email could not be accepted by the email provider. Ask the HOD to use Forgot password if needed.");
       setShowNewDeptPanel(false);
-      setNewDeptForm({ name: "", code: "", hodFullName: "", hodEmail: "" });
+      setNewDeptForm({ name: "", code: "", hodFullName: "", hodEmail: "", copyFromDepartmentId: "" });
       fetchDepartments();
     } catch (err: any) {
       toast.error(err.message || "Failed to create department");
@@ -158,10 +214,41 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
 
   const [backfilling, setBackfilling] = useState(false);
 
+  const handleCreateCollege = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const college = await createAdminCollege(newCollegeForm);
+      setColleges((current) => [...current, college]);
+      setShowNewCollegePanel(false);
+      setNewCollegeForm({ name: "", code: "", acceptingRegistrations: false });
+      sessionStorage.setItem("admin.selectedCollegeId", String(college.id));
+      setSelectedCollegeId(college.id);
+      toast.success("College created. Add its first department to continue.");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to create college");
+    }
+  };
+
+  const handleUpdateCollege = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (selectedCollegeId === null) return;
+    setSavingCollegeSettings(true);
+    try {
+      const updated = await updateAdminCollege(selectedCollegeId, collegeSettings);
+      setColleges((current) => current.map((college) => college.id === updated.id ? updated : college));
+      toast.success("College settings saved");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to save college settings");
+    } finally {
+      setSavingCollegeSettings(false);
+    }
+  };
+
   const handleBackfillTestDepartments = async () => {
+    if (selectedCollegeId === null) return;
     setBackfilling(true);
     try {
-      const result = await backfillTestDepartments();
+      const result = await backfillTestDepartments(selectedCollegeId);
       if (result.provisioned.length > 0) {
         toast.success(`Provisioned ${result.provisioned.length} test department${result.provisioned.length === 1 ? '' : 's'}`);
       } else if (result.failed.length === 0) {
@@ -221,7 +308,7 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
     return (
       <div className="flex h-64 flex-col items-center justify-center space-y-4 text-center" role="alert">
         <p className="text-sm font-medium text-rose-700">{error}</p>
-        <Button onClick={fetchDepartments} variant="outline">Try again</Button>
+        <Button onClick={() => void fetchDepartments()} variant="outline">Try again</Button>
       </div>
     );
   }
@@ -240,6 +327,14 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
+          <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+            College
+            <select aria-label="Select college" className="h-9 rounded-md border border-slate-200 bg-white px-3" value={selectedCollegeId ?? ""}
+              onChange={(event) => { const id = Number(event.target.value); departmentLoadVersion.current++; sessionStorage.setItem("admin.selectedCollegeId", String(id)); setShowNewDeptPanel(false); setDepartments([]); setSelectedDeptId(null); setDeptCounts(new Map()); setFailedDepts(new Set()); setSelectedCollegeId(id); }}>
+              {colleges.map((college) => <option key={college.id} value={college.id}>{college.name}</option>)}
+            </select>
+          </label>
+          <Button variant="outline" onClick={() => setShowNewCollegePanel((value) => !value)}>New college</Button>
           <Button asChild variant="outline" className="border-slate-200 text-slate-700"><Link href="/profile">My Profile</Link></Button>
           {onSignOut && (
             <Button variant="outline" onClick={onSignOut} className="border-slate-200 text-slate-700">
@@ -348,6 +443,21 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
 
       <MaintenanceAnnouncements />
 
+      {selectedCollegeId !== null && <Card><CardHeader><CardTitle>College settings</CardTitle><CardDescription>Update the selected college’s name and public registration availability.</CardDescription></CardHeader>
+        <CardContent><form onSubmit={handleUpdateCollege} className="flex flex-wrap items-end gap-3">
+          <div className="space-y-2"><Label htmlFor="selected-college-name">College name</Label><Input id="selected-college-name" value={collegeSettings.name} onChange={(event) => setCollegeSettings({ ...collegeSettings, name: event.target.value })} required /></div>
+          <label className="flex items-center gap-2 pb-2 text-sm text-slate-700"><input type="checkbox" checked={collegeSettings.acceptingRegistrations} onChange={(event) => setCollegeSettings({ ...collegeSettings, acceptingRegistrations: event.target.checked })} />Allow public registration</label>
+          <Button type="submit" disabled={savingCollegeSettings} variant="outline">{savingCollegeSettings ? "Saving…" : "Save college settings"}</Button>
+        </form></CardContent></Card>}
+
+      {showNewCollegePanel && <Card><CardHeader><CardTitle>New College</CardTitle><CardDescription>Create a college, then add departments under it.</CardDescription></CardHeader>
+        <CardContent><form onSubmit={handleCreateCollege} className="flex flex-wrap items-end gap-3">
+          <div className="space-y-2"><Label htmlFor="college-name">College name</Label><Input id="college-name" value={newCollegeForm.name} onChange={(event) => setNewCollegeForm({ ...newCollegeForm, name: event.target.value })} required /></div>
+          <div className="space-y-2"><Label htmlFor="college-code">College code</Label><Input id="college-code" placeholder="e.g. kozhikode-medical-college" value={newCollegeForm.code} onChange={(event) => setNewCollegeForm({ ...newCollegeForm, code: event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-") })} required /></div>
+          <label className="flex items-center gap-2 pb-2 text-sm text-slate-700"><input type="checkbox" checked={newCollegeForm.acceptingRegistrations} onChange={(event) => setNewCollegeForm({ ...newCollegeForm, acceptingRegistrations: event.target.checked })} />Allow public registration</label>
+          <Button type="submit" className="bg-teal-600 hover:bg-teal-700">Create college</Button>
+        </form></CardContent></Card>}
+
       {/* New department panel */}
       {showNewDeptPanel && (
         <Card className="border-teal-200 bg-teal-50/30 shadow-sm">
@@ -365,6 +475,19 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
                 <div className="space-y-2">
                   <Label htmlFor="dept-code">Department Code</Label>
                   <Input id="dept-code" placeholder="e.g. PED" value={newDeptForm.code} onChange={e => setNewDeptForm({...newDeptForm, code: e.target.value})} required />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="dept-config-source">Copy settings from (optional)</Label>
+                  <select id="dept-config-source" className="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
+                    value={newDeptForm.copyFromDepartmentId} onChange={(e) => setNewDeptForm({ ...newDeptForm, copyFromDepartmentId: e.target.value })}>
+                    <option value="">Start with default settings</option>
+                      {copySourceDepartments.map((department) => <option key={department.id} value={department.id}>
+                        {department.collegeName} · {department.name}
+                      </option>)}
+                  </select>
+                    {loadingCopySources && <p role="status" className="text-xs text-slate-500">Loading settings sources…</p>}
+                    {copySourceError && <p role="alert" className="text-xs text-rose-700">{copySourceError}</p>}
+                    <p className="text-xs text-slate-500">Copies settings, catalogs, schedules and logbook sections from any college. Accounts and records are not copied.</p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="hod-name">HOD Full Name</Label>

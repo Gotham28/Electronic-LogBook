@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, usersTable, departmentsTable, studentsTable, caseLogsTable, procedureLogsTable, academicLogsTable, departmentConfigsTable, departmentCatalogTable, procedureTypesTable, clinicalWorkLogsTable, departmentPostingScheduleTable } from "@workspace/db";
+import { db, collegesTable, usersTable, departmentsTable, studentsTable, caseLogsTable, procedureLogsTable, academicLogsTable, departmentConfigsTable, departmentCatalogTable, procedureTypesTable, clinicalWorkLogsTable, departmentPostingScheduleTable } from "@workspace/db";
 import { eq, and, inArray, count, sql, isNull } from "drizzle-orm";
 import { requireAuth, requireDepartment, requireRole } from "../middlewares/auth.js";
 import { completionPercent, idSchema } from "../lib/validation.js";
@@ -12,10 +12,12 @@ const router: IRouter = Router();
 
 // Registration only needs the directory, not department rosters or staff identities.
 router.get("/", async (_req, res) => {
-  const depts = await db.select({ id: departmentsTable.id, name: departmentsTable.name, code: departmentsTable.code }).from(departmentsTable)
+  const depts = await db.select({ id: departmentsTable.id, name: departmentsTable.name, code: departmentsTable.code,
+    collegeId: collegesTable.id, collegeName: collegesTable.name }).from(departmentsTable)
+    .innerJoin(collegesTable, eq(collegesTable.id, departmentsTable.collegeId))
     .innerJoin(usersTable, and(eq(usersTable.departmentId, departmentsTable.id), eq(usersTable.role, "hod"), eq(usersTable.status, "approved")))
     .leftJoin(departmentConfigsTable, eq(departmentConfigsTable.departmentId, departmentsTable.id))
-    .where(eq(departmentsTable.isTest, false))
+    .where(and(eq(departmentsTable.isTest, false), eq(collegesTable.acceptingRegistrations, true)))
     .orderBy(departmentsTable.name);
   res.json(depts.map(d => ({
     ...d,
