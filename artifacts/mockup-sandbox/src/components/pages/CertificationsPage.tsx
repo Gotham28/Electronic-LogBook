@@ -161,7 +161,8 @@ export function CertificationsPage() {
           {storedFileOnEdit && <p className="text-xs text-slate-600">This certificate already has a stored file, so the stored file is what will be shown. Pasting a link is not available. Choose a new file below to replace it.</p>}
           {mode === "link"
             ? <Field label="Certificate URL (HTTPS)"><Input required maxLength={2000} type="url" value={certificate.certificateUrl} onChange={(e) => setCertificate({ ...certificate, certificateUrl: e.target.value })} /></Field>
-            : <Field label="Certificate file (JPG, PNG, WebP or PDF)"><Input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" onChange={(e) => void chooseFile(e.target.files?.[0])} /></Field>}
+            : <><Field label="Certificate file (JPG, PNG, WebP or PDF)"><Input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" onChange={(e) => void chooseFile(e.target.files?.[0])} /></Field>
+              <p className="text-xs text-slate-500">Images are compressed before upload and may be up to 5 MB. PDFs may be up to 2 MB.</p></>}
           {mode === "file" && preparing && <p role="status" className="text-xs text-slate-600">Preparing file…</p>}
           {mode === "file" && file && !preparing && <p className="text-xs text-slate-600">{file.name} — {(file.size / 1024).toFixed(0)} KB{file.blob.type === "application/pdf" ? "" : " after compression"}</p>}
           {fileError && <p role="alert" className="text-sm text-rose-700">{fileError}</p>}

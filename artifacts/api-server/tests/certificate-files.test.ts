@@ -172,7 +172,14 @@ test("size limits, real type detection, editability and replacement", async () =
   const certId = await newCert(studentId);
   const path = filePath(studentId, certId);
 
-  assert.equal((await putFile(path, a.student0, JPEG(Math.round(1.1 * 1024 * 1024)))).status, 413, "image over 1 MB");
+  const maxImageBytes = 5 * 1024 * 1024;
+  const maxImage = await putFile(path, a.student0, JPEG(maxImageBytes));
+  assert.equal(maxImage.status, 200, "image at 5 MB is accepted");
+  assert.equal(maxImage.body.certificateFileSize, maxImageBytes);
+  const storedMaxImageKey = await keyOf(certId);
+  const imageOverLimit = await putFile(path, a.student0, JPEG(maxImageBytes + 1));
+  assert.equal(imageOverLimit.status, 413, "image over 5 MB is rejected");
+  assert.equal(await keyOf(certId), storedMaxImageKey, "oversize upload leaves the existing file unchanged");
   assert.equal((await putFile(path, a.student0, PDF(Math.round(2.1 * 1024 * 1024)))).status, 413, "PDF over 2 MB");
   const html = await putFile(path, a.student0, Buffer.from("<html><script>alert(1)</script></html>"), { "Content-Type": "application/pdf" });
   assert.equal(html.status, 415, "HTML claiming to be a PDF");

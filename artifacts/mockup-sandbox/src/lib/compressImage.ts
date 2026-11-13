@@ -1,10 +1,10 @@
-export const MAX_IMAGE_BYTES = 1024 * 1024;
+export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 export const MAX_PDF_BYTES = 2 * 1024 * 1024;
 const MAX_LONG_EDGE = 1600;
 
 /**
  * Downscale (long edge <= 1600 px) and re-encode as JPEG q0.8. Re-encoding through a canvas
- * also drops EXIF metadata such as location. Rejects if the result is still over 1 MB.
+ * also drops EXIF metadata such as location. Rejects if the result is still over 5 MB.
  */
 export async function compressImage(file: File): Promise<{ blob: Blob; size: number }> {
   const bitmap = await createImageBitmap(file);
@@ -21,7 +21,7 @@ export async function compressImage(file: File): Promise<{ blob: Blob; size: num
     ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.8));
     if (!blob) throw new Error("Could not compress this image");
-    if (blob.size > MAX_IMAGE_BYTES) throw new Error("This image is still over 1 MB after compression. Choose a smaller image.");
+    if (blob.size > MAX_IMAGE_BYTES) throw new Error("This image is still over 5 MB after compression. Choose a smaller image.");
     return { blob, size: blob.size };
   } finally {
     bitmap.close();
