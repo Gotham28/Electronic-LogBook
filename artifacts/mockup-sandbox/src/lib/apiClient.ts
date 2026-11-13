@@ -283,7 +283,7 @@ export type AdminUserRow = {
   status: string;
 };
 
-export type AdminCollege = { id: number; name: string; code: string; acceptingRegistrations: boolean };
+export type AdminCollege = { id: number; name: string; acceptingRegistrations: boolean };
 export type AdminConfigurationSource = { id: number; name: string; code: string; collegeId: number; collegeName: string };
 
 function adminCollegePath(path: string): string {
@@ -300,8 +300,12 @@ export function getAdminConfigurationSources(): Promise<AdminConfigurationSource
   return apiGet("/api/superadmin/configuration-sources");
 }
 
-export function createAdminCollege(data: { name: string; code: string; acceptingRegistrations: boolean }) {
+export function createAdminCollege(data: { name: string; acceptingRegistrations: boolean }) {
   return apiPost<AdminCollege>("/api/superadmin/colleges", data);
+}
+
+export function deleteAdminCollege(id: number): Promise<{ message: string }> {
+  return apiDelete(`/api/superadmin/colleges/${id}`);
 }
 
 export function updateAdminCollege(id: number, data: { name: string; acceptingRegistrations: boolean }) {

@@ -16,6 +16,7 @@ import {
   getAdminColleges,
   getAdminConfigurationSources,
   createAdminCollege,
+  deleteAdminCollege,
   updateAdminCollege,
   createAdminDepartment, 
   getAdminDepartmentRoster, 
@@ -60,9 +61,10 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
   const [selectedDeptId, setSelectedDeptId] = useState<number | null>(null);
   const [showNewDeptPanel, setShowNewDeptPanel] = useState(false);
   const [showNewCollegePanel, setShowNewCollegePanel] = useState(false);
-  const [newCollegeForm, setNewCollegeForm] = useState({ name: "", code: "", acceptingRegistrations: false });
+  const [newCollegeForm, setNewCollegeForm] = useState({ name: "", acceptingRegistrations: false });
   const [collegeSettings, setCollegeSettings] = useState({ name: "", acceptingRegistrations: false });
   const [savingCollegeSettings, setSavingCollegeSettings] = useState(false);
+  const [deletingCollege, setDeletingCollege] = useState(false);
 
   const [deptCounts, setDeptCounts] = useState<Map<number, { facultyCount: number, residentCount: number, pendingCount: number }>>(new Map());
   const [failedDepts, setFailedDepts] = useState<Set<number>>(new Set());
@@ -220,12 +222,47 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
       const college = await createAdminCollege(newCollegeForm);
       setColleges((current) => [...current, college]);
       setShowNewCollegePanel(false);
-      setNewCollegeForm({ name: "", code: "", acceptingRegistrations: false });
+      setNewCollegeForm({ name: "", acceptingRegistrations: false });
       sessionStorage.setItem("admin.selectedCollegeId", String(college.id));
+      setLoading(true);
       setSelectedCollegeId(college.id);
       toast.success("College created. Add its first department to continue.");
     } catch (err: any) {
       toast.error(err.message || "Failed to create college");
+    }
+  };
+
+  const handleDeleteCollege = async () => {
+    const college = colleges.find((item) => item.id === selectedCollegeId);
+    if (!college || selectedCollegeId === null || loading || departments.length > 0) return;
+    if (!window.confirm(`Delete ${college.name}? This cannot be undone.`)) return;
+
+    setDeletingCollege(true);
+    try {
+      await deleteAdminCollege(college.id);
+      const remaining = colleges.filter((item) => item.id !== college.id);
+      const nextCollege = remaining[0] ?? null;
+      departmentLoadVersion.current++;
+      setColleges(remaining);
+      setDepartments([]);
+      setSelectedDeptId(null);
+      setDeptCounts(new Map());
+      setFailedDepts(new Set());
+      setShowNewDeptPanel(false);
+      setSelectedCollegeId(nextCollege?.id ?? null);
+      if (nextCollege) {
+        sessionStorage.setItem("admin.selectedCollegeId", String(nextCollege.id));
+        setLoading(true);
+      } else {
+        sessionStorage.removeItem("admin.selectedCollegeId");
+        setLoading(false);
+        setLoadingCounts(false);
+      }
+      toast.success("College deleted");
+    } catch (err: any) {
+      toast.error(err.message || "Could not delete college");
+    } finally {
+      setDeletingCollege(false);
     }
   };
 
@@ -444,16 +481,28 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
       <MaintenanceAnnouncements />
 
       {selectedCollegeId !== null && <Card><CardHeader><CardTitle>College settings</CardTitle><CardDescription>Update the selected college’s name and public registration availability.</CardDescription></CardHeader>
-        <CardContent><form onSubmit={handleUpdateCollege} className="flex flex-wrap items-end gap-3">
+        <CardContent className="space-y-4"><form onSubmit={handleUpdateCollege} className="flex flex-wrap items-end gap-3">
           <div className="space-y-2"><Label htmlFor="selected-college-name">College name</Label><Input id="selected-college-name" value={collegeSettings.name} onChange={(event) => setCollegeSettings({ ...collegeSettings, name: event.target.value })} required /></div>
           <label className="flex items-center gap-2 pb-2 text-sm text-slate-700"><input type="checkbox" checked={collegeSettings.acceptingRegistrations} onChange={(event) => setCollegeSettings({ ...collegeSettings, acceptingRegistrations: event.target.checked })} />Allow public registration</label>
           <Button type="submit" disabled={savingCollegeSettings} variant="outline">{savingCollegeSettings ? "Saving…" : "Save college settings"}</Button>
-        </form></CardContent></Card>}
+        </form>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4">
+          <div>
+            <p className="text-sm font-medium text-slate-800">Delete college</p>
+            {departments.length > 0
+              ? <p className="mt-1 flex items-center gap-1.5 text-sm text-amber-700"><XCircle className="h-4 w-4" />Delete all {departments.length} department{departments.length === 1 ? "" : "s"} first.</p>
+              : <p className="mt-1 text-sm text-slate-500">A college can be deleted only when it has no departments.</p>}
+          </div>
+          <Button type="button" variant={departments.length > 0 ? "outline" : "destructive"}
+            disabled={loading || deletingCollege || departments.length > 0} onClick={() => void handleDeleteCollege()}>
+            {departments.length > 0 ? <><XCircle className="h-4 w-4" />Cannot delete yet</> : <><Trash2 className="h-4 w-4" />{deletingCollege ? "Deleting…" : "Delete college"}</>}
+          </Button>
+        </div>
+        </CardContent></Card>}
 
       {showNewCollegePanel && <Card><CardHeader><CardTitle>New College</CardTitle><CardDescription>Create a college, then add departments under it.</CardDescription></CardHeader>
         <CardContent><form onSubmit={handleCreateCollege} className="flex flex-wrap items-end gap-3">
           <div className="space-y-2"><Label htmlFor="college-name">College name</Label><Input id="college-name" value={newCollegeForm.name} onChange={(event) => setNewCollegeForm({ ...newCollegeForm, name: event.target.value })} required /></div>
-          <div className="space-y-2"><Label htmlFor="college-code">College code</Label><Input id="college-code" placeholder="e.g. kozhikode-medical-college" value={newCollegeForm.code} onChange={(event) => setNewCollegeForm({ ...newCollegeForm, code: event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-") })} required /></div>
           <label className="flex items-center gap-2 pb-2 text-sm text-slate-700"><input type="checkbox" checked={newCollegeForm.acceptingRegistrations} onChange={(event) => setNewCollegeForm({ ...newCollegeForm, acceptingRegistrations: event.target.checked })} />Allow public registration</label>
           <Button type="submit" className="bg-teal-600 hover:bg-teal-700">Create college</Button>
         </form></CardContent></Card>}

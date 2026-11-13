@@ -67,16 +67,22 @@ test("HOD, professor, and student accounts get 403 on every superadmin route", a
 
 test("selected college scope returns 401, 403, 200 and 404 for the four roster cases", async () => {
   const collegeCreated = await call("/superadmin/colleges", "admin", "POST", {
-    name: "Scope Test College", code: "scope-test-college", acceptingRegistrations: false,
+    name: "Scope Test College", acceptingRegistrations: false,
   });
   assert.equal(collegeCreated.status, 201);
-  const collegeB = collegeCreated.body as { id: number; name: string; code: string; acceptingRegistrations: boolean };
+  const collegeB = collegeCreated.body as { id: number; name: string; acceptingRegistrations: boolean };
+  const [collegeBRow] = await db.select({ code: collegesTable.code }).from(collegesTable).where(eq(collegesTable.id, collegeB.id));
+  assert.equal(collegeBRow.code, "scope-test-college", "the internal code is generated from the college name");
   const collegeUpdated = await call(`/superadmin/colleges/${collegeB.id}`, "admin", "PATCH", {
     name: "Scope Test College Updated", acceptingRegistrations: true,
   });
   assert.equal(collegeUpdated.status, 200);
   assert.equal(collegeUpdated.body.acceptingRegistrations, true);
   const [departmentB] = await db.insert(departmentsTable).values({ name: "Scope Test Department", code: "SCOPE-TEST", collegeId: collegeB.id }).returning();
+  const blockedCollegeDelete = await call(`/superadmin/colleges/${collegeB.id}`, "admin", "DELETE");
+  reportScopeCase("Admin attempts to delete a college with departments", "DELETE", `/superadmin/colleges/${collegeB.id}`, blockedCollegeDelete);
+  assert.equal(blockedCollegeDelete.status, 409);
+  assert.match(blockedCollegeDelete.body.message, /delete all departments/i);
   const path = `/superadmin/departments/${departmentB.id}/roster`;
 
   const unauthenticated = await request(runtime.base, `${path}?collegeId=${collegeB.id}`, undefined, "GET");
@@ -147,6 +153,35 @@ test("selected college scope returns 401, 403, 200 and 404 for the four roster c
   assert.equal((await db.select().from(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, copiedDepartmentId)))[0].requiredCases,
     sourceConfig.requiredCases, "later source edits must not affect copied settings");
   await db.update(departmentConfigsTable).set({ requiredCases: sourceConfig.requiredCases }).where(eq(departmentConfigsTable.departmentId, departmentIds[0]));
+});
+
+test("college deletion requires platform admin access and an empty college", async () => {
+  const first = await call("/superadmin/colleges", "admin", "POST", { name: "Delete Ready College" });
+  assert.equal(first.status, 201);
+  const [firstRow] = await db.select({ code: collegesTable.code }).from(collegesTable).where(eq(collegesTable.id, first.body.id));
+  assert.equal(firstRow.code, "delete-ready-college");
+  const second = await call("/superadmin/colleges", "admin", "POST", { name: "Delete Ready College" });
+  assert.equal(second.status, 201);
+  const [secondRow] = await db.select({ code: collegesTable.code }).from(collegesTable).where(eq(collegesTable.id, second.body.id));
+  assert.equal(secondRow.code, "delete-ready-college-2", "same-name colleges receive a unique generated code");
+
+  const path = `/superadmin/colleges/${second.body.id}`;
+  const unauthenticated = await request(runtime.base, path, undefined, "DELETE");
+  reportScopeCase("Unauthenticated college deletion", "DELETE", path, unauthenticated);
+  assert.equal(unauthenticated.status, 401);
+  const wrongRole = await call(path, "hod0", "DELETE");
+  reportScopeCase("Non-admin college deletion", "DELETE", path, wrongRole);
+  assert.equal(wrongRole.status, 403);
+  const allowed = await call(path, "admin", "DELETE");
+  reportScopeCase("Admin deletes an empty college", "DELETE", path, allowed);
+  assert.equal(allowed.status, 200);
+  const missing = await call("/superadmin/colleges/999999", "admin", "DELETE");
+  reportScopeCase("Admin deletes a nonexistent college", "DELETE", "/superadmin/colleges/999999", missing);
+  assert.equal(missing.status, 404);
+
+  const [stillPresent] = await db.select({ id: collegesTable.id }).from(collegesTable).where(eq(collegesTable.id, first.body.id));
+  assert.ok(stillPresent, "deleting one college must not affect another college");
+  assert.equal((await call(`/superadmin/colleges/${first.body.id}`, "admin", "DELETE")).status, 200);
 });
 
 // =========================================================================

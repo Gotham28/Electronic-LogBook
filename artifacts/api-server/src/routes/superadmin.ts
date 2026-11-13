@@ -79,7 +79,7 @@ router.param("collegeId", (req, res, next, value) => {
 
 router.get("/colleges", async (req, res) => {
   try {
-    res.json(await db.select({ id: collegesTable.id, name: collegesTable.name, code: collegesTable.code,
+    res.json(await db.select({ id: collegesTable.id, name: collegesTable.name,
       acceptingRegistrations: collegesTable.acceptingRegistrations }).from(collegesTable).orderBy(collegesTable.name));
   } catch {
     req.log.error({ userId: req.user!.id, status: 500 }, "Error listing colleges");
@@ -101,20 +101,52 @@ router.get("/configuration-sources", async (req, res) => {
   }
 });
 
-const createCollegeBody = z.object({ name: nameSchema,
-  code: z.string().trim().min(2).max(64).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
-  acceptingRegistrations: z.boolean().optional() }).strict();
+const createCollegeBody = z.object({ name: nameSchema, acceptingRegistrations: z.boolean().optional() }).strict();
+
+async function generateCollegeCode(name: string): Promise<string> {
+  const base = name.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "college";
+  const existingCodes = new Set((await db.select({ code: collegesTable.code }).from(collegesTable)).map(({ code }) => code));
+  if (!existingCodes.has(base)) return base;
+  for (let suffix = 2; ; suffix++) {
+    const candidate = `${base}-${suffix}`;
+    if (!existingCodes.has(candidate)) return candidate;
+  }
+}
 
 router.post("/colleges", validate(createCollegeBody), async (req, res) => {
   try {
-    const [college] = await db.insert(collegesTable).values({ ...req.body,
+    const code = await generateCollegeCode(req.body.name);
+    const [college] = await db.insert(collegesTable).values({ ...req.body, code,
       acceptingRegistrations: req.body.acceptingRegistrations ?? false }).returning({ id: collegesTable.id,
-      name: collegesTable.name, code: collegesTable.code, acceptingRegistrations: collegesTable.acceptingRegistrations });
+      name: collegesTable.name, acceptingRegistrations: collegesTable.acceptingRegistrations });
     return res.status(201).json(college);
   } catch (error: any) {
     const code = error?.code ?? error?.cause?.code;
-    if (code === "23505") return res.status(409).json({ message: "A college with this code already exists" });
+    if (code === "23505") return res.status(409).json({ message: "A similar college was added at the same time. Please retry." });
     req.log.error({ userId: req.user!.id, status: 500 }, "Error creating college");
+    return res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+router.delete("/colleges/:collegeId", async (req, res) => {
+  const collegeId = Number(req.params.collegeId);
+  try {
+    const [college] = await db.select({ id: collegesTable.id }).from(collegesTable)
+      .where(eq(collegesTable.id, collegeId)).limit(1);
+    if (!college) return res.status(404).json({ message: "College not found" });
+
+    const [department] = await db.select({ id: departmentsTable.id }).from(departmentsTable)
+      .where(eq(departmentsTable.collegeId, collegeId)).limit(1);
+    if (department) return res.status(409).json({ message: "Delete all departments before deleting this college" });
+
+    const [deleted] = await db.delete(collegesTable).where(eq(collegesTable.id, collegeId)).returning({ id: collegesTable.id });
+    if (!deleted) return res.status(404).json({ message: "College not found" });
+    return res.json({ message: "College deleted" });
+  } catch (error: any) {
+    const code = error?.code ?? error?.cause?.code;
+    if (code === "23503") return res.status(409).json({ message: "Delete all departments before deleting this college" });
+    req.log.error({ userId: req.user!.id, status: 500 }, "Error deleting college");
     return res.status(500).json({ message: "Internal server error" });
   }
 });
@@ -128,7 +160,7 @@ router.patch("/colleges/:collegeId", validate(updateCollegeBody), async (req, re
       acceptingRegistrations: req.body.acceptingRegistrations,
       updatedAt: new Date(),
     }).where(eq(collegesTable.id, Number(req.params.collegeId))).returning({
-      id: collegesTable.id, name: collegesTable.name, code: collegesTable.code,
+      id: collegesTable.id, name: collegesTable.name,
       acceptingRegistrations: collegesTable.acceptingRegistrations,
     });
     if (!college) return res.status(404).json({ message: "College not found" });
