@@ -13,6 +13,7 @@ import { JWT_SECRET } from "../lib/env.js";
 import { IMPERSONATION_TOKEN_LIFETIME } from "../lib/session-tokens.js";
 import { sessionProfile } from "./auth.js";
 import { hardDeleteUserCascade } from "../lib/hard-delete-user.js";
+import { deleteStoredFilesBestEffort } from "../lib/file-storage.js";
 import { buildMaintenanceNotice } from "../lib/maintenance-messages.js";
 import { notifyCurrentHodOfPendingStudent } from "../lib/student-notifications.js";
 import { changeUserName } from "../lib/profile-name-changes.js";
@@ -809,13 +810,17 @@ router.delete("/users/:id/hard", async (req, res) => {
     const role = target.role;
 
     let deletedCounts: Record<string, number> = {};
+    let certificateFileKeys: string[] = [];
     await db.transaction(async (tx) => {
       // Assignment types the target created are department-scoped, so they pass to the
       // department's HOD. With no approved HOD they pass to the acting admin.
       const [hod] = await tx.select({ id: usersTable.id }).from(usersTable)
         .where(and(eq(usersTable.departmentId, target.departmentId!), eq(usersTable.role, "hod"), eq(usersTable.status, "approved"))).limit(1);
-      deletedCounts = await hardDeleteUserCascade(tx, targetId, role, hod?.id ?? req.user!.id);
+      ({ deletedCounts, certificateFileKeys } = await hardDeleteUserCascade(tx, targetId, role, hod?.id ?? req.user!.id));
     });
+
+    // After commit only; best-effort, never alters the response.
+    await deleteStoredFilesBestEffort(certificateFileKeys, req.log);
 
     req.log.info({ targetId, departmentId: target.departmentId, status: 200 }, "Account hard-deleted by admin");
     res.json({ message: "Account and associated records permanently deleted", deletedRecords: deletedCounts });

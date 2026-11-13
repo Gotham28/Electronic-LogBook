@@ -12,6 +12,7 @@ import { recomputeProcedureRequirement, recomputeCatalogRequirements } from "../
 import { clinicalWorkTarget, verifiedClinicalWorkCounts } from "../lib/clinical-work-progress.js";
 import { getEmailFailure, sendAccountCreatedEmail, sendStudentApprovalEmail } from "../lib/mailer.js";
 import { hardDeleteUserCascade } from "../lib/hard-delete-user.js";
+import { deleteStoredFilesBestEffort } from "../lib/file-storage.js";
 import { departmentLogbookSectionsTable } from "@workspace/db";
 import { getDepartmentFeatures } from "../lib/department-features.js";
 import {
@@ -917,10 +918,14 @@ router.delete("/users/:id/hard", async (req, res) => {
 
     const role = target.role as "student" | "professor";
     let deletedCounts: Record<string, number> = {};
+    let certificateFileKeys: string[] = [];
 
     await db.transaction(async (tx) => {
-      deletedCounts = await hardDeleteUserCascade(tx, targetUserId, role, req.user!.id);
+      ({ deletedCounts, certificateFileKeys } = await hardDeleteUserCascade(tx, targetUserId, role, req.user!.id));
     });
+
+    // After commit only; best-effort, never alters the response.
+    await deleteStoredFilesBestEffort(certificateFileKeys, req.log);
 
     req.log.info({ targetUserId, departmentId, status: 200 }, "Account hard-deleted by HOD");
     res.json({ message: "Account and associated records permanently deleted", deletedRecords: deletedCounts });

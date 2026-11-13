@@ -1,8 +1,9 @@
 import { before, after, test } from "node:test";
 import assert from "node:assert/strict";
 import { setup, request, accounts as a, departmentIds } from "./support.js";
-import { engine, db, usersTable, studentsTable, caseLogsTable, assignmentTypesTable, assignmentsTable, assignmentRecipientsTable, conferencesTable, awardsTable } from "./database.js";
+import { engine, db, usersTable, studentsTable, caseLogsTable, assignmentTypesTable, assignmentsTable, assignmentRecipientsTable, conferencesTable, awardsTable, certificationsTable } from "./database.js";
 import { eq } from "drizzle-orm";
+import { setFileStorageForTests } from "../src/lib/file-storage.js";
 
 let runtime: Awaited<ReturnType<typeof setup>>;
 before(async () => { runtime = await setup(); });
@@ -149,6 +150,49 @@ test("HOD can permanently delete a student who has conference and award records"
   assert.equal(res.body.deletedRecords.conferences, 1);
   assert.equal(res.body.deletedRecords.awards, 1);
   assert.equal((await db.select().from(usersTable).where(eq(usersTable.id, a.student21.id))).length, 0);
+});
+
+// Certificate files live in object storage, outside the database transaction. They are removed
+// only after the delete has committed, best-effort, and never alter the response.
+async function certWithFile(studentId: number, key: string | null) {
+  await db.insert(certificationsTable).values({ studentId, title: "Synthetic cert", issueDate: new Date("2026-01-01"),
+    expiryDate: new Date("2027-01-01"), ...(key ? { certificateFileKey: key, certificateFileType: "image/jpeg", certificateFileSize: 10 } : {}) });
+}
+
+test("HOD hard-delete removes the student's certificate files from storage after the delete commits", async () => {
+  const objects = new Map<string, Buffer>([["certificates/del-a", Buffer.from("a")], ["certificates/del-b", Buffer.from("b")], ["certificates/keep-other", Buffer.from("o")]]);
+  const stillThereAtDeleteTime: boolean[] = [];
+  setFileStorageForTests({
+    async put() {}, async get() { return null; },
+    async delete(key) {
+      // The row must already be gone (transaction committed) when storage is touched.
+      stillThereAtDeleteTime.push((await db.select().from(certificationsTable).where(eq(certificationsTable.certificateFileKey, key))).length > 0);
+      objects.delete(key);
+    },
+  });
+  try {
+    await certWithFile(a.student2.studentId!, "certificates/del-a");
+    await certWithFile(a.student2.studentId!, "certificates/del-b");
+    await certWithFile(a.student2.studentId!, null);
+    const res = await call(`/admin/users/${a.student2.id}/hard`, "hod2", "DELETE");
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(res.body.deletedRecords.certifications, 3);
+    assert.deepEqual([...objects.keys()], ["certificates/keep-other"], "only this student's objects are removed");
+    assert.deepEqual(stillThereAtDeleteTime, [false, false]);
+    assert.equal(JSON.stringify(res.body).includes("certificates/"), false, "no storage key in the response");
+  } finally { setFileStorageForTests(undefined); }
+});
+
+test("HOD hard-delete still completes with the normal status when storage deletion fails", async () => {
+  setFileStorageForTests({ async put() {}, async get() { return null; }, async delete() { throw new Error("storage down certificates/fail-a"); } });
+  try {
+    await certWithFile(a.student22.studentId!, "certificates/fail-a");
+    const res = await call(`/admin/users/${a.student22.id}/hard`, "hod2", "DELETE");
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(JSON.stringify(res.body).includes("certificates/"), false, "no storage key in the response");
+    assert.equal((await db.select().from(usersTable).where(eq(usersTable.id, a.student22.id))).length, 0, "the delete was not undone");
+    assert.equal((await db.select().from(certificationsTable).where(eq(certificationsTable.studentId, a.student22.studentId!))).length, 0);
+  } finally { setFileStorageForTests(undefined); }
 });
 
 test("HOD can permanently delete a professor who supervised or reviewed a conference", async () => {

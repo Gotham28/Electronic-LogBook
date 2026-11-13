@@ -22,6 +22,11 @@ import type { IRouter } from "express";
 // importing support.ts first, which sets it before anything imports the app; this file
 // imports the router directly, so it must be set here, before that import runs.
 process.env.JWT_SECRET ??= "dept-scope-unit-test-secret";
+// student.ts also imports src/lib/file-storage.ts, which fails closed at import without these (dummy values).
+process.env.R2_ACCOUNT_ID ??= "test-account";
+process.env.R2_ACCESS_KEY_ID ??= "test-access-key";
+process.env.R2_SECRET_ACCESS_KEY ??= "test-secret-key";
+process.env.R2_BUCKET_NAME ??= "test-bucket";
 
 const { default: studentRouter } = await import("../src/routes/student.js");
 const { db } = await import("./database.js");

@@ -1,4 +1,5 @@
-import { Router, type IRouter } from "express";
+import express, { Router, type IRouter } from "express";
+import { getFileStorage, newCertificateFileKey } from "../lib/file-storage.js";
 import crypto from "crypto";
 import { 
   db, studentsTable, caseLogsTable, procedureLogsTable, 
@@ -1028,6 +1029,13 @@ router.post("/:studentId/thesis", validate(z.object({ thesisTitle: z.string().tr
   res.json({ data: row });
 });
 
+// The internal storage key never leaves the server. File type, size and name may be returned;
+// the client works out "has a file" from certificateFileType.
+function withoutCertificateFileKey<T extends { certificateFileKey?: unknown }>(row: T): Omit<T, "certificateFileKey"> {
+  const { certificateFileKey: _key, ...rest } = row;
+  return rest;
+}
+
 router.get("/:studentId/certifications", async (req, res) => {
   try {
     const studentId = parseInt(String(req.params.studentId), 10);
@@ -1047,7 +1055,8 @@ router.get("/:studentId/certifications", async (req, res) => {
         return;
       }
     }
-    res.json(await db.select().from(certificationsTable).where(eq(certificationsTable.studentId, Number(req.params.studentId))).orderBy(desc(certificationsTable.createdAt)));
+    const rows = await db.select().from(certificationsTable).where(eq(certificationsTable.studentId, Number(req.params.studentId))).orderBy(desc(certificationsTable.createdAt));
+    res.json(rows.map(withoutCertificateFileKey));
   } catch (error) {
     req.log.error({ studentId: req.params.studentId, status: 500 }, "Error fetching certifications");
     res.status(500).json({ message: "Internal server error" });
@@ -1055,11 +1064,118 @@ router.get("/:studentId/certifications", async (req, res) => {
 });
 
 router.post("/:studentId/certifications", validate(z.object({ title: nameSchema, provider: nameSchema, issueDate: dateSchema,
-  expiryDate: dateSchema, certificateUrl: z.string().url().max(2000).refine((value) => new URL(value).protocol === "https:", "Use an HTTPS URL")
+  expiryDate: dateSchema, certificateUrl: z.string().url().max(2000).refine((value) => new URL(value).protocol === "https:", "Use an HTTPS URL").optional()
 }).strict().refine((v) => v.expiryDate >= v.issueDate, "Expiry must be on or after issue date")), async (req, res) => {
   const [row] = await db.insert(certificationsTable).values({ ...req.body, studentId: Number(req.params.studentId),
     issueDate: new Date(req.body.issueDate + "T00:00:00Z"), expiryDate: new Date(req.body.expiryDate + "T00:00:00Z") }).returning();
-  res.status(201).json(row);
+  res.status(201).json(withoutCertificateFileKey(row));
+});
+
+// ── Certificate files (private R2 object, proxied through this API) ──────────
+const CERT_IMAGE_MAX_BYTES = 1024 * 1024;
+const CERT_PDF_MAX_BYTES = 2 * 1024 * 1024;
+const CERT_STORAGE_LIMIT_BYTES = 8 * 1024 * 1024 * 1024; // 80% of the 10 GB R2 free allowance
+
+// The type is decided from the first bytes, never from the request Content-Type.
+function detectCertificateFileType(b: Buffer): { type: string; ext: string } | null {
+  if (b.length >= 5 && b.subarray(0, 5).toString("latin1") === "%PDF-") return { type: "application/pdf", ext: "pdf" };
+  if (b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return { type: "image/jpeg", ext: "jpg" };
+  if (b.length >= 8 && b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return { type: "image/png", ext: "png" };
+  if (b.length >= 12 && b.subarray(0, 4).toString("latin1") === "RIFF" && b.subarray(8, 12).toString("latin1") === "WEBP") return { type: "image/webp", ext: "webp" };
+  return null;
+}
+
+function sanitiseCertificateFileName(raw: unknown, ext: string): string {
+  let name = typeof raw === "string" ? raw : "";
+  try { name = decodeURIComponent(name); } catch { /* keep the raw header value */ }
+  name = name.split(/[\\/]/).pop() ?? "";
+  name = name.replace(/[\u0000-\u001f\u007f"]/g, "").trim().slice(0, 120);
+  return name || `certificate.${ext}`;
+}
+
+router.put("/:studentId/certifications/:certId/file", requireAuth, express.raw({ type: () => true, limit: "2mb" }), async (req, res) => {
+  const certId = String(req.params.certId);
+  try {
+    const studentId = parseInt(String(req.params.studentId), 10);
+    if (!isUuid(certId)) { res.status(404).json({ message: "Log not found" }); return; }
+    const guard = await studentEditGuard(req, res, certificationsTable, certId, studentId);
+    if (guard.error) { res.status(guard.error).json({ message: guard.message }); return; }
+    // Same statuses as PATCH /certifications/:certId, which only updates pending rows.
+    if (guard.log!.status !== "pending") { res.status(400).json({ message: "Only pending certificates can be changed" }); return; }
+
+    const bytes = req.body;
+    if (!Buffer.isBuffer(bytes) || bytes.length === 0) { res.status(400).json({ message: "No file received" }); return; }
+    const detected = detectCertificateFileType(bytes);
+    if (!detected) { res.status(415).json({ message: "Only JPG, PNG, WebP or PDF files are accepted" }); return; }
+    const limit = detected.type === "application/pdf" ? CERT_PDF_MAX_BYTES : CERT_IMAGE_MAX_BYTES;
+    if (bytes.length > limit) { res.status(413).json({ message: "File is too large" }); return; }
+
+    const [{ total }] = await db.select({ total: sql<string>`coalesce(sum(${certificationsTable.certificateFileSize}), 0)::bigint` }).from(certificationsTable);
+    if (Number(total) > CERT_STORAGE_LIMIT_BYTES) { res.status(507).json({ message: "File storage is full" }); return; }
+
+    const storage = getFileStorage();
+    const key = newCertificateFileKey();
+    const previousKey: string | null = guard.log!.certificateFileKey ?? null;
+    await storage.put(key, bytes, detected.type);
+    const removeNewObject = async () => {
+      try { await storage.delete(key); } catch { req.log.error({ certId, status: 500 }, "Certificate file cleanup failed"); }
+    };
+    let updated;
+    try {
+      // Conditional on the key we read: of two concurrent uploads only one can win.
+      [updated] = await db.update(certificationsTable).set({
+        certificateFileKey: key, certificateFileType: detected.type, certificateFileSize: bytes.length,
+        certificateFileName: sanitiseCertificateFileName(req.headers["x-file-name"], detected.ext),
+      }).where(and(eq(certificationsTable.id, certId), eq(certificationsTable.studentId, studentId),
+        eq(certificationsTable.status, "pending"),
+        previousKey === null ? isNull(certificationsTable.certificateFileKey) : eq(certificationsTable.certificateFileKey, previousKey))).returning();
+    } catch (dbError) {
+      await removeNewObject();
+      throw dbError;
+    }
+    if (!updated) {
+      await removeNewObject();
+      res.status(409).json({ message: "This certificate changed while uploading. Please try again." }); return;
+    }
+    if (previousKey) {
+      try { await storage.delete(previousKey); } catch { req.log.error({ certId, status: 500 }, "Previous certificate file delete failed"); }
+    }
+    res.json(withoutCertificateFileKey(updated));
+  } catch (error) {
+    // Never echo the error: storage and query errors can carry request details.
+    req.log.error({ certId, status: 500 }, "Error uploading certificate file");
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+router.get("/:studentId/certifications/:certId/file", async (req, res) => {
+  const certId = String(req.params.certId);
+  try {
+    const studentId = parseInt(String(req.params.studentId), 10);
+    const caller = req.user!;
+    if (caller.role === "professor") {
+      const [mentee] = await db.select({ id: studentsTable.id }).from(studentsTable)
+        .where(and(eq(studentsTable.id, studentId), eq(studentsTable.mentorId, caller.id))).limit(1);
+      if (!mentee) { res.status(403).json({ message: "Student is outside your access scope" }); return; }
+    }
+    if (!isUuid(certId)) { res.status(404).json({ message: "Certificate file not found" }); return; }
+    const [cert] = await db.select({ key: certificationsTable.certificateFileKey, type: certificationsTable.certificateFileType,
+      name: certificationsTable.certificateFileName }).from(certificationsTable)
+      .where(and(eq(certificationsTable.id, certId), eq(certificationsTable.studentId, studentId))).limit(1);
+    if (!cert || !cert.key || !cert.type) { res.status(404).json({ message: "Certificate file not found" }); return; }
+    const stored = await getFileStorage().get(cert.key);
+    if (!stored) { res.status(404).json({ message: "Certificate file not found" }); return; }
+    const name = cert.name ?? "certificate";
+    const ascii = name.replace(/[^\x20-\x7e]/g, "_").replace(/[\\"]/g, "_");
+    res.setHeader("Content-Type", cert.type);
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Content-Disposition", `inline; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(name)}`);
+    res.setHeader("Cache-Control", "no-store");
+    res.send(stored.bytes);
+  } catch (error) {
+    req.log.error({ certId, status: 500 }, "Error fetching certificate file");
+    res.status(500).json({ message: "Internal server error" });
+  }
 });
 
 // ── Faculty Review Endpoints ──────────────────────────────────────────────────
@@ -1205,7 +1321,7 @@ router.patch("/:studentId/certifications/:certId/review", requireAuth, requireRo
       res.status(400).json({ message: "This log has already been reviewed" });
       return;
     }
-    res.json(updated);
+    res.json(withoutCertificateFileKey(updated));
   } catch (error) {
     req.log.error({ studentId: req.params.studentId, certId: req.params.certId, status: 500 }, "Error reviewing certification");
     res.status(500).json({ message: "Internal server error" });
@@ -2030,7 +2146,7 @@ router.patch("/:studentId/certifications/:certId", requireAuth, validate(z.objec
     const [updated] = await db.update(certificationsTable).set(updateSet)
       .where(and(eq(certificationsTable.id, certId), eq(certificationsTable.studentId, studentId), eq((certificationsTable as any).status, "pending"))).returning();
     if (!updated) { res.status(400).json({ message: "Log no longer pending or not found" }); return; }
-    res.json(updated);
+    res.json(withoutCertificateFileKey(updated));
   } catch (error) { res.status(500).json({ message: "Internal server error" }); }
 });
 

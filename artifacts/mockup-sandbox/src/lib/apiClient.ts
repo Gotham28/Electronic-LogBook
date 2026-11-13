@@ -158,6 +158,52 @@ export function apiDelete<T = any>(path: string, options?: RequestInit): Promise
   return fetchWithAuth(path, { ...options, method: "DELETE" });
 }
 
+/** PUT raw file bytes (Bearer auth via fetchWithAuth). The server detects the real type from the bytes. */
+export function apiPutFile<T = any>(path: string, file: Blob, fileName: string): Promise<T> {
+  return fetchWithAuth(path, {
+    method: "PUT",
+    body: file,
+    headers: { "Content-Type": "application/octet-stream", "X-File-Name": encodeURIComponent(fileName) },
+  });
+}
+
+/** GET a binary response as a Blob. Auth is header-based, so a plain link cannot be used to view files. */
+export async function apiGetBlob(path: string): Promise<Blob> {
+  const headers = new Headers();
+  const token = getAuthToken();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  const response = await fetch(`${API_BASE_URL}${path}`, { credentials: "include", headers });
+  if (!response.ok) {
+    let message = response.statusText || "An API error occurred";
+    try { message = (await response.json())?.message || message; } catch { /* not JSON */ }
+    if (response.status === 401 && token) {
+      clearSession();
+      window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT));
+    }
+    throw new ApiError(response.status, message, null);
+  }
+  return response.blob();
+}
+
+/** Fetch a certificate file with the caller's credentials and open it in a new tab. Throws on failure. */
+export async function openCertificateFile(studentId: number | string, certId: string): Promise<void> {
+  // Open the tab synchronously (inside the click) so popup blockers allow it, then point it at the blob.
+  // window.open(..., "noopener") returns null, which would lose the tab handle; clearing opener on the
+  // blank tab gives the same isolation (the opened page cannot reach back to this one).
+  const tab = window.open("", "_blank");
+  if (tab) tab.opener = null;
+  try {
+    const blob = await apiGetBlob(`/api/students/${studentId}/certifications/${certId}/file`);
+    const url = URL.createObjectURL(blob);
+    if (tab) tab.location.href = url;
+    else window.open(url, "_blank");
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  } catch (err) {
+    tab?.close();
+    throw err;
+  }
+}
+
 export type NameChangeEmailStatus = "queued" | "processing" | "waiting_for_hod" | "waiting_for_subject"
   | "waiting_for_configuration" | "accepted" | "needs_attention" | "cancelled" | "suppressed_test";
 
