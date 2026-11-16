@@ -251,6 +251,7 @@ account with a hardcoded password; they were deleted in commit `d2ba8e2`, with `
 
 Purging the credential from git history remains an open task.
 
+A second set of 14 scripts (`artifacts/api-server/run.mjs` and 13 `.cjs` files in `lib/db/`: `cleanup_test`, `dedup`, `final_check`, `leave_test`, `merge_accounts`, `merge_accounts_2`, `rename_user`, `reset_pass`, `reset_radhamani`, `restore`, `schema_test`, `sync_mohammed`, `test`) hardcoded a different database connection string (whether it targets production was not tested) and entered history at commit `5f700f9` (2026-09-28); they were deleted by the task "Remove committed credentials". A shared test password appeared in six of the scripts: four of the 14 (`run.mjs`, `cleanup_test.cjs`, `reset_pass.cjs`, `reset_radhamani.cjs`) and `lib/db/investigate_print.cjs` and `lib/db/verify_print.cjs`; those two were deleted in the same task. `artifacts/mockup-sandbox/.env.local` was tracked in git, held demo account passwords and PINs, and has been removed; `.gitignore` now ignores `.env.*` except `.env.example`. Purging the connection string, the shared test password and the demo credentials from git history remains an open task.
 
 ---
 
