@@ -1,5 +1,5 @@
 import { and, eq, or, inArray, sql } from "drizzle-orm";
-import { usersTable, studentsTable, caseLogsTable, procedureLogsTable, academicLogsTable, paymentsTable, leaveRecordsTable, leaveApplicationsTable, assessmentsTable, appraisalsTable, assignmentRecipientsTable, attendanceLogsTable, certificationsTable, postingsTable, thesisMilestonesTable, researchTable, auditTable, assignmentsTable, assignmentTypesTable, clinicalWorkLogsTable, conferencesTable, awardsTable } from "@workspace/db";
+import { usersTable, studentsTable, caseLogsTable, procedureLogsTable, academicLogsTable, paymentsTable, leaveRecordsTable, leaveApplicationsTable, assessmentsTable, appraisalsTable, assignmentRecipientsTable, attendanceLogsTable, certificationsTable, postingsTable, thesisMilestonesTable, researchTable, auditTable, assignmentsTable, assignmentTypesTable, clinicalWorkLogsTable, conferencesTable, awardsTable, supportTicketsTable } from "@workspace/db";
 
 // Permanently deletes a student or professor and every row tied to them, inside
 // the caller's transaction. Shared by the HOD route (DELETE /api/admin/users/:id/hard)
@@ -153,6 +153,8 @@ export async function hardDeleteUserCascade(tx: any, targetUserId: number, role:
 
   const _payments = await tx.delete(paymentsTable).where(eq(paymentsTable.userId, targetUserId)).returning({ id: paymentsTable.id });
   deletedCounts.payments = _payments.length;
+
+  await tx.update(supportTicketsTable).set({ userId: null }).where(eq(supportTicketsTable.userId, targetUserId));
 
   const _users = await tx.delete(usersTable).where(eq(usersTable.id, targetUserId)).returning({ id: usersTable.id });
   deletedCounts.users = _users.length;

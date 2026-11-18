@@ -9,11 +9,13 @@ import "@fontsource/roboto/latin-700.css";
 import App from "./App";
 import { CookieConsentBanner } from "./components/CookieConsentBanner";
 import { PublicMaintenanceNotice } from "./components/PublicMaintenanceNotice";
+import { SupportWidget } from "./components/SupportWidget";
 import "./index.css";
 
 createRoot(document.getElementById("root")!).render(
   <>
     <PublicMaintenanceNotice />
+    <SupportWidget />
     <App />
     <CookieConsentBanner />
   </>

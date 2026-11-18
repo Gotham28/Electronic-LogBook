@@ -373,3 +373,76 @@ export function resetTestCredentials(departmentId: number): Promise<{ mirrorCode
 export function deleteAdminDepartment(id: number) {
   return apiDelete(adminCollegePath(`/api/superadmin/departments/${id}`));
 }
+
+// Support Tickets
+export type SupportTicketCategory = "login_issue" | "bug" | "feature_request" | "other";
+export type SupportTicketStatus = "open" | "in_progress" | "resolved";
+export type SupportEmailStatus = "pending" | "sent" | "failed";
+
+export interface SupportTicket {
+  id: number;
+  referenceCode: string;
+  name: string | null;
+  email: string | null;
+  category: SupportTicketCategory;
+  message: string;
+  pageUrl: string | null;
+  userAgent: string | null;
+  userId: number | null;
+  status: SupportTicketStatus;
+  adminNotes: string | null;
+  emailStatus: SupportEmailStatus;
+  createdAt: string;
+  updatedAt: string;
+  resolvedAt: string | null;
+  userFullName?: string | null;
+  userEmail?: string | null;
+  userRole?: string | null;
+  departmentName?: string | null;
+}
+
+export interface SupportTicketListResponse {
+  tickets: SupportTicket[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface SubmitSupportTicketPayload {
+  category: SupportTicketCategory;
+  message: string;
+  name?: string | null;
+  email?: string | null;
+  pageUrl?: string | null;
+  userAgent?: string | null;
+  honeypot?: string | null;
+}
+
+export function submitSupportTicket(data: SubmitSupportTicketPayload): Promise<{ referenceCode: string }> {
+  return apiPost<{ referenceCode: string }>("/api/support/tickets", data);
+}
+
+export function getAdminSupportTickets(params?: {
+  status?: SupportTicketStatus | "all";
+  page?: number;
+  limit?: number;
+}): Promise<SupportTicketListResponse> {
+  const query = new URLSearchParams();
+  if (params?.status && params.status !== "all") query.set("status", params.status);
+  if (params?.page) query.set("page", String(params.page));
+  if (params?.limit) query.set("limit", String(params.limit));
+  const queryString = query.toString();
+  return apiGet<SupportTicketListResponse>(`/api/superadmin/support/tickets${queryString ? `?${queryString}` : ""}`);
+}
+
+export function getAdminOpenSupportTicketsCount(): Promise<{ count: number }> {
+  return apiGet<{ count: number }>("/api/superadmin/support/tickets/count-open");
+}
+
+export function updateAdminSupportTicket(
+  id: number,
+  data: { status?: SupportTicketStatus; adminNotes?: string | null }
+): Promise<SupportTicket> {
+  return apiPatch<SupportTicket>(`/api/superadmin/support/tickets/${id}`, data);
+}

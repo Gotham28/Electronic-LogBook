@@ -9,6 +9,10 @@ if (missingEmailVars.length > 0) {
   logger.error({ missing: missingEmailVars },
     `Missing email configuration (${missingEmailVars.join(", ")}); automated email delivery is unavailable until they are set`);
 }
+if (!process.env.SUPPORT_ADMIN_EMAIL) {
+  logger.error({ missing: ["SUPPORT_ADMIN_EMAIL"] },
+    "Missing SUPPORT_ADMIN_EMAIL; support ticket notification emails are unavailable until it is set");
+}
 
 // Use Render's port if available, otherwise default to 3000 for local testing
 const rawPort = process.env["PORT"] || "3000";
