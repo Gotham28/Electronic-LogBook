@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { db, usersTable, collegesTable, departmentsTable, studentsTable, departmentConfigsTable, departmentCatalogTable, procedureTypesTable, assignmentTypesTable, assignmentsTable, assignmentRecipientsTable, caseLogsTable, procedureLogsTable, academicLogsTable, leaveRecordsTable, postingsTable, researchTable, assessmentsTable, attendanceLogsTable, leaveApplicationsTable, thesisMilestonesTable, appraisalsTable, auditTable, clinicalWorkLogsTable, departmentPostingScheduleTable, conferencesTable, awardsTable, certificationsTable } from "@workspace/db";
-import { eq, and, sql, inArray, or, gt, isNull } from "drizzle-orm";
+import { db, usersTable, collegesTable, departmentsTable, studentsTable, departmentConfigsTable, departmentCatalogTable, procedureTypesTable, assignmentTypesTable, assignmentsTable, assignmentRecipientsTable, caseLogsTable, procedureLogsTable, academicLogsTable, leaveRecordsTable, postingsTable, researchTable, assessmentsTable, attendanceLogsTable, leaveApplicationsTable, thesisMilestonesTable, appraisalsTable, auditTable, clinicalWorkLogsTable, departmentPostingScheduleTable, conferencesTable, awardsTable, certificationsTable, supportTicketsTable } from "@workspace/db";
+import { eq, and, sql, inArray, or, gt, isNull, desc } from "drizzle-orm";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { randomBytes } from "node:crypto";
@@ -32,7 +32,7 @@ declare global {
 router.use(requireAuth, requireRole(["admin"]));
 
 router.use((req, res, next) => {
-  if (req.path === "/colleges" || req.path.startsWith("/colleges/") || req.path === "/configuration-sources" || req.path.startsWith("/announcements")) { next(); return; }
+  if (req.path === "/colleges" || req.path.startsWith("/colleges/") || req.path === "/configuration-sources" || req.path.startsWith("/announcements") || req.path === "/support/tickets" || req.path.startsWith("/support/tickets")) { next(); return; }
   const rawCollegeIds = [req.query.collegeId, req.body?.collegeId, req.body?.setup?.collegeId].filter((value) => value !== undefined && value !== null);
   const collegeIds = rawCollegeIds.map(Number);
   if (!collegeIds.length || collegeIds.some((collegeId) => !Number.isSafeInteger(collegeId) || collegeId <= 0)) {
@@ -46,7 +46,7 @@ router.use((req, res, next) => {
 
 router.param("id", (req, res, next, value) => {
   if (!Number.isSafeInteger(Number(value)) || Number(value) <= 0) { res.status(400).json({ message: "Invalid record ID" }); return; }
-  if (req.path.startsWith("/announcements/")) { next(); return; }
+  if (req.path.startsWith("/announcements/") || req.path.startsWith("/support/tickets/")) { next(); return; }
   const id = Number(value);
   const load = req.path.startsWith("/departments/")
     ? db.select({ collegeId: departmentsTable.collegeId }).from(departmentsTable).where(eq(departmentsTable.id, id)).limit(1)
@@ -1201,6 +1201,141 @@ router.post("/announcements/:id/cancel", async (req, res) => {
     return res.json(updated);
   } catch (error) {
     return res.status(500).json({ message: "Failed to cancel announcement" });
+  }
+});
+
+// Support Tickets Admin Endpoints
+const patchSupportTicketSchema = z.object({
+  status: z.enum(["open", "in_progress", "resolved"]).optional(),
+  adminNotes: z.string().max(5000).nullable().optional(),
+}).strict();
+
+// GET /api/superadmin/support/tickets/count-open
+router.get("/support/tickets/count-open", async (req, res) => {
+  try {
+    const [{ count }] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(supportTicketsTable)
+      .where(eq(supportTicketsTable.status, "open"));
+
+    res.json({ count: count ?? 0 });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch open tickets count" });
+  }
+});
+
+// GET /api/superadmin/support/tickets
+router.get("/support/tickets", async (req, res) => {
+  try {
+    const page = Math.max(1, parseInt(String(req.query.page || "1"), 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit || "20"), 10) || 20));
+    const offset = (page - 1) * limit;
+
+    const rawStatus = typeof req.query.status === "string" ? req.query.status.trim() : "";
+    const statusFilter = ["open", "in_progress", "resolved"].includes(rawStatus)
+      ? rawStatus
+      : null;
+
+    const whereClause = statusFilter ? eq(supportTicketsTable.status, statusFilter) : undefined;
+
+    const [{ total }] = await db
+      .select({ total: sql<number>`count(*)::int` })
+      .from(supportTicketsTable)
+      .where(whereClause);
+
+    const tickets = await db
+      .select({
+        id: supportTicketsTable.id,
+        referenceCode: supportTicketsTable.referenceCode,
+        name: supportTicketsTable.name,
+        email: supportTicketsTable.email,
+        category: supportTicketsTable.category,
+        message: supportTicketsTable.message,
+        pageUrl: supportTicketsTable.pageUrl,
+        userAgent: supportTicketsTable.userAgent,
+        userId: supportTicketsTable.userId,
+        status: supportTicketsTable.status,
+        adminNotes: supportTicketsTable.adminNotes,
+        emailStatus: supportTicketsTable.emailStatus,
+        createdAt: supportTicketsTable.createdAt,
+        updatedAt: supportTicketsTable.updatedAt,
+        resolvedAt: supportTicketsTable.resolvedAt,
+        userFullName: usersTable.fullName,
+        userEmail: usersTable.email,
+        userRole: usersTable.role,
+        departmentName: departmentsTable.name,
+      })
+      .from(supportTicketsTable)
+      .leftJoin(usersTable, eq(supportTicketsTable.userId, usersTable.id))
+      .leftJoin(departmentsTable, eq(usersTable.departmentId, departmentsTable.id))
+      .where(whereClause)
+      .orderBy(desc(supportTicketsTable.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    res.json({
+      tickets,
+      total: total ?? 0,
+      page,
+      limit,
+      totalPages: Math.ceil((total ?? 0) / limit),
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch support tickets" });
+  }
+});
+
+// PATCH /api/superadmin/support/tickets/:id
+router.patch("/support/tickets/:id", validate(patchSupportTicketSchema), async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const [existing] = await db
+      .select()
+      .from(supportTicketsTable)
+      .where(eq(supportTicketsTable.id, id))
+      .limit(1);
+
+    if (!existing) {
+      res.status(404).json({ message: "Ticket not found" });
+      return;
+    }
+
+    const { status, adminNotes } = req.body;
+    const updateData: Partial<typeof supportTicketsTable.$inferInsert> = {
+      updatedAt: new Date(),
+    };
+
+    if (adminNotes !== undefined) {
+      updateData.adminNotes = adminNotes;
+    }
+
+    if (status !== undefined) {
+      updateData.status = status;
+      if (status === "resolved") {
+        updateData.resolvedAt = new Date();
+      } else if (existing.status === "resolved" && status !== "resolved") {
+        updateData.resolvedAt = null;
+      }
+    }
+
+    const [updated] = await db
+      .update(supportTicketsTable)
+      .set(updateData)
+      .where(eq(supportTicketsTable.id, id))
+      .returning();
+
+    await db.insert(auditTable).values({
+      tableName: "support_tickets",
+      recordId: String(id),
+      action: "UPDATE",
+      performedById: req.user!.id,
+      beforeState: existing,
+      afterState: updated,
+    }).catch(() => {});
+
+    res.json(updated);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to update support ticket" });
   }
 });
 

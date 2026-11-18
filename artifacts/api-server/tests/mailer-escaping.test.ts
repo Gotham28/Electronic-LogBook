@@ -2,7 +2,7 @@
 // sent from the application's own address. Markup in that name must arrive as text.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { sendAccountCreatedEmail, sendHODApprovalRequestEmail, sendHODAppointmentEmail, sendStudentApprovalEmail, renderNameChangeEmail, sendFrozenNameChangeEmail } from "../src/lib/mailer.js";
+import { sendAccountCreatedEmail, sendHODApprovalRequestEmail, sendHODAppointmentEmail, sendStudentApprovalEmail, renderNameChangeEmail, sendFrozenNameChangeEmail, sendSupportTicketEmail } from "../src/lib/mailer.js";
 
 process.env.RESEND_API_KEY = "test-only-resend-key";
 process.env.EMAIL_FROM = "noreply@elogbookgothos.test";
@@ -79,6 +79,39 @@ test("name-change notice is professionally worded, escapes names and supports fr
   assert.equal(sent.length, 1);
   assert.equal(sent[0].idempotencyKey, "profile-name-change/test-generation-0");
   assert.equal(JSON.stringify({ from: sent[0].from, to: sent[0].to, subject: sent[0].subject, text: sent[0].text, html: sent[0].html }), payload);
+});
+
+test("support ticket email escapes all user-supplied content and sets reply-to header", async () => {
+  sent.length = 0;
+  process.env.SUPPORT_ADMIN_EMAIL = "admin-support@example.test";
+  await sendSupportTicketEmail({
+    referenceCode: "SUP-TEST1",
+    category: "bug",
+    name: "Dr. <script>alert(1)</script> HOD",
+    email: "user<script>@example.test",
+    message: "Found a bug: <a href='https://evil.com'>Click here</a> to see & test.",
+    pageUrl: "https://example.test/page?evil=<script>",
+    userAgent: "Mozilla/5.0 <script>test</script>",
+    createdAt: new Date("2026-11-19T00:00:00.000Z"),
+    userRole: "resident <b>admin</b>",
+    departmentName: "Pediatrics <dept>",
+  });
+
+  assert.equal(sent.length, 1);
+  const [msg] = sent;
+  assert.equal(msg.to, "admin-support@example.test");
+  assert.equal((msg as any).reply_to, "user<script>@example.test");
+  assert.ok(msg.subject.includes("[E-Logbook Support]"));
+  assert.ok(msg.subject.includes("SUP-TEST1"));
+  assert.ok(!msg.html.includes("<script>"));
+  assert.ok(!msg.html.includes("<a href='https://evil.com'>"));
+  assert.ok(!msg.html.includes("<b>admin</b>"));
+  assert.ok(!msg.html.includes("<dept>"));
+  assert.ok(msg.html.includes("&lt;script&gt;alert(1)&lt;/script&gt;"));
+  assert.ok(msg.html.includes("&lt;a href=&#39;https://evil.com&#39;&gt;"));
+  assert.ok(msg.html.includes("resident &lt;b&gt;admin&lt;/b&gt;"));
+  assert.ok(msg.html.includes("Pediatrics &lt;dept&gt;"));
+  assert.ok(msg.text.includes("<a href='https://evil.com'>"));
 });
 
 test("mail transport rejects missing config and provider errors without exposing response bodies", async () => {

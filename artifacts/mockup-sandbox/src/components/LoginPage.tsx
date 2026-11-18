@@ -14,6 +14,7 @@ import { clearMaintenanceNoticeSession, saveToken } from "@/lib/session";
 import { PaymentStep } from "@/components/PaymentStep";
 import { unlockDemoAudio } from "@/lib/demoSounds";
 import { startDemoSession } from "@/lib/demoSession";
+import { openSupportWidget } from "./SupportWidget";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -432,6 +433,16 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
                     </Button>
                   </>
                 )}
+
+                <div className="mt-6 pt-2 text-center border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => openSupportWidget({ category: "login_issue" })}
+                    className="text-xs font-medium text-teal-700 hover:text-teal-800 hover:underline"
+                  >
+                    Having trouble signing in? Contact support
+                  </button>
+                </div>
               </div>
             )}
 

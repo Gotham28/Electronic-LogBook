@@ -151,13 +151,14 @@ async function sendEmailPayload(payload: string, idempotencyKey?: string): Promi
   }
 }
 
-async function sendEmail(email: string, subject: string, text: string, html: string): Promise<void> {
+async function sendEmail(email: string, subject: string, text: string, html: string, replyTo?: string): Promise<void> {
   const payload = JSON.stringify({
     from: `"E-LogBook" <${process.env.EMAIL_FROM ?? ""}>`,
     to: email,
     subject,
     text,
     html,
+    ...(replyTo ? { reply_to: replyTo } : {}),
   });
   await sendEmailPayload(payload);
 }
@@ -421,4 +422,96 @@ export const sendStudentApprovalEmail = async (email: string, fullName: string, 
      <p style="margin:16px 0 0;font-size:15px;line-height:1.7;color:#475569;">You can now sign in with your existing account credentials.</p>
      <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:28px 0 12px;"><tr><td style="background-color:#0f766e;"><a href="${html.appUrl}" style="display:inline-block;padding:14px 28px;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold;color:#fff;text-decoration:none;">Log in to E-LogBook</a></td></tr></table>`);
   await sendEmail(email, "Your E-LogBook Account Has Been Approved", text, htmlBody);
+};
+
+export interface SupportTicketEmailParams {
+  referenceCode: string;
+  category: string;
+  name?: string | null;
+  email?: string | null;
+  message: string;
+  pageUrl?: string | null;
+  userAgent?: string | null;
+  createdAt?: Date | string;
+  userRole?: string | null;
+  departmentName?: string | null;
+}
+
+export const sendSupportTicketEmail = async (ticket: SupportTicketEmailParams) => {
+  const recipient = process.env.SUPPORT_ADMIN_EMAIL?.trim();
+  if (!recipient) {
+    throw new EmailDeliveryError("missing_configuration");
+  }
+
+  const categoryLabels: Record<string, string> = {
+    login_issue: "Login / Account Issue",
+    bug: "Bug / Defect",
+    feature_request: "Feature Request",
+    other: "Other",
+  };
+  const categoryLabel = categoryLabels[ticket.category] || ticket.category;
+  const subject = `[E-Logbook Support] ${ticket.category}: ${ticket.referenceCode}`;
+
+  const frontendUrl = (process.env.FRONTEND_URL || "http://localhost:5173").replace(/\/+$/, "");
+  const adminSupportUrl = `${frontendUrl}/admin`;
+
+  const safeRef = escapeHtml(ticket.referenceCode);
+  const safeCat = escapeHtml(categoryLabel);
+  const safeName = ticket.name ? escapeHtml(ticket.name) : "Anonymous";
+  const safeEmail = ticket.email ? escapeHtml(ticket.email) : "Not provided";
+  const safeUserRole = ticket.userRole ? escapeHtml(ticket.userRole) : null;
+  const safeDept = ticket.departmentName ? escapeHtml(ticket.departmentName) : null;
+  const safePageUrl = ticket.pageUrl ? escapeHtml(ticket.pageUrl) : "Not provided";
+  const safeUserAgent = ticket.userAgent ? escapeHtml(ticket.userAgent) : "Not recorded";
+  const dateStr = ticket.createdAt instanceof Date ? ticket.createdAt.toISOString() : (ticket.createdAt || new Date().toISOString());
+  const safeDate = escapeHtml(dateStr);
+  const safeMsg = escapeHtml(ticket.message);
+  const safeAdminLink = escapeHtml(adminSupportUrl);
+
+  const userInfoHtml = safeUserRole
+    ? `${safeUserRole}${safeDept ? ` (${safeDept})` : ""}`
+    : "Signed out / Guest";
+
+  const userInfoText = ticket.userRole
+    ? `${ticket.userRole}${ticket.departmentName ? ` (${ticket.departmentName})` : ""}`
+    : "Signed out / Guest";
+
+  const innerHtml = `
+    <h2 style="margin:0 0 16px; font-size:18px; color:#0f172a;">New Support Ticket Received</h2>
+    <p style="margin:0 0 20px; font-size:13px; color:#475569;">A user has submitted a support request through the E-Logbook platform.</p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:20px; border-collapse:collapse;">
+      ${credentialRow("Reference code", `<span style="font-family:monospace; font-size:15px; color:#0f766e; background:#f0fdf4; padding:2px 8px; border-radius:4px; border:1px solid #bbf7d0;">${safeRef}</span>`)}
+      ${credentialRow("Category", safeCat)}
+      ${credentialRow("Reported by", safeName)}
+      ${credentialRow("Email", ticket.email ? `<a href="mailto:${safeEmail}" style="color:#0f766e; text-decoration:none;">${safeEmail}</a>` : "Not provided")}
+      ${credentialRow("User account", userInfoHtml)}
+      ${credentialRow("Page URL", ticket.pageUrl ? `<a href="${safePageUrl}" style="color:#0f766e; text-decoration:none;">${safePageUrl}</a>` : "Not provided")}
+      ${credentialRow("User agent", `<span style="font-size:11px; color:#64748b; word-break:break-all;">${safeUserAgent}</span>`)}
+      ${credentialRow("Submitted at", safeDate, true)}
+    </table>
+    <div style="margin:20px 0 8px; font-size:12px; font-weight:bold; text-transform:uppercase; letter-spacing:0.8px; color:#64748b;">Message</div>
+    <div style="padding:16px; background-color:#f8fafc; border-radius:8px; border:1px solid #e2e8f0; font-size:14px; line-height:1.6; color:#1e293b; white-space:pre-wrap; word-break:break-word;">${safeMsg}</div>
+    <div style="margin-top:28px; text-align:center;">
+      <a href="${safeAdminLink}" style="display:inline-block; padding:12px 24px; background-color:#0f766e; color:#ffffff; text-decoration:none; border-radius:6px; font-weight:bold; font-size:14px;">Open Admin Support Portal &rarr;</a>
+    </div>
+  `;
+
+  const text = `[E-Logbook Support Ticket]
+Reference: ${ticket.referenceCode}
+Category: ${categoryLabel}
+Reported by: ${ticket.name || "Anonymous"}
+Email: ${ticket.email || "Not provided"}
+User: ${userInfoText}
+Page URL: ${ticket.pageUrl || "Not provided"}
+User Agent: ${ticket.userAgent || "Not recorded"}
+Submitted at: ${dateStr}
+
+Message:
+${ticket.message}
+
+Admin Portal: ${adminSupportUrl}
+`;
+
+  const replyTo = ticket.email?.trim() || undefined;
+  await sendEmail(recipient, subject, text, wrapEmail(`Support Ticket: ${safeRef}`, innerHtml), replyTo);
 };
