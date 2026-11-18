@@ -1,5 +1,6 @@
 import { MaintenanceAnnouncements } from './MaintenanceAnnouncements';
 import { SupportTicketsAdmin } from './SupportTicketsAdmin';
+import { SUPPORT_FEATURE_ENABLED } from './SupportWidget';
 import { Link } from "wouter";
 import { useEffect, useState, useMemo, useRef } from "react";
 import { toast } from "sonner";
@@ -81,6 +82,7 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
   const [openTicketCount, setOpenTicketCount] = useState<number>(0);
 
   useEffect(() => {
+    if (!SUPPORT_FEATURE_ENABLED) return;
     getAdminOpenSupportTicketsCount()
       .then((res) => setOpenTicketCount(res.count))
       .catch(() => {});
@@ -400,23 +402,25 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
 
       {/* Admin Top-Level Navigation */}
       <Tabs value={adminTab} onValueChange={(val) => setAdminTab(val as "departments" | "support")}>
-        <TabsList className="bg-slate-100 p-1">
-          <TabsTrigger value="departments" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
-            <Building2 className="mr-2 h-4 w-4" />
-            Departments & Roster
-          </TabsTrigger>
-          <TabsTrigger value="support" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
-            <LifeBuoy className="mr-2 h-4 w-4 text-teal-600" />
-            Support
-            {openTicketCount > 0 && (
-              <span className="ml-2 inline-flex items-center justify-center rounded-full bg-rose-600 px-2 py-0.5 text-xs font-bold text-white leading-none">
-                {openTicketCount}
-              </span>
-            )}
-          </TabsTrigger>
-        </TabsList>
+        {SUPPORT_FEATURE_ENABLED && (
+          <TabsList className="bg-slate-100 p-1">
+            <TabsTrigger value="departments" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
+              <Building2 className="mr-2 h-4 w-4" />
+              Departments & Roster
+            </TabsTrigger>
+            <TabsTrigger value="support" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
+              <LifeBuoy className="mr-2 h-4 w-4 text-teal-600" />
+              Support
+              {openTicketCount > 0 && (
+                <span className="ml-2 inline-flex items-center justify-center rounded-full bg-rose-600 px-2 py-0.5 text-xs font-bold text-white leading-none">
+                  {openTicketCount}
+                </span>
+              )}
+            </TabsTrigger>
+          </TabsList>
+        )}
 
-        <TabsContent value="departments" className="space-y-4 mt-3">
+        <TabsContent value="departments" className={SUPPORT_FEATURE_ENABLED ? "space-y-4 mt-3" : "space-y-4"}>
           {/* Hero */}
           <div className="space-y-1">
         <p className="text-xs font-bold uppercase tracking-wider text-teal-600">College administration</p>
@@ -652,9 +656,11 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
       </div>
         </TabsContent>
 
-        <TabsContent value="support" className="space-y-4 mt-3">
-          <SupportTicketsAdmin onOpenCountChange={setOpenTicketCount} />
-        </TabsContent>
+        {SUPPORT_FEATURE_ENABLED && (
+          <TabsContent value="support" className="space-y-4 mt-3">
+            <SupportTicketsAdmin onOpenCountChange={setOpenTicketCount} />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );

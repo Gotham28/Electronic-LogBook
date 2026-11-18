@@ -25,15 +25,21 @@ import {
 } from "@/lib/apiClient";
 import { getCurrentUser, isDemoMode, SESSION_USER_CHANGED_EVENT } from "@/lib/session";
 
+// Feature flag: set to true once database migration 0031_support_tickets is applied on production.
+export const SUPPORT_FEATURE_ENABLED = false;
+
 export const OPEN_SUPPORT_WIDGET_EVENT = "elogbook:open-support";
 
 export function openSupportWidget(preset?: { category?: SupportTicketCategory }) {
+  if (!SUPPORT_FEATURE_ENABLED) return;
   window.dispatchEvent(
     new CustomEvent(OPEN_SUPPORT_WIDGET_EVENT, { detail: preset })
   );
 }
 
 export function SupportWidget() {
+  if (!SUPPORT_FEATURE_ENABLED) return null;
+
   const [isOpen, setIsOpen] = React.useState(false);
   const [category, setCategory] = React.useState<SupportTicketCategory>("bug");
   const [message, setMessage] = React.useState("");
