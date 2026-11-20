@@ -35,7 +35,7 @@ after(async () => {
 test("valid anonymous submit stores a ticket and sends notification email", async () => {
   const initialSentCount = sentEmails.length;
   const payload = {
-    category: "bug",
+    category: "login_issue",
     message: "The submit button on the login screen is not responding to clicks.",
     name: "Dr. Anonymous Tester",
     email: "reporter@example.test",
@@ -56,7 +56,7 @@ test("valid anonymous submit stores a ticket and sends notification email", asyn
     .limit(1);
 
   assert.ok(stored);
-  assert.equal(stored.category, "bug");
+  assert.equal(stored.category, "login_issue");
   assert.equal(stored.message, payload.message);
   assert.equal(stored.name, payload.name);
   assert.equal(stored.email, payload.email);
@@ -69,13 +69,24 @@ test("valid anonymous submit stores a ticket and sends notification email", asyn
   const sent = sentEmails[sentEmails.length - 1];
   assert.equal(sent.to, "therealgautam2004@gmail.com");
   assert.ok(sent.subject.includes(res.body.referenceCode));
-  assert.ok(sent.subject.includes("bug"));
+  assert.ok(sent.subject.includes("login_issue"));
+});
+
+test("unauthenticated submit with non-login categories is rejected with 401", async () => {
+  for (const cat of ["bug", "feature_request", "other"]) {
+    const res = await request(runtime.base, "/support/tickets", undefined, "POST", {
+      category: cat,
+      message: "Trying to submit a non-login ticket without authenticating.",
+    });
+    assert.equal(res.status, 401, `Anonymous submit with category ${cat} must return 401`);
+    assert.match(res.body.message, /sign in/i);
+  }
 });
 
 test("invalid payloads rejected with 400", async () => {
   // Too short message (< 10 chars)
   const shortMsg = await request(runtime.base, "/support/tickets", undefined, "POST", {
-    category: "bug",
+    category: "login_issue",
     message: "Short",
   });
   assert.equal(shortMsg.status, 400);
@@ -89,7 +100,7 @@ test("invalid payloads rejected with 400", async () => {
 
   // Invalid email format
   const badEmail = await request(runtime.base, "/support/tickets", undefined, "POST", {
-    category: "bug",
+    category: "login_issue",
     message: "This is a valid length message for the ticket.",
     email: "not-an-email",
   });
@@ -131,14 +142,21 @@ test("signed-in submit sets user_id, invalid token works as anonymous", async ()
   assert.ok(storedStudentTicket);
   assert.equal(storedStudentTicket.userId, a.student0.id);
 
-  // 2. Malformed / expired token falls back to anonymous without failing
+  // 2. Malformed / expired token falls back to anonymous: non-login category gets 401
   const fakeTokenAccount = {
     ...a.student0,
     token: "invalid.token.payload",
   };
-  const invalidTokenRes = await request(runtime.base, "/support/tickets", fakeTokenAccount, "POST", {
+  const invalidTokenForbidden = await request(runtime.base, "/support/tickets", fakeTokenAccount, "POST", {
     category: "other",
     message: "General question about logbook submission deadlines.",
+  });
+  assert.equal(invalidTokenForbidden.status, 401);
+
+  // Login issue category succeeds as anonymous even with malformed token
+  const invalidTokenRes = await request(runtime.base, "/support/tickets", fakeTokenAccount, "POST", {
+    category: "login_issue",
+    message: "Cannot log in with my credentials.",
   });
   assert.equal(invalidTokenRes.status, 200);
 
@@ -150,13 +168,14 @@ test("signed-in submit sets user_id, invalid token works as anonymous", async ()
 
   assert.ok(storedAnonTicket);
   assert.equal(storedAnonTicket.userId, null);
+  assert.equal(storedAnonTicket.category, "login_issue");
 });
 
 test("ticket is saved even when the mailer throws or fails", async () => {
   simulateFailure.enabled = true;
   try {
     const res = await request(runtime.base, "/support/tickets", undefined, "POST", {
-      category: "bug",
+      category: "login_issue",
       message: "Testing resilience when outgoing email provider is unavailable.",
     });
     assert.equal(res.status, 200);
@@ -186,7 +205,7 @@ test("ticket is saved even when the mailer throws or fails", async () => {
 test("HTML characters in user input are escaped in outgoing email", async () => {
   const initialSentCount = sentEmails.length;
   const res = await request(runtime.base, "/support/tickets", undefined, "POST", {
-    category: "bug",
+    category: "login_issue",
     name: "Dr. <script>alert(1)</script>",
     message: "Danger <img src=x onerror=alert('xss')> & <tag>",
     pageUrl: "/login?a=<b>test</b>",
@@ -209,7 +228,7 @@ test("rate limit returns 429 after per-IP cap is reached", async () => {
   // Send 5 tickets (the max allowed per IP)
   for (let i = 0; i < 5; i++) {
     const res = await request(runtime.base, "/support/tickets", undefined, "POST", {
-      category: "bug",
+      category: "login_issue",
       message: `Rate limit test message number ${i + 1} with sufficient length.`,
     }, extraHeaders);
     assert.equal(res.status, 200);
@@ -217,7 +236,7 @@ test("rate limit returns 429 after per-IP cap is reached", async () => {
 
   // 6th ticket must be rate limited
   const blocked = await request(runtime.base, "/support/tickets", undefined, "POST", {
-    category: "bug",
+    category: "login_issue",
     message: "This 6th attempt should be blocked by the IP rate limiter.",
   }, extraHeaders);
   assert.equal(blocked.status, 429);

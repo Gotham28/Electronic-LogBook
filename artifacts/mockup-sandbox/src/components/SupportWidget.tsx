@@ -25,8 +25,8 @@ import {
 } from "@/lib/apiClient";
 import { getCurrentUser, isDemoMode, SESSION_USER_CHANGED_EVENT } from "@/lib/session";
 
-// Feature flag: set to true once database migration 0031_support_tickets is applied on production.
-export const SUPPORT_FEATURE_ENABLED = false;
+// Feature flag: reactivated with unauthenticated restriction (only "login_issue" permitted signed out)
+export const SUPPORT_FEATURE_ENABLED = true;
 
 export const OPEN_SUPPORT_WIDGET_EVENT = "elogbook:open-support";
 
@@ -40,8 +40,9 @@ export function openSupportWidget(preset?: { category?: SupportTicketCategory })
 export function SupportWidget() {
   if (!SUPPORT_FEATURE_ENABLED) return null;
 
+  const [currentUser, setCurrentUser] = React.useState(getCurrentUser);
   const [isOpen, setIsOpen] = React.useState(false);
-  const [category, setCategory] = React.useState<SupportTicketCategory>("bug");
+  const [category, setCategory] = React.useState<SupportTicketCategory>(() => (getCurrentUser() ? "bug" : "login_issue"));
   const [message, setMessage] = React.useState("");
   const [name, setName] = React.useState("");
   const [email, setEmail] = React.useState("");
@@ -49,13 +50,16 @@ export function SupportWidget() {
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [referenceCode, setReferenceCode] = React.useState<string | null>(null);
   const [copied, setCopied] = React.useState(false);
-  const [currentUser, setCurrentUser] = React.useState(getCurrentUser);
 
   const isDemo = isDemoMode();
 
   React.useEffect(() => {
     const handleUserChange = () => {
-      setCurrentUser(getCurrentUser());
+      const user = getCurrentUser();
+      setCurrentUser(user);
+      if (!user) {
+        setCategory("login_issue");
+      }
     };
     window.addEventListener(SESSION_USER_CHANGED_EVENT, handleUserChange);
     window.addEventListener("popstate", handleUserChange);
@@ -79,8 +83,13 @@ export function SupportWidget() {
   React.useEffect(() => {
     const handleOpen = (e: Event) => {
       const customEvent = e as CustomEvent<{ category?: SupportTicketCategory }>;
-      if (customEvent.detail?.category) {
+      const user = getCurrentUser();
+      if (!user) {
+        setCategory("login_issue");
+      } else if (customEvent.detail?.category) {
         setCategory(customEvent.detail.category);
+      } else {
+        setCategory("bug");
       }
       initUserFields();
       setReferenceCode(null);
@@ -96,6 +105,10 @@ export function SupportWidget() {
   const handleOpenChange = (open: boolean) => {
     setIsOpen(open);
     if (open) {
+      const user = getCurrentUser();
+      if (!user) {
+        setCategory("login_issue");
+      }
       initUserFields();
       setReferenceCode(null);
     } else {
@@ -139,9 +152,10 @@ export function SupportWidget() {
       // Auto-capture pathname only (strip query string and fragment for privacy)
       const pathname = window.location.pathname.slice(0, 500);
       const userAgent = navigator.userAgent ? navigator.userAgent.slice(0, 300) : null;
+      const finalCategory = currentUser ? category : "login_issue";
 
       const res = await submitSupportTicket({
-        category,
+        category: finalCategory,
         message: trimmedMsg,
         name: name.trim() || null,
         email: email.trim() || null,
@@ -255,20 +269,34 @@ export function SupportWidget() {
                 <Label htmlFor="support-category" className="text-xs font-semibold text-slate-700">
                   Category <span className="text-rose-500">*</span>
                 </Label>
-                <Select
-                  value={category}
-                  onValueChange={(val) => setCategory(val as SupportTicketCategory)}
-                >
-                  <SelectTrigger id="support-category" className="w-full">
-                    <SelectValue placeholder="Select a category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="login_issue">Login or Account Issue</SelectItem>
-                    <SelectItem value="bug">Report a Bug / Error</SelectItem>
-                    <SelectItem value="feature_request">Feature Request</SelectItem>
-                    <SelectItem value="other">Other Inquiry / Feedback</SelectItem>
-                  </SelectContent>
-                </Select>
+                {currentUser ? (
+                  <Select
+                    value={category}
+                    onValueChange={(val) => setCategory(val as SupportTicketCategory)}
+                  >
+                    <SelectTrigger id="support-category" className="w-full">
+                      <SelectValue placeholder="Select a category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="login_issue">Cannot log in / Account issue</SelectItem>
+                      <SelectItem value="bug">Report a Bug / Error</SelectItem>
+                      <SelectItem value="feature_request">Feature Request</SelectItem>
+                      <SelectItem value="other">Other Inquiry / Feedback</SelectItem>
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div className="space-y-1.5">
+                    <div className="flex h-10 w-full items-center justify-between rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800">
+                      <span>Cannot log in / Account access</span>
+                      <span className="rounded bg-teal-50 px-2 py-0.5 text-[11px] font-medium text-teal-700 border border-teal-100">
+                        Login Issue
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                      Public reports are restricted to login issues. Please log in to report bugs or request features.
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Message */}

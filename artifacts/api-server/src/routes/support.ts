@@ -122,6 +122,14 @@ router.post("/tickets", async (req, res) => {
   // Resolve optional user identity without failing on invalid token
   const { userId, userRole, departmentName } = await resolveOptionalUser(req);
 
+  // Anonymous / signed-out callers are restricted to "login_issue" to reduce spam and fake reports
+  if (!userId && category !== "login_issue") {
+    res.status(401).json({
+      message: "Please sign in to report bugs, request features, or submit feedback. Unauthenticated reports are limited to login issues.",
+    });
+    return;
+  }
+
   // Strip query string and fragment from page_url
   const sanitizedPageUrl = pageUrl ? pageUrl.split(/[?#]/)[0].slice(0, 500) : null;
   const rawUserAgent = userAgent || req.headers["user-agent"] || null;
