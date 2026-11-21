@@ -12,6 +12,10 @@ const safeRoutes: Record<string, string> = {
   "leave-approvals": "/leave-approvals", requirements: "/requirements",
 };
 
+function displayWorkflowTitle(id: string, title: string) {
+  return id === "assistant-scope" ? "What Mochi can check" : title;
+}
+
 export function AssistantAnswer({ answer, onNavigate }: { answer: ArogyaAnswer; onNavigate: (href: string) => void }) {
   return <div className="flex flex-col gap-2">
     <p className="whitespace-pre-wrap font-medium text-slate-800">{answer.reply}</p>
@@ -25,9 +29,11 @@ export function AssistantAnswer({ answer, onNavigate }: { answer: ArogyaAnswer; 
       {answer.checkedAt && <p className="text-[10px] text-slate-500">Checked {new Date(answer.checkedAt).toLocaleString()}</p>}
     </dl>}
     {answer.clarification?.choices && answer.clarification.choices.length > 0 && <div className="flex flex-wrap gap-1">
-      {answer.clarification.choices.map((choice) => <span key={choice.id} className="rounded-full bg-teal-50 px-2 py-1 text-xs">{choice.label}</span>)}
+      {answer.clarification.choices.map((choice) => <span key={choice.id} className="rounded-full bg-teal-50 px-2 py-1 text-xs">
+        {answer.clarification?.type === "workflow" ? displayWorkflowTitle(choice.id, choice.label) : choice.label}
+      </span>)}
     </div>}
-    {answer.sources.length > 0 && <p className="text-[10px] text-slate-500">Source: {answer.sources.map((source) => source.title).join(", ")}</p>}
+    {answer.sources.length > 0 && <p className="text-[10px] text-slate-500">Source: {answer.sources.map((source) => displayWorkflowTitle(source.id, source.title)).join(", ")}</p>}
     {answer.actions.length > 0 && <div className="flex flex-wrap gap-2">
       {answer.actions.map((action) => {
         const href = safeRoutes[action.id];

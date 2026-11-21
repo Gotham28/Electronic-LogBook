@@ -92,13 +92,12 @@ function boundaryAction(element: HTMLElement) {
 function collectPageActions(role: Role, route: string, ids: WeakMap<HTMLElement, string>, nextId: { value: number }): Candidate[] {
   const main = document.querySelector<HTMLElement>("main[data-demo-page]");
   if (!main) return [];
-  const surfaces: HTMLElement[] = [main];
+  // Walk the open panel before background controls can dismiss the popover.
+  const surfaces = Array.from(document.querySelectorAll<HTMLElement>('[data-tour="arogya-panel"][data-state="open"],[data-tour="arogya-launcher"][aria-expanded="false"]')).filter(isVisible);
+  surfaces.push(main);
   const header = document.querySelector<HTMLElement>("header");
   if (header && isVisible(header)) surfaces.push(header);
-  document.querySelectorAll<HTMLElement>('[data-slot="dialog-content"],[data-slot="alert-dialog-content"],[data-tour="arogya-panel"],[role="menu"],[role="listbox"]').forEach((el) => {
-    if (isVisible(el)) surfaces.push(el);
-  });
-  document.querySelectorAll<HTMLElement>('[data-tour="arogya-launcher"]').forEach((el) => {
+  document.querySelectorAll<HTMLElement>('[data-slot="dialog-content"],[data-slot="alert-dialog-content"],[role="menu"],[role="listbox"]').forEach((el) => {
     if (isVisible(el)) surfaces.push(el);
   });
   const result: Candidate[] = [];
@@ -117,8 +116,8 @@ function collectPageActions(role: Role, route: string, ids: WeakMap<HTMLElement,
       if (node instanceof HTMLInputElement && ["submit", "button", "image", "reset", "password"].includes(node.type)) continue;
       const label = labelFor(node);
       if (OMIT_ACTION.test(label)) continue;
-      if (node.closest('[data-tour="arogya-panel"]') && /^(close arogya assistant|clear conversation)$/i.test(label)) continue;
-      if (node instanceof HTMLButtonElement && node.getAttribute("aria-label") === "Close Arogya assistant" && !document.querySelector('[data-tour="arogya-panel"]')) continue;
+      if (node.closest('[data-tour="arogya-panel"]') && /^(close mochi assistant|clear conversation)$/i.test(label)) continue;
+      if (node instanceof HTMLButtonElement && node.getAttribute("aria-label") === "Close Mochi assistant" && !document.querySelector('[data-tour="arogya-panel"]')) continue;
       if (node instanceof HTMLSelectElement && /demo role|demo department|resident for record checks/i.test(label)) continue;
       if ((node instanceof HTMLInputElement || node instanceof HTMLTextAreaElement || node instanceof HTMLSelectElement) && /patient|uhid|age|gender|diagnosis|complaint|history|examination|investigation|management|outcome|learning points|leave reason/i.test(label)) continue;
 
@@ -144,9 +143,9 @@ function captionFor(kind: string, preview: boolean, title: string, route: string
   const label = labelFor(element).trim().toLowerCase();
   if (preview && /^print(?:\b|,)/i.test(label)) return { title: "Print preview", body: "This option prepares a consolidated copy. The walkthrough shows its location without opening a printer or producing a document." };
   if (element.dataset.tourId === "notifications" || /^open notifications\b/i.test(label)) return { title: "Notifications", body: "This menu groups the notification items available to the selected role. The walkthrough opens the menu without completing those items." };
-  if (element.dataset.tour === "arogya-launcher") return { title: "Arogya assistant", body: "Open the role-specific assistant to see its suggested questions and sample responses." };
-  if (label === "my progress coach") return { title: "Arogya · progress coach", body: "This prompt summarizes progress from the sample workspace. The response is sample guidance, not a clinical assessment." };
-  if (label === "what's due?" || label === "what’s due?") return { title: "Arogya · what’s due", body: "This prompt shows a sample summary of notifications that need attention in this workspace." };
+  if (element.dataset.tour === "arogya-launcher") return { title: "Mochi assistant", body: "Open the role-specific assistant to see its suggested questions and sample responses." };
+  if (label === "my progress coach") return { title: "Mochi · progress coach", body: "This prompt summarizes progress from the sample workspace. The response is sample guidance, not a clinical assessment." };
+  if (label === "what's due?" || label === "what’s due?") return { title: "Mochi · what’s due", body: "This prompt shows a sample summary of notifications that need attention in this workspace." };
   if (preview && kind === "setting") return { title, body: "This setting can change the sample workspace. The cursor shows where it belongs while leaving its current value unchanged." };
   if (preview && kind === "choice option") return { title, body: "This menu option can change what is shown or update data. The walkthrough points it out without activating it." };
   if (preview) return { title, body: "This action can change or send information. The cursor shows where it belongs without activating it; you make the final choice." };
@@ -536,7 +535,7 @@ export function DemoMovie({ activeRole, navigationItems, navigate, blocked, arog
             if (!(await wait(100, token, tokenNow))) return false;
           }
           if (assistant.dataset.demoAssistantState === "thinking") {
-            setCaption({ title: "Arogya response", body: "The response is taking longer than expected. Playback is paused so the viewer can read it when it arrives." });
+            setCaption({ title: "Mochi response", body: "The response is taking longer than expected. Playback is paused so the viewer can read it when it arrives." });
             setStage("paused");
             return false;
           }

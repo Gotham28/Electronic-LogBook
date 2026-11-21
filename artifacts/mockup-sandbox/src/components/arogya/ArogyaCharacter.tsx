@@ -6,10 +6,12 @@ interface ArogyaCharacterProps {
   state?: ArogyaState;
   size?: number;
   className?: string;
+  closeUp?: boolean;
 }
 
-export function ArogyaCharacter({ state = "idle", size = 48, className = "" }: ArogyaCharacterProps) {
+export function ArogyaCharacter({ state = "idle", size = 48, className = "", closeUp = false }: ArogyaCharacterProps) {
   const shouldReduceMotion = useReducedMotion();
+  const imageSize = closeUp ? Math.round(size * 1.65) : size;
 
   const floatVariants: Variants = {
     idle: { y: shouldReduceMotion ? 0 : [0, -3, 0], transition: shouldReduceMotion ? { duration: 0 } : { repeat: Infinity, duration: 4, ease: "easeInOut" } },
@@ -21,13 +23,14 @@ export function ArogyaCharacter({ state = "idle", size = 48, className = "" }: A
   };
 
   return (
-    <div className={`relative flex items-center justify-center ${className}`} style={{ width: size, height: size }}>
+    <div className={`relative flex items-center justify-center ${closeUp ? "overflow-hidden rounded-full" : ""} ${className}`} style={{ width: size, height: size }}>
       <motion.img
         src={`${import.meta.env.BASE_URL}hoot-body.png`}
         alt=""
-        width={size}
-        height={size}
-        className="object-contain"
+        width={imageSize}
+        height={imageSize}
+        className={closeUp ? "absolute top-0 left-1/2 max-w-none object-contain" : "object-contain"}
+        style={closeUp ? { marginLeft: -imageSize * 0.56 } : undefined}
         variants={floatVariants}
         animate={state}
         initial="idle"

@@ -21,6 +21,7 @@ import {
 import { useDemoTypedValue } from "./demo-movie/DemoTypedText";
 import { useDemoMotionEnabled } from "@/components/DemoMotion";
 import { openArogya, publishArogyaContext } from "@/lib/arogya-context";
+import { displayAssistantError } from "./arogya/assistantCopy";
 
 function blankScores(): Record<AppraisalScoreKey, string> {
   return Object.fromEntries(quarterlyAppraisalCategories.map(({ key }) => [key, ""])) as Record<AppraisalScoreKey, string>;
@@ -215,7 +216,7 @@ export function QuarterlyAppraisalSection() {
     } catch (err: any) {
       // apiPost throws ApiError; the Arogya routes return { error: "..." } not { message: "..." }
       // so we read err.data.error first, then fall back to err.message
-      setDraftError(err?.data?.error || err?.message || "Arogya couldn't draft remarks right now.");
+      setDraftError(displayAssistantError(err?.data?.error || err?.message, "Mochi couldn't draft remarks right now."));
     } finally {
       setDraftLoading(false);
     }
@@ -333,7 +334,7 @@ export function QuarterlyAppraisalSection() {
                     <div className="min-w-0">
                       <Label htmlFor="appraisal-faculty-remarks">Faculty remarks</Label>
                       <p id="appraisal-draft-help" className="mt-1 text-xs leading-relaxed text-slate-500">
-                        Arogya drafts from training progress and posting data; it does not use the selected quarter or entered scores.
+                        Mochi drafts from training progress and posting data; it does not use the selected quarter or entered scores.
                       </p>
                     </div>
                     <Button
@@ -348,7 +349,7 @@ export function QuarterlyAppraisalSection() {
                       id="appraisal-draft-arogya"
                     >
                       <Wand2 className="h-3.5 w-3.5" aria-hidden="true" />
-                      {draftLoading ? "Drafting…" : "Draft with Arogya AI"}
+                      {draftLoading ? "Drafting…" : "Draft with Mochi"}
                     </Button>
                   </div>
                   {draftError && <div className="flex flex-wrap items-center justify-between gap-2" role="alert">
