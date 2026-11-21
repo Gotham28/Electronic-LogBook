@@ -16,7 +16,7 @@ export function MaintenanceNoticeBubble({ heading, message, onOpen, onDismiss }:
           <h2 className="mt-1 text-sm font-semibold text-slate-900">{heading}</h2>
           <p className="mt-2 text-sm leading-relaxed text-slate-700">{message}</p>
           <Button type="button" variant="link" size="sm" onClick={onOpen} className="mt-1 h-auto px-0 py-1 text-teal-800">
-            View in Arogya
+            View in Mochi
           </Button>
         </div>
         <Button type="button" variant="ghost" size="icon" aria-label="Dismiss maintenance notice" onClick={onDismiss} className="-mr-2 -mt-2 h-8 w-8 shrink-0 text-slate-500">

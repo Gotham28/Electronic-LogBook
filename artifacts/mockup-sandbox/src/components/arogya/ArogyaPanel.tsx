@@ -8,6 +8,7 @@ import { apiGet, apiPost, type ArogyaAnswer, type ArogyaContextResponse } from "
 import { isDemoMode } from "@/lib/session";
 import { AROGYA_CONTEXT_EVENT, type ArogyaSelectedContext } from "@/lib/arogya-context";
 import { AssistantAnswer } from "./AssistantAnswer";
+import { displayAssistantError } from "./assistantCopy";
 import { playDemoSound } from "@/lib/demoSounds";
 import { DemoTypedText } from "../demo-movie/DemoTypedText";
 import { isDemoMovieActive } from "@/lib/demoSession";
@@ -87,7 +88,7 @@ export function ArogyaPanel({ open, onOpenChange, role, actorKey, workflowId, st
         }
       }
     }).catch((error: any) => {
-      if (!cancelled) setContextError(error?.data?.error || error?.message || "Arogya could not load its role and department settings.");
+      if (!cancelled) setContextError(displayAssistantError(error?.data?.error || error?.message, "Mochi could not load its role and department settings."));
     });
     return () => { cancelled = true; };
   }, [actorKey, role, studentProfileId]);
@@ -176,7 +177,7 @@ export function ArogyaPanel({ open, onOpenChange, role, actorKey, workflowId, st
     const requestActorKey = actorKey;
 
     try {
-      if (!assistantContext) throw new Error(contextError || "Arogya is still loading its settings.");
+      if (!assistantContext) throw new Error(contextError || "Mochi is still loading its settings.");
       let data: any;
       if (assistantContext.mode === "v2") {
         const prior: Array<{ question: string; reply: string }> = [];
@@ -200,7 +201,7 @@ export function ArogyaPanel({ open, onOpenChange, role, actorKey, workflowId, st
             ...(selectedContext.validationCodes ? { validationCodes: selectedContext.validationCodes } : {}),
           },
         });
-        if (typeof data.reply !== "string" || !Array.isArray(data.steps) || !Array.isArray(data.sources) || !Array.isArray(data.facts) || !Array.isArray(data.actions)) throw new Error("Invalid Arogya response");
+        if (typeof data.reply !== "string" || !Array.isArray(data.steps) || !Array.isArray(data.sources) || !Array.isArray(data.facts) || !Array.isArray(data.actions)) throw new Error("Invalid Mochi response");
       } else {
         data = await apiPost("/api/arogya/ask", { question: q });
         if (typeof data.reply !== "string") throw new Error("Invalid shape");
@@ -212,7 +213,7 @@ export function ArogyaPanel({ open, onOpenChange, role, actorKey, workflowId, st
     } catch (err: any) {
       if (requestId !== requestSequence.current || requestActorKey !== actorKey) return;
       setCharacterState("error");
-      setMessages((prev) => [...prev, { role: "arogya", text: err?.data?.error ?? "Arogya couldn't answer right now.", error: true }]);
+      setMessages((prev) => [...prev, { role: "arogya", text: displayAssistantError(err?.data?.error, "Mochi couldn't answer right now."), error: true }]);
     }
   };
 
@@ -234,7 +235,7 @@ export function ArogyaPanel({ open, onOpenChange, role, actorKey, workflowId, st
       setMessages((prev) => [...prev, { role: "arogya", tips: data.tips }]);
     } catch (err: any) {
       setCharacterState("error");
-      setMessages((prev) => [...prev, { role: "arogya", text: err?.data?.error ?? "Arogya couldn't answer right now.", error: true }]);
+      setMessages((prev) => [...prev, { role: "arogya", text: displayAssistantError(err?.data?.error, "Mochi couldn't answer right now."), error: true }]);
     }
   };
 
@@ -258,7 +259,7 @@ export function ArogyaPanel({ open, onOpenChange, role, actorKey, workflowId, st
       setMessages((prev) => [...prev, { role: "arogya", text: data.reply }]);
     } catch (err: any) {
       setCharacterState("error");
-      setMessages((prev) => [...prev, { role: "arogya", text: err?.data?.error ?? "Arogya couldn't answer right now.", error: true }]);
+      setMessages((prev) => [...prev, { role: "arogya", text: displayAssistantError(err?.data?.error, "Mochi couldn't answer right now."), error: true }]);
     }
   };
 
@@ -307,10 +308,10 @@ export function ArogyaPanel({ open, onOpenChange, role, actorKey, workflowId, st
         <button
           type="button"
           data-tour="arogya-launcher"
-          aria-label={open ? "Close Arogya assistant" : "Open Arogya assistant"}
+          aria-label={open ? "Close Mochi assistant" : "Open Mochi assistant"}
           className="print:hidden fixed bottom-[calc(76px+env(safe-area-inset-bottom))] right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full border-[3px] border-[#009689] bg-white shadow-[0_12px_24px_rgba(15,23,42,0.12)] transition-colors hover:bg-teal-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2 sm:bottom-6 sm:right-6"
         >
-          <ArogyaCharacter state={characterState} size={36} />
+          <ArogyaCharacter state={characterState} size={44} closeUp />
         </button>
       </PopoverTrigger>
       <PopoverContent
@@ -323,7 +324,7 @@ export function ArogyaPanel({ open, onOpenChange, role, actorKey, workflowId, st
         aria-describedby="arogya-panel-description"
         data-tour="arogya-panel"
         data-demo-assistant-state={characterState}
-        className="arogya-chat-surface flex h-[min(68dvh,38rem)] min-h-0 w-[min(26rem,calc(100vw-1.5rem))] max-h-[calc(100dvh-1.5rem)] flex-col gap-0 overflow-hidden rounded-[1.5rem] border border-teal-900/10 bg-slate-50 p-0 text-slate-800 shadow-[0_24px_70px_rgba(15,23,42,0.22)]"
+        className="arogya-chat-surface flex h-[min(68dvh,38rem)] min-h-0 w-[min(26rem,calc(100vw-1.5rem),var(--radix-popover-content-available-width,100vw))] max-h-[calc(100dvh-1.5rem)] flex-col gap-0 overflow-hidden rounded-[1.5rem] border border-teal-900/10 bg-slate-50 p-0 text-slate-800 shadow-[0_24px_70px_rgba(15,23,42,0.22)]"
       >
         <style>{`
           @keyframes arogya-expand {
@@ -345,11 +346,11 @@ export function ArogyaPanel({ open, onOpenChange, role, actorKey, workflowId, st
         `}</style>
         <header className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 py-3">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-teal-100/80 bg-teal-50/80">
-              <img src={`${import.meta.env.BASE_URL}gothos-owl.svg`} alt="" width={32} height={32} />
+            <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-2xl border border-teal-100/80">
+              <img src={`${import.meta.env.BASE_URL}gothos-logo.png`} alt="Gothos Labs" width={66} height={57} className="absolute -top-1 left-1/2 h-auto w-[66px] max-w-none -translate-x-1/2" />
             </div>
             <div className="min-w-0">
-              <h2 id="arogya-panel-heading" className="font-display text-base font-bold leading-tight text-teal-950">Arogya</h2>
+              <h2 id="arogya-panel-heading" className="font-display text-base font-bold leading-tight text-teal-950">Mochi</h2>
               <p className="mt-0.5 text-xs font-medium text-slate-500">Your assistant</p>
             </div>
           </div>
@@ -357,13 +358,13 @@ export function ArogyaPanel({ open, onOpenChange, role, actorKey, workflowId, st
             type="button"
             size="icon"
             variant="ghost"
-            aria-label="Close Arogya assistant"
+            aria-label="Close Mochi assistant"
             onClick={() => onOpenChange(false)}
             className="h-11 w-11 shrink-0 rounded-full text-slate-500 hover:bg-white/80 hover:text-slate-800"
           >
             <X className="h-4 w-4" aria-hidden="true" />
           </Button>
-          <p id="arogya-panel-description" className="sr-only">Arogya assistant panel with role-specific suggestions and a prompt box.</p>
+          <p id="arogya-panel-description" className="sr-only">Mochi assistant panel with role-specific suggestions and a prompt box.</p>
         </header>
 
         <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-3">
@@ -421,7 +422,7 @@ export function ArogyaPanel({ open, onOpenChange, role, actorKey, workflowId, st
             </div>}
           </section>
 
-          <div role="log" aria-label="Arogya conversation" aria-live="polite" data-tour="arogya-messages" className="flex min-h-0 flex-1 flex-col gap-3">
+          <div role="log" aria-label="Mochi conversation" aria-live="polite" data-tour="arogya-messages" className="flex min-h-0 flex-1 flex-col gap-3">
             {messages.length === 0 ? (
               <div className="my-auto flex min-h-32 flex-col items-center justify-center rounded-2xl border border-white/80 bg-white/55 px-5 py-5 text-center shadow-sm">
                 <ArogyaCharacter state={characterState} size={54} />
@@ -494,7 +495,7 @@ export function ArogyaPanel({ open, onOpenChange, role, actorKey, workflowId, st
             setCharacterState("idle");
           }} className="text-xs font-medium text-slate-500 underline decoration-slate-300 underline-offset-2 hover:text-slate-800">Clear conversation</button></div>}
           <form onSubmit={handleAsk} className="flex flex-col gap-1.5">
-            <label htmlFor="arogya-ask-input" className="text-xs font-semibold text-slate-700">Ask Arogya</label>
+            <label htmlFor="arogya-ask-input" className="text-xs font-semibold text-slate-700">Ask Mochi</label>
             <div className="relative">
               <Input
                 id="arogya-ask-input"
@@ -507,7 +508,7 @@ export function ArogyaPanel({ open, onOpenChange, role, actorKey, workflowId, st
               />
               <Button
                 type="submit"
-                aria-label="Send prompt to Arogya"
+                aria-label="Send prompt to Mochi"
                 disabled={characterState === "thinking" || !question.trim() || assistantContext === null}
                 size="icon"
                 className="absolute right-0.5 top-0.5 h-11 w-11 rounded-lg bg-teal-700 text-white shadow-sm hover:bg-teal-800"

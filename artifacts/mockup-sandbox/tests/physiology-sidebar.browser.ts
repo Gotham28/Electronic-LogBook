@@ -53,9 +53,17 @@ try {
       knowledgeVersion: "synthetic", capabilitySignature: "synthetic",
     };
     else if (url.pathname === "/api/arogya/ask") {
-      assistantRequests.push(request.postDataJSON());
-      body = { reply: "Synthetic contextual answer", kind: "help", steps: [], sources: [], facts: [], actions: [],
-        checkedAt: "2026-10-23T00:00:00Z", knowledgeVersion: "synthetic", capabilitySignature: "synthetic" };
+      const payload = request.postDataJSON();
+      assistantRequests.push(payload);
+      if (payload.question === "Simulate unavailable assistant") {
+        status = 503;
+        body = { error: "Arogya is not available right now." };
+      } else {
+        const workflow = { id: "assistant-scope", title: "What Arogya can check" };
+        body = { reply: "Synthetic contextual answer for Arogya E-LogBook", kind: "clarification", steps: [], sources: [workflow], facts: [], actions: [],
+          clarification: { type: "workflow", choices: [{ id: workflow.id, label: workflow.title }] },
+          checkedAt: "2026-10-23T00:00:00Z", knowledgeVersion: "synthetic", capabilitySignature: "synthetic" };
+      }
     }
     else if (url.pathname.endsWith("/catalog")) body = {
       department: { id: 9002, name: profile ? "Physiology" : "Other Department", code: profile ? "PSI" : "OTHER" },
@@ -116,19 +124,29 @@ try {
     for (const related of category.relatedPages ?? []) {
       assert.equal(await page.getByRole("navigation", { name: "Related records" }).getByRole("link", { name: related.title, exact: true }).getAttribute("href"), related.href);
     }
-    await page.getByRole("button", { name: "Open Arogya assistant", exact: true }).click();
+    await page.getByRole("button", { name: "Open Mochi assistant", exact: true }).click();
     const requestPromise = page.waitForRequest((request: any) => new URL(request.url()).pathname === "/api/arogya/ask");
     await page.getByPlaceholder("Write a prompt...", { exact: true }).fill("How do I use this page?");
-    await page.getByRole("button", { name: "Send prompt to Arogya", exact: true }).click();
+    await page.getByRole("button", { name: "Send prompt to Mochi", exact: true }).click();
     const assistantRequest = await requestPromise;
     assert.equal(assistantRequest.postDataJSON().context.workflowId, "academics", category.id);
     assert.equal(assistantRequest.postDataJSON().context.studentId, user.studentProfileId);
-    await page.getByText("Synthetic contextual answer", { exact: true }).last().waitFor();
-    await page.locator('[data-tour="arogya-panel"]').getByRole("button", { name: "Close Arogya assistant", exact: true }).click();
+    await page.getByText("Synthetic contextual answer for Arogya E-LogBook", { exact: true }).last().waitFor();
+    await page.locator('[data-tour="arogya-panel"]').getByRole("button", { name: "Close Mochi assistant", exact: true }).click();
   }
   console.log("PASS all five category routes: correct titles, active menu and existing assessment/posting/thesis/conference links");
   assert.equal(assistantRequests.length, 5);
-  console.log("PASS Arogya context: all five category pages send academics workflow and existing student profile ID");
+  console.log("PASS Mochi context: all five category pages send academics workflow and existing student profile ID");
+
+  await page.getByRole("button", { name: "Open Mochi assistant", exact: true }).click();
+  const assistant = page.getByRole("dialog", { name: "Mochi", exact: true });
+  await assistant.getByText("What Mochi can check", { exact: true }).last().waitFor();
+  await assistant.getByText("Source: What Mochi can check", { exact: true }).last().waitFor();
+  await assistant.getByLabel("Ask Mochi", { exact: true }).fill("Simulate unavailable assistant");
+  await assistant.getByRole("button", { name: "Send prompt to Mochi", exact: true }).click();
+  await assistant.getByText("Mochi is not available right now.", { exact: true }).waitFor();
+  await assistant.getByRole("button", { name: "Close Mochi assistant", exact: true }).click();
+  console.log("PASS Mochi copy: workflow labels and assistant errors use Mochi while the Arogya E-LogBook name stays visible");
 
   await sidebar.getByRole("link", { name: "Practicals & Postings", exact: true }).click();
   await page.getByRole("combobox", { name: "Show year", exact: true }).click();
