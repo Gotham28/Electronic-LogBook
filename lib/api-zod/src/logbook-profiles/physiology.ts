@@ -77,7 +77,7 @@ export const physiologyLogbook: AcademicLogbookProfile = {
     section("Formative assessment", [1, 2], { fields: marks }),
     section("District Residency Programme", [2], { topicLabel: "Posting / activities", multilineTopic: true,
       fields: [{ key: "institution", label: "Institution / location", type: "text", required: true, maxLength: 160 }, endDate] }),
-    section("Postings in allied departments", [3], { topicLabel: "Topics / activities", multilineTopic: true, fields: [department, endDate] }),
+    section("Postings in allied departments", allYears, { topicLabel: "Topics / activities", multilineTopic: true, fields: [department, endDate] }),
     section("Papers presented / published", [3], { topicLabel: "Paper title", fields: [
       { key: "paperStatus", label: "Paper status", type: "select", options: ["Presented", "Published"], required: true },
       { key: "publication", label: "Journal / event / publication reference", type: "text", maxLength: 500 },
