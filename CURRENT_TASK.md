@@ -115,9 +115,8 @@ Tests
 - [ ] Part 3 — error-state buttons + grounding label + tests. Separate commit.
 
 ## Blocked on developer input
-- [ ] Exact `OPENAI_MODEL` name in production (the model name, not the key) — waiting on:
-      developer, so the ₹500 ceiling can be checked with real per-token prices before Part 2's
-      HOD card ships. Parts 0, 1, 3 may proceed without it.
+- [x] Render showed `OPENAI_MODEL=gpt-4o-mini` for `elogbook-api` on 2026-11-23. Use that
+      model's published token prices to check the ₹500 ceiling before the Part 2 HOD card ships.
 
 ## Order
 ### Steps inside this task
@@ -131,7 +130,13 @@ Tests
 
 ### Where this task sits
 - Before this: nothing.
-- After this: re-check usage numbers after 2–4 weeks of pilot use; idea 4 once college approval exists.
+- After this:
+  - Scope the `gpt-6-luna` migration for `elogbook-api` as a separate task. Prioritize low
+    cost and latency for tool-assisted chats. Verify both provider paths, structured JSON,
+    and function calls with synthetic input in an approved OpenAI test project before
+    changing the Render setting.
+  - Re-check usage numbers after 2–4 weeks of pilot use.
+  - Revisit idea 4 once college approval exists.
 
 ## Verification required before this is considered done
 - [ ] `pnpm test` in `artifacts/api-server` — full pass pasted, including
