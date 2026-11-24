@@ -1,20 +1,21 @@
-import { Router } from "express";
-import { and, eq, inArray } from "drizzle-orm";
+import { Router, type RequestHandler } from "express";
+import { and, count, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
-import { requireAuth } from "../middlewares/auth.js";
+import { requireAuth, requireDepartment, requireRole } from "../middlewares/auth.js";
 import { _arogya, checkAndIncrementLimit, buildProgressFacts, buildAppraisalFacts } from "../lib/arogya.js";
 import { callerCanAccessStudent, findStudent } from "../lib/appraisals.js";
 import { buildDepartmentReportFacts } from "../lib/department-report.js";
-import { db, departmentsTable, studentsTable, usersTable } from "@workspace/db";
+import { assistantUsageEventsTable, db, departmentsTable, studentsTable, usersTable, type ProcedureType } from "@workspace/db";
 import { getDepartmentFeatures } from "../lib/department-features.js";
 import { resolveConfigDepartmentId } from "../lib/department-config-source.js";
 import { AROGYA_HELP_GUIDE } from "../lib/arogya-help.js";
 import { idSchema } from "../lib/validation.js";
 import { capabilitySignature, knowledgeVersion, roleWorkflows } from "../lib/arogya/knowledge/index.js";
-import { canonicalArogyaRole } from "../lib/arogya/policy.js";
+import { assertAuthorizedStudent, canonicalArogyaRole } from "../lib/arogya/policy.js";
 import { normalizeHistory, scrubAccountNames, containsSensitiveClinicalInput } from "../lib/arogya/input-privacy.js";
 import { answerArogya, ArogyaProviderError, validateV2Enabled } from "../lib/arogya/provider.js";
 import type { ArogyaLogType } from "../lib/arogya/facts.js";
+import { getWeeklyDepartmentDigest } from "../lib/arogya/weekly-digest.js";
 
 const router = Router();
 
@@ -34,6 +35,176 @@ const askV2Schema = z.object({
   history: z.unknown().optional(),
   context: contextSchema.optional(),
 }).strict();
+
+const usageEventSchema = z.object({
+  eventType: z.enum(["panel_open", "quick_action_click", "nudge_click"]),
+}).strict();
+
+const postgresIntegerMax = 2_147_483_647;
+const usageCountQuery = z.object({ departmentId: idSchema.max(postgresIntegerMax).optional() }).strict();
+type UsageFeature = "ask" | "progress-coach" | "appraisal-draft" | "department-report" | "department-report-weekly";
+
+function trackMochiRequest(feature: UsageFeature): RequestHandler {
+  return (req, res, next) => {
+    const actor = req.user!;
+    const role = canonicalArogyaRole(actor.role);
+    if (role && Number.isSafeInteger(actor.departmentId) && actor.departmentId! > 0) {
+      res.once("finish", () => {
+        const tokenCount = res.locals.mochiTokenCount;
+        void db.insert(assistantUsageEventsTable).values({
+          userId: actor.id,
+          role,
+          departmentId: actor.departmentId,
+          feature: res.locals.mochiAskV2 === true ? "ask-v2" : feature,
+          eventType: "api_request",
+          httpStatus: res.statusCode,
+          tokenCount: Number.isSafeInteger(tokenCount) && tokenCount >= 0 && tokenCount <= postgresIntegerMax
+            ? tokenCount : null,
+        }).catch(() => {
+          req.log.warn({ userId: actor.id, status: 500 }, "Mochi request usage could not be recorded");
+        });
+      });
+    }
+    next();
+  };
+}
+
+router.post("/usage", requireAuth, requireDepartment, async (req, res) => {
+  const actor = req.user!;
+  const role = canonicalArogyaRole(actor.role);
+  if (!role) {
+    res.status(403).json({ error: "Mochi usage is unavailable for this account type." });
+    return;
+  }
+
+  const event = usageEventSchema.safeParse(req.body);
+  if (!event.success) {
+    res.status(400).json({ error: "Invalid Mochi usage event." });
+    return;
+  }
+
+  try {
+    await db.insert(assistantUsageEventsTable).values({
+      userId: actor.id,
+      role,
+      departmentId: actor.departmentId,
+      feature: "mochi",
+      eventType: event.data.eventType,
+    });
+    res.json({ recorded: true });
+  } catch {
+    res.status(500).json({ error: "Mochi usage could not be recorded." });
+  }
+});
+
+router.get("/usage", requireAuth, async (req, res) => {
+  const actor = req.user!;
+  if (actor.role !== "admin" && actor.role !== "hod") {
+    res.status(403).json({ error: "You cannot view Mochi usage counts." });
+    return;
+  }
+
+  const query = usageCountQuery.safeParse(req.query);
+  if (!query.success) {
+    res.status(400).json({ error: "Invalid department filter." });
+    return;
+  }
+
+  let departmentId = query.data.departmentId;
+  if (actor.role === "hod") {
+    const assignedDepartment = actor.departmentId;
+    if (!assignedDepartment || !Number.isSafeInteger(assignedDepartment) || assignedDepartment < 1
+      || (departmentId !== undefined && departmentId !== assignedDepartment)) {
+      res.status(403).json({ error: "You cannot view Mochi usage for this department." });
+      return;
+    }
+    departmentId = assignedDepartment;
+  }
+
+  try {
+    let collegeId: number | undefined;
+    if (actor.role === "admin" && actor.departmentId !== null) {
+      const [assignment] = await db.select({ collegeId: departmentsTable.collegeId }).from(departmentsTable)
+        .where(eq(departmentsTable.id, actor.departmentId)).limit(1);
+      if (!assignment) {
+        res.status(403).json({ error: "A college assignment is required." });
+        return;
+      }
+      collegeId = assignment.collegeId;
+    }
+
+    if (departmentId !== undefined) {
+      const [department] = await db.select({ collegeId: departmentsTable.collegeId }).from(departmentsTable)
+        .where(eq(departmentsTable.id, departmentId)).limit(1);
+      if (!department) {
+        res.status(404).json({ error: "Department not found." });
+        return;
+      }
+      if (collegeId !== undefined && department.collegeId !== collegeId) {
+        res.status(403).json({ error: "You cannot view Mochi usage for this department." });
+        return;
+      }
+    }
+
+    const scope = and(
+      departmentId === undefined ? undefined : eq(assistantUsageEventsTable.departmentId, departmentId),
+      collegeId === undefined ? undefined : inArray(assistantUsageEventsTable.departmentId,
+        db.select({ id: departmentsTable.id }).from(departmentsTable).where(eq(departmentsTable.collegeId, collegeId))),
+    );
+    const counts = await db.select({
+      feature: assistantUsageEventsTable.feature,
+      eventType: assistantUsageEventsTable.eventType,
+      count: count(),
+    }).from(assistantUsageEventsTable)
+      .where(scope)
+      .groupBy(assistantUsageEventsTable.feature, assistantUsageEventsTable.eventType)
+      .orderBy(assistantUsageEventsTable.feature, assistantUsageEventsTable.eventType);
+    res.json({ departmentId: departmentId ?? null, counts });
+  } catch {
+    res.status(500).json({ error: "Mochi usage counts could not be loaded." });
+  }
+});
+
+router.get("/progress-gaps", requireAuth, requireDepartment, requireRole(["student"]), async (req, res) => {
+  const actor = req.user!;
+  try {
+    const resident = await assertAuthorizedStudent(actor);
+    if (resident.departmentId !== actor.departmentId) {
+      res.status(403).json({ error: "You cannot view these progress targets." });
+      return;
+    }
+    const facts = await buildProgressFacts(resident.id, actor.departmentId!, db);
+    const config = facts.departmentTargets;
+    const features = config?.enabledFeatures ?? {};
+    const gaps: Array<{ label: string; verified: number; target: number }> = [];
+    const includeGap = (label: string, verified: number, target: number | null | undefined) => {
+      if (target != null && target > 0 && verified < target) gaps.push({ label, verified, target });
+    };
+    if (!features.hideCaseLogs) {
+      includeGap("Cases", facts.caseCategories.reduce((sum, item) => sum + item.verified, 0), config?.requiredCases);
+    }
+    if (!features.hideProcedureLogs) {
+      includeGap("Procedures", facts.procedures.reduce((sum, item) => sum + item.verified, 0), config?.requiredProcedures);
+      const verifiedByProcedure = new Map(facts.procedures.map((item) => [`${item.group}\0${item.name}`, item.verified]));
+      for (const requirement of facts.procedureRequirements as ProcedureType[]) {
+        includeGap(`${requirement.group}: ${requirement.name}`,
+          verifiedByProcedure.get(`${requirement.group}\0${requirement.name}`) ?? 0, requirement.required);
+      }
+    }
+    includeGap("Academic activities", facts.academics.reduce((sum, item) => sum + item.verified, 0), config?.requiredAcademic);
+    res.json({ gaps });
+  } catch (error) {
+    if (error instanceof Error && error.message === "AROGYA_SCOPE_404") {
+      res.status(404).json({ error: "Resident profile not found." });
+      return;
+    }
+    if (error instanceof Error && error.message === "AROGYA_SCOPE_403") {
+      res.status(403).json({ error: "You cannot view these progress targets." });
+      return;
+    }
+    res.status(500).json({ error: "Progress targets could not be loaded." });
+  }
+});
 
 router.get("/context", requireAuth, async (req, res) => {
   const role = canonicalArogyaRole(req.user!.role);
@@ -62,7 +233,7 @@ router.get("/context", requireAuth, async (req, res) => {
   }
 });
 
-router.post("/ask", requireAuth, async (req, res) => {
+router.post("/ask", requireAuth, trackMochiRequest("ask"), async (req, res) => {
   const userId = String(req.user!.id);
 
   // Arogya is for residents, professors, and HODs only.
@@ -72,6 +243,7 @@ router.post("/ask", requireAuth, async (req, res) => {
   }
 
   if (validateV2Enabled()) {
+    res.locals.mochiAskV2 = true;
     const parsed = askV2Schema.safeParse(req.body);
     if (!parsed.success) { res.status(400).json({ error: "Invalid Arogya request." }); return; }
     const history = normalizeHistory(parsed.data.history);
@@ -213,6 +385,7 @@ router.post("/ask", requireAuth, async (req, res) => {
     checkAndIncrementLimit(userId);
 
     const { reply, tokenCount } = await _arogya.call(sanitisedQuestion, factsPack);
+    res.locals.mochiTokenCount = tokenCount;
     console.log(JSON.stringify({ userId, feature: "ask", httpStatus: 200, tokenCount }));
     res.json({ reply });
   } catch (err: any) {
@@ -231,7 +404,7 @@ router.post("/ask", requireAuth, async (req, res) => {
   }
 });
 
-router.post("/progress-coach", requireAuth, async (req, res) => {
+router.post("/progress-coach", requireAuth, trackMochiRequest("progress-coach"), async (req, res) => {
   const userId = String(req.user!.id);
 
   if (!req.user!.departmentId) {
@@ -263,6 +436,7 @@ router.post("/progress-coach", requireAuth, async (req, res) => {
     const userMessage = `Give me exactly three short progress coach tips based only on the facts provided. Return them as a JSON array of three strings and nothing else. Example: ["tip one","tip two","tip three"]`;
 
     const { reply, tokenCount } = await _arogya.call(userMessage, factsPack);
+    res.locals.mochiTokenCount = tokenCount;
     let tips;
     try {
       tips = JSON.parse(reply);
@@ -289,7 +463,7 @@ router.post("/progress-coach", requireAuth, async (req, res) => {
   }
 });
 
-router.post("/appraisal-draft/:studentId", requireAuth, async (req, res) => {
+router.post("/appraisal-draft/:studentId", requireAuth, trackMochiRequest("appraisal-draft"), async (req, res) => {
   const userId = String(req.user!.id);
 
   // Step 1: parse studentId
@@ -334,6 +508,7 @@ router.post("/appraisal-draft/:studentId", requireAuth, async (req, res) => {
     // Step 8: call AI
     const userMessage = `Draft facultyRemarks and remediationSuggestions for a quarterly appraisal. Based only on the facts provided, write two separate plain-text paragraphs. Return a JSON object with exactly two keys: facultyRemarks and remediationSuggestions. Each value must be a plain string of 2-4 sentences. Do not invent any number. Do not mention scores or suggest any numeric score value. Example: {"facultyRemarks":"...","remediationSuggestions":"..."}`;
     const { reply, tokenCount } = await _arogya.call(userMessage, factsPack);
+    res.locals.mochiTokenCount = tokenCount;
 
     // Step 9: parse and validate reply
     let parsedReply: { facultyRemarks: string; remediationSuggestions: string };
@@ -365,7 +540,37 @@ router.post("/appraisal-draft/:studentId", requireAuth, async (req, res) => {
   }
 });
 
-router.post("/department-report", requireAuth, async (req, res) => {
+router.post("/department-report/weekly", requireAuth, requireDepartment, requireRole(["hod"]),
+  trackMochiRequest("department-report-weekly"), async (req, res) => {
+    if (req.body?.departmentId !== undefined) {
+      res.status(403).json({ error: "Use the department assigned to your account." });
+      return;
+    }
+    if (!z.object({}).strict().safeParse(req.body ?? {}).success) {
+      res.status(400).json({ error: "Invalid weekly digest request." });
+      return;
+    }
+    const departmentId = req.user!.departmentId!;
+    try {
+      const [department] = await db.select({ id: departmentsTable.id }).from(departmentsTable)
+        .where(eq(departmentsTable.id, departmentId)).limit(1);
+      if (!department) {
+        res.status(404).json({ error: "Department not found." });
+        return;
+      }
+      const { tokenCount, ...digest } = await getWeeklyDepartmentDigest(department.id);
+      res.locals.mochiTokenCount = tokenCount;
+      if (digest.status === "failed") {
+        res.status(503).json({ error: "This week's Mochi digest is unavailable." });
+        return;
+      }
+      res.status(digest.status === "pending" ? 202 : 200).json(digest);
+    } catch {
+      res.status(500).json({ error: "The Mochi digest could not be loaded." });
+    }
+  });
+
+router.post("/department-report", requireAuth, trackMochiRequest("department-report"), async (req, res) => {
   const userId = String(req.user!.id);
 
   if (req.user!.role !== "hod") {
@@ -391,6 +596,7 @@ router.post("/department-report", requireAuth, async (req, res) => {
       : "List only the residents who are below target (belowTarget: true in the facts). For each, write one sentence describing their specific gaps using only the facts provided. Use the resident placeholders as given. Return a plain list, one resident per line. Do not invent any number. If no residents are below target, say so.";
 
     const { reply, tokenCount } = await _arogya.call(userMessage, facts, nameMap);
+    res.locals.mochiTokenCount = tokenCount;
 
     console.log(JSON.stringify({ userId, feature: "department-report", httpStatus: 200, tokenCount }));
     res.json({ reply, type });

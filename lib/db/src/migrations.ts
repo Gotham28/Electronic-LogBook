@@ -17,6 +17,8 @@ export async function applyMigrations(connection: MigrationConnection, adoptExis
   files.push("0029_certificate_files.sql");
   files.push("0030_colleges.sql");
   files.push("0031_support_tickets.sql");
+  files.push("0032_assistant_usage_events.sql");
+  files.push("0033_assistant_department_weekly_digests.sql");
   files.push("0034_department_label_overrides.sql");
   await connection.query("BEGIN");
   try {

@@ -21,10 +21,14 @@ import { DemoCount, DemoProgress, useDemoAnimatedValue } from "@/components/Demo
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { formatLogbookDate } from "@/lib/logbook-config";
-import { apiGet } from "@/lib/apiClient";
+import { apiGet, apiPost } from "@/lib/apiClient";
 import { isDemoMode } from "@/lib/session";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useDepartment } from "@/lib/department-context";
+import { openArogya } from "@/lib/arogya-context";
+
+type ProgressGap = { label: string; verified: number; target: number };
+type ProgressGapsState = { userId: number; gaps: ProgressGap[] } | { userId: number; error: string };
 
 export function Dashboard() {
   const { config: departmentConfig, clinicalWorkCategories, clinicalWorkSubtypes, label } = useDepartment();
@@ -34,6 +38,8 @@ export function Dashboard() {
   const [logs, setLogs] = React.useState<any>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  const [progressGapsState, setProgressGapsState] = React.useState<ProgressGapsState | null>(null);
+  const [progressRetry, setProgressRetry] = React.useState(0);
   const fetchDashboardData = React.useCallback(async () => {
     if (!user?.studentProfileId) {
       setError("No student profile ID found. Please log in as a student.");
@@ -55,6 +61,21 @@ export function Dashboard() {
   React.useEffect(() => {
     fetchDashboardData();
   }, [fetchDashboardData]);
+
+  React.useEffect(() => {
+    const userId = user?.id;
+    setProgressGapsState(null);
+    if (!userId || isDemoMode()) return;
+
+    let active = true;
+    void apiGet<{ gaps: ProgressGap[] }>("/api/arogya/progress-gaps").then(({ gaps }) => {
+      if (!Array.isArray(gaps)) throw new Error("Invalid progress response");
+      if (active) setProgressGapsState({ userId, gaps });
+    }).catch(() => {
+      if (active) setProgressGapsState({ userId, error: "Progress targets could not be loaded." });
+    });
+    return () => { active = false; };
+  }, [user?.id, progressRetry]);
 
   if (isLoading) {
     return (
@@ -129,9 +150,38 @@ export function Dashboard() {
   const progressLabel = completion !== null ? (completion >= 75 ? "On track" : completion >= 40 ? "Needs attention" : "Getting started") : "Getting started";
 
   const hasAnyNumericTargets = configured.length > 0;
+  const progressGaps = progressGapsState?.userId === user?.id ? progressGapsState : null;
 
   return (
     <div className="section-spacing pb-12">
+      {progressGaps && ("error" in progressGaps || progressGaps.gaps.length > 0) && (
+        <Card>
+          <CardHeader><CardTitle className="text-base">Training targets to work on</CardTitle></CardHeader>
+          <CardContent>
+            {"error" in progressGaps ? (
+              <div role="alert" className="flex flex-wrap items-center gap-3">
+                <p className="text-sm text-rose-700">{progressGaps.error}</p>
+                <Button type="button" variant="outline" size="sm" onClick={() => setProgressRetry((value) => value + 1)}>Try again</Button>
+              </div>
+            ) : (
+              <>
+                <ul className="space-y-2 text-sm">
+                  {progressGaps.gaps.map((gap, index) => (
+                    <li key={`${gap.label}-${index}`} className="flex flex-wrap justify-between gap-2">
+                      <span>{gap.label}</span>
+                      <span className="text-slate-600">{gap.verified} of {gap.target} verified</span>
+                    </li>
+                  ))}
+                </ul>
+                <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => {
+                  void apiPost("/api/arogya/usage", { eventType: "nudge_click" }).catch(() => {});
+                  openArogya();
+                }}>Ask Mochi about this</Button>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      )}
       {rejectedCount > 0 && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-rose-200 bg-rose-50/90 p-4 text-rose-900 shadow-sm animate-float-up">
           <div className="flex items-center gap-3">

@@ -59,6 +59,7 @@ export function ArogyaPanel({ open, onOpenChange, role, actorKey, workflowId, st
   const [selectedResidentId, setSelectedResidentId] = React.useState("");
   const [selectedContext, setSelectedContext] = React.useState<ArogyaSelectedContext>({ studentId: studentProfileId });
   const requestSequence = React.useRef(0);
+  const wasOpen = React.useRef(false);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -128,6 +129,14 @@ export function ArogyaPanel({ open, onOpenChange, role, actorKey, workflowId, st
     }
     return undefined;
   }, [characterState, messages]);
+
+  React.useEffect(() => {
+    const justOpened = open && !wasOpen.current;
+    wasOpen.current = open;
+    if (justOpened && !isDemoMode()) {
+      void apiPost("/api/arogya/usage", { eventType: "panel_open" }).catch(() => {});
+    }
+  }, [open]);
 
   React.useEffect(() => {
     if (!open) return undefined;

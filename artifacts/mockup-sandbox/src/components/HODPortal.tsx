@@ -26,6 +26,7 @@ import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatLogbookDate } from "@/lib/logbook-config";
+import { isoToIstDateTimeInput, istDateTimeInputToIso } from "@/lib/maintenanceTime";
 import { useDepartment } from "@/lib/department-context";
 import { DepartmentSettings } from "@/components/DepartmentSettings";
 import { DemoDepartmentCustomizer } from "@/components/DemoDepartmentCustomizer";
@@ -68,6 +69,59 @@ type LeaveRequest = {
   totalDays: number;
   availableByYear?: { year: string; available: number | null }[];
 };
+
+type WeeklyDigestResponse =
+  | { status: "ready"; weekStart: string; generatedAt: string; summary: string }
+  | { status: "pending"; weekStart: string };
+
+type DigestCardState = {
+  userId: number;
+  departmentId: number;
+  requestedWeek: string;
+} & (WeeklyDigestResponse | { status: "loading" | "error" });
+
+function digestWeek(now: Date) {
+  const localDay = isoToIstDateTimeInput(now).slice(0, 10);
+  const monday = new Date(localDay + "T00:00:00Z");
+  monday.setUTCDate(monday.getUTCDate() - (monday.getUTCDay() + 6) % 7);
+  const weekStart = monday.toISOString().slice(0, 10);
+  monday.setUTCDate(monday.getUTCDate() + 7);
+  const nextMonday = monday.toISOString().slice(0, 10);
+  const nextWeek = istDateTimeInputToIso(nextMonday + "T00:00");
+  return { weekStart, refreshAt: nextWeek ? Date.parse(nextWeek) : null };
+}
+
+function isValidWeeklyDigest(data: unknown): data is WeeklyDigestResponse {
+  if (!data || typeof data !== "object" || !("status" in data) ||
+      !("weekStart" in data) || typeof data.weekStart !== "string") return false;
+  if (data.status === "ready") {
+    return (
+      "generatedAt" in data &&
+      typeof data.generatedAt === "string" &&
+      "summary" in data &&
+      typeof data.summary === "string" &&
+      !Number.isNaN(new Date(data.generatedAt).getTime())
+    );
+  }
+  return data.status === "pending";
+}
+
+function formatDigestSnapshotDate(generatedAt: string): string {
+  try {
+    const date = new Date(generatedAt);
+    if (Number.isNaN(date.getTime())) return generatedAt;
+    return new Intl.DateTimeFormat("en-IN", {
+      timeZone: "Asia/Kolkata",
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    }).format(date);
+  } catch {
+    return generatedAt;
+  }
+}
 
 const paths: Record<string, string> = {
   "roster": "/roster",
@@ -127,6 +181,79 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
 
   // Leave approvals
   const [leaves, setLeaves] = React.useState<LeaveRequest[]>([]);
+
+  // Weekly Mochi digest state for HOD
+  const [digestState, setDigestState] = React.useState<DigestCardState | null>(null);
+  const [digestRetry, setDigestRetry] = React.useState(0);
+  const digestUserId = currentUser?.id;
+  const digestDepartmentId = currentUser?.departmentId;
+  const isEligibleHod =
+    !isDemoMode() &&
+    currentUser?.role === "hod" &&
+    typeof digestUserId === "number" &&
+    typeof digestDepartmentId === "number" &&
+    digestDepartmentId > 0;
+  const digestActive = isEligibleHod && currentTab === "mentees";
+
+  const retryWeeklyDigest = React.useCallback(() => {
+    setDigestRetry((count) => count + 1);
+  }, []);
+
+  React.useEffect(() => {
+    if (!digestActive) return;
+    let timer: number;
+    let requestedWeek: string | undefined;
+    let currentRequest: AbortController | undefined;
+
+    const refreshDigest = () => {
+      window.clearTimeout(timer);
+      if (document.visibilityState !== "visible") return;
+
+      const { weekStart, refreshAt } = digestWeek(new Date());
+      if (refreshAt !== null) {
+        timer = window.setTimeout(refreshDigest, Math.max(0, refreshAt - Date.now()));
+      }
+      if (requestedWeek === weekStart) return;
+
+      currentRequest?.abort();
+      const request = new AbortController();
+      currentRequest = request;
+      requestedWeek = weekStart;
+      const scope = { userId: digestUserId, departmentId: digestDepartmentId, requestedWeek: weekStart };
+      setDigestState({ ...scope, status: "loading" });
+      apiPost<unknown>("/api/arogya/department-report/weekly", {}, { signal: request.signal })
+        .then((data) => {
+          if (request.signal.aborted) return;
+          if (isValidWeeklyDigest(data) && data.weekStart === weekStart) {
+            setDigestState({ ...data, ...scope });
+            return;
+          }
+          requestedWeek = undefined;
+          setDigestState({ ...scope, status: "error" });
+        })
+        .catch(() => {
+          if (!request.signal.aborted) setDigestState({ ...scope, status: "error" });
+        });
+    };
+    refreshDigest();
+    window.addEventListener("focus", refreshDigest);
+    document.addEventListener("visibilitychange", refreshDigest);
+    return () => {
+      currentRequest?.abort();
+      window.clearTimeout(timer);
+      window.removeEventListener("focus", refreshDigest);
+      document.removeEventListener("visibilitychange", refreshDigest);
+    };
+  }, [digestActive, digestUserId, digestDepartmentId, digestRetry]);
+
+  let activeDigest: DigestCardState | null = null;
+  if (digestActive) {
+    const currentDigestWeek = digestWeek(new Date()).weekStart;
+    activeDigest = digestState?.userId === digestUserId && digestState.departmentId === digestDepartmentId &&
+      digestState.requestedWeek === currentDigestWeek
+      ? digestState
+      : { userId: digestUserId, departmentId: digestDepartmentId, requestedWeek: currentDigestWeek, status: "loading" };
+  }
 
   const fetchData = React.useCallback(async () => {
     setLoading(true);
@@ -370,6 +497,46 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
         </TabsContent>
 
         <TabsContent value="mentees" className="pt-4">
+          {activeDigest && (
+            <Card className="mb-4 border-slate-200 bg-white shadow-sm">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base font-semibold">This week</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {activeDigest.status === "loading" && (
+                  <p role="status" className="text-sm text-slate-500">
+                    Loading this week’s Mochi digest…
+                  </p>
+                )}
+                {activeDigest.status === "pending" && (
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <p className="text-sm text-slate-600">Mochi is preparing this week’s digest.</p>
+                    <Button size="sm" variant="outline" onClick={retryWeeklyDigest}>
+                      Check again
+                    </Button>
+                  </div>
+                )}
+                {activeDigest.status === "error" && (
+                  <div role="alert" className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <p className="text-sm font-medium text-rose-700">
+                      This week’s Mochi digest is unavailable.
+                    </p>
+                    <Button size="sm" variant="outline" onClick={retryWeeklyDigest}>
+                      Try again
+                    </Button>
+                  </div>
+                )}
+                {activeDigest.status === "ready" && (
+                  <div className="space-y-2">
+                    <p className="text-sm text-slate-800 leading-relaxed">{activeDigest.summary}</p>
+                    <p className="text-xs text-slate-500">
+                      Snapshot from {formatDigestSnapshotDate(activeDigest.generatedAt)}
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
           <ProfessorPortal activeTab="mentees" embedded />
         </TabsContent>
 

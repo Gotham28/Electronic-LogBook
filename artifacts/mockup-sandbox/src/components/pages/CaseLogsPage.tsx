@@ -2,7 +2,7 @@ import * as React from "react";
 import { AlertCircle, CheckCircle2, Clock, Eye, FileText, PlusCircle, Search, Loader2, Trash2, Edit3, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { apiGet, apiPost, apiDelete, apiPatch } from "@/lib/apiClient";
-import { publishArogyaContext } from "@/lib/arogya-context";
+import { openArogya, publishArogyaContext } from "@/lib/arogya-context";
 import { getCurrentUser, isDemoMode } from "@/lib/session";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -252,7 +252,10 @@ export function CaseLogsPage() {
       {error && (
         <div className="flex flex-col items-center justify-center p-8 text-center border rounded-2xl bg-rose-50 border-rose-100">
           <p className="text-rose-700 mb-4">{error}</p>
-          <Button onClick={fetchLogs} variant="outline" className="border-rose-200 text-rose-700">Try Again</Button>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <Button onClick={fetchLogs} variant="outline" className="border-rose-200 text-rose-700">Try Again</Button>
+            <Button type="button" variant="outline" size="sm" onClick={openArogya}>Ask Mochi about this</Button>
+          </div>
         </div>
       )}
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">

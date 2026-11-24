@@ -13,7 +13,14 @@ test("fresh installation and rerunning migrations are safe and checksum-tracked"
   try {
     await applyMigrations(migrationConnection(database));
     await applyMigrations(migrationConnection(database));
-    assert.equal((await database.query("SELECT * FROM elogbook_migrations")).rows.length, 32);
+    assert.equal((await database.query("SELECT * FROM elogbook_migrations")).rows.length, 34);
+    assert.equal((await database.query("SELECT to_regclass('assistant_department_weekly_digests') AS table_name")).rows[0].table_name, "assistant_department_weekly_digests");
+    const assistantUsageColumns = await database.query<{ column_name: string }>(
+      "SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'assistant_usage_events' ORDER BY ordinal_position",
+    );
+    assert.deepEqual(assistantUsageColumns.rows.map(({ column_name }) => column_name), [
+      "id", "user_id", "role", "department_id", "feature", "event_type", "http_status", "token_count", "created_at",
+    ]);
     assert.equal((await database.query("SELECT to_regclass('support_tickets') AS table_name")).rows[0].table_name, "support_tickets");
     assert.equal((await database.query<any>("SELECT is_nullable FROM information_schema.columns WHERE table_name = 'procedure_types' AND column_name = 'required_log_fields'")).rows[0].is_nullable, "NO");
     assert.equal((await database.query<any>("SELECT is_nullable FROM information_schema.columns WHERE table_name = 'procedure_logs' AND column_name = 'setting'")).rows[0].is_nullable, "YES");

@@ -179,13 +179,11 @@ and any payload sent to an external service.
 
 ## 9. One feature per task, one feature per diff
 
-If a task touches more than what was asked, **flag it — do not just do it.**
-
-Do not silently restructure, rename, reformat, tidy or "improve" code that was not part of
-the task. Report what you noticed and leave it alone.
-
-Bundled diffs cannot be reviewed properly, and even a passing test suite will not catch
-everything review would.
+A task may bundle related features when the developer approves it at scoping. Each
+feature is a numbered Part in CURRENT_TASK.md with its own files, its own commit, and its
+own verification evidence; the review report covers each Part separately. Work not listed
+as a Part is still flagged, not done. Do not silently restructure, rename, reformat, tidy
+or improve code outside the listed Parts.
 
 ---
 
@@ -322,7 +320,7 @@ work around them, and do not decide them.
 - Anything that puts patient text or leave reasons near a log, error, or
   audit trail (§8).
 - Any secret, credential, or `.env` value (§10, §13).
-- The task turning out to be more than one feature (§9).
+- Work appearing that is not a listed Part (§9).
 - Any value the agent would otherwise guess or invent.
 
 ### 14.6 The review report
