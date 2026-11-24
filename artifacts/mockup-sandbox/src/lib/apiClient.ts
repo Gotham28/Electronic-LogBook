@@ -1,5 +1,6 @@
 import { clearSession, getToken, SESSION_EXPIRED_EVENT } from './session';
 import { handleDemoRequest } from './demoData';
+import type { VoiceLogExtractResponse } from '@workspace/api-zod';
 
 // A 401 from these means wrong credentials, not an expired session.
 const SESSION_CHECK_EXEMPT = ["/api/auth/login", "/api/auth/change-password", "/api/auth/logout", "/api/payments"];
@@ -167,6 +168,38 @@ export function apiPutFile<T = any>(path: string, file: Blob, fileName: string):
     method: "PUT",
     body: file,
     headers: { "Content-Type": "application/octet-stream", "X-File-Name": encodeURIComponent(fileName) },
+  });
+}
+
+/**
+ * POST raw binary audio bytes for Voice Input AI logging.
+ * Rejects demo mode prior to request dispatch to prevent JSON.parse on Blob.
+ */
+export function apiPostAudio<T = VoiceLogExtractResponse>(
+  path: string,
+  audio: Blob,
+  options?: { signal?: AbortSignal }
+): Promise<T> {
+  const userStr = window.sessionStorage.getItem("elogbook-user");
+  if (userStr) {
+    let demoUser: any = null;
+    try {
+      demoUser = JSON.parse(userStr);
+    } catch {
+      // Ignore
+    }
+    if (demoUser?.isDemoMode) {
+      throw new ApiError(400, "Voice AI logging is not available in demo mode.");
+    }
+  }
+
+  return fetchWithAuth(path, {
+    method: "POST",
+    body: audio,
+    signal: options?.signal,
+    headers: {
+      "Content-Type": audio.type || "application/octet-stream",
+    },
   });
 }
 

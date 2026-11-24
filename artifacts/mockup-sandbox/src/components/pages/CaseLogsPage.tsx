@@ -1,5 +1,5 @@
 import * as React from "react";
-import { AlertCircle, CheckCircle2, Clock, Eye, FileText, PlusCircle, Search, Loader2, Trash2, Edit3, RotateCcw } from "lucide-react";
+import { AlertCircle, CheckCircle2, Clock, Eye, FileText, PlusCircle, Search, Loader2, Trash2, Edit3, RotateCcw, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { apiGet, apiPost, apiDelete, apiPatch } from "@/lib/apiClient";
 import { openArogya, publishArogyaContext } from "@/lib/arogya-context";
@@ -23,6 +23,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Kbd } from "@/components/ui/kbd";
 import { formatLogbookDate, todayForInput } from "@/lib/logbook-config";
+import { VoiceLogRecorder } from "@/components/VoiceLogRecorder";
+import { mergeCaseVoiceFields } from "@/lib/voiceLogMerge";
+import type { VoiceLogExtractResponse } from "@workspace/api-zod";
 import { useDepartment } from "@/lib/department-context";
 import { getCaseMedicalSummary } from "@/lib/case-medical-summary";
 
@@ -84,7 +87,20 @@ export function CaseLogsPage() {
   const [editLogRemarks, setEditLogRemarks] = React.useState<string | null>(null);
   const [editLogStatus, setEditLogStatus] = React.useState<string | null>(null);
 
+  const [manuallyEditedFields, setManuallyEditedFields] = React.useState<Set<string>>(new Set());
+  const [aiFilledFields, setAiFilledFields] = React.useState<Set<string>>(new Set());
+  const [lastVoiceExtraction, setLastVoiceExtraction] = React.useState<VoiceLogExtractResponse | null>(null);
+  const [voiceResetKey, setVoiceResetKey] = React.useState(0);
+
+  const resetVoiceState = React.useCallback(() => {
+    setManuallyEditedFields(new Set());
+    setAiFilledFields(new Set());
+    setLastVoiceExtraction(null);
+    setVoiceResetKey((k) => k + 1);
+  }, []);
+
   const startEditCase = (log: any) => {
+    resetVoiceState();
     setEditLogId(log.id);
     setEditLogRemarks(log.facultyRemarks || null);
     setEditLogStatus(log.status);
@@ -207,6 +223,7 @@ export function CaseLogsPage() {
       setEditLogId(null);
       setEditLogRemarks(null);
       setEditLogStatus(null);
+      resetVoiceState();
       toast.success(
         editLogStatus === "rejected"
           ? "Case resubmitted for faculty review"
@@ -243,7 +260,98 @@ export function CaseLogsPage() {
     return searchFields.some((value) => String(value).toLowerCase().includes(search));
   });
 
-  const setField = (field: keyof typeof form, value: string) => setForm({ ...form, [field]: value });
+  const setField = (field: keyof typeof form, value: string) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+    setManuallyEditedFields((prev) => new Set(prev).add(field));
+    setAiFilledFields((prev) => {
+      const next = new Set(prev);
+      next.delete(field);
+      return next;
+    });
+  };
+
+  const handleVoiceExtracted = (result: VoiceLogExtractResponse) => {
+    setLastVoiceExtraction(result);
+    if (result.logType === "case" && result.fields) {
+      const { nextForm, appliedFields } = mergeCaseVoiceFields(
+        form,
+        result.fields,
+        manuallyEditedFields,
+        false,
+        {
+          microbiologyCaseFields,
+          medicalSummaryCaseFields,
+          hideUhid,
+        }
+      );
+      setForm(nextForm);
+      setAiFilledFields(new Set(appliedFields));
+    }
+  };
+
+  const handleOverwriteEdited = () => {
+    if (lastVoiceExtraction && lastVoiceExtraction.logType === "case" && lastVoiceExtraction.fields) {
+      const { nextForm, appliedFields } = mergeCaseVoiceFields(
+        form,
+        lastVoiceExtraction.fields,
+        manuallyEditedFields,
+        true,
+        {
+          microbiologyCaseFields,
+          medicalSummaryCaseFields,
+          hideUhid,
+        }
+      );
+      setForm(nextForm);
+      setAiFilledFields(new Set(appliedFields));
+    }
+  };
+
+  const skippedEditedCount = React.useMemo(() => {
+    if (!lastVoiceExtraction || lastVoiceExtraction.logType !== "case" || !lastVoiceExtraction.fields) {
+      return 0;
+    }
+    const { skippedEditedFields } = mergeCaseVoiceFields(
+      form,
+      lastVoiceExtraction.fields,
+      manuallyEditedFields,
+      false,
+      { microbiologyCaseFields, medicalSummaryCaseFields, hideUhid }
+    );
+    return skippedEditedFields.length;
+  }, [lastVoiceExtraction, form, manuallyEditedFields, microbiologyCaseFields, medicalSummaryCaseFields, hideUhid]);
+
+  const caseFieldLabels = React.useMemo<Record<string, string>>(() => ({
+    date: "Date",
+    patientUhid: "UHID",
+    age: "Age",
+    gender: "Gender",
+    category: deptConfig?.enabledFeatures?.useCaseTypeLabel ? "Case type" : microbiologyCaseFields ? "Sample category" : "Case category",
+    diagnosis: "Diagnosis",
+    sampleProcessing: "Sample processing",
+    medicalSummary: "Medical summary",
+    chiefComplaints: "Chief complaints",
+    history: "Relevant history",
+    examination: "Clinical examination",
+    investigations: "Investigations",
+    differentialDiagnosis: "Differential diagnosis",
+    management: "Management and interventions",
+    outcome: "Outcome / follow-up",
+    learningPoints: "Learning points",
+  }), [deptConfig?.enabledFeatures?.useCaseTypeLabel, microbiologyCaseFields]);
+
+  const missingRequiredLabels = React.useMemo(() => {
+    const list: string[] = [];
+    if (lastVoiceExtraction?.missingRequired) {
+      for (const key of lastVoiceExtraction.missingRequired) {
+        list.push(caseFieldLabels[key] || key);
+      }
+    }
+    if (!form.supervisorId) {
+      list.push("Reviewing faculty member");
+    }
+    return list;
+  }, [lastVoiceExtraction, form.supervisorId, caseFieldLabels]);
   
   const hasTarget = deptConfig?.requiredCases !== null && deptConfig?.requiredCases !== undefined;
 
@@ -273,6 +381,7 @@ export function CaseLogsPage() {
             setEditLogId(null);
             setEditLogRemarks(null);
             setEditLogStatus(null);
+            resetVoiceState();
           } 
         }}>
           <DialogTrigger asChild>
@@ -284,6 +393,16 @@ export function CaseLogsPage() {
               <DialogDescription>{editLogStatus === "rejected" ? "Review the faculty feedback below, edit your case details, and resubmit for faculty review." : "Complete the clinical record before sending it to a faculty member."}</DialogDescription>
             </DialogHeader>
             <form data-tour="caselog-form" onSubmit={handleAddCase} className="space-y-5">
+              <VoiceLogRecorder
+                studentId={user?.studentProfileId}
+                logType="case"
+                disabled={isSubmitting}
+                onExtracted={handleVoiceExtracted}
+                skippedEditedCount={skippedEditedCount}
+                onOverwriteEdited={handleOverwriteEdited}
+                missingRequiredLabels={missingRequiredLabels}
+                resetKey={voiceResetKey}
+              />
               {editLogStatus === "rejected" && (
                 <div className="rounded-xl border border-rose-200 bg-rose-50/90 p-3.5 text-xs text-rose-900">
                   <div className="flex items-center gap-1.5 font-semibold text-rose-800">
@@ -296,9 +415,9 @@ export function CaseLogsPage() {
                 </div>
               )}
               <div data-tour="caselog-patient-info" className={`grid gap-4 ${hideUhid ? "sm:grid-cols-3" : "sm:grid-cols-4"}`}>
-                <Field label="Date"><Input type="date" value={form.date} onChange={(e) => setField("date", e.target.value)} required /></Field>
-                <Field label="Age"><Input value={form.age} onChange={(e) => setField("age", e.target.value)} placeholder="e.g. 7 years" required /></Field>
-                <Field label="Gender">
+                <Field label="Date" isAiFilled={aiFilledFields.has("date")}><Input type="date" value={form.date} onChange={(e) => setField("date", e.target.value)} required /></Field>
+                <Field label="Age" isAiFilled={aiFilledFields.has("age")}><Input value={form.age} onChange={(e) => setField("age", e.target.value)} placeholder="e.g. 7 years" required /></Field>
+                <Field label="Gender" isAiFilled={aiFilledFields.has("gender")}>
                   <Select value={form.gender} onValueChange={(value) => setField("gender", value)}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent><SelectItem value="Male">Male</SelectItem><SelectItem value="Female">Female</SelectItem><SelectItem value="Other">Other</SelectItem></SelectContent>
@@ -307,7 +426,7 @@ export function CaseLogsPage() {
               </div>
               {microbiologyCaseFields ? (
                 <>
-                  <Field label="Sample category">
+                  <Field label="Sample category" isAiFilled={aiFilledFields.has("category")}>
                     <Input
                       value={form.category}
                       onChange={(e) => setField("category", e.target.value)}
@@ -316,7 +435,7 @@ export function CaseLogsPage() {
                     />
                   </Field>
                   <div data-tour="caselog-clinical-details" className="space-y-5">
-                    <Field label="Provisional diagnosis">
+                    <Field label="Provisional diagnosis" isAiFilled={aiFilledFields.has("diagnosis")}>
                       <Input
                         value={form.diagnosis}
                         onChange={(e) => setField("diagnosis", e.target.value)}
@@ -324,7 +443,7 @@ export function CaseLogsPage() {
                         required
                       />
                     </Field>
-                    <Field label="Sample processing in lab">
+                    <Field label="Sample processing in lab" isAiFilled={aiFilledFields.has("sampleProcessing")}>
                       <Textarea
                         rows={4}
                         value={form.sampleProcessing}
@@ -337,7 +456,7 @@ export function CaseLogsPage() {
               ) : (
                 <>
                   <div data-tour="caselog-clinical-details" className="space-y-5">
-                    <Field label={deptConfig?.enabledFeatures?.useCaseTypeLabel ? "Case type" : "Case category"}>
+                    <Field label={deptConfig?.enabledFeatures?.useCaseTypeLabel ? "Case type" : "Case category"} isAiFilled={aiFilledFields.has("category")}>
                       <Select value={form.category} onValueChange={(value) => setField("category", value)}>
                         <SelectTrigger><SelectValue placeholder={deptConfig?.enabledFeatures?.useCaseTypeLabel ? "Select a case type" : "Select a case category"} /></SelectTrigger>
                         <SelectContent>
@@ -350,24 +469,24 @@ export function CaseLogsPage() {
                       </Select>
                     </Field>
                     {medicalSummaryCaseFields ? (
-                      <Field label="Medical Summary"><Textarea rows={8} maxLength={8000} value={form.medicalSummary} onChange={(e) => setField("medicalSummary", e.target.value)} /></Field>
+                      <Field label="Medical Summary" isAiFilled={aiFilledFields.has("medicalSummary")}><Textarea rows={8} maxLength={8000} value={form.medicalSummary} onChange={(e) => setField("medicalSummary", e.target.value)} /></Field>
                     ) : (
                       <>
-                        <Field label="Chief complaints"><Textarea rows={2} value={form.chiefComplaints} onChange={(e) => setField("chiefComplaints", e.target.value)} /></Field>
-                        <Field label="Relevant history"><Textarea rows={3} value={form.history} onChange={(e) => setField("history", e.target.value)} /></Field>
-                        <Field label="Clinical examination"><Textarea rows={3} value={form.examination} onChange={(e) => setField("examination", e.target.value)} /></Field>
+                        <Field label="Chief complaints" isAiFilled={aiFilledFields.has("chiefComplaints")}><Textarea rows={2} value={form.chiefComplaints} onChange={(e) => setField("chiefComplaints", e.target.value)} /></Field>
+                        <Field label="Relevant history" isAiFilled={aiFilledFields.has("history")}><Textarea rows={3} value={form.history} onChange={(e) => setField("history", e.target.value)} /></Field>
+                        <Field label="Clinical examination" isAiFilled={aiFilledFields.has("examination")}><Textarea rows={3} value={form.examination} onChange={(e) => setField("examination", e.target.value)} /></Field>
                       </>
                     )}
-                    <Field label="Investigations"><Textarea rows={2} value={form.investigations} onChange={(e) => setField("investigations", e.target.value)} /></Field>
+                    <Field label="Investigations" isAiFilled={aiFilledFields.has("investigations")}><Textarea rows={2} value={form.investigations} onChange={(e) => setField("investigations", e.target.value)} /></Field>
                   </div>
                   <div data-tour="caselog-diagnosis-details" className="space-y-5">
                     <div className="grid gap-4 sm:grid-cols-2">
-                      <Field label="Final diagnosis"><Input value={form.diagnosis} onChange={(e) => setField("diagnosis", e.target.value)} required /></Field>
-                      <Field label="Differential diagnosis"><Input value={form.differentialDiagnosis} onChange={(e) => setField("differentialDiagnosis", e.target.value)} /></Field>
+                      <Field label="Final diagnosis" isAiFilled={aiFilledFields.has("diagnosis")}><Input value={form.diagnosis} onChange={(e) => setField("diagnosis", e.target.value)} required /></Field>
+                      <Field label="Differential diagnosis" isAiFilled={aiFilledFields.has("differentialDiagnosis")}><Input value={form.differentialDiagnosis} onChange={(e) => setField("differentialDiagnosis", e.target.value)} /></Field>
                     </div>
-                    <Field label="Management and interventions"><Textarea rows={3} value={form.management} onChange={(e) => setField("management", e.target.value)} /></Field>
-                    <Field label="Outcome / follow-up"><Textarea rows={2} value={form.outcome} onChange={(e) => setField("outcome", e.target.value)} /></Field>
-                    <Field label="Learning points"><Textarea rows={2} value={form.learningPoints} onChange={(e) => setField("learningPoints", e.target.value)} /></Field>
+                    <Field label="Management and interventions" isAiFilled={aiFilledFields.has("management")}><Textarea rows={3} value={form.management} onChange={(e) => setField("management", e.target.value)} /></Field>
+                    <Field label="Outcome / follow-up" isAiFilled={aiFilledFields.has("outcome")}><Textarea rows={2} value={form.outcome} onChange={(e) => setField("outcome", e.target.value)} /></Field>
+                    <Field label="Learning points" isAiFilled={aiFilledFields.has("learningPoints")}><Textarea rows={2} value={form.learningPoints} onChange={(e) => setField("learningPoints", e.target.value)} /></Field>
                   </div>
                 </>
               )}
@@ -628,8 +747,21 @@ export function CaseLogsPage() {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <div className="space-y-2"><Label>{label}</Label>{children}</div>;
+function Field({ label, children, isAiFilled }: { label: string; children: React.ReactNode; isAiFilled?: boolean }) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-1.5">
+        <Label>{label}</Label>
+        {isAiFilled && (
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+            <Sparkles className="h-2.5 w-2.5" />
+            <span>AI filled</span>
+          </span>
+        )}
+      </div>
+      {children}
+    </div>
+  );
 }
 
 function Detail({ label, value }: { label: string; value: string }) {
