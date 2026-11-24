@@ -24,12 +24,14 @@ export interface ArogyaTurnInput {
 }
 
 export interface AssistantFact { id: string; label: string; value: string | number | null }
+type AssistantGrounding = { scope: "resident_logs"; logCount: number } | { scope: "department" };
 export interface AssistantResult {
   reply: string;
   kind: "help" | "diagnostic" | "clarification" | "unsupported";
   steps: string[];
   sources: Array<{ id: string; title: string }>;
   facts: AssistantFact[];
+  grounding?: AssistantGrounding;
   actions: ArogyaAction[];
   clarification?: { type: "workflow" | "student" | "appraisal_period" | "log"; choices?: Array<{ id: string; label: string }> };
   checkedAt?: string;
@@ -49,6 +51,7 @@ interface ToolEvidence {
   facts: AssistantFact[];
   displayFacts?: AssistantFact[];
   localResidentNames?: Record<string, string>;
+  grounding?: AssistantGrounding;
   checkedAt: string;
 }
 
@@ -116,7 +119,15 @@ async function executeTool(name: ToolName, input: ArogyaTurnInput): Promise<Tool
   if (name === "get_workflow_help") throw new ArogyaProviderError("AROGYA_INVALID_OUTPUT");
   if (name === "get_progress_summary") {
     if (input.studentId === undefined && input.actor.role !== "student") return { data: { needsStudent: true }, facts: [], checkedAt };
-    data = await getProgressSummary(input.actor, input.studentId);
+    const progress = await getProgressSummary(input.actor, input.studentId);
+    const logCount = progress.categories.reduce((sum, category) =>
+      sum + category.verified + category.pending + category.rejected, 0);
+    return {
+      data: progress,
+      facts: factsForTool(name, progress),
+      ...(input.actor.role === "student" ? { grounding: { scope: "resident_logs", logCount } as const } : {}),
+      checkedAt,
+    };
   } else if (name === "check_appraisal_period") {
     if (input.context.appraisalPeriod === undefined) return { data: { needsPeriod: true }, facts: [], checkedAt };
     if (input.studentId === undefined && input.actor.role !== "student") return { data: { needsStudent: true }, facts: [], checkedAt };
@@ -264,6 +275,7 @@ function departmentSummaryAnswer(
     steps: [],
     sources,
     facts: evidence.displayFacts ?? evidence.facts,
+    grounding: { scope: "department" },
     actions,
     checkedAt: evidence.checkedAt,
     knowledgeVersion,
@@ -338,6 +350,7 @@ export async function answerArogya(input: ArogyaTurnInput, accountNames: readonl
   const displayFacts: AssistantFact[] = [];
   const extraWorkflows = new Map<string, RetrievedWorkflow>();
   let checkedAt: string | undefined;
+  let grounding: AssistantGrounding | undefined;
   let toolExecutions = 0;
   let usedDiagnosticTool = false;
   if (diagnosticName) {
@@ -345,6 +358,7 @@ export async function answerArogya(input: ArogyaTurnInput, accountNames: readonl
     toolFacts.push(...evidence.facts);
     displayFacts.push(...(evidence.displayFacts ?? evidence.facts));
     checkedAt = evidence.checkedAt;
+    grounding = evidence.grounding;
     usedDiagnosticTool = true;
     toolExecutions++;
     messages[0] = { role: "system", content: `${instructions}\n\nChecked live facts (the only current record data available): ${JSON.stringify(evidence.facts)}.` };
@@ -372,6 +386,7 @@ export async function answerArogya(input: ArogyaTurnInput, accountNames: readonl
         steps: [],
         sources,
         facts: evidence.displayFacts ?? evidence.facts,
+        grounding: { scope: "department" },
         actions,
         checkedAt: evidence.checkedAt,
         knowledgeVersion,
@@ -397,6 +412,7 @@ export async function answerArogya(input: ArogyaTurnInput, accountNames: readonl
         kind: usedDiagnosticTool ? "diagnostic" : "help",
         sources: [...sources, ...[...extraWorkflows.values()].map((entry) => ({ id: entry.id, title: entry.title }))],
         facts: displayFacts,
+        ...(grounding ? { grounding } : {}),
         actions: [...actions, ...workflowActions([...extraWorkflows.values()])],
         ...(checkedAt ? { checkedAt } : {}),
         knowledgeVersion,
@@ -425,6 +441,7 @@ export async function answerArogya(input: ArogyaTurnInput, accountNames: readonl
     toolFacts.push(...evidence.facts);
     displayFacts.push(...(evidence.displayFacts ?? evidence.facts));
     checkedAt = evidence.checkedAt;
+    grounding = evidence.grounding ?? grounding;
     messages.push({ role: "assistant", content: null, tool_calls: [call] });
     messages.push({ role: "tool", tool_call_id: call.id, content: JSON.stringify(evidence.data) });
   }

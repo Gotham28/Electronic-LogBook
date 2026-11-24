@@ -3,6 +3,7 @@ import { studentsTable, usersTable, caseLogsTable, procedureLogsTable, academicL
 import { resolveConfigDepartmentId } from "./department-config-source.js";
 
 export const DAILY_LIMIT = 20;
+export const AROGYA_PROVIDER_TIMEOUT_MS = 20_000;
 
 const SYSTEM_INSTRUCTION = `Use only the facts in the facts pack provided. Do not invent any number.
 If asked a medical, clinical, diagnostic or treatment question, reply: "I can only help with app usage and your records in this system. Please consult a qualified professional."
@@ -47,7 +48,7 @@ export async function callOpenAI(
     throw new Error("AROGYA_UNAVAILABLE");
   }
 
-  const abortSignal = AbortSignal.timeout(20_000);
+  const abortSignal = AbortSignal.timeout(AROGYA_PROVIDER_TIMEOUT_MS);
 
   try {
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
