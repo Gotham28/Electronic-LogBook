@@ -19,6 +19,11 @@ function displayWorkflowTitle(id: string, title: string) {
 export function AssistantAnswer({ answer, onNavigate }: { answer: ArogyaAnswer; onNavigate: (href: string) => void }) {
   return <div className="flex flex-col gap-2">
     <p className="whitespace-pre-wrap font-medium text-slate-800">{answer.reply}</p>
+    {answer.grounding && <p className="text-xs text-slate-600">
+      {answer.grounding.scope === "department"
+        ? "Based on department data"
+        : `Based on your ${answer.grounding.logCount} ${answer.grounding.logCount === 1 ? "log" : "logs"}`}
+    </p>}
     {answer.steps.length > 0 && <ol className="list-decimal space-y-1.5 pl-5">
       {answer.steps.map((step, index) => <li key={index}>{step}</li>)}
     </ol>}

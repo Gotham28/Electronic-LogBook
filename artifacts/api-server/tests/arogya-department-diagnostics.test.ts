@@ -60,6 +60,7 @@ test("HOD below-target diagnostics are consistent and disclose names only in the
     });
     console.log("AROGYA_AUTH_EVIDENCE", JSON.stringify({ case: "authenticated correct department", request: { method: "POST", path: "/api/arogya/ask", role: "hod", question: "Which approved residents are currently classified below their configured progress targets?" }, response: { status: belowTarget.status } }));
     assert.equal(belowTarget.status, 200);
+    assert.deepEqual(belowTarget.body.grounding, { scope: "department" });
     assert.match(belowTarget.body.reply, /Diagnostic Resident/);
     assert.equal(providerBodies.length, 0, "the evidence-backed below-target answer should be assembled locally");
 
@@ -80,6 +81,7 @@ test("HOD below-target diagnostics are consistent and disclose names only in the
       question: "Summarize my department's approved residents and pending review queue.",
     });
     assert.equal(report.status, 200);
+    assert.deepEqual(report.body.grounding, { scope: "department" });
     assert.ok(report.body.facts.some((item: any) => item.label === "Diagnostic Resident"));
     assert.match(report.body.reply, /Diagnostic Resident/);
     assert.match(report.body.reply, /pending records in the HOD review queue/);
@@ -94,6 +96,12 @@ test("HOD below-target diagnostics are consistent and disclose names only in the
     assert.match(acceptancePrompt, /pending status/);
     assert.match(acceptancePrompt, /payment must be completed/);
     assert.match(acceptancePrompt, /created directly by an HOD/);
+    const residentAnswer = await request(runtime.base, "/arogya/ask", a.student0, "POST", {
+      question: "How much progress have I made?",
+    });
+    assert.equal(residentAnswer.status, 200);
+    assert.deepEqual(residentAnswer.body.grounding, { scope: "resident_logs", logCount: 1 });
+
     assert.ok(providerBodies.every((body) => !body.includes("Diagnostic Resident")), "resident names must stay out of provider input");
     assert.ok(providerBodies.every((body) => !body.includes("synthetic test value")), "clinical text must stay out of provider input");
 

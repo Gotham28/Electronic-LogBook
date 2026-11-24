@@ -243,7 +243,10 @@ export function QuarterlyAppraisalSection() {
           ) : studentsError ? (
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 p-4" role="alert">
               <p className="text-sm text-rose-800">{studentsError}</p>
-              <Button type="button" variant="outline" size="sm" onClick={loadStudents}>Try again</Button>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={loadStudents}>Try again</Button>
+                <Button type="button" variant="outline" size="sm" onClick={openArogya}>Ask Mochi about this</Button>
+              </div>
             </div>
           ) : students.length === 0 ? (
             <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600">
@@ -354,7 +357,7 @@ export function QuarterlyAppraisalSection() {
                   </div>
                   {draftError && <div className="flex flex-wrap items-center justify-between gap-2" role="alert">
                     <p className="text-xs text-rose-700">{draftError}</p>
-                    <Button type="button" variant="outline" size="sm" className="min-h-10" onClick={openArogya}>Explain this issue</Button>
+                    <Button type="button" variant="outline" size="sm" className="min-h-10" onClick={openArogya}>Ask Mochi about this</Button>
                   </div>}
                   <Textarea
                     id="appraisal-faculty-remarks"
@@ -390,7 +393,7 @@ export function QuarterlyAppraisalSection() {
 
               {formError && <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2" role="alert">
                 <p className="text-sm text-rose-800">{formError}</p>
-                <Button type="button" variant="outline" size="sm" className="min-h-10" onClick={openArogya}>Explain this issue</Button>
+                <Button type="button" variant="outline" size="sm" className="min-h-10" onClick={openArogya}>Ask Mochi about this</Button>
               </div>}
               <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
                 <p className="text-xs text-slate-500">The saved form will be visible to the student and can be printed.</p>
@@ -414,7 +417,15 @@ export function QuarterlyAppraisalSection() {
           </CardHeader>
           <CardContent className="space-y-4 p-5 sm:p-6">
             {appraisalsLoading ? <p className="py-5 text-center text-sm text-slate-600" role="status">Loading saved appraisals…</p>
-              : appraisalsError ? <div className="flex flex-wrap items-center justify-between gap-3" role="alert"><p className="text-sm text-rose-700">{appraisalsError}</p><Button type="button" size="sm" variant="outline" onClick={() => loadAppraisals(studentId)}>Try again</Button></div>
+              : appraisalsError ? (
+                <div className="flex flex-wrap items-center justify-between gap-3" role="alert">
+                  <p className="text-sm text-rose-700">{appraisalsError}</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button type="button" size="sm" variant="outline" onClick={() => loadAppraisals(studentId)}>Try again</Button>
+                    <Button type="button" variant="outline" size="sm" onClick={openArogya}>Ask Mochi about this</Button>
+                  </div>
+                </div>
+              )
                 : appraisals.length === 0 ? <p className="py-5 text-center text-sm text-slate-600">No quarterly appraisal has been saved for this student yet.</p>
                   : appraisals.map((appraisal) => <QuarterlyAppraisalRecord key={appraisal.id} appraisal={appraisal} />)}
           </CardContent>
