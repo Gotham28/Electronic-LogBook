@@ -49,7 +49,7 @@ export function RegistrationPage({
     setDepartmentsLoading(true); setDepartmentError("");
     try {
       const list = await apiGet<Array<{ id: number; name: string; collegeId: number; collegeName: string }>>("/api/departments");
-      setDepartments(list.map((d) => ({ ...d, name: /microbiology/i.test(d.name) ? d.name.replace(/microbiology/i, "Microbiology") : d.name })));
+      setDepartments(list);
       if (list.length) setSelectedCollegeId(list[0].collegeId);
     }
     catch (err) { setDepartmentError(err instanceof Error ? err.message : "Could not load departments"); }

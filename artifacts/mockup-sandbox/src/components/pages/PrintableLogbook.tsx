@@ -174,8 +174,7 @@ export function PrintableLogbook() {
   const user = useCurrentUser();
   const hideUhid = isDemoMode();
   const shouldReduceMotion = useReducedMotion();
-  const { config, clinicalWorkCategories, clinicalWorkSubtypes, competencyLevels, procedureFields, department: dept, academicLogbook } = useDepartment();
-  const isRadiology = dept?.name?.toLowerCase().includes("radiology");
+  const { config, clinicalWorkCategories, clinicalWorkSubtypes, competencyLevels, procedureFields, academicLogbook, label } = useDepartment();
   const features = config?.enabledFeatures ?? {};
   const dynamicProcedureFields = Boolean(features.dynamicProcedureFields);
   const activeProcedureFields = dynamicProcedureFields ? (procedureFields ?? []) : undefined;
@@ -406,7 +405,7 @@ export function PrintableLogbook() {
             <>
               <table data-mobile="cards" className="w-full border-collapse">
                 <thead><tr>
-                  <Th>{isRadiology ? "Posting" : "Ward / Unit"}</Th><Th>Start</Th><Th>End</Th><Th>Supervisor</Th><Th>Status</Th>
+                  <Th>{label("postings.printColumn")}</Th><Th>Start</Th><Th>End</Th><Th>Supervisor</Th><Th>Status</Th>
                 </tr></thead>
                 <tbody>
                   {rows.map((p: any, i: number) => (
@@ -433,7 +432,7 @@ export function PrintableLogbook() {
               <table data-mobile="cards" className="w-full border-collapse">
                 <thead><tr>
                   <Th>#</Th><Th>Date</Th>
-                  {!hideUhid && <Th>Case ID</Th>}
+                  {!hideUhid && <Th>{label("caseLog.caseId")}</Th>}
                   <Th>Age / Gender</Th><Th>Category</Th><Th>Diagnosis</Th><Th>Status</Th>
                 </tr></thead>
                 <tbody>
@@ -463,7 +462,7 @@ export function PrintableLogbook() {
               <table data-mobile="cards" className="w-full border-collapse">
                 <thead><tr>
                   <Th>#</Th><Th>Date</Th><Th>Procedure</Th><Th>Group</Th>
-                  {!hideUhid && <Th>Case ID</Th>}
+                  {!hideUhid && <Th>{label("caseLog.caseId")}</Th>}
                   <Th>Competency</Th><Th>Verified Level</Th><Th>Status</Th>
                 </tr></thead>
                 <tbody>

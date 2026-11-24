@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, collegesTable, usersTable, departmentsTable, studentsTable, caseLogsTable, procedureLogsTable, academicLogsTable, departmentConfigsTable, departmentCatalogTable, procedureTypesTable, clinicalWorkLogsTable, departmentPostingScheduleTable } from "@workspace/db";
+import { db, collegesTable, usersTable, departmentsTable, studentsTable, caseLogsTable, procedureLogsTable, academicLogsTable, departmentConfigsTable, departmentCatalogTable, procedureTypesTable, clinicalWorkLogsTable, departmentPostingScheduleTable, departmentLabelOverridesTable } from "@workspace/db";
 import { eq, and, inArray, count, sql, isNull } from "drizzle-orm";
 import { requireAuth, requireDepartment, requireRole } from "../middlewares/auth.js";
 import { completionPercent, idSchema } from "../lib/validation.js";
@@ -19,10 +19,7 @@ router.get("/", async (_req, res) => {
     .leftJoin(departmentConfigsTable, eq(departmentConfigsTable.departmentId, departmentsTable.id))
     .where(and(eq(departmentsTable.isTest, false), eq(collegesTable.acceptingRegistrations, true)))
     .orderBy(departmentsTable.name);
-  res.json(depts.map(d => ({
-    ...d,
-    name: /microbiology/i.test(d.name) ? d.name.replace(/microbiology/i, "Microbiology") : d.name
-  })));
+  res.json(depts);
 });
 
 router.use(requireAuth, requireRole(["student", "professor", "hod"]), requireDepartment);
@@ -40,7 +37,7 @@ router.get("/:departmentId/catalog", async (req, res) => {
     const departmentId = req.user!.departmentId!;
     const configSourceId = await resolveConfigDepartmentId(departmentId);
     step = "load-catalog";
-    const [department, hod, config, procedures, catalog, postingSchedule, academicLogbook] = await Promise.all([
+    const [department, hod, config, procedures, catalog, postingSchedule, academicLogbook, labelRows] = await Promise.all([
       db.select({ id: departmentsTable.id, name: departmentsTable.name, code: departmentsTable.code }).from(departmentsTable).where(eq(departmentsTable.id, departmentId)).limit(1),
       db.select({ id: usersTable.id, name: usersTable.fullName }).from(usersTable)
         .where(and(eq(usersTable.departmentId, departmentId), eq(usersTable.role, "hod"), eq(usersTable.status, "approved"))).limit(1),
@@ -52,12 +49,12 @@ router.get("/:departmentId/catalog", async (req, res) => {
         .where(eq(departmentPostingScheduleTable.departmentId, configSourceId))
         .orderBy(departmentPostingScheduleTable.trainingYear, departmentPostingScheduleTable.sortOrder),
       getAcademicLogbook(configSourceId),
+      // Wording overrides follow the config source, like enabledFeatures. Overrides only.
+      db.select({ key: departmentLabelOverridesTable.key, value: departmentLabelOverridesTable.value }).from(departmentLabelOverridesTable)
+        .where(eq(departmentLabelOverridesTable.departmentId, configSourceId)),
     ]);
-    const rawDeptInfo = department[0];
-    const deptInfo = rawDeptInfo ? {
-      ...rawDeptInfo,
-      name: /microbiology/i.test(rawDeptInfo.name) ? rawDeptInfo.name.replace(/microbiology/i, "Microbiology") : rawDeptInfo.name,
-    } : rawDeptInfo;
+    const labels = Object.fromEntries(labelRows.map((row) => [row.key, row.value]));
+    const deptInfo = department[0];
     const isMicro = deptInfo?.code?.toLowerCase() === "microbiology" || deptInfo?.name?.toLowerCase().includes("microbiology");
     let resolvedConfig = config[0] ? { ...config[0] } : null;
     if (resolvedConfig) {
@@ -126,7 +123,7 @@ router.get("/:departmentId/catalog", async (req, res) => {
       ] as any : catalog.filter((item) => item.kind === "conference_level"),
       clinicalWorkCategories: catalog.filter((item) => item.kind === "clinical_work_category"),
       clinicalWorkSubtypes: catalog.filter((item) => item.kind === "clinical_work_subtype"),
-      postingSchedule, academicLogbook });
+      postingSchedule, academicLogbook, labels });
   } catch (error: any) {
     // The Postgres error code only (e.g. 42P01 missing table, 42703 missing column), never
     // the error text, which can carry SQL parameters (AGENTS.md §8). Same rule as app.ts.

@@ -31,7 +31,7 @@ type ProgressGap = { label: string; verified: number; target: number };
 type ProgressGapsState = { userId: number; gaps: ProgressGap[] } | { userId: number; error: string };
 
 export function Dashboard() {
-  const { config: departmentConfig, clinicalWorkCategories, clinicalWorkSubtypes } = useDepartment();
+  const { config: departmentConfig, clinicalWorkCategories, clinicalWorkSubtypes, label } = useDepartment();
   const deptConfig = departmentConfig;
   const features = deptConfig?.enabledFeatures ?? {};
   const user = useCurrentUser();
@@ -342,7 +342,7 @@ export function Dashboard() {
               </div>
             ) : (
               <Table>
-                <TableHeader><TableRow><TableHead>#</TableHead><TableHead>Date</TableHead><TableHead>Type</TableHead><TableHead>Entry</TableHead>{!hideUhid && <TableHead>Case ID</TableHead>}<TableHead>Status</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
+                <TableHeader><TableRow><TableHead>#</TableHead><TableHead>Date</TableHead><TableHead>Type</TableHead><TableHead>Entry</TableHead>{!hideUhid && <TableHead>{label("caseLog.caseId")}</TableHead>}<TableHead>Status</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
                 <TableBody>
                   {recent.map((item, index) => (
                     <TableRow key={`${item.type}-${item.number}`} className={isDemoMode() ? "demo-stagger-item" : undefined} style={isDemoMode() ? { "--demo-stagger-index": index } as React.CSSProperties : undefined}>

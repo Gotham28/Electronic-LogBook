@@ -27,11 +27,8 @@ const emptyThesis: Thesis = { thesisTitle: "", guideId: null, coGuideId: null, p
 const emptyCertificate = { title: "", provider: "", issueDate: "", expiryDate: "", certificateUrl: "" };
 
 export function MilestonesPage() {
-  const { config, department } = useDepartment();
-  const isMicrobiology = department?.code?.toLowerCase() === "microbiology" || department?.name?.toLowerCase().includes("microbiology");
-  const pageTitle = (config?.enabledFeatures?.useThesisAndMandatoryCertificationsLabel || isMicrobiology)
-    ? "Thesis and mandatory certifications"
-    : "Thesis & certifications";
+  const { label } = useDepartment();
+  const pageTitle = label("milestones.pageTitle");
   const user = getCurrentUser()!;
   const base = `/api/students/${user.studentProfileId}`;
   const [thesis, setThesis] = React.useState<Thesis | null>(null);
