@@ -3,6 +3,7 @@ import type { ArogyaAction, ArogyaRole, RetrievedWorkflow } from "./knowledge/ty
 import { containsSensitiveClinicalInput, scrubAccountNames } from "./input-privacy.js";
 import { checkAppraisalPeriod, getDepartmentSummary, getLogState, getProgressSummary, getReviewSummary, type ArogyaLogType } from "./facts.js";
 import type { ArogyaActor } from "./policy.js";
+import { reasoningEffortParam } from "./model-params.js";
 
 export interface ArogyaTurnContext {
   workflowId?: string;
@@ -198,7 +199,8 @@ async function providerRequest(messages: Array<Record<string, unknown>>, useTool
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({
         model,
-        max_tokens: 800,
+        max_completion_tokens: 800,
+        ...reasoningEffortParam(),
         messages,
         ...(useTools ? { tools, tool_choice: "auto", parallel_tool_calls: false } : {}),
         response_format: { type: "json_schema", json_schema: {
