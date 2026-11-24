@@ -66,7 +66,7 @@ import { LegalDisclaimerModal } from "@/components/LegalDisclaimerModal";
 import { ArogyaPanel } from "@/components/arogya/ArogyaPanel";
 import { AROGYA_OPEN_EVENT } from "@/lib/arogya-context";
 import { MaintenanceNoticeBubble } from "@/components/arogya/MaintenanceNoticeBubble";
-import { useDepartment } from "@/lib/department-context";
+import { useDepartment, defaultDepartmentLabel, resolveDepartmentLabel, type DepartmentLabelKey } from "@/lib/department-context";
 import type { AcademicLogbookProfile } from "@/lib/academic-logbook";
 import { navigationIsActive, profileNavigation } from "@/lib/academic-navigation";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
@@ -133,8 +133,17 @@ const navigationDescriptions: Record<string, string> = {
   "Leave Approvals": "Review leave requests and record approval decisions.",
   Requirements: "Configure the case, procedure, and academic requirements used to measure progress.",
 };
+// Titles for these two routes are department wording that a HOD can rename, so their descriptions are
+// found by route. Every other entry still looks up by title.
+const navigationDescriptionsByRoute: Record<string, string> = {
+  "/postings": navigationDescriptions["Postings & Rotations"],
+  "/milestones": navigationDescriptions["Thesis & Certifications"],
+};
 
-function navigationForRole(role: RoleType, dashboardData?: any, loadingBadges?: boolean, config?: any, demoMode = false, academicLogbook?: AcademicLogbookProfile | null, department?: any): NavigationItem[] {
+function navigationForRole(role: RoleType, dashboardData?: any, loadingBadges?: boolean, config?: any, demoMode = false, academicLogbook?: AcademicLogbookProfile | null, department?: any, label?: (key: DepartmentLabelKey) => string, overrides?: Record<string, string>): NavigationItem[] {
+  // Titles for the two label-driven entries; the registry default applies when no label function is passed.
+  const postingsTitle = label ? label("nav.postings") : defaultDepartmentLabel("nav.postings");
+  const milestonesTitle = label ? label("nav.milestones") : defaultDepartmentLabel("nav.milestones", { useThesisAndMandatoryCertificationsLabel: Boolean(config?.enabledFeatures?.useThesisAndMandatoryCertificationsLabel) });
   const isMicroDept = department?.code?.toLowerCase() === "microbiology" || department?.name?.toLowerCase().includes("microbiology");
   if (role === "Faculty") {
     const items: NavigationItem[] = [
@@ -210,10 +219,12 @@ function navigationForRole(role: RoleType, dashboardData?: any, loadingBadges?: 
     if (config?.enabledFeatures?.splitThesisAndCertifications) {
       dermItems.push({ title: (config?.enabledFeatures?.useThesisAndPublicationsLabel || config?.enabledFeatures?.publicationsOnly) ? "Thesis and Publications" : "Thesis", icon: FileText, href: "/thesis" });
     } else {
-      dermItems.push({ title: "Thesis & Certifications", icon: Award, href: "/milestones" });
+      // This branch has always shown the fixed "Thesis & Certifications", whatever the wording flag says.
+      // An override still applies; with none, resolving without the flag gives that fixed default.
+      dermItems.push({ title: resolveDepartmentLabel("nav.milestones", overrides), icon: Award, href: "/milestones" });
     }
     dermItems.push({ title: "Assessments", icon: ClipboardCheck, href: "/assessments" });
-    dermItems.push({ title: "Postings & Rotations", icon: CalendarDays, href: "/postings" });
+    dermItems.push({ title: postingsTitle, icon: CalendarDays, href: "/postings" });
     if (config?.enabledFeatures?.splitThesisAndCertifications) {
       dermItems.push({ title: "Certifications", icon: Award, href: "/certifications" });
     }
@@ -226,7 +237,7 @@ function navigationForRole(role: RoleType, dashboardData?: any, loadingBadges?: 
 
   const items: NavigationItem[] = [
     { title: "Dashboard", icon: LayoutDashboard, href: "/" },
-    { title: "Postings & Rotations", icon: CalendarDays, href: "/postings" },
+    { title: postingsTitle, icon: CalendarDays, href: "/postings" },
   ];
   if (!features.hideCaseLogs) {
     items.push({ title: "Case Logs", icon: FileText, href: "/cases", badge: getCount("cases"), badgeLoading: loadingBadges });
@@ -249,7 +260,7 @@ function navigationForRole(role: RoleType, dashboardData?: any, loadingBadges?: 
     items.push({ title: (config?.enabledFeatures?.useThesisAndPublicationsLabel || config?.enabledFeatures?.publicationsOnly) ? "Thesis and Publications" : "Thesis", icon: FileText, href: "/thesis" });
     items.push({ title: "Certifications", icon: Award, href: "/certifications" });
   } else {
-    items.push({ title: config?.enabledFeatures?.useThesisAndMandatoryCertificationsLabel ? "Thesis and mandatory certifications" : "Thesis & Certifications", icon: Award, href: "/milestones" });
+    items.push({ title: milestonesTitle, icon: Award, href: "/milestones" });
   }
 
   if (config?.enabledFeatures?.yearlyAttendance || isMicroDept) {
@@ -285,7 +296,7 @@ export function AppLayout({
   onSignOut,
 }: AppLayoutProps) {
   const [location, setLocation] = useLocation();
-  const { department, config, academicLogbook } = useDepartment();
+  const { department, config, academicLogbook, label, labels } = useDepartment();
   const demoMode = isDemoMode();
   const reduceMotion = useReducedMotion();
   const [isDepartmentSwitching, setIsDepartmentSwitching] = React.useState(false);
@@ -507,9 +518,9 @@ export function AppLayout({
 
 
   const navigationItems = React.useMemo(
-    () => navigationForRole(activeRole, dashboardData, loadingBadges, config, demoMode, academicLogbook, department)
+    () => navigationForRole(activeRole, dashboardData, loadingBadges, config, demoMode, academicLogbook, department, label, labels)
       .map((item) => item.href === "/academics" && academicLogbook ? { ...item, title: academicLogbook.title } : item),
-    [activeRole, dashboardData, loadingBadges, config, demoMode, academicLogbook, department],
+    [activeRole, dashboardData, loadingBadges, config, demoMode, academicLogbook, department, label, labels],
   );
   const visibleNavigationItems = isDepartmentSwitching ? [] : navigationItems;
   const closeTour = React.useCallback(() => {
@@ -520,7 +531,7 @@ export function AppLayout({
     const navigationSteps = navigationItems.map((item, index) => ({
       target: `navigation-${index}`,
       title: item.title,
-      description: navigationDescriptions[item.title] || `Open ${item.title} from the sidebar.`,
+      description: navigationDescriptionsByRoute[item.href] ?? navigationDescriptions[item.title] ?? `Open ${item.title} from the sidebar.`,
     }));
 
     return [
@@ -727,7 +738,7 @@ export function AppLayout({
                 <div className="hidden h-7 w-px bg-teal-100 sm:block" />
                 <div className="min-w-0">
                   <p className="truncate font-display text-base font-bold text-slate-900">
-                    Department of {department.name?.replace(/microbiology/i, "Microbiology")}
+                    Department of {department.name}
                   </p>
                   <p className="truncate text-[11px] font-medium text-slate-500">
                     {activeRole} workspace
@@ -823,7 +834,7 @@ export function AppLayout({
               </div>}
                 <DemoBanner />
               <div className="print-only mb-6 border-b border-slate-300 pb-4">
-                <p className="page-eyebrow">Department of {department.name?.replace(/microbiology/i, "Microbiology")}</p>
+                <p className="page-eyebrow">Department of {department.name}</p>
                 <h1 className="mt-1 text-2xl font-bold">Resident Training Record</h1>
               </div>
               {demoMode && reduceMotion === false ? (

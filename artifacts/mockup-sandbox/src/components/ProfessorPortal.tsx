@@ -139,7 +139,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
   const currentUser = useCurrentUser();
   const hideUhid = isDemoMode();
   const { config, department, competencyLevels, caseCategories: deptCaseCategories, procedures: deptProcedures, procedureFields, academics: deptAcademics,
-    clinicalWorkCategories, clinicalWorkSubtypes, academicLogbook } = useDepartment();
+    clinicalWorkCategories, clinicalWorkSubtypes, academicLogbook, label } = useDepartment();
   const dynamicProcedureFields = Boolean(config?.enabledFeatures?.dynamicProcedureFields);
   const activeProcedureFields = dynamicProcedureFields ? (procedureFields ?? []) : undefined;
   const showProcedureDetails = dynamicProcedureFields || !!config?.enabledFeatures?.procedureClinicalDetails || deptProcedures.some((item) => item.requiredLogFields?.length);
@@ -564,7 +564,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                         <h4 className="text-xs font-semibold uppercase text-slate-500">Submission Details</h4>
                         <p className="text-sm text-slate-800 leading-relaxed whitespace-pre-wrap">{currentItem.detail}</p>
                         {currentItem.patientInfo && <p className="text-xs text-slate-600 font-medium">Patient Info: {currentItem.patientInfo}</p>}
-                        {!hideUhid && currentItem.patientUhid && <p className="text-xs font-semibold text-teal-800">Case ID: {currentItem.patientUhid}</p>}
+                        {!hideUhid && currentItem.patientUhid && <p className="text-xs font-semibold text-teal-800">{label("caseLog.caseId")}: {currentItem.patientUhid}</p>}
                         {!hideUhid && currentItem.caseNumber && <p className="text-xs font-semibold text-teal-800">Case number: {currentItem.caseNumber}</p>}
                         {currentItem.type === "Conference" && currentItem.location && <p className="text-xs text-slate-600 font-medium">Location: {currentItem.location}</p>}
                         {currentItem.type === "Conference" && currentItem.conferenceType && <p className="text-xs text-slate-600 font-medium">Type: {currentItem.conferenceType === 'cme' ? 'CME' : 'Conference'}</p>}
@@ -1055,7 +1055,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                         <TableRow>
                           <TableHead className="text-xs font-semibold">Date</TableHead>
                           <TableHead className="text-xs font-semibold">Diagnosis</TableHead>
-                          <TableHead className="text-xs font-semibold">{hideUhid ? "Patient Info" : "Case ID & Info"}</TableHead>
+                          <TableHead className="text-xs font-semibold">{hideUhid ? "Patient Info" : `${label("caseLog.caseId")} & Info`}</TableHead>
                           <TableHead className="text-xs font-semibold text-right">Status</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -1190,7 +1190,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                       <TableHeader className="bg-slate-50">
                         <TableRow>
                           <TableHead className="text-xs font-semibold">Procedure Name</TableHead>
-                          <TableHead className="text-xs font-semibold">{hideUhid ? "Age" : "Case ID & Age"}</TableHead>
+                          <TableHead className="text-xs font-semibold">{hideUhid ? "Age" : `${label("caseLog.caseId")} & Age`}</TableHead>
                           <TableHead className="text-xs font-semibold">Competency</TableHead>
                           <TableHead className="text-xs font-semibold text-right">Status</TableHead>
                         </TableRow>

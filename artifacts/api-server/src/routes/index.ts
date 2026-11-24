@@ -16,6 +16,7 @@ import profileRouter from "./profile.js";
 import nameChangeNotificationsRouter from "./name-change-notifications.js";
 import logbookSectionsRouter from "./logbook-sections.js";
 import supportRouter from "./support.js";
+import departmentLabelsRouter from "./department-labels.js";
 
 const router: IRouter = Router();
 
@@ -24,6 +25,7 @@ router.use("/auth", authRouter);
 router.use("/profile", profileRouter);
 router.use("/notifications/name-changes", nameChangeNotificationsRouter);
 router.use("/admin/department/logbook-sections", logbookSectionsRouter);
+router.use("/admin/department/labels", departmentLabelsRouter);
 router.use("/admin", adminRouter);
 router.use("/superadmin", superadminRouter);
 router.use("/support", supportRouter);

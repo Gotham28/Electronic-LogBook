@@ -5,6 +5,13 @@ import { isDemoMode } from "./session";
 import { Button } from "@/components/ui/button";
 import type { AcademicLogbookProfile } from "./academic-logbook";
 import { resolveProcedureFieldDefinitions, type ProcedureFieldDefinition } from "./procedure-log-fields";
+import { resolveDepartmentLabel, type DepartmentLabelKey } from "../../../../lib/api-zod/src/department-labels";
+
+// The label registry is shared with the API. Re-exported so screens import it from one place.
+export {
+  DEPARTMENT_LABELS, DEPARTMENT_LABEL_GROUPS, DEPARTMENT_LABEL_MAX_LENGTH, defaultDepartmentLabel, resolveDepartmentLabel,
+  type DepartmentLabelKey,
+} from "../../../../lib/api-zod/src/department-labels";
 
 export type DepartmentConfig = {
   requiredCases: number | null; requiredProcedures: number | null; requiredAcademic: number | null;
@@ -23,19 +30,20 @@ export type DepartmentData = {
   postings: CatalogItem[]; academics: CatalogItem[]; caseCategories: CatalogItem[]; competencyLevels: CatalogItem[]; leaveTypes: CatalogItem[]; conferenceLevels: CatalogItem[];
   clinicalWorkCategories: CatalogItem[]; clinicalWorkSubtypes: CatalogItem[]; postingSchedule: PostingScheduleRow[];
   academicLogbook?: AcademicLogbookProfile | null;
+  // Overrides only. Use label(key) / useLabel(key), which apply the registry default.
+  labels?: Record<string, string>;
 };
-const DepartmentContext = React.createContext<(DepartmentData & { refresh: () => Promise<void> }) | null>(null);
+// refresh() never throws: it resolves true when the catalog loaded, false when it could not (the error is also shown by the provider).
+type DepartmentContextValue = DepartmentData & { refresh: () => Promise<boolean>; label: (key: DepartmentLabelKey) => string };
+const DepartmentContext = React.createContext<DepartmentContextValue | null>(null);
 
 export function DepartmentProvider({ departmentId, children }: { departmentId: number | null; children: React.ReactNode }) {
   const [data, setData] = React.useState<DepartmentData | null>(null);
   const [error, setError] = React.useState("");
-  const refresh = React.useCallback(async () => {
-    if (!departmentId) { setError("Your account has no department. Contact the database administrator."); return; }
+  const refresh = React.useCallback(async (): Promise<boolean> => {
+    if (!departmentId) { setError("Your account has no department. Contact the database administrator."); return false; }
     try {
       const result = await apiGet<DepartmentData>(`/api/departments/${departmentId}/catalog`);
-      if (result.department && /microbiology/i.test(result.department.name)) {
-        result.department.name = result.department.name.replace(/microbiology/i, "Microbiology");
-      }
       const isMicro = result.department?.code?.toLowerCase() === "microbiology" || result.department?.name?.toLowerCase().includes("microbiology");
       const enabledFeatures = { ...(result.config?.enabledFeatures || {}) };
       if (isMicro) {
@@ -89,19 +97,26 @@ export function DepartmentProvider({ departmentId, children }: { departmentId: n
           ? result.procedureFields
           : resolveProcedureFieldDefinitions(resolvedConfig?.procedureLogFields, Boolean(resolvedConfig?.enabledFeatures?.dynamicProcedureFields)),
         readOnlyConfig: Boolean(result.readOnlyConfig),
+        labels: result.labels ?? {},
       });
       setError("");
-    } catch (err) { setError(err instanceof Error ? err.message : "Unable to load your department"); }
+      return true;
+    } catch (err) { setError(err instanceof Error ? err.message : "Unable to load your department"); return false; }
   }, [departmentId]);
   React.useEffect(() => {
     if (!isDemoMode()) setData(null);
     void refresh();
   }, [refresh]);
+  const labels = data?.labels;
+  const mandatoryCertifications = Boolean(data?.config?.enabledFeatures?.useThesisAndMandatoryCertificationsLabel);
+  // An override if one exists, else the default (which follows the existing wording flag).
+  const label = React.useCallback((key: DepartmentLabelKey) => resolveDepartmentLabel(key, labels,
+    { useThesisAndMandatoryCertificationsLabel: mandatoryCertifications }), [labels, mandatoryCertifications]);
   if (!data) return <div className="mx-auto max-w-lg space-y-4 p-10" role="status">
     <p>{error || "Loading your department…"}</p>
     {error && <><Button onClick={refresh}>Try again</Button><Button variant="outline" onClick={() => { clearSession(); window.location.assign("/"); }}>Return to sign in</Button></>}
   </div>;
-  return <DepartmentContext.Provider value={{ ...data, refresh }}>
+  return <DepartmentContext.Provider value={{ ...data, refresh, label }}>
     {error && <p role="alert" className="bg-rose-50 p-3 text-rose-700">{error}</p>}{children}
   </DepartmentContext.Provider>;
 }
@@ -110,4 +125,8 @@ export function useDepartment() {
   const value = React.useContext(DepartmentContext);
   if (!value) throw new Error("Department data is not ready");
   return value;
+}
+
+export function useLabel(key: DepartmentLabelKey): string {
+  return useDepartment().label(key);
 }
