@@ -133,6 +133,12 @@ type LogFilter =
   | { tab: "clinical-works"; category: string; label: string }
   | null;
 
+const PROFESSOR_REVIEW_FLAG_LABELS: Record<string, string> = {
+  missing_required_fields: "A required field is empty",
+  outside_posting_dates: "Date is outside verified posting dates",
+  duplicate_uhid_date: "Another pending log has the same patient ID and date",
+};
+
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; embedded?: boolean }) {
@@ -417,6 +423,10 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
   }
 
   const currentItem = reviews[currentIndex];
+  const recognizedReviewFlags = Array.isArray(currentItem?.reviewFlags)
+    ? [...new Set((currentItem.reviewFlags as unknown[]).filter((flag): flag is string =>
+      typeof flag === "string" && Object.prototype.hasOwnProperty.call(PROFESSOR_REVIEW_FLAG_LABELS, flag)))]
+    : [];
 
   const handleReviewAction = async (status: "verified" | "rejected") => {
     if (!currentItem || isSubmitting) return;
@@ -564,6 +574,27 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                       </div>
                       <span className="text-xs text-slate-400 font-mono">{formatLogbookDate(currentItem.date)}</span>
                     </div>
+
+                    {recognizedReviewFlags.length > 0 && (
+                      <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-2">
+                        <ul className="list-disc pl-4 space-y-1 text-xs text-amber-900">
+                          {recognizedReviewFlags.map((flag) => (
+                            <li key={flag}>{PROFESSOR_REVIEW_FLAG_LABELS[flag]}</li>
+                          ))}
+                        </ul>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            openArogya();
+                            void apiPost("/api/arogya/usage", { eventType: "nudge_click" }).catch(() => {});
+                          }}
+                        >
+                          Ask Mochi about this
+                        </Button>
+                      </div>
+                    )}
 
                     {currentItem.type === "Case Log" ? (
                       <CaseLogDetails caseLog={currentItem as CaseLogDetailRecord} hideUhid={hideUhid} medicalSummaryCaseFields={Boolean(config?.enabledFeatures?.medicalSummaryCaseFields)} microbiologyCaseFields={microbiologyCaseFields} />

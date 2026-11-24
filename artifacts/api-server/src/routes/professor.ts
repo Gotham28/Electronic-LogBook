@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, caseLogsTable, procedureLogsTable, academicLogsTable, studentsTable, usersTable, departmentsTable, departmentConfigsTable, conferencesTable, clinicalWorkLogsTable, departmentCatalogTable, attendanceLogsTable } from "@workspace/db";
+import { db, caseLogsTable, procedureLogsTable, academicLogsTable, studentsTable, usersTable, departmentsTable, departmentConfigsTable, conferencesTable, clinicalWorkLogsTable, departmentCatalogTable, attendanceLogsTable, postingsTable, procedureTypesTable } from "@workspace/db";
 import { eq, and, inArray, count, or, isNull } from "drizzle-orm";
 import { requireAuth, requireRole, requireDepartment } from "../middlewares/auth.js";
 import { z } from "zod";
@@ -8,7 +8,7 @@ import { resolveConfigDepartmentId } from "../lib/department-config-source.js";
 import { clinicalWorkTarget, verifiedClinicalWorkCounts } from "../lib/clinical-work-progress.js";
 import { getDepartmentFeatures } from "../lib/department-features.js";
 import { getAcademicLogbook } from "../lib/academic-logbook.js";
-import { academicSectionName } from "@workspace/api-zod";
+import { academicFieldVisible, academicSectionForRecord, academicSectionName, isBuiltInProcedureField, PROCEDURE_LOG_FIELDS, readAcademicRecord, resolveProcedureFieldDefinitions } from "@workspace/api-zod";
 
 const router: IRouter = Router();
 
@@ -351,8 +351,8 @@ router.get("/:professorId/review-queue", async (req, res) => {
 
     const deptId = caller.departmentId!;
     const isHod = profMatch[0].role === "hod";
-    const { features } = await getDepartmentFeatures(deptId);
-    const logbook = await getAcademicLogbook(await resolveConfigDepartmentId(deptId));
+    const { features, configSourceId, procedureLogFields } = await getDepartmentFeatures(deptId);
+    const logbook = await getAcademicLogbook(configSourceId);
 
     // For HOD: show pending logs assigned to them or unassigned (department-scoped below via join).
     // For professor: show only logs where they are the named supervisor.
@@ -437,12 +437,116 @@ router.get("/:professorId/review-queue", async (req, res) => {
       .leftJoin(departmentsTable, eq(usersTable.departmentId, departmentsTable.id))
       .where(and(clinicalWhere, eq(usersTable.departmentId, deptId), eq(usersTable.status, "approved"), isNull(clinicalWorkLogsTable.deletedAt)));
     const clinicalNames = new Map<string, string>();
+    const categoriesWithSubtypes = new Set<string>();
+    let clinicalCompetencyRequired = false;
     if (clinicalWorks.length > 0) {
-      const configSourceId = await resolveConfigDepartmentId(deptId);
-      const rows = await db.select({ value: departmentCatalogTable.value, name: departmentCatalogTable.name }).from(departmentCatalogTable)
+      const rows = await db.select({
+        value: departmentCatalogTable.value, name: departmentCatalogTable.name,
+        kind: departmentCatalogTable.kind, parentValue: departmentCatalogTable.parentValue,
+      }).from(departmentCatalogTable)
         .where(and(eq(departmentCatalogTable.departmentId, configSourceId),
-          inArray(departmentCatalogTable.kind, ["clinical_work_category", "clinical_work_subtype"])));
-      rows.forEach((row) => clinicalNames.set(row.value, row.name));
+          inArray(departmentCatalogTable.kind, isHod
+            ? ["clinical_work_category", "clinical_work_subtype"]
+            : ["clinical_work_category", "clinical_work_subtype", "competency_level"])));
+      for (const row of rows) {
+        if (row.kind === "competency_level") {
+          clinicalCompetencyRequired = true;
+          continue;
+        }
+        clinicalNames.set(row.value, row.name);
+        if (row.kind === "clinical_work_subtype" && row.parentValue !== null) {
+          categoriesWithSubtypes.add(row.parentValue);
+        }
+      }
+    }
+
+    type ReviewFlag = "missing_required_fields" | "outside_posting_dates" | "duplicate_uhid_date";
+    const reviewFlags = new Map<string, ReviewFlag[]>();
+    const isBlank = (value: unknown) => typeof value !== "string" || value.trim() === "";
+    const missingAcademicFields = (log: typeof academicLogsTable.$inferSelect) => {
+      if ([log.date, log.activityType, log.topic].some(isBlank)) return true;
+      const section = academicSectionForRecord(logbook, log.activityType, log.description);
+      if (!section) return false;
+      const record = readAcademicRecord(log.description);
+      if (!record || (section.participation && isBlank(log.presentationType))) return true;
+      return section.fields.some((field) => (field.required || field.requiredWhen) &&
+        academicFieldVisible(field, record.values) && isBlank(record.values[field.key]));
+    };
+    if (!isHod) {
+      const clinicalRows = [
+        ...cases.map(({ log }) => ({ kind: "case" as const, log })),
+        ...procedures.map(({ log }) => ({ kind: "procedure" as const, log })),
+      ];
+      const ids = [...new Set([
+        ...clinicalRows.map(({ log }) => log.studentId),
+        ...clinicalWorks.map(({ log }) => log.studentId),
+      ])];
+      const [postings, procedureTypes] = await Promise.all([
+        ids.length > 0 ? db.select({ studentId: postingsTable.studentId, start: postingsTable.startDate, end: postingsTable.endDate })
+          .from(postingsTable)
+          .innerJoin(studentsTable, eq(postingsTable.studentId, studentsTable.id))
+          .innerJoin(usersTable, eq(studentsTable.userId, usersTable.id))
+          .where(and(inArray(postingsTable.studentId, ids), eq(postingsTable.supervisorId, professorId),
+            eq(postingsTable.status, "verified"), eq(usersTable.departmentId, deptId), eq(usersTable.status, "approved"))) : [],
+        procedures.length > 0 && !features.freeTextProcedures
+          ? db.select({ group: procedureTypesTable.group, name: procedureTypesTable.name, required: procedureTypesTable.requiredLogFields })
+          .from(procedureTypesTable).where(eq(procedureTypesTable.departmentId, configSourceId)) : [],
+      ]);
+      const postingRanges = new Map<number, Array<{ start: string; end: string }>>();
+      for (const { studentId, start, end } of postings) {
+        if (!dateSchema.safeParse(start).success || !dateSchema.safeParse(end).success || start > end) continue;
+        const ranges = postingRanges.get(studentId) ?? [];
+        ranges.push({ start, end });
+        postingRanges.set(studentId, ranges);
+      }
+      const outsidePostingDates = (studentId: number, date: string) => {
+        const ranges = postingRanges.get(studentId);
+        return !!ranges && dateSchema.safeParse(date).success &&
+          !ranges.some(({ start, end }) => start <= date && date <= end);
+      };
+
+      const duplicateKey = ({ kind, log }: typeof clinicalRows[number]) => {
+        const uhid = log.patientUhid?.trim();
+        if (!uhid || uhid.toUpperCase() === "N/A" || !dateSchema.safeParse(log.date).success) return null;
+        return JSON.stringify([kind, log.studentId, log.date, uhid]);
+      };
+      const duplicateCounts = new Map<string, number>();
+      for (const item of clinicalRows) {
+        const key = duplicateKey(item);
+        if (key !== null) duplicateCounts.set(key, (duplicateCounts.get(key) ?? 0) + 1);
+      }
+
+      const activeFields: ReadonlySet<string> = new Set(features.dynamicProcedureFields
+        ? resolveProcedureFieldDefinitions(procedureLogFields, true).map(({ id }) => id) : PROCEDURE_LOG_FIELDS);
+      const requiredByProcedure = new Map(procedureTypes.map(({ group, name, required }) => [`${group}\0${name}`, required]));
+      for (const item of clinicalRows) {
+        const { log } = item;
+        const flags: ReviewFlag[] = [];
+        const foundMissing = item.kind === "case"
+          ? [item.log.date, item.log.patientAge, item.log.patientGender, item.log.diagnosisFinal].some(isBlank)
+          : [item.log.date, item.log.procedureName].some(isBlank) ||
+            (!features.freeTextProcedures && isBlank(item.log.procedureGroup)) ||
+            (!features.dynamicProcedureFields &&
+              [item.log.patientUhid, item.log.patientAge, item.log.competencyLevel].some(isBlank)) ||
+            (requiredByProcedure.get(`${item.log.procedureGroup}\0${item.log.procedureName}`) ?? []).some((field) => {
+              if (!activeFields.has(field)) return false;
+              const value = isBuiltInProcedureField(field) ? item.log[field] : item.log.customFields?.[field];
+              return isBlank(value) || String(value).trim().toUpperCase() === "N/A";
+            });
+        if (foundMissing) flags.push("missing_required_fields");
+        if (outsidePostingDates(log.studentId, log.date)) flags.push("outside_posting_dates");
+        const key = duplicateKey(item);
+        if (key !== null && (duplicateCounts.get(key) ?? 0) > 1) flags.push("duplicate_uhid_date");
+        reviewFlags.set(`${item.kind}-${log.id}`, flags);
+      }
+      for (const { log } of clinicalWorks) {
+        const flags: ReviewFlag[] = [];
+        if ([log.date, log.category, log.caseNumber, log.patientAge, log.patientSex].some(isBlank) ||
+          (categoriesWithSubtypes.has(log.category) && isBlank(log.subType)) ||
+          (clinicalCompetencyRequired && isBlank(log.competency))) flags.push("missing_required_fields");
+        if (outsidePostingDates(log.studentId, log.date)) flags.push("outside_posting_dates");
+        reviewFlags.set(`clinical_work-${log.id}`, flags);
+      }
     }
 
     const pendingReviews = [
@@ -458,6 +562,7 @@ router.get("/:professorId/review-queue", async (req, res) => {
         // The provisional diagnosis is optional; the final diagnosis is always recorded.
         title: `${c.log.diagnosisProvisional || c.log.diagnosisFinal} — ${c.log.patientAge}, ${c.log.patientGender}`,
         date: c.log.date,
+        reviewFlags: reviewFlags.get(`case-${c.log.id}`) ?? [],
         patientUhid: c.log.patientUhid,
         patientInfo: `${c.log.patientAge} / ${c.log.patientGender}`,
         patientAge: c.log.patientAge,
@@ -490,6 +595,7 @@ router.get("/:professorId/review-queue", async (req, res) => {
         type: "Procedure",
         title: p.log.procedureName,
         date: p.log.date,
+        reviewFlags: reviewFlags.get(`procedure-${p.log.id}`) ?? [],
         patientUhid: p.log.patientUhid,
         patientInfo: p.log.patientAge,
         patientAge: p.log.patientAge,
@@ -514,6 +620,7 @@ router.get("/:professorId/review-queue", async (req, res) => {
         title: `${academicSectionName(logbook, a.log.activityType)}: ${a.log.topic}`,
         activityType: a.log.activityType,
         date: a.log.date,
+        reviewFlags: !isHod && missingAcademicFields(a.log) ? ["missing_required_fields"] : [],
         detail: a.log.presentationType || academicSectionName(logbook, a.log.activityType),
         description: a.log.description,
         presentationType: a.log.presentationType,
@@ -530,6 +637,8 @@ router.get("/:professorId/review-queue", async (req, res) => {
         type: "Conference",
         title: c.log.conferenceName,
         date: c.log.date,
+        reviewFlags: !isHod && [c.log.date, c.log.conferenceName, c.log.conferenceType, c.log.role].some(isBlank)
+          ? ["missing_required_fields"] : [],
         conferenceType: c.log.conferenceType,
         level: c.log.level,
         category: c.log.category,
@@ -538,7 +647,7 @@ router.get("/:professorId/review-queue", async (req, res) => {
         detail: c.log.role === "presented" ? "Presented" : "Attended",
         status: c.log.status
       })),
-      ...clinicalWorks.map((c: any) => {
+      ...clinicalWorks.map(c => {
         const category = clinicalNames.get(c.log.category) || c.log.category;
         const subType = c.log.subType ? (clinicalNames.get(c.log.subType) || c.log.subType) : null;
         return {
@@ -552,6 +661,7 @@ router.get("/:professorId/review-queue", async (req, res) => {
           type: "Clinical Work",
           title: subType ? `${category} — ${subType}` : category,
           date: c.log.date,
+          reviewFlags: reviewFlags.get(`clinical_work-${c.log.id}`) ?? [],
           caseNumber: c.log.caseNumber,
           patientInfo: `${c.log.patientAge} / ${c.log.patientSex}`,
           detail: subType ? `${category} — ${subType}` : category,
