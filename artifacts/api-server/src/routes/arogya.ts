@@ -15,6 +15,7 @@ import { assertAuthorizedStudent, canonicalArogyaRole } from "../lib/arogya/poli
 import { normalizeHistory, scrubAccountNames, containsSensitiveClinicalInput } from "../lib/arogya/input-privacy.js";
 import { answerArogya, ArogyaProviderError, validateV2Enabled } from "../lib/arogya/provider.js";
 import type { ArogyaLogType } from "../lib/arogya/facts.js";
+import { getWeeklyDepartmentDigest } from "../lib/arogya/weekly-digest.js";
 
 const router = Router();
 
@@ -41,7 +42,7 @@ const usageEventSchema = z.object({
 
 const postgresIntegerMax = 2_147_483_647;
 const usageCountQuery = z.object({ departmentId: idSchema.max(postgresIntegerMax).optional() }).strict();
-type UsageFeature = "ask" | "progress-coach" | "appraisal-draft" | "department-report";
+type UsageFeature = "ask" | "progress-coach" | "appraisal-draft" | "department-report" | "department-report-weekly";
 
 function trackMochiRequest(feature: UsageFeature): RequestHandler {
   return (req, res, next) => {
@@ -538,6 +539,36 @@ router.post("/appraisal-draft/:studentId", requireAuth, trackMochiRequest("appra
     res.status(500).json({ error: "Arogya couldn't answer right now." });
   }
 });
+
+router.post("/department-report/weekly", requireAuth, requireDepartment, requireRole(["hod"]),
+  trackMochiRequest("department-report-weekly"), async (req, res) => {
+    if (req.body?.departmentId !== undefined) {
+      res.status(403).json({ error: "Use the department assigned to your account." });
+      return;
+    }
+    if (!z.object({}).strict().safeParse(req.body ?? {}).success) {
+      res.status(400).json({ error: "Invalid weekly digest request." });
+      return;
+    }
+    const departmentId = req.user!.departmentId!;
+    try {
+      const [department] = await db.select({ id: departmentsTable.id }).from(departmentsTable)
+        .where(eq(departmentsTable.id, departmentId)).limit(1);
+      if (!department) {
+        res.status(404).json({ error: "Department not found." });
+        return;
+      }
+      const { tokenCount, ...digest } = await getWeeklyDepartmentDigest(department.id);
+      res.locals.mochiTokenCount = tokenCount;
+      if (digest.status === "failed") {
+        res.status(503).json({ error: "This week's Mochi digest is unavailable." });
+        return;
+      }
+      res.status(digest.status === "pending" ? 202 : 200).json(digest);
+    } catch {
+      res.status(500).json({ error: "The Mochi digest could not be loaded." });
+    }
+  });
 
 router.post("/department-report", requireAuth, trackMochiRequest("department-report"), async (req, res) => {
   const userId = String(req.user!.id);

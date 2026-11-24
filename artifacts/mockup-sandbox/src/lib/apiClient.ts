@@ -114,7 +114,9 @@ async function fetchWithAuth(
       // Not JSON, ignore
     }
     const errorMessage = errorData?.message || response.statusText || "An API error occurred";
-    if (response.status === 401 && token && !SESSION_CHECK_EXEMPT.some((path) => endpoint.startsWith(path))) {
+    // A cancellable request can finish after the active account changes.
+    const requestIsCurrent = !options.signal || (!options.signal.aborted && getAuthToken() === token);
+    if (response.status === 401 && token && requestIsCurrent && !SESSION_CHECK_EXEMPT.some((path) => endpoint.startsWith(path))) {
       clearSession();
       window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT));
     }

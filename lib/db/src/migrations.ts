@@ -18,6 +18,7 @@ export async function applyMigrations(connection: MigrationConnection, adoptExis
   files.push("0030_colleges.sql");
   files.push("0031_support_tickets.sql");
   files.push("0032_assistant_usage_events.sql");
+  files.push("0033_assistant_department_weekly_digests.sql");
   await connection.query("BEGIN");
   try {
     await connection.query("SELECT pg_advisory_xact_lock(hashtext('elogbook-schema-migrations'))");
