@@ -295,7 +295,7 @@ The four parts are complete in the code. The three role updates within Part 2 ha
 | 2, HOD | c2b07b2 | Cached weekly digest |
 | 3 | 0f64c71 | Error actions and answer-source labels |
 
-PR pending.
+The implementation PR is open against main. [Mochi adoption PR #164](https://github.com/Gotham28/Electronic-LogBook/pull/164)
 
 Independent review used the scoped high-assurance tier. The final API and UI checks ran locally with synthetic fixtures. The 18 matching baseline failures, rollout cost confirmation, and migrations 0032 and 0033 are tracked separately. This repository has no STATUS.md or MASTER_PLAN.md, so this handoff records the result. AGENTS.md §14.2 still names Claude Chat. The developer's approval was recorded in this conversation.
 
