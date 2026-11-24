@@ -72,7 +72,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { getCurrentUser, isDemoMode } from "@/lib/session";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { QuarterlyAppraisalSection } from "@/components/QuarterlyAppraisalSection";
-import { publishArogyaContext } from "@/lib/arogya-context";
+import { openArogya, publishArogyaContext } from "@/lib/arogya-context";
 import { useDepartment } from "@/lib/department-context";
 import {
   ChartContainer,
@@ -148,6 +148,11 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
   const isMicroDept = department?.code?.toLowerCase() === "microbiology" || department?.name?.toLowerCase().includes("microbiology");
   const microbiologyCaseFields = Boolean(config?.enabledFeatures?.microbiologyCaseFields || isMicroDept);
   const isHodUser = Boolean(embedded || currentUser?.role === "hod");
+  const askMochiButton = (
+    <Button type="button" variant="outline" size="sm" onClick={openArogya}>
+      Ask Mochi about this
+    </Button>
+  );
   const hideQuarterlyAppraisal = Boolean(
     config?.enabledFeatures?.hideQuarterlyAppraisal ||
     (isHodUser && (config?.enabledFeatures?.hideHodQuarterlyAppraisal || isMicroDept))
@@ -403,7 +408,10 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
     return (
       <div className="flex h-64 flex-col items-center justify-center space-y-4">
         <p className="text-red-500">{error}</p>
-        <Button onClick={fetchProfessorData} variant="outline">Try Again</Button>
+        <div className="flex items-center gap-2">
+          <Button onClick={fetchProfessorData} variant="outline">Try Again</Button>
+          {askMochiButton}
+        </div>
       </div>
     );
   }
@@ -1065,7 +1073,16 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                             ? (menteeLogs?.caseLogs ?? []).filter((log: any) => log.category === (logFilter as any).category)
                             : (menteeLogs?.caseLogs ?? []);
                           if (menteeLoadErrors.logs) {
-                            return <TableRow><TableCell colSpan={4} role="alert" className="text-center text-sm font-medium text-rose-700 py-6">{menteeLoadErrors.logs}</TableCell></TableRow>;
+                            return (
+                              <TableRow>
+                                <TableCell colSpan={4} role="alert" className="text-center text-sm font-medium text-rose-700 py-6">
+                                  <div className="flex flex-wrap items-center justify-center gap-2">
+                                    <span>{menteeLoadErrors.logs}</span>
+                                    {askMochiButton}
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            );
                           }
                           if (!rows.length) {
                             return <TableRow><TableCell colSpan={4} className="text-center text-sm text-slate-500 py-6">No case logs found.</TableCell></TableRow>;
@@ -1138,7 +1155,16 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                             ? (menteeLogs?.clinicalWorkLogs ?? []).filter((log: any) => log.category === (logFilter as any).category)
                             : (menteeLogs?.clinicalWorkLogs ?? []);
                           if (menteeLoadErrors.logs) {
-                            return <TableRow><TableCell colSpan={4} role="alert" className="text-center text-sm font-medium text-rose-700 py-6">{menteeLoadErrors.logs}</TableCell></TableRow>;
+                            return (
+                              <TableRow>
+                                <TableCell colSpan={4} role="alert" className="text-center text-sm font-medium text-rose-700 py-6">
+                                  <div className="flex flex-wrap items-center justify-center gap-2">
+                                    <span>{menteeLoadErrors.logs}</span>
+                                    {askMochiButton}
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            );
                           }
                           if (!rows.length) {
                             return <TableRow><TableCell colSpan={4} className="text-center text-sm text-slate-500 py-6">No clinical work found.</TableCell></TableRow>;
@@ -1204,7 +1230,16 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                             )
                             : (menteeLogs?.procedureLogs ?? []);
                           if (menteeLoadErrors.logs) {
-                            return <TableRow><TableCell colSpan={4} role="alert" className="text-center text-sm font-medium text-rose-700 py-6">{menteeLoadErrors.logs}</TableCell></TableRow>;
+                            return (
+                              <TableRow>
+                                <TableCell colSpan={4} role="alert" className="text-center text-sm font-medium text-rose-700 py-6">
+                                  <div className="flex flex-wrap items-center justify-center gap-2">
+                                    <span>{menteeLoadErrors.logs}</span>
+                                    {askMochiButton}
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            );
                           }
                           if (!rows.length) {
                             return <TableRow><TableCell colSpan={4} className="text-center text-sm text-slate-500 py-6">No procedure logs found.</TableCell></TableRow>;
@@ -1402,7 +1437,16 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                             ? (menteeLogs?.academicLogs ?? []).filter((log: any) => log.activityType === (logFilter as any).activityType)
                             : (menteeLogs?.academicLogs ?? []);
                           if (menteeLoadErrors.logs) {
-                            return <TableRow><TableCell colSpan={3} role="alert" className="text-center text-sm font-medium text-rose-700 py-6">{menteeLoadErrors.logs}</TableCell></TableRow>;
+                            return (
+                              <TableRow>
+                                <TableCell colSpan={3} role="alert" className="text-center text-sm font-medium text-rose-700 py-6">
+                                  <div className="flex flex-wrap items-center justify-center gap-2">
+                                    <span>{menteeLoadErrors.logs}</span>
+                                    {askMochiButton}
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            );
                           }
                           if (!rows.length) {
                             return <TableRow><TableCell colSpan={3} className="text-center text-sm text-slate-500 py-6">No academic logs found.</TableCell></TableRow>;
@@ -1427,7 +1471,10 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                 {/* ── Postings Tab ──────────────────────────────────────────── */}
                 <TabsContent value="postings" className="pt-3">
                   {menteeLoadErrors.postings ? (
-                    <p role="alert" className="text-sm font-medium text-rose-700 py-6 text-center">{menteeLoadErrors.postings}</p>
+                    <div className="flex flex-wrap items-center justify-center gap-2 py-6 text-center">
+                      <p role="alert" className="text-sm font-medium text-rose-700">{menteeLoadErrors.postings}</p>
+                      {askMochiButton}
+                    </div>
                   ) : menteePostings.length === 0 ? (
                     <p className="text-sm text-slate-500 py-6 text-center">No postings visible to you (either none logged or none assigned to you as supervisor).</p>
                   ) : (
@@ -1470,7 +1517,10 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                 {config?.enabledFeatures?.awards && (
                   <TabsContent value="awards" className="pt-3">
                     {menteeLoadErrors.awards ? (
-                      <p role="alert" className="text-sm font-medium text-rose-700 py-6 text-center">{menteeLoadErrors.awards}</p>
+                      <div className="flex flex-wrap items-center justify-center gap-2 py-6 text-center">
+                        <p role="alert" className="text-sm font-medium text-rose-700">{menteeLoadErrors.awards}</p>
+                        {askMochiButton}
+                      </div>
                     ) : menteeAwards.length === 0 ? (
                       <p className="text-sm text-slate-500 py-6 text-center">No awards visible to you (either none logged or none assigned to you as supervisor).</p>
                     ) : (
@@ -1513,7 +1563,10 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                 {/* ── Thesis Tab ────────────────────────────────────────────── */}
                 <TabsContent value="thesis" className="pt-3">
                   {menteeLoadErrors.thesis ? (
-                    <p role="alert" className="text-sm font-medium text-rose-700 py-6 text-center">{menteeLoadErrors.thesis}</p>
+                    <div className="flex flex-wrap items-center justify-center gap-2 py-6 text-center">
+                      <p role="alert" className="text-sm font-medium text-rose-700">{menteeLoadErrors.thesis}</p>
+                      {askMochiButton}
+                    </div>
                   ) : !menteeThesis ? (
                     <p className="text-sm text-slate-500 py-6 text-center">No thesis recorded yet, or this student's thesis is not assigned to you as guide.</p>
                   ) : (
@@ -1559,7 +1612,10 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                 {/* ── Certifications Tab ────────────────────────────────────── */}
                 <TabsContent value="certifications" className="pt-3">
                   {menteeLoadErrors.certifications ? (
-                    <p role="alert" className="text-sm font-medium text-rose-700 py-6 text-center">{menteeLoadErrors.certifications}</p>
+                    <div className="flex flex-wrap items-center justify-center gap-2 py-6 text-center">
+                      <p role="alert" className="text-sm font-medium text-rose-700">{menteeLoadErrors.certifications}</p>
+                      {askMochiButton}
+                    </div>
                   ) : menteeCerts.length === 0 ? (
                     <p className="text-sm text-slate-500 py-6 text-center">No certifications visible to you (this student may not be your direct mentee).</p>
                   ) : (
@@ -1609,7 +1665,10 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                 {/* ── Assessments Tab ─────────────────────────────────────────── */}
                 <TabsContent value="assessments" className="pt-3">
                   {menteeLoadErrors.assessments ? (
-                    <p role="alert" className="text-sm font-medium text-rose-700 py-6 text-center">{menteeLoadErrors.assessments}</p>
+                    <div className="flex flex-wrap items-center justify-center gap-2 py-6 text-center">
+                      <p role="alert" className="text-sm font-medium text-rose-700">{menteeLoadErrors.assessments}</p>
+                      {askMochiButton}
+                    </div>
                   ) : menteeAssessments.length === 0 ? (
                     <p className="text-sm text-slate-500 py-6 text-center">No assessments found for this student.</p>
                   ) : (

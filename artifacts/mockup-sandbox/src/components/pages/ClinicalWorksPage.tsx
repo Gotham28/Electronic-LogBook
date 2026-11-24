@@ -2,7 +2,7 @@ import * as React from "react";
 import { AlertCircle, CheckCircle2, Clock, Edit3, Loader2, PlusCircle, Search, Stethoscope, Trash2, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/apiClient";
-import { publishArogyaContext } from "@/lib/arogya-context";
+import { openArogya, publishArogyaContext } from "@/lib/arogya-context";
 import { getCurrentUser, isDemoMode } from "@/lib/session";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -247,7 +247,12 @@ export function ClinicalWorksPage() {
                 </Field>
               </div>
               <Field label="Reviewing faculty member" htmlFor="cw-supervisor">
-                {professorsError ? <p role="alert" className="text-sm text-rose-700">{professorsError}</p> : (
+                {professorsError ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p role="alert" className="text-sm text-rose-700">{professorsError}</p>
+                    <Button type="button" variant="outline" size="sm" onClick={openArogya}>Ask Mochi about this</Button>
+                  </div>
+                ) : (
                   <Select value={form.supervisorId} onValueChange={(value) => setField("supervisorId", value)}>
                     <SelectTrigger id="cw-supervisor"><SelectValue placeholder="Select a faculty member" /></SelectTrigger>
                     <SelectContent>
@@ -359,7 +364,10 @@ export function ClinicalWorksPage() {
           ) : error ? (
             <div className="flex flex-col items-center justify-center gap-4 p-8 text-center" role="alert">
               <p className="text-sm font-medium text-rose-700">{error}</p>
-              <Button size="sm" variant="outline" onClick={() => void fetchLogs()} className="border-rose-200 text-rose-700">Try again</Button>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <Button size="sm" variant="outline" onClick={() => void fetchLogs()} className="border-rose-200 text-rose-700">Try again</Button>
+                <Button type="button" variant="outline" size="sm" onClick={openArogya}>Ask Mochi about this</Button>
+              </div>
             </div>
           ) : filtered.length === 0 ? (
             <div className="flex h-48 flex-col items-center justify-center gap-2 text-center">

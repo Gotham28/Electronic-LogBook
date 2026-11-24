@@ -27,6 +27,7 @@ export interface ArogyaAnswer {
   facts: Array<{ id: string; label: string; value: string | number | null }>;
   actions: ArogyaAction[];
   clarification?: { type: "workflow" | "student" | "appraisal_period" | "log"; choices?: Array<{ id: string; label: string }> };
+  grounding?: { scope: "resident_logs"; logCount: number } | { scope: "department" };
   checkedAt?: string;
   knowledgeVersion: string;
   capabilitySignature: string;
