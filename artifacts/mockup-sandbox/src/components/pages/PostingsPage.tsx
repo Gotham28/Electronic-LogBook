@@ -38,12 +38,10 @@ import { apiGet, apiPost, apiPatch } from "@/lib/apiClient";
 import { getCurrentUser } from "@/lib/session";
 
 export function PostingsPage() {
-  const { postings: postingOptions, config, postingSchedule, department } = useDepartment();
-  const isRadiology = department?.name?.toLowerCase().includes("radiology");
-  const isDermatology = department?.name?.toLowerCase().includes("dermatology");
+  const { postings: postingOptions, config, postingSchedule, department, label } = useDepartment();
   const isMicrobiology = department?.code?.toLowerCase() === "microbiology" || department?.name?.toLowerCase().includes("microbiology");
-  const postingLabelTitle = isRadiology ? "Posting" : isDermatology ? "Posting unit" : "Ward / Posting Unit";
-  const postingLabelLower = isRadiology ? "posting" : isDermatology ? "posting unit" : "ward posting or rotation";
+  const postingLabelTitle = label("postings.unitTitle");
+  const postingLabelLower = label("postings.unitPhrase");
   const [open, setOpen] = React.useState(false);
   const [postings, setPostings] = React.useState<Posting[]>([]);
   const user = React.useMemo(() => getCurrentUser(), []);

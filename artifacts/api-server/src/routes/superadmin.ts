@@ -211,10 +211,9 @@ router.get("/departments", async (req, res) => {
 
     return res.json(departments.map((d) => ({
       ...d,
-      name: /microbiology/i.test(d.name) ? d.name.replace(/microbiology/i, "Microbiology") : d.name,
       hod: hodByDept.get(d.id) || null,
       mirrorDepartmentId: mirrorByRealDeptId.get(d.id)?.id ?? null,
-      mirrorDepartmentName: mirrorByRealDeptId.get(d.id)?.name ? (/microbiology/i.test(mirrorByRealDeptId.get(d.id)!.name) ? mirrorByRealDeptId.get(d.id)!.name.replace(/microbiology/i, "Microbiology") : mirrorByRealDeptId.get(d.id)!.name) : null,
+      mirrorDepartmentName: mirrorByRealDeptId.get(d.id)?.name ?? null,
       mirrorHod: mirrorByRealDeptId.get(d.id)?.hod ?? null,
       mirrorCode: mirrorByRealDeptId.get(d.id)?.code ?? null,
     })));

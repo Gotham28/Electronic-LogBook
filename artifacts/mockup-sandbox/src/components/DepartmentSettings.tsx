@@ -2,7 +2,7 @@ import * as React from "react";
 import { toast } from "sonner";
 import { apiPost, apiPatch, apiGet, apiDelete } from "@/lib/apiClient";
 import { Trash2, AlertTriangle, ChevronDown, Search } from "lucide-react";
-import { useDepartment } from "@/lib/department-context";
+import { useDepartment, DEPARTMENT_LABELS, DEPARTMENT_LABEL_GROUPS, defaultDepartmentLabel, type DepartmentLabelKey } from "@/lib/department-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -34,6 +34,117 @@ import {
 const TARGET_KINDS = ["academic", "case_category", "conference_level", "clinical_work_category"];
 const COLLAPSE_THRESHOLD = 5;
 
+type WordingItem = {
+  key: DepartmentLabelKey; value: string; default: string; override: string | null; revision: number;
+  group: string; description: string; maxLength: number;
+};
+type WordingResponse = { labels: WordingItem[]; readOnly: boolean };
+const WORDING_ENDPOINT = "/api/admin/department/labels";
+
+// One label at a time: each row saves and resets on its own, sending the revision it read. A failed
+// load or save shows an error; the defaults are never presented as saved values.
+function WordingSettings() {
+  const department = useDepartment();
+  const [wording, setWording] = React.useState<WordingResponse | null>(null);
+  const [loadError, setLoadError] = React.useState("");
+  // Set when a change was saved on the server but the department context could not reload. It lives here,
+  // not in the row, because a saved row remounts (its key includes the revision) and would lose it.
+  const [refreshNotice, setRefreshNotice] = React.useState("");
+  const generation = React.useRef(0);
+  const load = React.useCallback(async () => {
+    const request = ++generation.current;
+    setLoadError("");
+    try {
+      const result = await apiGet<WordingResponse>(WORDING_ENDPOINT);
+      if (!result || !Array.isArray(result.labels) || typeof result.readOnly !== "boolean"
+        || result.labels.some((item) => typeof item?.key !== "string" || typeof item?.revision !== "number")) {
+        throw new Error("Could not load department wording");
+      }
+      if (request === generation.current) setWording(result);
+    } catch (error) {
+      if (request === generation.current) { setWording(null); setLoadError(error instanceof Error ? error.message : "Could not load department wording"); }
+    }
+  }, [department.department.id]);
+  React.useEffect(() => { void load(); return () => { generation.current++; }; }, [load]);
+  const onRowChanged = React.useCallback(async (refreshed: boolean) => {
+    setRefreshNotice(refreshed ? "" : "Your change was saved, but the pages could not reload it. Reload this page to see the new wording everywhere.");
+    await load();
+  }, [load]);
+
+  if (loadError) return <div role="alert" className="space-y-3 rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
+    <p>{loadError}</p><Button variant="outline" onClick={() => void load()}>Try again</Button>
+  </div>;
+  if (!wording) return <p role="status" className="text-sm text-slate-500">Loading wording…</p>;
+  const groups = DEPARTMENT_LABEL_GROUPS.filter((group) => wording.labels.some((item) => item.group === group));
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col gap-2 border-b border-slate-200 pb-4">
+        <h3 className="text-lg font-semibold text-slate-900">Wording</h3>
+        <p className="text-sm text-slate-500">The names residents and faculty see for a few pages and columns. Each one saves on its own, and pages update straight away.</p>
+        {wording.readOnly && <p className="text-sm text-amber-700">This department mirrors another department's settings, so its wording can't be changed here.</p>}
+      </div>
+      {refreshNotice && <p role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">{refreshNotice}</p>}
+      {groups.map((group) => (
+        <section key={group} aria-label={`${group} wording`} className="space-y-3">
+          <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-500">{group}</h4>
+          {wording.labels.filter((item) => item.group === group).map((item) => (
+            <WordingRow key={`${item.key}:${item.revision}`} item={item} readOnly={wording.readOnly} onChanged={onRowChanged} />
+          ))}
+        </section>
+      ))}
+    </div>
+  );
+}
+
+function WordingRow({ item, readOnly, onChanged }: { item: WordingItem; readOnly: boolean; onChanged: (refreshed: boolean) => Promise<void> }) {
+  const department = useDepartment();
+  const inputId = React.useId();
+  // The default shown follows the department's wording flag, the same way the pages resolve it.
+  const defaultValue = defaultDepartmentLabel(item.key, {
+    useThesisAndMandatoryCertificationsLabel: Boolean(department.config?.enabledFeatures?.useThesisAndMandatoryCertificationsLabel),
+  });
+  const current = item.override ?? defaultValue;
+  const [draft, setDraft] = React.useState(current);
+  const [busy, setBusy] = React.useState(false);
+  const [error, setError] = React.useState("");
+  const trimmed = draft.trim();
+  const invalid = trimmed.length === 0 || trimmed.length > item.maxLength || /[\r\n]/.test(draft);
+
+  const run = async (operation: () => Promise<unknown>, message: string) => {
+    setBusy(true); setError("");
+    try {
+      await operation();
+      // refresh() does not throw; it returns false when the catalog could not reload. The change is already
+      // saved on the server, but the pages still show the old wording, so this is not a full success.
+      const refreshed = await department.refresh();
+      await onChanged(refreshed);
+      if (refreshed) toast.success(message);
+      else toast.warning(`${message}, but the pages could not reload it. Reload this page to see it everywhere.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save wording");
+    } finally { setBusy(false); }
+  };
+  const save = () => run(() => apiPatch(`${WORDING_ENDPOINT}/${item.key}`, { value: trimmed, revision: item.revision }), "Wording saved");
+  const reset = () => run(() => apiDelete(`${WORDING_ENDPOINT}/${item.key}`, { body: JSON.stringify({ revision: item.revision }) }), "Wording reset to default");
+
+  return (
+    <div className="space-y-2 rounded-lg border border-slate-200 bg-white p-4">
+      <Label htmlFor={inputId}>{item.description}</Label>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <Input id={inputId} value={draft} maxLength={item.maxLength} disabled={readOnly || busy}
+          aria-invalid={invalid || undefined} aria-describedby={`${inputId}-hint`}
+          onChange={(event) => setDraft(event.target.value)} />
+        <Button type="button" disabled={readOnly || busy || invalid || trimmed === current} onClick={() => void save()}>Save</Button>
+        <Button type="button" variant="outline" disabled={readOnly || busy || item.override === null} onClick={() => void reset()}>Reset to default</Button>
+      </div>
+      <p id={`${inputId}-hint`} className="text-xs text-slate-500">
+        Default: {defaultValue} · {item.override === null ? "using the default" : "customised"}
+      </p>
+      {error && <p role="alert" className="text-sm text-rose-700">{error}</p>}
+    </div>
+  );
+}
+
 function useSearch<T extends { name: string }>(items: T[], query: string): T[] {
   const q = query.trim().toLowerCase();
   return React.useMemo(() => {
@@ -43,7 +154,6 @@ function useSearch<T extends { name: string }>(items: T[], query: string): T[] {
 
 export function DepartmentSettings() {
   const data = useDepartment();
-  const isRadiology = data.department?.name?.toLowerCase().includes("radiology") || data.department?.name?.toLowerCase().includes("dermatology");
   const features = data.config?.enabledFeatures ?? {};
   const procedureTypesEnabled = !features.freeTextProcedures && !features.hideProcedureLogs;
   
@@ -51,15 +161,16 @@ export function DepartmentSettings() {
     const list = [];
     if (procedureTypesEnabled) list.push({ id: "procedures", label: "Procedures", items: data.procedures, kind: "procedure", addLabel: "+ Add procedure", desc: "Procedure groups and types, with the required count for each." });
     if (features.clinicalWorks) list.push({ id: "clinical", label: "Clinical work", items: data.clinicalWorkCategories, kind: "clinical_work_category", addLabel: "+ Add category", desc: "Categories residents log under, the minimum for each (0 means optional), and the sub-types offered. A category with no sub-types is logged without one." });
-    list.push({ id: "postings", label: isRadiology ? "Postings" : "Wards / postings", items: data.postings, kind: "posting", addLabel: "+ Add posting", desc: `${isRadiology ? "Postings" : "Wards"}, academic activities and the other lists residents choose from.` });
+    list.push({ id: "postings", label: data.label("postings.settingsSection"), items: data.postings, kind: "posting", addLabel: "+ Add posting", desc: `${data.label("postings.settingsNoun")}, academic activities and the other lists residents choose from.` });
     list.push({ id: "academic", label: "Academic activities", items: data.academics.filter((item) => !data.academicLogbook?.sections.some((section) => section.value === item.value)), kind: "academic", addLabel: "+ Add activity" });
     list.push({ id: "logbook", label: "Logbook sections", items: (data.academicLogbook?.sections ?? []).map((section, index) => ({ id: index, name: section.name || section.value, required: 0 })), kind: "logbook", addLabel: "+ Add logbook section" });
     if (!features.hideCaseLogs) list.push({ id: "cases", label: "Case categories", items: data.caseCategories ?? [], kind: "case_category", addLabel: "+ Add case category" });
     if (!features.hideProcedureLogs) list.push({ id: "competency", label: "Competency levels", items: data.competencyLevels ?? [], kind: "competency_level", addLabel: "+ Add competency level" });
     if (features.conferenceLevels) list.push({ id: "conference", label: "Conference levels", items: data.conferenceLevels ?? [], kind: "conference_level", addLabel: "+ Add conference level" });
     list.push({ id: "leaves", label: "Leave types", items: data.leaveTypes ?? [], kind: "leave_type", addLabel: "+ Add leave type" });
+    list.push({ id: "wording", label: "Wording", items: (Object.keys(DEPARTMENT_LABELS) as DepartmentLabelKey[]).map((key, index) => ({ id: index, name: key, required: 0 })), kind: "wording", addLabel: "" });
     return list;
-  }, [procedureTypesEnabled, features, data, isRadiology]);
+  }, [procedureTypesEnabled, features, data]);
 
   const [activeSectionId, setActiveSectionId] = React.useState(sections[0].id);
   React.useEffect(() => {
@@ -348,7 +459,7 @@ export function DepartmentSettings() {
         </div>
 
         <div className="min-w-0 flex flex-col gap-4 pb-12">
-          {activeSection.kind === "logbook" ? <LogbookSectionSettings /> : <>
+          {activeSection.kind === "logbook" ? <LogbookSectionSettings /> : activeSection.kind === "wording" ? <WordingSettings /> : <>
           <div className="flex flex-col gap-2 border-b border-slate-200 pb-4">
             <div className="flex items-center justify-between gap-4">
               <h3 className="text-lg font-semibold text-slate-900">{activeSection.label}</h3>

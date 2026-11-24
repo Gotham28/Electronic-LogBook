@@ -34,6 +34,8 @@ type DemoProfileData = {
     clinicalWorkCategories: DemoCatalogItem[];
     clinicalWorkSubtypes: DemoCatalogItem[];
     postingSchedule: Array<{ trainingYear: number; postingValue: string; months: number }>;
+    // Label overrides only, matching the migration backfill; no entry means the registry default.
+    labels?: Record<string, string>;
   };
   students: any[];
   studentProfile: any;
@@ -301,6 +303,13 @@ const radiologyProfile = createEmptyDepartmentProfile({
   accent: "#4338ca",
   enabledFeatures: { ...radiologyTemplate.features },
 });
+radiologyProfile.data.departmentCatalog.labels = {
+  "postings.unitTitle": "Posting",
+  "postings.unitPhrase": "posting",
+  "postings.printColumn": "Posting",
+  "postings.settingsSection": "Postings",
+  "postings.settingsNoun": "Postings",
+};
 radiologyProfile.data.departmentCatalog.clinicalWorkCategories = radiologyCategories;
 radiologyProfile.data.departmentCatalog.clinicalWorkSubtypes = radiologySubtypes;
 radiologyProfile.data.departmentCatalog.postings = radiologyPostings;
@@ -345,6 +354,13 @@ const dermatologyProfile = createEmptyDepartmentProfile({
   ],
 });
 
+dermatologyProfile.data.departmentCatalog.labels = {
+  "postings.unitTitle": "Posting unit",
+  "postings.unitPhrase": "posting unit",
+  "postings.settingsSection": "Postings",
+  "postings.settingsNoun": "Postings",
+};
+
 const microbiologyProfile = createEmptyDepartmentProfile({
   id: 18,
   label: "Microbiology",
@@ -366,6 +382,8 @@ const microbiologyProfile = createEmptyDepartmentProfile({
     freeTextPostingUnit: true,
   },
 });
+
+microbiologyProfile.data.departmentCatalog.labels = { "milestones.pageTitle": "Thesis and mandatory certifications" };
 
 microbiologyProfile.data.departmentCatalog.academics = [
   { id: 1, name: "Journal club", value: "journal_club", required: 0, period: "total" },

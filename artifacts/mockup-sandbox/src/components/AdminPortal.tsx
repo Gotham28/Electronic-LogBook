@@ -132,12 +132,7 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
     try {
       const data = await getAdminDepartments(collegeId);
       if (loadVersion !== departmentLoadVersion.current) return;
-      const normalized = data.map((d: any) => ({
-        ...d,
-        name: /microbiology/i.test(d.name) ? d.name.replace(/microbiology/i, "Microbiology") : d.name,
-        mirrorDepartmentName: d.mirrorDepartmentName ? (/microbiology/i.test(d.mirrorDepartmentName) ? d.mirrorDepartmentName.replace(/microbiology/i, "Microbiology") : d.mirrorDepartmentName) : d.mirrorDepartmentName,
-      }));
-      setDepartments(normalized);
+      setDepartments(data);
       if (data.length > 0 && !selectedDeptId) {
         setSelectedDeptId(data[0].id);
       } else if (selectedDeptId && !data.find((d: any) => d.id === selectedDeptId)) {
