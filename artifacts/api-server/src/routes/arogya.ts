@@ -1,17 +1,17 @@
 import { Router, type RequestHandler } from "express";
 import { and, count, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
-import { requireAuth, requireDepartment } from "../middlewares/auth.js";
+import { requireAuth, requireDepartment, requireRole } from "../middlewares/auth.js";
 import { _arogya, checkAndIncrementLimit, buildProgressFacts, buildAppraisalFacts } from "../lib/arogya.js";
 import { callerCanAccessStudent, findStudent } from "../lib/appraisals.js";
 import { buildDepartmentReportFacts } from "../lib/department-report.js";
-import { assistantUsageEventsTable, db, departmentsTable, studentsTable, usersTable } from "@workspace/db";
+import { assistantUsageEventsTable, db, departmentsTable, studentsTable, usersTable, type ProcedureType } from "@workspace/db";
 import { getDepartmentFeatures } from "../lib/department-features.js";
 import { resolveConfigDepartmentId } from "../lib/department-config-source.js";
 import { AROGYA_HELP_GUIDE } from "../lib/arogya-help.js";
 import { idSchema } from "../lib/validation.js";
 import { capabilitySignature, knowledgeVersion, roleWorkflows } from "../lib/arogya/knowledge/index.js";
-import { canonicalArogyaRole } from "../lib/arogya/policy.js";
+import { assertAuthorizedStudent, canonicalArogyaRole } from "../lib/arogya/policy.js";
 import { normalizeHistory, scrubAccountNames, containsSensitiveClinicalInput } from "../lib/arogya/input-privacy.js";
 import { answerArogya, ArogyaProviderError, validateV2Enabled } from "../lib/arogya/provider.js";
 import type { ArogyaLogType } from "../lib/arogya/facts.js";
@@ -161,6 +161,47 @@ router.get("/usage", requireAuth, async (req, res) => {
     res.json({ departmentId: departmentId ?? null, counts });
   } catch {
     res.status(500).json({ error: "Mochi usage counts could not be loaded." });
+  }
+});
+
+router.get("/progress-gaps", requireAuth, requireDepartment, requireRole(["student"]), async (req, res) => {
+  const actor = req.user!;
+  try {
+    const resident = await assertAuthorizedStudent(actor);
+    if (resident.departmentId !== actor.departmentId) {
+      res.status(403).json({ error: "You cannot view these progress targets." });
+      return;
+    }
+    const facts = await buildProgressFacts(resident.id, actor.departmentId!, db);
+    const config = facts.departmentTargets;
+    const features = config?.enabledFeatures ?? {};
+    const gaps: Array<{ label: string; verified: number; target: number }> = [];
+    const includeGap = (label: string, verified: number, target: number | null | undefined) => {
+      if (target != null && target > 0 && verified < target) gaps.push({ label, verified, target });
+    };
+    if (!features.hideCaseLogs) {
+      includeGap("Cases", facts.caseCategories.reduce((sum, item) => sum + item.verified, 0), config?.requiredCases);
+    }
+    if (!features.hideProcedureLogs) {
+      includeGap("Procedures", facts.procedures.reduce((sum, item) => sum + item.verified, 0), config?.requiredProcedures);
+      const verifiedByProcedure = new Map(facts.procedures.map((item) => [`${item.group}\0${item.name}`, item.verified]));
+      for (const requirement of facts.procedureRequirements as ProcedureType[]) {
+        includeGap(`${requirement.group}: ${requirement.name}`,
+          verifiedByProcedure.get(`${requirement.group}\0${requirement.name}`) ?? 0, requirement.required);
+      }
+    }
+    includeGap("Academic activities", facts.academics.reduce((sum, item) => sum + item.verified, 0), config?.requiredAcademic);
+    res.json({ gaps });
+  } catch (error) {
+    if (error instanceof Error && error.message === "AROGYA_SCOPE_404") {
+      res.status(404).json({ error: "Resident profile not found." });
+      return;
+    }
+    if (error instanceof Error && error.message === "AROGYA_SCOPE_403") {
+      res.status(403).json({ error: "You cannot view these progress targets." });
+      return;
+    }
+    res.status(500).json({ error: "Progress targets could not be loaded." });
   }
 });
 
