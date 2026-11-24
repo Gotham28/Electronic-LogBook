@@ -29,6 +29,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "src"),
+      "@workspace/api-zod": path.resolve(import.meta.dirname, "../../lib/api-zod/src/index.ts"),
     },
   },
   root: path.resolve(import.meta.dirname),

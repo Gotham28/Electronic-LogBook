@@ -1,5 +1,5 @@
 import * as React from "react";
-import { AlertCircle, CheckCircle2, Clock, PlusCircle, Stethoscope, Loader2, Trash2, Edit3, RotateCcw } from "lucide-react";
+import { AlertCircle, CheckCircle2, Clock, PlusCircle, Stethoscope, Loader2, Trash2, Edit3, RotateCcw, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { apiGet, apiPost, apiDelete, apiPatch } from "@/lib/apiClient";
 import { openArogya, publishArogyaContext } from "@/lib/arogya-context";
@@ -25,6 +25,9 @@ import {
   type ProcedureFieldDefinition,
 } from "@/lib/procedure-log-fields";
 import { ProcedureClinicalDetails } from "@/components/ProcedureClinicalDetails";
+import { VoiceLogRecorder } from "@/components/VoiceLogRecorder";
+import { mergeProcedureVoiceFields } from "@/lib/voiceLogMerge";
+import type { VoiceLogExtractResponse } from "@workspace/api-zod";
 type ProcedureGroup = string;
 
 type ProcedureLog = {
@@ -102,6 +105,27 @@ export function ProcedureLogsPage() {
   const [editLogStatus, setEditLogStatus] = React.useState<string | null>(null);
   const [editingOriginalLog, setEditingOriginalLog] = React.useState<any | null>(null);
 
+  const [manuallyEditedFields, setManuallyEditedFields] = React.useState<Set<string>>(new Set());
+  const [aiFilledFields, setAiFilledFields] = React.useState<Set<string>>(new Set());
+  const [lastVoiceExtraction, setLastVoiceExtraction] = React.useState<VoiceLogExtractResponse | null>(null);
+  const [voiceResetKey, setVoiceResetKey] = React.useState(0);
+
+  const resetVoiceState = React.useCallback(() => {
+    setManuallyEditedFields(new Set());
+    setAiFilledFields(new Set());
+    setLastVoiceExtraction(null);
+    setVoiceResetKey((k) => k + 1);
+  }, []);
+
+  const recordManualEdit = React.useCallback((fieldKey: string) => {
+    setManuallyEditedFields((prev) => new Set(prev).add(fieldKey));
+    setAiFilledFields((prev) => {
+      const next = new Set(prev);
+      next.delete(fieldKey);
+      return next;
+    });
+  }, []);
+
   const getDynamicFieldValue = (fieldId: string): string => {
     switch (fieldId) {
       case "patientAge": return form.age;
@@ -126,7 +150,106 @@ export function ProcedureLogsPage() {
         default: return { ...prev, customFields: { ...prev.customFields, [fieldId]: nextValue } };
       }
     });
+    const keyMap: Record<string, string> = {
+      patientAge: "age",
+      sex: "sex",
+      patientUhid: "patientUhid",
+      diagnosis: "diagnosis",
+      setting: "setting",
+      competencyLevel: "experience",
+    };
+    recordManualEdit(keyMap[fieldId] || ("customFields." + fieldId));
   };
+
+  const handleVoiceExtracted = (result: VoiceLogExtractResponse) => {
+    setLastVoiceExtraction(result);
+    if (result.logType === "procedure" && result.fields) {
+      const { nextForm, appliedFields } = mergeProcedureVoiceFields(
+        form,
+        result.fields,
+        manuallyEditedFields,
+        false,
+        {
+          isFreeTextProcedures,
+          dynamicProcedureFields,
+          procedureGroups: PROCEDURE_GROUPS,
+          hideUhid,
+        }
+      );
+      setForm(nextForm);
+      setAiFilledFields(new Set(appliedFields));
+    }
+  };
+
+  const handleOverwriteEdited = () => {
+    if (lastVoiceExtraction && lastVoiceExtraction.logType === "procedure" && lastVoiceExtraction.fields) {
+      const { nextForm, appliedFields } = mergeProcedureVoiceFields(
+        form,
+        lastVoiceExtraction.fields,
+        manuallyEditedFields,
+        true,
+        {
+          isFreeTextProcedures,
+          dynamicProcedureFields,
+          procedureGroups: PROCEDURE_GROUPS,
+          hideUhid,
+        }
+      );
+      setForm(nextForm);
+      setAiFilledFields(new Set(appliedFields));
+    }
+  };
+
+  const skippedEditedCount = React.useMemo(() => {
+    if (!lastVoiceExtraction || lastVoiceExtraction.logType !== "procedure" || !lastVoiceExtraction.fields) {
+      return 0;
+    }
+    const { skippedEditedFields } = mergeProcedureVoiceFields(
+      form,
+      lastVoiceExtraction.fields,
+      manuallyEditedFields,
+      false,
+      {
+        isFreeTextProcedures,
+        dynamicProcedureFields,
+        procedureGroups: PROCEDURE_GROUPS,
+        hideUhid,
+      }
+    );
+    return skippedEditedFields.length;
+  }, [lastVoiceExtraction, form, manuallyEditedFields, isFreeTextProcedures, dynamicProcedureFields, PROCEDURE_GROUPS, hideUhid]);
+
+  const procedureFieldLabels = React.useMemo<Record<string, string>>(() => ({
+    date: "Date",
+    group: "Procedure group",
+    procedureName: "Procedure",
+    patientUhid: "UHID",
+    diagnosis: "Diagnosis / Indication",
+    sex: "Sex",
+    age: "Age",
+    setting: "Setting",
+    experience: recordDetailsEnabled ? "Role level" : "Competency level",
+  }), [recordDetailsEnabled]);
+
+  const missingRequiredLabels = React.useMemo(() => {
+    const list: string[] = [];
+    if (lastVoiceExtraction?.missingRequired) {
+      for (const key of lastVoiceExtraction.missingRequired) {
+        if (procedureFieldLabels[key]) {
+          list.push(procedureFieldLabels[key]);
+        } else if (dynamicProcedureFields) {
+          const customDef = activeProcedureFields.find((f) => f.id === key);
+          list.push(customDef?.label || key);
+        } else {
+          list.push(key);
+        }
+      }
+    }
+    if (!form.supervisorId) {
+      list.push("Reviewing faculty member");
+    }
+    return list;
+  }, [lastVoiceExtraction, form.supervisorId, procedureFieldLabels, dynamicProcedureFields, activeProcedureFields]);
 
   const getOriginalDynamicFieldValue = (fieldId: string): string => {
     if (!editingOriginalLog) return "";
@@ -146,6 +269,7 @@ export function ProcedureLogsPage() {
   };
 
   const openLogEditor = (log: any, withRemarks: boolean) => {
+    resetVoiceState();
     const cleanVal = (value: unknown) => {
       if (typeof value !== "string") return "";
       const trimmed = value.trim();
@@ -187,7 +311,11 @@ export function ProcedureLogsPage() {
     [logs, PROCEDURE_REQUIREMENTS],
   );
 
-  const setGroup = (group: ProcedureGroup) => setForm({ ...form, group, procedureName: "" });
+  const setGroup = (group: ProcedureGroup) => {
+    setForm({ ...form, group, procedureName: "" });
+    recordManualEdit("group");
+    recordManualEdit("procedureName");
+  };
 
   const [professors, setProfessors] = React.useState<any[]>([]);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
@@ -324,6 +452,7 @@ export function ProcedureLogsPage() {
       setEditLogStatus(null);
       setEditingOriginalLog(null);
       setForm(createInitialForm());
+      resetVoiceState();
       toast.success(
         editLogStatus === "rejected"
           ? "Procedure resubmitted for faculty review"
@@ -364,6 +493,7 @@ export function ProcedureLogsPage() {
             setEditLogRemarks(null);
             setEditLogStatus(null);
             setEditingOriginalLog(null);
+            resetVoiceState();
           }
         }}>
           <DialogTrigger asChild><Button><PlusCircle className="h-4 w-4" /> Log procedure</Button></DialogTrigger>
@@ -373,6 +503,16 @@ export function ProcedureLogsPage() {
               <DialogDescription>{editLogStatus === "rejected" ? "Review the faculty feedback below, update the entry details, and resubmit for faculty verification." : hideUhid && isFreeTextProcedures ? "Enter the procedure name and record the level of exposure." : "Select the required procedure and record the level of exposure."}</DialogDescription>
             </DialogHeader>
             <form onSubmit={submit} className="space-y-4">
+              <VoiceLogRecorder
+                studentId={user?.studentProfileId}
+                logType="procedure"
+                disabled={isSubmitting}
+                onExtracted={handleVoiceExtracted}
+                skippedEditedCount={skippedEditedCount}
+                onOverwriteEdited={handleOverwriteEdited}
+                missingRequiredLabels={missingRequiredLabels}
+                resetKey={voiceResetKey}
+              />
               {editLogStatus === "rejected" && (
                 <div className="rounded-xl border border-rose-200 bg-rose-50/90 p-3.5 text-xs text-rose-900">
                   <div className="flex items-center gap-1.5 font-semibold text-rose-800">
@@ -385,9 +525,9 @@ export function ProcedureLogsPage() {
                 </div>
               )}
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Date"><Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required /></Field>
+                <Field label="Date" isAiFilled={aiFilledFields.has("date")}><Input type="date" value={form.date} onChange={(e) => { setForm({ ...form, date: e.target.value }); recordManualEdit("date"); }} required /></Field>
                 {!isFreeTextProcedures && (
-                <Field label="Procedure group">
+                <Field label="Procedure group" isAiFilled={aiFilledFields.has("group")}>
                   <Select value={form.group} onValueChange={(value: ProcedureGroup) => setGroup(value)}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>{Object.keys(PROCEDURE_GROUPS).map((group) => <SelectItem key={group} value={group}>{group}</SelectItem>)}</SelectContent>
@@ -395,21 +535,21 @@ export function ProcedureLogsPage() {
                 </Field>
                 )}
               </div>
-              <Field label="Procedure">
+              <Field label="Procedure" isAiFilled={aiFilledFields.has("procedureName")}>
                 {isFreeTextProcedures ? (
-                  <Input value={form.procedureName} onChange={(e) => setForm({ ...form, procedureName: e.target.value })} placeholder="Enter procedure name" required />
+                  <Input value={form.procedureName} onChange={(e) => { setForm({ ...form, procedureName: e.target.value }); recordManualEdit("procedureName"); }} placeholder="Enter procedure name" required />
                 ) : (
-                <Select value={form.procedureName} onValueChange={(value) => setForm({ ...form, procedureName: value })}>
+                <Select value={form.procedureName} onValueChange={(value) => { setForm({ ...form, procedureName: value }); recordManualEdit("procedureName"); }}>
                   <SelectTrigger><SelectValue placeholder="Select a required procedure" /></SelectTrigger>
                   <SelectContent>{(PROCEDURE_GROUPS[form.group] || []).map((procedure) => <SelectItem key={procedure} value={procedure}>{procedure}</SelectItem>)}</SelectContent>
                 </Select>
                 )}
               </Field>
               {isMicrobiology ? (
-                <Field label="Details">
+                <Field label="Details" isAiFilled={aiFilledFields.has("diagnosis")}>
                   <Textarea
                     value={form.diagnosis}
-                    onChange={(e) => setForm({ ...form, diagnosis: e.target.value })}
+                    onChange={(e) => { setForm({ ...form, diagnosis: e.target.value }); recordManualEdit("diagnosis"); }}
                     placeholder="Enter procedure details"
                     rows={3}
                     required
@@ -428,10 +568,20 @@ export function ProcedureLogsPage() {
                         : baseOptions;
                       const spanFull = field.type === "textarea" || field.type === "radio";
                       const label = `${field.label}${isReq ? " *" : " (optional)"}`;
+                      const keyMap: Record<string, string> = {
+                        patientAge: "age",
+                        sex: "sex",
+                        patientUhid: "patientUhid",
+                        diagnosis: "diagnosis",
+                        setting: "setting",
+                        competencyLevel: "experience",
+                      };
+                      const editKey = keyMap[field.id] || ("customFields." + field.id);
+                      const isAi = aiFilledFields.has(editKey);
 
                       return (
                         <div key={field.id} className={spanFull ? "sm:col-span-2" : undefined}>
-                          <Field label={label}>
+                          <Field label={label} isAiFilled={isAi}>
                             {field.type === "textarea" ? (
                               <Textarea
                                 aria-label={field.label}
@@ -513,35 +663,35 @@ export function ProcedureLogsPage() {
                   <div className={`grid gap-4 ${hideUhid ? "sm:grid-cols-1" : "sm:grid-cols-2"}`}>
                     {isFreeTextProcedures && !isMicrobiology && !recordDetailsEnabled && (
                       <>
-                        <Field label="Diagnosis"><Input value={form.diagnosis} onChange={(e) => setForm({ ...form, diagnosis: e.target.value })} placeholder="e.g. Tinea Corporis" required /></Field>
-                        <Field label="Sex"><Input value={form.sex} onChange={(e) => setForm({ ...form, sex: e.target.value })} placeholder="e.g. Male" required /></Field>
+                        <Field label="Diagnosis" isAiFilled={aiFilledFields.has("diagnosis")}><Input value={form.diagnosis} onChange={(e) => { setForm({ ...form, diagnosis: e.target.value }); recordManualEdit("diagnosis"); }} placeholder="e.g. Tinea Corporis" required /></Field>
+                        <Field label="Sex" isAiFilled={aiFilledFields.has("sex")}><Input value={form.sex} onChange={(e) => { setForm({ ...form, sex: e.target.value }); recordManualEdit("sex"); }} placeholder="e.g. Male" required /></Field>
                       </>
                     )}
-                    {!hideProcedureAge && <Field label={`Age${recordDetailsEnabled ? requires("patientAge") ? " *" : " (optional)" : ""}`}><Input aria-label="Age" value={form.age} onChange={(e) => setForm({ ...form, age: e.target.value })} placeholder="Age with unit" maxLength={160} required={!recordDetailsEnabled || requires("patientAge")} /></Field>}
+                    {!hideProcedureAge && <Field label={`Age${recordDetailsEnabled ? requires("patientAge") ? " *" : " (optional)" : ""}`} isAiFilled={aiFilledFields.has("age")}><Input aria-label="Age" value={form.age} onChange={(e) => { setForm({ ...form, age: e.target.value }); recordManualEdit("age"); }} placeholder="Age with unit" maxLength={160} required={!recordDetailsEnabled || requires("patientAge")} /></Field>}
                   </div>
                   {recordDetailsEnabled && <div className="grid min-w-0 gap-4 sm:grid-cols-2">
-                    <Field label={`Sex${requires("sex") ? " *" : " (optional)"}`}>
-                      <Select value={form.sex} onValueChange={(sex) => setForm({ ...form, sex: sex === "__none__" ? "" : sex })}>
+                    <Field label={`Sex${requires("sex") ? " *" : " (optional)"}`} isAiFilled={aiFilledFields.has("sex")}>
+                      <Select value={form.sex} onValueChange={(sex) => { setForm({ ...form, sex: sex === "__none__" ? "" : sex }); recordManualEdit("sex"); }}>
                         <SelectTrigger aria-label="Sex"><SelectValue placeholder="Select sex" /></SelectTrigger>
                         <SelectContent>{!requires("sex") && <SelectItem value="__none__">Not recorded</SelectItem>}{PROCEDURE_SEX_OPTIONS.map((sex) => <SelectItem key={sex} value={sex}>{sex}</SelectItem>)}</SelectContent>
                       </Select>
                     </Field>
-                    <Field label={`De-identified patient ID (IP/OP number)${requires("patientUhid") ? " *" : " (optional)"}`}>
-                      <Input aria-label="De-identified patient ID (IP/OP number)" value={form.patientUhid} onChange={(e) => setForm({ ...form, patientUhid: e.target.value })} maxLength={160} required={requires("patientUhid")} />
+                    <Field label={`De-identified patient ID (IP/OP number)${requires("patientUhid") ? " *" : " (optional)"}`} isAiFilled={aiFilledFields.has("patientUhid")}>
+                      <Input aria-label="De-identified patient ID (IP/OP number)" value={form.patientUhid} onChange={(e) => { setForm({ ...form, patientUhid: e.target.value }); recordManualEdit("patientUhid"); }} maxLength={160} required={requires("patientUhid")} />
                     </Field>
-                    <div className="sm:col-span-2"><Field label={`Diagnosis or indication${requires("diagnosis") ? " *" : " (optional)"}`}>
-                      <Textarea aria-label="Diagnosis or indication" value={form.diagnosis} onChange={(e) => setForm({ ...form, diagnosis: e.target.value })} maxLength={8000} required={requires("diagnosis")} />
+                    <div className="sm:col-span-2"><Field label={`Diagnosis or indication${requires("diagnosis") ? " *" : " (optional)"}`} isAiFilled={aiFilledFields.has("diagnosis")}>
+                      <Textarea aria-label="Diagnosis or indication" value={form.diagnosis} onChange={(e) => { setForm({ ...form, diagnosis: e.target.value }); recordManualEdit("diagnosis"); }} maxLength={8000} required={requires("diagnosis")} />
                     </Field></div>
-                    <Field label={`Setting${requires("setting") ? " *" : " (optional)"}`}>
-                      <Select value={form.setting} onValueChange={(setting) => setForm({ ...form, setting: setting === "__none__" ? "" : setting })}>
+                    <Field label={`Setting${requires("setting") ? " *" : " (optional)"}`} isAiFilled={aiFilledFields.has("setting")}>
+                      <Select value={form.setting} onValueChange={(setting) => { setForm({ ...form, setting: setting === "__none__" ? "" : setting }); recordManualEdit("setting"); }}>
                         <SelectTrigger aria-label="Setting"><SelectValue placeholder="Select setting" /></SelectTrigger>
                         <SelectContent>{!requires("setting") && <SelectItem value="__none__">Not recorded</SelectItem>}{PROCEDURE_SETTINGS.map((setting) => <SelectItem key={setting} value={setting}>{setting}</SelectItem>)}</SelectContent>
                       </Select>
                     </Field>
                   </div>}
                   {showProcedureExperience && (
-                    <Field label={recordDetailsEnabled ? `Role level${requires("competencyLevel") ? " *" : " (optional)"}` : "Competency level"}>
-                      <Select value={form.experience} onValueChange={(value) => setForm({ ...form, experience: value })}>
+                    <Field label={recordDetailsEnabled ? `Role level${requires("competencyLevel") ? " *" : " (optional)"}` : "Competency level"} isAiFilled={aiFilledFields.has("experience")}>
+                      <Select value={form.experience} onValueChange={(value) => { setForm({ ...form, experience: value }); recordManualEdit("experience"); }}>
                         <SelectTrigger aria-label={recordDetailsEnabled ? "Role level" : "Competency level"}><SelectValue placeholder="Select a level" /></SelectTrigger>
                         <SelectContent>
                           {recordDetailsEnabled && !requires("competencyLevel") && <SelectItem value="N/A">Not recorded</SelectItem>}
@@ -734,8 +884,21 @@ export function ProcedureLogsPage() {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <div className="space-y-2"><Label>{label}</Label>{children}</div>;
+function Field({ label, children, isAiFilled }: { label: string; children: React.ReactNode; isAiFilled?: boolean }) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-1.5">
+        <Label>{label}</Label>
+        {isAiFilled && (
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+            <Sparkles className="h-2.5 w-2.5" />
+            <span>AI filled</span>
+          </span>
+        )}
+      </div>
+      {children}
+    </div>
+  );
 }
 
 function statusBadge(status: ProcedureLog["status"]) {
