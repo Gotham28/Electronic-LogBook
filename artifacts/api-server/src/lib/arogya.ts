@@ -1,6 +1,7 @@
 import { eq, and, isNull, count } from "drizzle-orm";
 import { studentsTable, usersTable, caseLogsTable, procedureLogsTable, academicLogsTable, departmentConfigsTable, procedureTypesTable, departmentCatalogTable, postingsTable } from "@workspace/db";
 import { resolveConfigDepartmentId } from "./department-config-source.js";
+import { reasoningEffortParam } from "./arogya/model-params.js";
 
 export const DAILY_LIMIT = 20;
 export const AROGYA_PROVIDER_TIMEOUT_MS = 20_000;
@@ -59,7 +60,8 @@ export async function callOpenAI(
       },
       body: JSON.stringify({
         model,
-        max_tokens: 400,
+        max_completion_tokens: 400,
+        ...reasoningEffortParam(),
         messages: [
           {
             role: "system",
