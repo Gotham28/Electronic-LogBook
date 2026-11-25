@@ -4,7 +4,7 @@ import { and, eq } from "drizzle-orm";
 import jwt from "jsonwebtoken";
 import { setup, request, accounts, departmentIds, type Account } from "./support.js";
 import { db, engine, auditTable, departmentsTable, departmentConfigsTable, usersTable, studentsTable, getTestCollegeId } from "./database.js";
-import { DEPARTMENT_SETTING_TIERS } from "@workspace/api-zod";
+import { DEPARTMENT_SETTING_TIERS, DEPARTMENT_SETTING_VALUE_TYPES } from "@workspace/api-zod";
 import { setDepartmentSetting, DepartmentSettingError } from "../src/lib/department-settings.js";
 
 let runtime: Awaited<ReturnType<typeof setup>>;
@@ -93,7 +93,7 @@ test("GET §11 cases: 401, wrong role 403, HOD 200 returns only the caller's dep
     response: { status: a.status, body: a.body.filter((row: any) => row.value !== null) } }));
   const value = (rows: any[], key: string) => rows.find((row) => row.key === key).value;
   assert.deepEqual(a.body.map((row: any) => row.key), Object.keys(DEPARTMENT_SETTING_TIERS));
-  assert.ok(a.body.every((row: any) => row.valueType === "boolean" && row.tier === DEPARTMENT_SETTING_TIERS[row.key as keyof typeof DEPARTMENT_SETTING_TIERS]));
+  assert.ok(a.body.every((row: any) => row.valueType === DEPARTMENT_SETTING_VALUE_TYPES[row.key as keyof typeof DEPARTMENT_SETTING_VALUE_TYPES] && row.tier === DEPARTMENT_SETTING_TIERS[row.key as keyof typeof DEPARTMENT_SETTING_TIERS]));
   assert.equal(value(a.body, "hideCaseLogs"), false);
   assert.equal(value(a.body, "awards"), null, "department B's awards value is not visible to department A");
   assert.equal(value(b.body, "awards"), true);
@@ -219,4 +219,59 @@ test("the service rejects every hod_only key for actor mochi with 403 before any
   assert.deepEqual(row.afterState, { eventType: "department_setting_change", key: "academicsFirstInNav", value: true, actor: "mochi" });
   await assert.rejects(setDepartmentSetting({ departmentId: departmentIds[2], userId: accounts.hod2.id, key: "keepExistingFlag", value: true,
     expectedValue: null, actor: "hod" }), (error) => error instanceof DepartmentSettingError && error.status === 400);
+});
+
+test("studentNavOrder list setting: §11 auth/mirror checks, set/no-op/409/empty, invalid 400s, and mochi tier", async () => {
+  const orderPath = `${endpoint}/studentNavOrder`;
+  const initialOrder = ["/academics", "/cases", "/postings"];
+  const [mirror] = await db.insert(departmentsTable).values({
+    name: "Pediatrics (Nav Mirror)", code: "NAV-MIRROR", isTest: true, configSourceDepartmentId: departmentIds[0], collegeId: await getTestCollegeId(),
+  }).returning();
+  const mirrorHod = await makeAccount(mirror.id, "hod", "nav-mirror-hod@example.test");
+
+  assert.equal((await show("studentNavOrder unauthenticated", orderPath, undefined, "PATCH", { value: initialOrder, expectedValue: null })).status, 401);
+  assert.equal((await show("studentNavOrder student", orderPath, accounts.student0, "PATCH", { value: initialOrder, expectedValue: null })).status, 403);
+  assert.equal((await show("studentNavOrder professor", orderPath, accounts.faculty0, "PATCH", { value: initialOrder, expectedValue: null })).status, 403);
+  assert.equal((await show("studentNavOrder mirror HOD", orderPath, mirrorHod, "PATCH", { value: initialOrder, expectedValue: null })).status, 403);
+
+  const saved = await show("studentNavOrder set", orderPath, accounts.hod0, "PATCH", { value: initialOrder, expectedValue: null });
+  assert.equal(saved.status, 200);
+  assert.deepEqual(saved.body.before, null);
+  assert.deepEqual(saved.body.after, initialOrder);
+  const rowsAfterSave = await auditRows(departmentIds[0]);
+  const setAudit = rowsAfterSave.find((row) => row.id === saved.body.auditId)!;
+  assert.deepEqual(setAudit.beforeState, { eventType: "department_setting_change", key: "studentNavOrder", value: null });
+  assert.deepEqual(setAudit.afterState, { eventType: "department_setting_change", key: "studentNavOrder", value: initialOrder, actor: "hod" });
+
+  const noop = await show("studentNavOrder no-op", orderPath, accounts.hod0, "PATCH", { value: initialOrder, expectedValue: initialOrder });
+  assert.equal(noop.status, 200);
+  assert.equal(noop.body.auditId, null);
+  assert.equal((await auditRows(departmentIds[0])).length, rowsAfterSave.length);
+
+  const stale = await show("studentNavOrder stale 409", orderPath, accounts.hod0, "PATCH", { value: ["/cases"], expectedValue: ["/postings"] });
+  assert.equal(stale.status, 409);
+  assert.deepEqual((await features(departmentIds[0]))?.studentNavOrder, initialOrder);
+
+  for (const [label, badValue] of [
+    ["not an array", "/cases"],
+    ["non-string item", [123]],
+    ["duplicates", ["/cases", "/cases"]],
+    ["more than 30 items", Array.from({ length: 31 }, (_, i) => `/p${i}`)],
+    ["missing leading slash", ["cases"]],
+    ["longer than 64 chars", [`/${"a".repeat(64)}`]],
+  ] as const) {
+    const bad = await show(`studentNavOrder invalid (${label})`, orderPath, accounts.hod0, "PATCH", { value: badValue, expectedValue: initialOrder });
+    assert.equal(bad.status, 400, label);
+  }
+
+  const reset = await show("studentNavOrder reset []", orderPath, accounts.hod0, "PATCH", { value: [], expectedValue: initialOrder });
+  assert.equal(reset.status, 200);
+  assert.deepEqual((await features(departmentIds[0]))?.studentNavOrder, []);
+
+  // Mochi tier allows actor: "mochi"
+  const mochiSet = await setDepartmentSetting({
+    departmentId: departmentIds[0], userId: accounts.hod0.id, key: "studentNavOrder", value: ["/postings", "/cases"], expectedValue: [], actor: "mochi",
+  });
+  assert.deepEqual(mochiSet.after, ["/postings", "/cases"]);
+  assert.equal(DEPARTMENT_SETTING_TIERS.studentNavOrder, "mochi");
 });

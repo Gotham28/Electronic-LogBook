@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { physiologyLogbook } from "../../../lib/api-zod/src/logbook-profiles/physiology.ts";
 import { writeAcademicRecord } from "../../../lib/api-zod/src/academic-logbook.ts";
-import { categoryPath, categorySections, filterAcademicLogs, mobileNavigationItems, navigationIsActive, profileNavigation } from "../src/lib/academic-navigation.ts";
+import { applyNavOrder, categoryPath, categorySections, filterAcademicLogs, mobileNavigationItems, navigationIsActive, profileNavigation, readStudentNavOrder } from "../src/lib/academic-navigation.ts";
 
 test("the five categories cover all 22 existing sections exactly once", () => {
   const categories = physiologyLogbook.navigationCategories!;
@@ -76,4 +76,30 @@ test("mobile Physiology navigation has four useful shortcuts and retains other r
   assert.deepEqual(mobileNavigationItems("Student", existing).map((item) => item.href), ["/", "/cases", "/procedures", "/academics"]);
   assert.deepEqual(mobileNavigationItems("Faculty", [{ href: "/assessments" }, { href: "/" }, { href: "/mentees" }]).map((item) => item.href), ["/", "/mentees", "/assessments"]);
   assert.deepEqual(mobileNavigationItems("HOD", [{ href: "/requirements" }, { href: "/roster" }, { href: "/review-queue" }, { href: "/mentees" }]).map((item) => item.href), ["/roster", "/mentees", "/review-queue", "/requirements"]);
+});
+
+test("student menu ordering keeps Dashboard first, drops unknown paths, appends unlisted items, and updates phone slots", () => {
+  const base = [
+    { href: "/" },
+    { href: "/cases" },
+    { href: "/procedures" },
+    { href: "/academics" },
+    { href: "/postings" },
+    { href: "/attendance" },
+  ];
+  assert.deepEqual(applyNavOrder(base, []), base);
+  assert.deepEqual(
+    applyNavOrder(base, ["/postings", "/unknown-page", "/", "/academics"]).map((item) => item.href),
+    ["/", "/postings", "/academics", "/cases", "/procedures", "/attendance"],
+  );
+  assert.deepEqual(
+    mobileNavigationItems("Student", applyNavOrder(base, ["/postings", "/academics"]), true).map((item) => item.href),
+    ["/", "/postings", "/academics", "/cases"],
+  );
+  assert.deepEqual(
+    mobileNavigationItems("Student", base, false).map((item) => item.href),
+    ["/", "/cases", "/procedures", "/academics"],
+  );
+  assert.deepEqual(readStudentNavOrder({ studentNavOrder: ["/postings", "/", "/bad path", "/postings", "/cases"] }), ["/postings", "/cases"]);
+  assert.deepEqual(readStudentNavOrder({ studentNavOrder: "not-an-array" }), []);
 });
