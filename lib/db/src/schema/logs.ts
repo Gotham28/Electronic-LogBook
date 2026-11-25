@@ -23,6 +23,7 @@ export const caseLogsTable = pgTable("case_logs", {
   outcome: text("outcome"),
   learningPoints: text("learning_points"),
   category: text("category"),
+  customFields: jsonb("custom_fields").$type<Record<string, string>>().notNull().default({}),
   status: text("status", { enum: ["pending", "verified", "rejected"] }).default("pending"),
   facultyRemarks: text("faculty_remarks"),
   facultyGrade: text("faculty_grade"),

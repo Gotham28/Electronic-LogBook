@@ -7,6 +7,7 @@ import { useCurrentUser } from "@/hooks/use-current-user";
 import { apiGet } from "@/lib/apiClient";
 import { formatLogbookDate } from "@/lib/logbook-config";
 import { useDepartment } from "@/lib/department-context";
+import { logCustomFieldVisible } from "@/lib/log-custom-fields";
 import { Printer, X, BookOpen } from "lucide-react";
 import { useMobileCellLabels } from "@/components/ui/table";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
@@ -174,7 +175,7 @@ export function PrintableLogbook() {
   const user = useCurrentUser();
   const hideUhid = isDemoMode();
   const shouldReduceMotion = useReducedMotion();
-  const { config, clinicalWorkCategories, clinicalWorkSubtypes, competencyLevels, procedureFields, academicLogbook, label } = useDepartment();
+  const { config, clinicalWorkCategories, clinicalWorkSubtypes, competencyLevels, procedureFields, caseLogFields = [], academicLogbook, label } = useDepartment();
   const features = config?.enabledFeatures ?? {};
   const dynamicProcedureFields = Boolean(features.dynamicProcedureFields);
   const activeProcedureFields = dynamicProcedureFields ? (procedureFields ?? []) : undefined;
@@ -443,7 +444,23 @@ export function PrintableLogbook() {
                       {!hideUhid && <Td muted={!c.patientUhid}>{c.patientUhid || "—"}</Td>}
                       <Td>{[c.patientAge, c.patientGender].filter(Boolean).join(" / ") || "—"}</Td>
                       <Td>{c.category || "—"}</Td>
-                      <Td><span className="font-medium">{c.diagnosisFinal || c.diagnosisProvisional || "—"}</span></Td>
+                      <Td>
+                        <span className="font-medium">{c.diagnosisFinal || c.diagnosisProvisional || "—"}</span>
+                        {(() => {
+                          const visibleValues = caseLogFields
+                            .filter((field) => logCustomFieldVisible(field, c.customFields ?? {}))
+                            .map((field) => ({ key: field.key, label: field.label, val: c.customFields?.[field.key] }))
+                            .filter((entry) => Boolean(entry.val));
+                          if (!visibleValues.length) return null;
+                          return (
+                            <div className="mt-1 space-y-0.5 text-[11px] text-slate-600">
+                              {visibleValues.map((entry) => (
+                                <div key={entry.key}><span className="font-semibold">{entry.label}:</span> {entry.val}</div>
+                              ))}
+                            </div>
+                          );
+                        })()}
+                      </Td>
                       <Td><StatusPill status={c.status ?? "pending"} /></Td>
                     </tr>
                   ))}

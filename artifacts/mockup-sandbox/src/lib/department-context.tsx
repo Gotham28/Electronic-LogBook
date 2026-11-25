@@ -5,6 +5,7 @@ import { isDemoMode } from "./session";
 import { Button } from "@/components/ui/button";
 import type { AcademicLogbookProfile } from "./academic-logbook";
 import { resolveProcedureFieldDefinitions, type ProcedureFieldDefinition } from "./procedure-log-fields";
+import type { LogCustomFieldDefinition } from "./log-custom-fields";
 import { resolveDepartmentLabel, type DepartmentLabelKey } from "../../../../lib/api-zod/src/department-labels";
 
 // The label registry is shared with the API. Re-exported so screens import it from one place.
@@ -26,6 +27,7 @@ export type DepartmentData = {
   config: DepartmentConfig | null;
   procedures: Array<{ id: number; name: string; group: string; required: number; requiredLogFields?: string[] }>;
   procedureFields?: ProcedureFieldDefinition[];
+  caseLogFields?: LogCustomFieldDefinition[];
   readOnlyConfig?: boolean;
   postings: CatalogItem[]; academics: CatalogItem[]; caseCategories: CatalogItem[]; competencyLevels: CatalogItem[]; leaveTypes: CatalogItem[]; conferenceLevels: CatalogItem[];
   clinicalWorkCategories: CatalogItem[]; clinicalWorkSubtypes: CatalogItem[]; postingSchedule: PostingScheduleRow[];
@@ -68,6 +70,7 @@ export function DepartmentProvider({ departmentId, children }: { departmentId: n
         procedureFields: result.procedureFields !== undefined
           ? result.procedureFields
           : resolveProcedureFieldDefinitions(resolvedConfig?.procedureLogFields, Boolean(resolvedConfig?.enabledFeatures?.dynamicProcedureFields)),
+        caseLogFields: result.caseLogFields ?? [],
         readOnlyConfig: Boolean(result.readOnlyConfig),
         labels: result.labels ?? {},
       });

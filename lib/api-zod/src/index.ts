@@ -7,3 +7,4 @@ export * from "./logbook-profiles/physiology.js";
 export * from "./logbook-section-settings.js";
 export * from "./voice-log.js";
 export * from "./department-labels.js";
+export * from "./log-custom-fields.js";

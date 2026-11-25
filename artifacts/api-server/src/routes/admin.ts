@@ -17,6 +17,7 @@ import { departmentLogbookSectionsTable } from "@workspace/db";
 import { getDepartmentFeatures } from "../lib/department-features.js";
 import {
   PROCEDURE_LOG_FIELDS,
+  logCustomFieldDefinitionsSchema,
   procedureFieldIdSchema,
   procedureFieldDefinitionsSchema,
   normalizeProcedureFieldDefinitions,
@@ -531,6 +532,65 @@ router.post("/department/config", validate(configSchema), async (req, res) => {
     }
   } catch (error) {
     req.log.error({ departmentId: req.user!.departmentId, status: 500 }, "Error updating department config");
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// GET /api/admin/department/case-log-fields
+router.get("/department/case-log-fields", async (req, res) => {
+  try {
+    const departmentId = req.user?.departmentId;
+    if (!departmentId) {
+      res.status(400).json({ message: "No department assigned" });
+      return;
+    }
+    const [dept] = await db.select({ configSourceDepartmentId: departmentsTable.configSourceDepartmentId })
+      .from(departmentsTable).where(eq(departmentsTable.id, departmentId)).limit(1);
+    const { caseLogFields } = await getDepartmentFeatures(departmentId);
+    res.json({
+      readOnlyConfig: dept?.configSourceDepartmentId !== null,
+      fields: caseLogFields ?? [],
+    });
+  } catch {
+    req.log.error({ departmentId: req.user!.departmentId, status: 500 }, "Error fetching case log fields");
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// PATCH /api/admin/department/case-log-fields
+router.patch("/department/case-log-fields", validate(z.object({
+  fields: logCustomFieldDefinitionsSchema,
+}).strict()), async (req, res) => {
+  try {
+    const departmentId = req.user?.departmentId;
+    if (!departmentId) {
+      res.status(400).json({ message: "No department assigned" });
+      return;
+    }
+    const [dept] = await db.select({ configSourceDepartmentId: departmentsTable.configSourceDepartmentId })
+      .from(departmentsTable).where(eq(departmentsTable.id, departmentId)).limit(1);
+    if (dept?.configSourceDepartmentId !== null) {
+      res.status(403).json({ message: "Test departments cannot modify mirrored settings" });
+      return;
+    }
+    const nextFields = req.body.fields;
+    await db.transaction(async (tx) => {
+      const [existingConfig] = await tx.select({ id: departmentConfigsTable.id })
+        .from(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, departmentId)).limit(1);
+      if (existingConfig) {
+        await tx.update(departmentConfigsTable)
+          .set({ caseLogFields: nextFields })
+          .where(eq(departmentConfigsTable.departmentId, departmentId));
+      } else {
+        await tx.insert(departmentConfigsTable).values({
+          departmentId,
+          caseLogFields: nextFields,
+        });
+      }
+    });
+    res.json({ readOnlyConfig: false, fields: nextFields });
+  } catch {
+    req.log.error({ departmentId: req.user!.departmentId, status: 500 }, "Error updating case log fields");
     res.status(500).json({ message: "Internal server error" });
   }
 });
