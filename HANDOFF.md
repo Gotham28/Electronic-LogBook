@@ -1,125 +1,168 @@
-# HANDOFF — Task 3c-1: Custom fields on case logs
+# Handoff — Script Cleanup (Phase 3C)
 
-Branch `task/custom-log-fields`, created from `origin/main` `fde56c6` (includes 0032–0035, 2a, 2b, 3a, Task 4). **Nothing is committed, pushed, or opened as a PR.**
-`CURRENT_TASK.md` sha256 preserved byte-for-byte: `018FB27B3650C7AE51D74D1FEF359CD466C459E42BE6425D37CC819DC06154B9`.
+## 1. Branch & Commit State
+- **Worktree:** `D:\Electronic-LogBook-main\.claude\worktrees\remove-more-one-off-scripts-959436`
+- **Branch:** `task/remove-more-one-off-scripts`
+- **HEAD / `origin/main` / merge-base:** `9db447e` (`Merge pull request #172 from Gotham28/task/department-page-order`, fast-forward from `5b5e16e`)
+- **Commit status:** Close-out ready — `CURRENT_TASK.md` restored to `origin/main` (`9db447e`), staging only the 10 deleted files and `HANDOFF.md` for commit, push, and PR against `main`.
+- **Stashes (untouched):**
+  - `stash@{0}`: On `fix/conference-certificate-url-https`: Preserve certificate work and approved Mochi plan before cleanup (2026-11-21)
+  - `stash@{1}`: On `fix/remove-committed-credentials`: certificate-url task file 2026-11-15
+  - `stash@{2}`: On `feat/certificate-file-uploads`: security-audit task file 2026-11-14
 
-**No command connected to a database.** `DATABASE_URL` remained unset; all tests ran against in-process PGlite. Migration `0036_case_log_custom_fields.sql` is drafted only and never applied (§6). `pnpm install --frozen-lockfile --offline` was run to create `node_modules`.
+## 2. Files Deleted (Exact 10 In-Scope Files)
+1. `gen.js`
+2. `gen_2.js`
+3. `run_sql.mjs`
+4. `generate_missing.sql`
+5. `artifacts/api-server/fix_db.ts`
+6. `artifacts/api-server/run_sql_2.ts`
+7. `artifacts/api-server/test-direct.mjs`
+8. `artifacts/api-server/test-email.ts`
+9. `artifacts/api-server/test_cat.js`
+10. `artifacts/api-server/test_cat.mjs`
 
-## RELEASE GATE
-**Apply migration `lib/db/migrations/0036_case_log_custom_fields.sql` (developer, `src/migrate.ts`) BEFORE deploying this code (after `0035`).** The new code selects `department_configs.case_log_fields` and `case_logs.custom_fields` and will fail queries if deployed before `0036` is applied.
+Note: `CURRENT_TASK.md` was updated only on line 122 to `- Status: APPROVED 2026-11-25 by the developer`, backed up to `$env:TEMP\current-task-scripts-backup.md` (SHA256 `202DC23972F95881CBDE7A58C1458FE2B2AE86D2F6A055C258015F63E2A72D2D`), and restored byte-for-byte after merging `origin/main` (matching SHA256 verified). `CURRENT_TASK.md` will not be staged in the task commit.
 
-## What changed (in-scope files only)
-- `lib/db/migrations/0036_case_log_custom_fields.sql` (new, DRAFT): Adds nullable `department_configs.case_log_fields jsonb` and `case_logs.custom_fields jsonb NOT NULL DEFAULT '{}'::jsonb`.
-- `lib/db/src/migrations.ts`: Registered `0036_case_log_custom_fields.sql`.
-- `lib/db/src/schema/department_configs.ts`: Added `StoredLogCustomFieldDefinition` and `caseLogFields`.
-- `lib/db/src/schema/logs.ts`: Added `customFields` to `caseLogsTable` only.
-- `lib/api-zod/src/log-custom-fields.ts` (new) & `lib/api-zod/src/index.ts`: Added `logCustomFieldDefinitionSchema`, `logCustomFieldDefinitionsSchema` (max 40, unique keys and case-insensitive labels, `requiredWhen` and type rules), `logCustomFieldVisible`, `validateLogCustomFieldValues` (returns field-label messages only, never values), and `normalizeLogCustomFieldValues`.
-- `artifacts/api-server/src/lib/department-features.ts`: Returns `caseLogFields` resolved from `configSourceId`.
-- `artifacts/api-server/src/routes/admin.ts`: Added `GET /api/admin/department/case-log-fields` and `PATCH /api/admin/department/case-log-fields` (HOD-only, `req.user.departmentId` only, mirrored test dept `403`, last-write-wins matching `procedure-fields` since `department_configs` has no `updatedAt` column).
-- `artifacts/api-server/src/routes/department.ts`: `GET /:departmentId/catalog` now returns `caseLogFields` alongside `procedureFields`.
-- `artifacts/api-server/src/routes/student.ts`: `POST /:studentId/case-logs` and `PATCH /:studentId/case-logs/:logId` validate and normalize `customFields` (enforcing required fields on older log edits per developer decision; null/empty clears keys; orphan keys survive PATCH; catch blocks log nothing). `professor.ts` and `logs.ts` required no changes (`caseLogsTable` whole row is already selected and `updateData` does not touch `customFields`).
-- `artifacts/api-server/tests/migrations.test.ts`: Bumped migration count from `35` to `36`.
-- `artifacts/api-server/tests/case-log-custom-fields.test.ts` (new): §11 cases, validation, orphan preservation, null clearing, unchanged legacy rendering, and professor review preservation.
-- Frontend (`artifacts/mockup-sandbox/src/`): `lib/log-custom-fields.ts` (new), `lib/department-context.tsx`, `components/LogCustomFields.tsx` (new), `components/CaseLogFieldsCard.tsx` (new), `components/DepartmentSettings.tsx`, `components/pages/CaseLogsPage.tsx`, `components/CaseLogDetails.tsx`, `components/ProfessorPortal.tsx`, `components/pages/PrintableLogbook.tsx`.
+## 3. Verification Output
 
-## Verification
-
-### Typecheck — `pnpm run typecheck` (repo root), exit `0`
+### 3.1 `git status --short` & `git ls-files --deleted`
+```text
+ M CURRENT_TASK.md
+ D artifacts/api-server/fix_db.ts
+ D artifacts/api-server/run_sql_2.ts
+ D artifacts/api-server/test-direct.mjs
+ D artifacts/api-server/test-email.ts
+ D artifacts/api-server/test_cat.js
+ D artifacts/api-server/test_cat.mjs
+ D gen.js
+ D gen_2.js
+ D generate_missing.sql
+ D run_sql.mjs
 ```
+
+`git ls-files --deleted`:
+```text
+artifacts/api-server/fix_db.ts
+artifacts/api-server/run_sql_2.ts
+artifacts/api-server/test-direct.mjs
+artifacts/api-server/test-email.ts
+artifacts/api-server/test_cat.js
+artifacts/api-server/test_cat.mjs
+gen.js
+gen_2.js
+generate_missing.sql
+run_sql.mjs
+```
+
+### 3.2 Repository Reference Search (`git grep`)
+Command:
+```powershell
+git grep -n -I -E "gen\.js|gen_2\.js|run_sql|fix_db|test-direct|test-email|test_cat|generate_missing"
+```
+Output (zero matches in source, `package.json` scripts, or CI configs; only historical `.agents/runs/` and `.agy-jobs/` records plus `CURRENT_TASK.md`):
+```text
+.agents/runs/dispatch-71-resend-mailer-clean-failure.md:86:  `artifacts/api-server/test-direct.mjs` also imports it — do NOT edit or delete it (see Do NOT
+.agents/runs/dispatch-71-resend-mailer-clean-failure.md:109:- `artifacts/api-server/test-direct.mjs` — a tracked stray script that imports nodemailer.
+.agents/runs/dispatch-72-resend-mailer-review-fixes.md:50:- `artifacts/api-server/test-direct.mjs`
+.agents/runs/dispatch-72-resend-mailer-review-fixes.md:51:- `artifacts/api-server/test-email.ts`
+.agy-jobs/2c5cb8f7b6604c3e927e51e5f0c59477/TASK.md:35:- `artifacts/api-server/test-direct.mjs`
+.agy-jobs/2c5cb8f7b6604c3e927e51e5f0c59477/TASK.md:36:- `artifacts/api-server/test-email.ts`
+.agy-jobs/2eca200fed1c43ba83e1a247b0262b37/TASK.md:86:  `artifacts/api-server/test-direct.mjs` also imports it — do NOT edit or delete it (see Do NOT
+.agy-jobs/2eca200fed1c43ba83e1a247b0262b37/TASK.md:109:- `artifacts/api-server/test-direct.mjs` — a tracked stray script that imports nodemailer.
+.agy-jobs/63962ba1de934ceb99acd39ed8c222f3/TASK.md:35:- `artifacts/api-server/test-direct.mjs`
+.agy-jobs/63962ba1de934ceb99acd39ed8c222f3/TASK.md:36:- `artifacts/api-server/test-email.ts`
+.agy-jobs/c0deeb776b7f4bb7bbf3a9b3bb0ab531/TASK.md:86:  `artifacts/api-server/test-direct.mjs` also imports it — do NOT edit or delete it (see Do NOT
+.agy-jobs/c0deeb776b7f4bb7bbf3a9b3bb0ab531/TASK.md:109:- `artifacts/api-server/test-direct.mjs` — a tracked stray script that imports nodemailer.
+CURRENT_TASK.md:20:- `gen.js` (repo root). Reads `artifacts/api-server/scripts/department-templates/radiology.json` and writes `generate_missing.sql` (inserts for department_catalog, departments 18 and 19 hardcoded). No database, no email, no hardcoded secret.
+CURRENT_TASK.md:21:- `gen_2.js` (repo root). Near-duplicate of `gen.js` with a different ON CONFLICT clause. No database, no email, no hardcoded secret.
+CURRENT_TASK.md:22:- `run_sql.mjs` (repo root). **Connects to a database** via `process.env.DATABASE_URL` (no fallback) and runs `generate_missing.sql` with `sql.unsafe`. No hardcoded secret.
+CURRENT_TASK.md:23:- `generate_missing.sql` (repo root). **Not in the original list of nine.** It is the tracked output of `gen.js`/`gen_2.js` and the input of `run_sql.mjs`/`run_sql_2.ts`. 12,387 bytes of `INSERT INTO department_catalog` rows for departments 18 and 19. It came in with the same commit (`56255e6`). No secret pattern (grep for password/secret/postgres URL/api key/token: 0 matches). Deleting the scripts would orphan it, so it is scoped in here; see Flags.
+CURRENT_TASK.md:24:- `artifacts/api-server/fix_db.ts`. **Connects to a database** via `@workspace/db`. It DELETEs and re-INSERTs department_catalog subtype rows for departments 18 and 19 with raw SQL. No hardcoded secret.
+CURRENT_TASK.md:25:- `artifacts/api-server/run_sql_2.ts`. **Connects to a database** via `@workspace/db` and runs `../../generate_missing.sql` raw. No hardcoded secret.
+CURRENT_TASK.md:26:- `artifacts/api-server/test-direct.mjs`. **Sends email** through nodemailer/Gmail, using credentials from env vars only. It hardcodes a real third-party recipient email address (personal data, not a credential). No hardcoded secret.
+CURRENT_TASK.md:27:- `artifacts/api-server/test-email.ts`. **Sends email** via `src/lib/mailer.js` `sendHODApprovalRequestEmail` to the same hardcoded third-party address. No hardcoded secret.
+CURRENT_TASK.md:28:- `artifacts/api-server/test_cat.js` (UTF-16 encoded). Signs a JWT (student, id 1, dept 1) and calls `localhost:3000/api/departments/1/catalog`. **Holds a hardcoded credential:** a JWT signing-secret fallback (`process.env.JWT_SECRET || <literal>`), the fail-open pattern from AGENTS.md §13. The value is not repeated here. No database, no email.
+CURRENT_TASK.md:29:- `artifacts/api-server/test_cat.mjs` (UTF-16 encoded). Same request, but the JWT secret comes from `.env` via dotenv, with no fallback. No database, no email, no hardcoded secret.
+CURRENT_TASK.md:33:- The only hits are historical dispatch records: `.agents/runs/dispatch-71-resend-mailer-clean-failure.md`, `.agents/runs/dispatch-72-resend-mailer-review-fixes.md`, and `.agy-jobs/{2c5cb8f7…,2eca200f…,63962ba1…}/TASK.md` mention `test-direct.mjs` / `test-email.ts`.
+CURRENT_TASK.md:34:- Also, inside the set itself, `gen.js`, `gen_2.js`, `run_sql.mjs` and `run_sql_2.ts` all reference `generate_missing.sql`.
+CURRENT_TASK.md:39:- Editing the historical `.agents/runs/*` and `.agy-jobs/*` records that mention `test-direct.mjs`/`test-email.ts`. They are an append-only history (§14.8), not live references.
+CURRENT_TASK.md:41:- Updating AGENTS.md §13 to record this deletion or the `test_cat.js` credential. Listed as a follow-up.
+CURRENT_TASK.md:46:- `artifacts/api-server/scripts/department-templates/radiology.json`, which `gen.js` reads. It is a real template.
+CURRENT_TASK.md:47:- `artifacts/api-server/src/**`, including `src/lib/mailer.ts`, which `test-email.ts` imports.
+CURRENT_TASK.md:59:- [ ] **Rotate the JWT signing secret (`JWT_SECRET`) because of `artifacts/api-server/test_cat.js`.** Its committed fallback has been in history since `5f700f9` (2026-09-28), and it is burned (§10). Rotating invalidates every live session token. If production `JWT_SECRET` was never set to that value, the developer may decide rotation is unnecessary and record that decision.
+CURRENT_TASK.md:60:- [ ] Note for the existing §13 open item: purging history now also covers `test_cat.js`. Deleting the file from the tree does not remove it from history.
+CURRENT_TASK.md:61:- [ ] Optional: decide whether the third-party email address hardcoded in `test-direct.mjs`/`test-email.ts` needs any action beyond deletion. It also stays in history.
+CURRENT_TASK.md:89:- [ ] `git ls-files gen.js gen_2.js run_sql.mjs generate_missing.sql artifacts/api-server/fix_db.ts artifacts/api-server/run_sql_2.ts artifacts/api-server/test-direct.mjs artifacts/api-server/test-email.ts artifacts/api-server/test_cat.js artifacts/api-server/test_cat.mjs` prints nothing (run it after staging, or use `git ls-files --deleted` before staging and show all ten).
+CURRENT_TASK.md:90:- [ ] `git grep -n -I -E "gen\.js|gen_2\.js|run_sql|fix_db|test-direct|test-email|test_cat|generate_missing"` returns only the historical `.agents/runs/` and `.agy-jobs/` record lines listed above (plus `CURRENT_TASK.md`/`HANDOFF.md` themselves), and nothing in source, config or package files.
+CURRENT_TASK.md:96:- **§10 / §13, secrets:** `artifacts/api-server/test_cat.js` holds a hardcoded JWT signing-secret fallback. This makes the task Opus tier, and rotation is listed under Manual. §14.5 "any secret" halt: the dispatch prompt and every report name the file only, never the value. If any further secret turns up during execution, halt.
+CURRENT_TASK.md:97:- **§9, one feature:** `generate_missing.sql` was added beyond the nine-file list. It is the same feature (removing one coupled set of throwaway scripts), but the developer confirms this by approving the plan.
+CURRENT_TASK.md:98:- **§6, no database:** `run_sql.mjs`, `fix_db.ts` and `run_sql_2.ts` connect to a database. They are deleted, never run.
+CURRENT_TASK.md:99:- **§8, personal data:** a real third-party email address is hardcoded in `test-direct.mjs`/`test-email.ts`. Do not repeat it in prompts or reports.
+CURRENT_TASK.md:100:- **§5, hardcoded departments:** `gen.js`, `gen_2.js`, `fix_db.ts` and `generate_missing.sql` hardcode department ids 18 and 19. Deletion removes that; nothing replaces it.
+CURRENT_TASK.md:102:- **Follow-up:** AGENTS.md §13 should later record the `test_cat.js` credential and this deletion. That is not scoped here.
+CURRENT_TASK.md:107:- Trigger: §15.2 "secrets or credentials (§10, §13)", because of the hardcoded JWT secret fallback in `test_cat.js`. Without it this would be Haiku (low).
+```
+
+### 3.3 Typecheck (`pnpm run typecheck` at repo root)
+Exited with code `0`:
+```text
+$ pnpm run typecheck:libs && pnpm -r --filter "./artifacts/**" --filter "./scripts" --if-present run typecheck
+$ tsc --build
 Scope: 3 of 8 workspace projects
+artifacts/api-server typecheck$ tsc -p tsconfig.json --noEmit
+scripts typecheck$ tsc -p tsconfig.json --noEmit
+artifacts/mockup-sandbox typecheck$ tsc -p tsconfig.json --noEmit
 scripts typecheck: Done
 artifacts/api-server typecheck: Done
 artifacts/mockup-sandbox typecheck: Done
+TYPECHECK_EXIT=0
 ```
 
-### §8 grep check (`git grep -n -E "customFields|custom_fields" artifacts/api-server/src`, raw output)
-Zero logger, `console`, or error-payload references to custom field values:
-```
-artifacts/api-server/src/lib/voice-log/provider.ts:98:            if (!procFields.customFields?.[field.id] && !missing.includes(field.id)) {
-artifacts/api-server/src/lib/voice-log/provider.ts:204:      customFields: {
-artifacts/api-server/src/lib/voice-log/provider.ts:328:        customFields: {},
-artifacts/api-server/src/lib/voice-log/provider.ts:617:    const customFields: Record<string, string> = {};
-artifacts/api-server/src/lib/voice-log/provider.ts:618:    if (procCtx.dynamicProcedureFields && rawFields.customFields && typeof rawFields.customFields === "object") {
-artifacts/api-server/src/lib/voice-log/provider.ts:619:      const rawCustom = rawFields.customFields as Record<string, unknown>;
-artifacts/api-server/src/lib/voice-log/provider.ts:628:              customFields[field.id] = matchedOpt;
-artifacts/api-server/src/lib/voice-log/provider.ts:633:            customFields[field.id] = trimmed;
-artifacts/api-server/src/lib/voice-log/provider.ts:649:      customFields,
-artifacts/api-server/src/routes/professor.ts:533:              const value = isBuiltInProcedureField(field) ? item.log[field] : item.log.customFields?.[field];
-artifacts/api-server/src/routes/professor.ts:607:        customFields: (p.log as any).customFields ?? {},
-artifacts/api-server/src/routes/student.ts:1434:const customFieldsInputSchema = z.record(procedureFieldIdSchema, z.string().max(8000).nullable()).refine(
-artifacts/api-server/src/routes/student.ts:1448:  customFields: caseCustomFieldsInputSchema }).strict()), async (req, res) => {
-artifacts/api-server/src/routes/student.ts:1460:    const rawCustomFields = req.body.customFields ?? {};
-artifacts/api-server/src/routes/student.ts:1479:      customFields: normalizedCustomFields,
-artifacts/api-server/src/routes/student.ts:1499:  customFields: customFieldsInputSchema,
-artifacts/api-server/src/routes/student.ts:1533:      if (req.body.customFields && Object.keys(req.body.customFields).length > 0) {
-artifacts/api-server/src/routes/student.ts:1609:      finalCustomFields = normalizeCustomProcedureFieldValues(req.body.customFields, customFieldIds);
-artifacts/api-server/src/routes/student.ts:1624:      customFields: finalCustomFields,
-artifacts/api-server/src/routes/student.ts:1953:  customFields: caseCustomFieldsInputSchema }).strict().partial()), async (req, res) => {
-artifacts/api-server/src/routes/student.ts:1969:    const previousCustomFields = (guard.log?.customFields ?? {}) as Record<string, string>;
-artifacts/api-server/src/routes/student.ts:1971:    if (req.body.customFields) {
-artifacts/api-server/src/routes/student.ts:1972:      for (const [k, v] of Object.entries(req.body.customFields as Record<string, string | null>)) {
-artifacts/api-server/src/routes/student.ts:1987:    const updateBody = { ...req.body, customFields: normalizedCustomFields, status: "pending", facultyRemarks: null };
-artifacts/api-server/src/routes/student.ts:2007:  customFields: customFieldsInputSchema,
-artifacts/api-server/src/routes/student.ts:2038:      if (req.body.customFields && Object.keys(req.body.customFields).length > 0) {
-artifacts/api-server/src/routes/student.ts:2069:      const { customFields: _ignoredCustomFields, ...restBody } = req.body;
-artifacts/api-server/src/routes/student.ts:2075:      const prevCustom = (existingLog.customFields && typeof existingLog.customFields === "object" && !Array.isArray(existingLog.customFields))
-artifacts/api-server/src/routes/student.ts:2076:        ? { ...(existingLog.customFields as Record<string, string>) }
-artifacts/api-server/src/routes/student.ts:2080:      if (req.body.customFields) {
-artifacts/api-server/src/routes/student.ts:2081:        for (const [key, rawVal] of Object.entries(req.body.customFields as Record<string, string | null>)) {
-artifacts/api-server/src/routes/student.ts:2104:        entry: { ...resulting, customFields: mergedCustom },
-artifacts/api-server/src/routes/student.ts:2128:      if (req.body.customFields !== undefined) updateBody.customFields = mergedCustom;
-```
+### 3.4 Full Test Suite (`pnpm test` in `artifacts/api-server`, `DATABASE_URL` unset)
+Summary:
+- `tests 481`
+- `suites 27`
+- `pass 463`
+- `fail 18`
+- `cancelled 0`
+- `skipped 0`
+- `todo 0`
+- `duration_ms 579441.7966`
 
-### `<CaseLogDetails` grep in `ProfessorPortal.tsx` (only 2 occurrences exist; both receive `customFieldDefinitions={caseLogFields}`)
-```
-artifacts/mockup-sandbox/src/components/ProfessorPortal.tsx:602:                  <CaseLogDetails caseLog={currentItem as CaseLogDetailRecord} hideUhid={hideUhid} medicalSummaryCaseFields={Boolean(config?.enabledFeatures?.medicalSummaryCaseFields)} microbiologyCaseFields={microbiologyCaseFields} customFieldDefinitions={caseLogFields} />
-artifacts/mockup-sandbox/src/components/ProfessorPortal.tsx:1150:                              <CaseLogDetails caseLog={log} hideUhid={hideUhid} showReview medicalSummaryCaseFields={Boolean(config?.enabledFeatures?.medicalSummaryCaseFields)} microbiologyCaseFields={microbiologyCaseFields} customFieldDefinitions={caseLogFields} />
-```
+`tests/arogya-department-actions.test.ts` confirmation: all tests in `arogya-department-actions.test.ts` passed (13/13 `it` blocks under `POST /api/arogya/actions/apply`, `POST /api/arogya/actions/:auditId/undo`, `stale previews and stale undo`, `/api/arogya/ask: the model proposes, never writes`, `AROGYA_HOD_EDITS_ENABLED`, and `daily limit`).
 
-### §11 verbatim evidence (`tests/case-log-custom-fields.test.ts`)
-- Note on `PATCH /api/admin/department/case-log-fields`: `404` is **not applicable** because the route has no row id — the department always comes from `req.user`. Instead, `case-fields HOD with no config row` proves that a HOD with no `department_configs` row gets `200` and creates the row.
-- Note on `POST /api/students/:studentId/case-logs`: `studentAccess` collapses nonexistent `studentId` to `403` by design (`enumeration-collapse.test.ts`).
-```json
-{"case":"case-fields unauthenticated","request":{"method":"PATCH","path":"/api/admin/department/case-log-fields","body":{"fields":[{"key":"ward","label":"Ward","type":"select","required":true,"options":["PICU","NICU","General"]},{"key":"icu_days","label":"ICU days","type":"number","required":true,"min":0,"max":365,"requiredWhen":{"field":"ward","value":"PICU"}},{"key":"followup_date","label":"Follow-up date","type":"date"},{"key":"short_note","label":"Short note","type":"text","maxLength":100},{"key":"summary","label":"Summary","type":"textarea"}]}},"response":{"status":401,"body":{"message":"No token found in cookies or authorization header"}}}
-{"case":"case-fields student","request":{"method":"PATCH","path":"/api/admin/department/case-log-fields","body":{"fields":[{"key":"ward","label":"Ward","type":"select","required":true,"options":["PICU","NICU","General"]},{"key":"icu_days","label":"ICU days","type":"number","required":true,"min":0,"max":365,"requiredWhen":{"field":"ward","value":"PICU"}},{"key":"followup_date","label":"Follow-up date","type":"date"},{"key":"short_note","label":"Short note","type":"text","maxLength":100},{"key":"summary","label":"Summary","type":"textarea"}]}},"response":{"status":403,"body":{"message":"Forbidden: Insufficient role permissions"}}}
-{"case":"case-fields professor","request":{"method":"PATCH","path":"/api/admin/department/case-log-fields","body":{"fields":[{"key":"ward","label":"Ward","type":"select","required":true,"options":["PICU","NICU","General"]},{"key":"icu_days","label":"ICU days","type":"number","required":true,"min":0,"max":365,"requiredWhen":{"field":"ward","value":"PICU"}},{"key":"followup_date","label":"Follow-up date","type":"date"},{"key":"short_note","label":"Short note","type":"text","maxLength":100},{"key":"summary","label":"Summary","type":"textarea"}]}},"response":{"status":403,"body":{"message":"Forbidden: Insufficient role permissions"}}}
-{"case":"case-fields mirror HOD","request":{"method":"PATCH","path":"/api/admin/department/case-log-fields","body":{"fields":[{"key":"ward","label":"Ward","type":"select","required":true,"options":["PICU","NICU","General"]},{"key":"icu_days","label":"ICU days","type":"number","required":true,"min":0,"max":365,"requiredWhen":{"field":"ward","value":"PICU"}},{"key":"followup_date","label":"Follow-up date","type":"date"},{"key":"short_note","label":"Short note","type":"text","maxLength":100},{"key":"summary","label":"Summary","type":"textarea"}]}},"response":{"status":403,"body":{"message":"Test departments cannot modify mirrored settings"}}}
-{"case":"case-fields HOD0","request":{"method":"PATCH","path":"/api/admin/department/case-log-fields","body":{"fields":[{"key":"ward","label":"Ward","type":"select","required":true,"options":["PICU","NICU","General"]},{"key":"icu_days","label":"ICU days","type":"number","required":true,"min":0,"max":365,"requiredWhen":{"field":"ward","value":"PICU"}},{"key":"followup_date","label":"Follow-up date","type":"date"},{"key":"short_note","label":"Short note","type":"text","maxLength":100},{"key":"summary","label":"Summary","type":"textarea"}]}},"response":{"status":200,"body":{"readOnlyConfig":false,"fields":[{"key":"ward","label":"Ward","type":"select","required":true,"options":["PICU","NICU","General"]},{"key":"icu_days","label":"ICU days","type":"number","required":true,"min":0,"max":365,"requiredWhen":{"field":"ward","value":"PICU"}},{"key":"followup_date","label":"Follow-up date","type":"date"},{"key":"short_note","label":"Short note","type":"text","maxLength":100},{"key":"summary","label":"Summary","type":"textarea"}]}}}
-{"case":"case-fields HOD with no config row","request":{"method":"PATCH","path":"/api/admin/department/case-log-fields","body":{"fields":[{"key":"short_note","label":"Short note","type":"text","maxLength":100}]}},"response":{"status":200,"body":{"readOnlyConfig":false,"fields":[{"key":"short_note","label":"Short note","type":"text","maxLength":100}]}}}
-{"case":"case-fields invalid definition","request":{"method":"PATCH","path":"/api/admin/department/case-log-fields","body":{"fields":[{"key":"bad_select","label":"Bad Select","type":"select"}]}},"response":{"status":400,"body":{"message":"fields.0: Dropdown fields need choices"}}}
-{"case":"case POST unauthenticated","request":{"method":"POST","path":"/api/students/1/case-logs","body":{"supervisorId":2,"date":"2026-10-20","patientAge":"5y","patientGender":"female","diagnosisFinal":"Acute bronchiolitis","customFields":{"ward":"PICU","icu_days":"3","followup_date":"2026-11-01","short_note":"Stable"}}},"response":{"status":401,"body":{"message":"No token found in cookies or authorization header"}}}
-{"case":"case POST wrong owner (student20 on student0)","request":{"method":"POST","path":"/api/students/1/case-logs","body":{"supervisorId":2,"date":"2026-10-20","patientAge":"5y","patientGender":"female","diagnosisFinal":"Acute bronchiolitis","customFields":{"ward":"PICU","icu_days":"3","followup_date":"2026-11-01","short_note":"Stable"}}},"response":{"status":403,"body":{"message":"Student is outside your access scope"}}}
-{"case":"case POST nonexistent studentId (collapsed 403 by studentAccess)","request":{"method":"POST","path":"/api/students/99999999/case-logs","body":{"supervisorId":2,"date":"2026-10-20","patientAge":"5y","patientGender":"female","diagnosisFinal":"Acute bronchiolitis","customFields":{"ward":"PICU","icu_days":"3","followup_date":"2026-11-01","short_note":"Stable"}}},"response":{"status":403,"body":{"message":"Student is outside your access scope"}}}
-{"case":"case POST owner","request":{"method":"POST","path":"/api/students/1/case-logs","body":{"supervisorId":2,"date":"2026-10-20","patientAge":"5y","patientGender":"female","diagnosisFinal":"Acute bronchiolitis","customFields":{"ward":"PICU","icu_days":"3","followup_date":"2026-11-01","short_note":"Stable"}}},"response":{"status":201,"body":{"id":2,"studentId":1,"supervisorId":2,"date":"2026-10-20","attemptNumber":1,"patientUhid":null,"patientAge":"5y","patientGender":"female","chiefComplaints":null,"diagnosisProvisional":null,"diagnosisFinal":"Acute bronchiolitis","history":null,"examination":null,"investigations":null,"differentialDiagnosis":null,"managementPlan":null,"outcome":null,"learningPoints":null,"category":null,"customFields":{"ward":"PICU","icu_days":"3","short_note":"Stable","followup_date":"2026-11-01"},"status":"pending","facultyRemarks":null,"facultyGrade":null,"reviewedBy":null,"reviewedAt":null,"deletedAt":null,"createdAt":"2026-11-25T12:24:59.460Z"}}}
-{"case":"case PATCH unauthenticated","request":{"method":"PATCH","path":"/api/students/1/case-logs/2","body":{"diagnosisFinal":"Updated"}},"response":{"status":401,"body":{"message":"No token found in cookies or authorization header"}}}
-{"case":"case PATCH wrong owner","request":{"method":"PATCH","path":"/api/students/1/case-logs/2","body":{"diagnosisFinal":"Updated"}},"response":{"status":403,"body":{"message":"Student is outside your access scope"}}}
-{"case":"case PATCH nonexistent id","request":{"method":"PATCH","path":"/api/students/1/case-logs/99999999","body":{"diagnosisFinal":"Updated"}},"response":{"status":404,"body":{"message":"Log not found"}}}
-{"case":"case PATCH owner","request":{"method":"PATCH","path":"/api/students/1/case-logs/2","body":{"customFields":{"short_note":null}}},"response":{"status":200,"body":{"id":2,"studentId":1,"supervisorId":2,"date":"2026-10-20","attemptNumber":1,"patientUhid":null,"patientAge":"5y","patientGender":"female","chiefComplaints":null,"diagnosisProvisional":null,"diagnosisFinal":"Acute bronchiolitis","history":null,"examination":null,"investigations":null,"differentialDiagnosis":null,"managementPlan":null,"outcome":null,"learningPoints":null,"category":null,"customFields":{"ward":"PICU","icu_days":"3","followup_date":"2026-11-01"},"status":"pending","facultyRemarks":null,"facultyGrade":null,"reviewedBy":null,"reviewedAt":null,"deletedAt":null,"createdAt":"2026-11-25T12:24:59.460Z"}}}
-```
+Exact sorted list of the 18 pre-existing baseline failures (matching `origin/main`; 0 new failures):
+1. `DELETE clinical-works: 401 / 403 / 200 / 404, and a deleted row cannot be edited`
+2. `HOD adds sub-types under a category; bad parents, wrong kinds and in-use categories are refused`
+3. `HOD hard-delete of a student removes their clinical work logs`
+4. `PATCH changing the category clears a stale sub-type and re-checks it`
+5. `PATCH clinical-works: 401 / 403 / 200 / 404`
+6. `POST clinical-works: 401 / 403 / 201 / nonexistent student`
+7. `a dry run reports the changes and saves nothing`
+8. `applying merges flags without dropping existing ones and loads the catalog and schedule`
+9. `applying twice changes nothing more`
+10. `category and sub-type rules`
+11. `faculty review: only the named supervisor or the HOD can verify, and verified rows are locked`
+12. `logbook read: owner and HOD see all entries, a professor sees only entries they supervise`
+13. `rejected entries can be edited and go back to pending with remarks cleared`
+14. `review queue lists pending clinical works with category names`
+15. `the document's 15, 15 and 18 sections are available in the corresponding years`
+16. `the radiology template matches the requested lists`
+17. `the supplied SQL creates Surgery, its config and exactly the four requested role codes`
+18. `validation covers participation, year, date ranges, attendance, appraisal ratings and discussion`
 
-### Full `pnpm test` (`artifacts/api-server`, `DATABASE_URL` unset)
-- `ℹ tests 480 / ℹ pass 462 / ℹ fail 18` (all 3 migration tests including `0036` and all 4 `case-log-custom-fields` tests pass; 0 new failures).
-- Exact sorted list of 18 pre-existing baseline failures:
-```
-DELETE clinical-works: 401 / 403 / 200 / 404, and a deleted row cannot be edited
-HOD adds sub-types under a category; bad parents, wrong kinds and in-use categories are refused
-HOD hard-delete of a student removes their clinical work logs
-PATCH changing the category clears a stale sub-type and re-checks it
-PATCH clinical-works: 401 / 403 / 200 / 404
-POST clinical-works: 401 / 403 / 201 / nonexistent student
-a dry run reports the changes and saves nothing
-applying merges flags without dropping existing ones and loads the catalog and schedule
-applying twice changes nothing more
-category and sub-type rules
-faculty review: only the named supervisor or the HOD can verify, and verified rows are locked
-logbook read: owner and HOD see all entries, a professor sees only entries they supervise
-rejected entries can be edited and go back to pending with remarks cleared
-review queue lists pending clinical works with category names
-the document's 15, 15 and 18 sections are available in the corresponding years
-the radiology template matches the requested lists
-the supplied SQL creates Surgery, its config and exactly the four requested role codes
-validation covers participation, year, date ranges, attendance, appraisal ratings and discussion
-```
+## 4. Compliance Statement & Full Command List
+- No in-scope script was executed.
+- No database-connecting command was run (`DATABASE_URL` remained unset during all test runs; tests ran against in-process PGlite only).
+- No secret value, `.env` file, or `test_cat.js` content/`git diff` was printed, logged, or included.
 
-### Screenshots / Browser verification
-- Not run in this headless pass (recorded as unverified here).
+Commands run in this session:
+1. `cd D:\Electronic-LogBook-main\.claude\worktrees\remove-more-one-off-scripts-959436; git rev-parse --abbrev-ref HEAD; git status --short; git stash list; git log --oneline -5`
+2. `Copy-Item "D:\Electronic-LogBook-main\.claude\worktrees\remove-more-one-off-scripts-959436\CURRENT_TASK.md" "$env:TEMP\current-task-scripts-backup.md" -Force; (Get-FileHash -Algorithm SHA256 "$env:TEMP\current-task-scripts-backup.md").Hash`
+3. `cd D:\Electronic-LogBook-main\.claude\worktrees\remove-more-one-off-scripts-959436; git fetch origin`
+4. `cd D:\Electronic-LogBook-main\.claude\worktrees\remove-more-one-off-scripts-959436; git checkout -- CURRENT_TASK.md; if ($LASTEXITCODE -eq 0) { git merge origin/main --no-edit }; if ($LASTEXITCODE -eq 0) { Copy-Item "$env:TEMP\current-task-scripts-backup.md" "D:\Electronic-LogBook-main\.claude\worktrees\remove-more-one-off-scripts-959436\CURRENT_TASK.md" -Force }; (Get-FileHash -Algorithm SHA256 "D:\Electronic-LogBook-main\.claude\worktrees\remove-more-one-off-scripts-959436\CURRENT_TASK.md").Hash; git log --oneline -3`
+5. `cd D:\Electronic-LogBook-main\.claude\worktrees\remove-more-one-off-scripts-959436; Remove-Item -LiteralPath "gen.js","gen_2.js","run_sql.mjs","generate_missing.sql","artifacts/api-server/fix_db.ts","artifacts/api-server/run_sql_2.ts","artifacts/api-server/test-direct.mjs","artifacts/api-server/test-email.ts","artifacts/api-server/test_cat.js","artifacts/api-server/test_cat.mjs"; git status --short; git ls-files ...; git ls-files --deleted; git grep -n -I -E "gen\.js|gen_2\.js|run_sql|fix_db|test-direct|test-email|test_cat|generate_missing"`
+6. `cd D:\Electronic-LogBook-main\.claude\worktrees\remove-more-one-off-scripts-959436; pnpm install --frozen-lockfile --offline`
+7. `cd D:\Electronic-LogBook-main\.claude\worktrees\remove-more-one-off-scripts-959436; pnpm run typecheck`
+8. `cd D:\Electronic-LogBook-main\.claude\worktrees\remove-more-one-off-scripts-959436\artifacts\api-server; Remove-Item Env:DATABASE_URL -ErrorAction SilentlyContinue; pnpm test 2>&1 | Tee-Object -FilePath "$env:TEMP\scripts-test-out.txt"`
