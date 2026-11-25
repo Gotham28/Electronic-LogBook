@@ -63,15 +63,17 @@ app.use(
   }),
 );
 app.use(cookieParser());
-// The one write route that carries raw file bytes (route-level express.raw, real type sniffed server-side).
-// Only the JSON content-type requirement is waived for it; the Origin and cookie checks below still apply.
+// The write routes that carry raw file bytes (route-level express.raw, real type sniffed server-side).
+// Only the JSON content-type requirement is waived for them; the Origin and cookie checks below still apply.
 const CERTIFICATE_FILE_UPLOAD = /^\/api\/students\/[^/]+\/certifications\/[^/]+\/file$/;
+const VOICE_LOG_EXTRACT = /^\/api\/students\/[^/]+\/voice-log\/extract$/;
 app.use((req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("Cache-Control", "no-store");
   if (!["GET", "HEAD", "OPTIONS"].includes(req.method)) {
     const isCertificateFileUpload = req.method === "PUT" && CERTIFICATE_FILE_UPLOAD.test(req.path);
-    if (!isCertificateFileUpload && !/^application\/json(?:;|$)/i.test(req.headers["content-type"] || "")) {
+    const isVoiceLogExtract = req.method === "POST" && VOICE_LOG_EXTRACT.test(req.path);
+    if (!isCertificateFileUpload && !isVoiceLogExtract && !/^application\/json(?:;|$)/i.test(req.headers["content-type"] || "")) {
       res.status(415).json({ message: "Use application/json" }); return;
     }
     const origin = req.headers.origin;
