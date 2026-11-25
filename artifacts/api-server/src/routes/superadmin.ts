@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { psychiatryEntriesTable } from "@workspace/db";
 import { db, usersTable, collegesTable, departmentsTable, studentsTable, departmentConfigsTable, departmentCatalogTable, procedureTypesTable, assignmentTypesTable, assignmentsTable, assignmentRecipientsTable, caseLogsTable, procedureLogsTable, academicLogsTable, leaveRecordsTable, postingsTable, researchTable, assessmentsTable, attendanceLogsTable, leaveApplicationsTable, thesisMilestonesTable, appraisalsTable, auditTable, clinicalWorkLogsTable, departmentPostingScheduleTable, conferencesTable, awardsTable, certificationsTable, supportTicketsTable } from "@workspace/db";
 import { eq, and, sql, inArray, or, gt, isNull, desc } from "drizzle-orm";
 import { z } from "zod";
@@ -526,6 +527,17 @@ export async function deleteDepartmentCascade(tx: any, targetDepartmentId: numbe
   ];
 
   const conflicts: string[] = [];
+  const psychiatryDepartment = eq(psychiatryEntriesTable.departmentId, targetDepartmentId);
+  if (isMirror) {
+    await tx.delete(psychiatryEntriesTable).where(psychiatryDepartment);
+  } else {
+    const [result] = await tx.select({ count: sql<number>`cast(count(*) as integer)` }).from(psychiatryEntriesTable).where(or(
+      psychiatryDepartment, studentIds.length ? inArray(psychiatryEntriesTable.studentId, studentIds) : undefined,
+      userIds.length ? inArray(psychiatryEntriesTable.reviewerId, userIds) : undefined,
+      userIds.length ? inArray(psychiatryEntriesTable.reviewedBy, userIds) : undefined,
+    ));
+    if (result.count > 0) conflicts.push(`psychiatry_entries (${result.count} rows)`);
+  }
   if (studentIds.length > 0 || userIds.length > 0) {
     for (const entry of checkedTables) {
       const conditions = [];

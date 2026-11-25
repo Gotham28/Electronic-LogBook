@@ -523,6 +523,9 @@ export function AppLayout({
   const navigationItems = React.useMemo(() => {
     const items = navigationForRole(activeRole, dashboardData, loadingBadges, config, demoMode, academicLogbook, department, label, labels)
       .map((item) => (item.href === "/academics" && academicLogbook ? { ...item, title: academicLogbook.title } : item));
+    if ((activeRole === "Faculty" || activeRole === "HOD") && !demoMode && config?.enabledFeatures?.psychiatryWorkspace) {
+      items.splice(1, 0, { title: "Psychiatry reviews", icon: FileText, href: "/psychiatry/reviews" });
+    }
     return studentNavOrder.length ? applyNavOrder(items, studentNavOrder) : items;
   }, [activeRole, dashboardData, loadingBadges, config, demoMode, academicLogbook, department, label, labels, studentNavOrder]);
   const hasCustomStudentOrder = React.useMemo(

@@ -1,4 +1,148 @@
-# Handoff — Script Cleanup (Phase 3C)
+# Handoff — Psychiatry workspace
+
+The working branch is `codex/psychiatry-logbook` from `9db447ef024385d961f32450129b6de404f381dc`. The Psychiatry audit ZIP supplied the 23 resident navigation items, form fields, and screen references. Production content comes from the authenticated LogBook account, department configuration, and saved records.
+
+## Deployment order
+
+1. The developer applies the drafted `lib/db/migrations/0037_psychiatry_workspace.sql` through the existing migration runner before deploying the API. The migration adds two tables and does not backfill existing data. General account and department deletion paths need the new tables present.
+2. Deploy the API and frontend together through the existing release process.
+3. The Psychiatry HOD enables **Department Settings → Psychiatry workspace → Enable Psychiatry workspace**. The switch is off until enabled. Other departments keep their existing workspace.
+
+## Production behavior
+
+- Psychiatry resident routes use `/psychiatry/*`. Standard resident deep links remain available. The resident summary prints from the Psychiatry workspace. The regular HOD progress aggregates and standard printable logbook continue to use their existing record sources. The new Psychiatry review history contains the stand-alone Psychiatry records.
+- Short cases use the existing case log and faculty review queue. The selected WHO code, title, and URI are persisted with the intake details. All 858 Chapter 06 codes are indexed using the published hierarchy.
+- Monthly clinical records have one entry per resident, section, and month. Long cases can be saved as drafts. Assigned faculty can verify or return entries, and the department HOD can review department entries. The new record and review writes check the revision.
+- Shared academic sessions create attendance links for approved people in the author's department. Tagged attendees see their attendance and session information. Department-wide views show the date and title of verified sessions and recorded CME conferences. Private discussion and review notes stay within the owner and review workflow.
+- The audit left several prototype actions unverified. The main LogBook uses its existing authentication and roles, real department rosters and counts, a returned-entry notification panel, and the browser print dialog.
+
+The migration was exercised only against in-process PGlite. No command connected to a live database. Repository review and developer acceptance precede opening a PR.
+
+## Review
+
+### Scope adherence
+
+Part 1 implements the 23 sidebar destinations, list and entry views, resident home, summary and header actions. Part 2 implements persisted records and permission-scoped ownership, attendance, and review. Part 3 adds the nested WHO catalogue and validates the saved diagnosis at the API.
+
+### Rule violations
+
+The two read-only reviews identified deletion safeguards, access projections, existing route compatibility, and form issues. The changes now include restrictive clinical record references, explicit deletion handling, limited session data, route preservation, and conditional date validation. No live data or schema was touched. Deployment of migration 0037 belongs to the developer under §6.
+
+### Evidence check
+
+The workspace build and typecheck passed. A focused API run passed 30 tests, including migration reruns, new Psychiatry access, and existing case, hard-delete, and department delete paths. The isolated browser passed the 23 menu routes, the short case form and 20 other add forms, switching long-case date modes, 390 px layout, the `6A7` query with 26 choices, and saving and reading back `6A70`.
+
+The full API run reported 467 passes and 18 failures. A side-by-side run of the Clinical Work, Physiology LogBook, and Surgery procedure-field suites produced the same 14 failures on the working branch and clean baseline `9db447e`. Four failures from the full run were outside that comparison.
+
+| Case | Request | Response |
+|---|---|---|
+| Resident, unauthenticated | `PATCH /api/psychiatry/entries/opd/1` | `401 {"message":"No token found in cookies or authorization header"}` |
+| Resident, wrong owner | `PATCH /api/psychiatry/entries/opd/1` | `403 {"message":"Entry is outside your access scope"}` |
+| Resident, correct owner | `PATCH /api/psychiatry/entries/opd/1` | `200 {"id":1}` |
+| Resident, nonexistent | `PATCH /api/psychiatry/entries/opd/999999` | `404 {"message":"Entry not found"}` |
+| Review, unauthenticated | `PATCH /api/psychiatry/reviews/1` | `401 {"message":"No token found in cookies or authorization header"}` |
+| Review, unassigned faculty | `PATCH /api/psychiatry/reviews/1` | `403 {"message":"Entry is outside your assigned reviews"}` |
+| Review, assigned faculty | `PATCH /api/psychiatry/reviews/1` | `200 {"id":1}` |
+| Review, nonexistent | `PATCH /api/psychiatry/reviews/999999` | `404 {"message":"Entry not found"}` |
+
+### Blast radius
+
+The HOD setting limits the Psychiatry UI and writes to participating departments. Short cases intentionally participate in existing case reviews. New Psychiatry records constrain department and resident deletion, and production deployment must apply migration 0037 before deploying code that references those tables.
+
+### Expanded scope
+
+The new clinical records required updates to production department deletion checks, test department cleanup, and record counts for authorized hard deletes. These changes preserve the existing behavior for clinical data retention and clean deletion of synthetic test departments.
+
+### Skipped
+
+The audited resident mock-up provides the visual reference. Prototype seed records, targets, and the demo role switch are excluded from production. Standard HOD progress counters still use their existing data sources. Actual print pagination and the deployed environment were outside local verification.
+
+### Verdict
+
+Accept for PR review, with the full-suite limitations documented above. The repository close-out process commits, pushes, and opens the PR after developer acceptance.
+
+## Changed project files
+
+```text
+CURRENT_TASK.md
+HANDOFF.md
+artifacts/api-server/src/lib/hard-delete-user.ts
+artifacts/api-server/src/routes/index.ts
+artifacts/api-server/src/routes/psychiatry.ts
+artifacts/api-server/src/routes/student.ts
+artifacts/api-server/src/routes/superadmin.ts
+artifacts/api-server/tests/migrations.test.ts
+artifacts/api-server/tests/psychiatry-workspace.test.ts
+artifacts/mockup-sandbox/src/App.tsx
+artifacts/mockup-sandbox/src/components/CaseLogDetails.tsx
+artifacts/mockup-sandbox/src/components/Chapter06DiagnosisPicker.tsx
+artifacts/mockup-sandbox/src/components/DepartmentSettings.tsx
+artifacts/mockup-sandbox/src/components/PsychiatrySettings.tsx
+artifacts/mockup-sandbox/src/components/layout/AppLayout.tsx
+artifacts/mockup-sandbox/src/components/pages/CaseLogsPage.tsx
+artifacts/mockup-sandbox/src/components/pages/PsychiatryShortCasesPage.tsx
+artifacts/mockup-sandbox/src/components/pages/PsychiatryWorkspace.tsx
+lib/api-zod/src/department-settings.ts
+lib/api-zod/src/icd11-chapter06-data.ts
+lib/api-zod/src/index.ts
+lib/api-zod/src/psychiatry-case-id.ts
+lib/api-zod/src/psychiatry-short-cases.ts
+lib/api-zod/src/psychiatry-workspace.ts
+lib/db/migrations/0037_psychiatry_workspace.sql
+lib/db/src/migrations.ts
+lib/db/src/schema/index.ts
+lib/db/src/schema/psychiatry.ts
+```
+
+## Build and verification commands
+
+The API checks use in-process PostgreSQL fixtures and loopback HTTP. A disposable detached baseline worktree and the local browser harness were used only for verification. Reference screenshots, browser screenshots, the browser harness, and the comparison logs are in the ignored `node_modules/.psychiatry-qa` directory.
+
+```powershell
+git status
+git stash list
+git checkout main
+if ($LASTEXITCODE -eq 0) { git pull origin main }
+git log --oneline -5
+git switch -c codex/psychiatry-logbook
+pnpm.cmd install --frozen-lockfile
+pnpm.cmd run typecheck
+pnpm.cmd --dir artifacts/mockup-sandbox run build
+pnpm.cmd run build
+pnpm.cmd --dir artifacts/api-server exec tsx --tsconfig tests/tsconfig.json --test tests/migrations.test.ts
+pnpm.cmd --dir artifacts/api-server exec tsx --tsconfig tests/tsconfig.json --test --test-concurrency=1 tests/migrations.test.ts tests/psychiatry-workspace.test.ts tests/case-log-custom-fields.test.ts
+pnpm.cmd --dir artifacts/api-server exec tsx --tsconfig tests/tsconfig.json --test --test-concurrency=1 tests/migrations.test.ts tests/psychiatry-workspace.test.ts tests/hard-delete.test.ts tests/delete-cascade.test.ts tests/mirror-cascade-coverage.test.ts tests/case-log-custom-fields.test.ts
+pnpm.cmd --dir artifacts/api-server test
+node artifacts/api-server/node_modules/tsx/dist/cli.mjs --tsconfig artifacts/api-server/tests/tsconfig.json node_modules/.psychiatry-qa/browser.mts
+git worktree add --detach node_modules/.psychiatry-qa/baseline 9db447ef024385d961f32450129b6de404f381dc
+pnpm.cmd --dir node_modules/.psychiatry-qa/baseline install --frozen-lockfile --offline
+$repo = (Resolve-Path -LiteralPath '.').Path
+$source = (Resolve-Path -LiteralPath 'node_modules/.psychiatry-qa/baseline').Path
+$target = Join-Path $repo '.psychiatry-baseline'
+if ($source -ne (Join-Path $repo 'node_modules\.psychiatry-qa\baseline') -or (Test-Path -LiteralPath $target)) { throw 'Unexpected baseline worktree path' }
+git worktree move $source $target
+$baseline = (Resolve-Path -LiteralPath '.psychiatry-baseline').Path
+if ($baseline -ne (Join-Path $repo '.psychiatry-baseline')) { throw 'Unexpected baseline worktree path' }
+pnpm.cmd --dir $baseline install --frozen-lockfile --offline --config.confirmModulesPurge=false
+Remove-Item Env:DATABASE_URL -ErrorAction SilentlyContinue
+pnpm.cmd --dir .psychiatry-baseline/artifacts/api-server exec tsx --tsconfig tests/tsconfig.json --test --test-concurrency=1 --test-reporter=tap tests/clinical-works.test.ts tests/physiology-logbook.test.ts tests/surgery-procedure-fields.test.ts *> node_modules/.psychiatry-qa/baseline-tests.log
+pnpm.cmd --dir artifacts/api-server exec tsx --tsconfig tests/tsconfig.json --test --test-concurrency=1 --test-reporter=tap tests/clinical-works.test.ts tests/physiology-logbook.test.ts tests/surgery-procedure-fields.test.ts *> node_modules/.psychiatry-qa/branch-legacy-tests.log
+$baselineFailures = @(Get-Content -Encoding UTF8 node_modules/.psychiatry-qa/baseline-tests.log | Where-Object { $_ -match '^not ok ' })
+$branchFailures = @(Get-Content -Encoding UTF8 node_modules/.psychiatry-qa/branch-legacy-tests.log | Where-Object { $_ -match '^not ok ' })
+Compare-Object -ReferenceObject $baselineFailures -DifferenceObject $branchFailures
+git worktree remove $baseline
+Remove-Item -LiteralPath $baseline -Recurse -Force -ErrorAction Stop
+Test-Path -LiteralPath $baseline
+git restore --worktree -- artifacts/mockup-sandbox/src/.generated/mockup-components.ts
+git diff --check
+git status --short
+```
+
+The first baseline run was located under `node_modules`, where the TSX loader skipped the test database alias. The worktree was relocated, its dependencies were relinked offline, and the baseline comparison completed. Git unregistered the disposable worktree but encountered a Windows path length limit during deletion. PowerShell removed the verified temporary directory.
+
+---
+
+# Previous handoff — Task 3c-1: Custom fields on case logs
 
 ## 1. Branch & Commit State
 - **Worktree:** `D:\Electronic-LogBook-main\.claude\worktrees\remove-more-one-off-scripts-959436`
