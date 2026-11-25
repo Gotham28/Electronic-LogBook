@@ -144,7 +144,7 @@ const PROFESSOR_REVIEW_FLAG_LABELS: Record<string, string> = {
 export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; embedded?: boolean }) {
   const currentUser = useCurrentUser();
   const hideUhid = isDemoMode();
-  const { config, competencyLevels, caseCategories: deptCaseCategories, procedures: deptProcedures, procedureFields, academics: deptAcademics,
+  const { config, competencyLevels, caseCategories: deptCaseCategories, procedures: deptProcedures, procedureFields, caseLogFields, academics: deptAcademics,
     clinicalWorkCategories, clinicalWorkSubtypes, academicLogbook, label } = useDepartment();
   const dynamicProcedureFields = Boolean(config?.enabledFeatures?.dynamicProcedureFields);
   const activeProcedureFields = dynamicProcedureFields ? (procedureFields ?? []) : undefined;
@@ -599,7 +599,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                     )}
 
                     {currentItem.type === "Case Log" ? (
-                      <CaseLogDetails caseLog={currentItem as CaseLogDetailRecord} hideUhid={hideUhid} medicalSummaryCaseFields={Boolean(config?.enabledFeatures?.medicalSummaryCaseFields)} microbiologyCaseFields={microbiologyCaseFields} />
+                      <CaseLogDetails caseLog={currentItem as CaseLogDetailRecord} hideUhid={hideUhid} medicalSummaryCaseFields={Boolean(config?.enabledFeatures?.medicalSummaryCaseFields)} microbiologyCaseFields={microbiologyCaseFields} customFieldDefinitions={caseLogFields} />
                     ) : (
                       <div className="bg-slate-50 p-4 rounded-xl space-y-2 border border-slate-200/60">
                         <h4 className="text-xs font-semibold uppercase text-slate-500">Submission Details</h4>
@@ -1147,7 +1147,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                                   </TableCell>
                                 </TableRow>
                                 {expanded && <TableRow><TableCell id={`case-details-${log.id}`} colSpan={4} className="bg-slate-50 p-3">
-                                  <CaseLogDetails caseLog={log} hideUhid={hideUhid} showReview medicalSummaryCaseFields={Boolean(config?.enabledFeatures?.medicalSummaryCaseFields)} microbiologyCaseFields={microbiologyCaseFields} />
+                                  <CaseLogDetails caseLog={log} hideUhid={hideUhid} showReview medicalSummaryCaseFields={Boolean(config?.enabledFeatures?.medicalSummaryCaseFields)} microbiologyCaseFields={microbiologyCaseFields} customFieldDefinitions={caseLogFields} />
                                 </TableCell></TableRow>}
                               </React.Fragment>
                             );
