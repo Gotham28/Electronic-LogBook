@@ -80,7 +80,7 @@ router.get("/:departmentId/catalog", async (req, res) => {
       : rawCompetencyLevels.filter((item) => !config[0]?.enabledFeatures?.procedureClinicalDetails || (PROCEDURE_ROLE_CODES as readonly string[]).includes(item.value));
 
     res.json({ department: deptInfo, hod: hod[0] || null, config: resolvedConfig, procedures,
-      procedureFields, readOnlyConfig: configSourceId !== departmentId,
+      procedureFields, caseLogFields: config[0]?.caseLogFields ?? [], readOnlyConfig: configSourceId !== departmentId,
       postings: catalog.filter((item) => item.kind === "posting"), academics: catalog.filter((item) => item.kind === "academic"), caseCategories: catalog.filter((item) => item.kind === "case_category"),
       competencyLevels,
       leaveTypes: catalog.filter((item) => item.kind === "leave_type"),

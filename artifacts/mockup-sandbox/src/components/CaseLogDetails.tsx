@@ -1,6 +1,8 @@
 import * as React from "react";
 import { formatLogbookDate } from "@/lib/logbook-config";
 import { getCaseMedicalSummary } from "@/lib/case-medical-summary";
+import { LogCustomFieldValues } from "@/components/LogCustomFields";
+import type { LogCustomFieldDefinition } from "@/lib/log-custom-fields";
 
 export type CaseLogDetailRecord = {
   date: string;
@@ -23,6 +25,7 @@ export type CaseLogDetailRecord = {
   facultyRemarks?: string | null;
   facultyGrade?: string | null;
   reviewedAt?: string | Date | null;
+  customFields?: Record<string, string> | null;
 };
 
 function DetailField({ label, value }: { label: string; value?: string | number | null }) {
@@ -42,12 +45,14 @@ export function CaseLogDetails({
   showReview = false,
   medicalSummaryCaseFields = false,
   microbiologyCaseFields = false,
+  customFieldDefinitions,
 }: {
   caseLog: CaseLogDetailRecord;
   hideUhid?: boolean;
   showReview?: boolean;
   medicalSummaryCaseFields?: boolean;
   microbiologyCaseFields?: boolean;
+  customFieldDefinitions?: LogCustomFieldDefinition[];
 }) {
   return (
     <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
@@ -96,6 +101,7 @@ export function CaseLogDetails({
           </section>
         </>
       )}
+      <LogCustomFieldValues fields={customFieldDefinitions} values={caseLog.customFields} />
       {showReview && (caseLog.status !== "pending" || caseLog.facultyRemarks || caseLog.facultyGrade || caseLog.reviewedAt) && (
         <section aria-labelledby="case-review-heading" className="border-t border-slate-100 pt-4">
           <h4 id="case-review-heading" className="mb-3 text-xs font-bold uppercase tracking-wide text-teal-800">Faculty review</h4>

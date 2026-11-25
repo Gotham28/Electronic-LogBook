@@ -1,31 +1,26 @@
-# HANDOFF — Task 3b: Residents' menu order
+# HANDOFF — Task 3c-1: Custom fields on case logs
 
-Branch `task/department-page-order`, created from `origin/main` `fde56c6` (includes 2a, 2b, 3a, and Task 4). **Nothing is committed, pushed, or opened as a PR.**
-`CURRENT_TASK.md` sha256 preserved byte-for-byte: `0C400A6C95EA38833FEAC2A1C196268B48A602A9E7A2E6D616788AB2A3AC6CD8`.
+Branch `task/custom-log-fields`, created from `origin/main` `fde56c6` (includes 0032–0035, 2a, 2b, 3a, Task 4). **Nothing is committed, pushed, or opened as a PR.**
+`CURRENT_TASK.md` sha256 preserved byte-for-byte: `018FB27B3650C7AE51D74D1FEF359CD466C459E42BE6425D37CC819DC06154B9`.
 
-**No command connected to a database.** `DATABASE_URL` remained unset; all tests ran against in-process PGlite. No migration was written (`0037` stays unused; `lib/db/**` untouched). `pnpm install --frozen-lockfile --offline` was run to create `node_modules`.
+**No command connected to a database.** `DATABASE_URL` remained unset; all tests ran against in-process PGlite. Migration `0036_case_log_custom_fields.sql` is drafted only and never applied (§6). `pnpm install --frozen-lockfile --offline` was run to create `node_modules`.
 
-## Scope widening (developer-approved 2026-11-25)
-- **`artifacts/api-server/src/lib/arogya/department-actions.ts` (Option A, approved by developer):**
-  - Imported `DEPARTMENT_SETTING_VALUE_TYPES` from `@workspace/api-zod` and filtered `ALL_SETTING_KEYS` / `MOCHI_SETTING_KEYS` to boolean-valued settings (`DEPARTMENT_SETTING_VALUE_TYPES[key] === "boolean"`).
-  - In `classifyAction()` (`setting_set`), non-boolean keys return `{ kind: "unsupported" }`.
-  - In `applyAction()` (`setting_set`), non-boolean keys throw `DepartmentActionError(400, "This setting cannot be changed as a boolean")` before calling `setDepartmentSetting()`.
-  - Narrowed `stored`, `change.before`, and `change.after` in `buildProposal`, `applyAction`, and `undoAction` to `boolean | null` so `onOff(...)` typechecks with zero `any` casts.
-- **Additional fix-round polish:**
-  - `NavOrderSettings.tsx`: Passes `department.department` (7th arg) to `navigationForRole(...)` and checks the boolean returned by `await refresh()` (showing an alert if `false`).
-  - `AppLayout.tsx`: Computes `hasCustomStudentOrder` so `hasCustomOrder` is `true` only when `studentNavOrder` matches at least one current non-Dashboard item in `navigationItems`.
+## RELEASE GATE
+**Apply migration `lib/db/migrations/0036_case_log_custom_fields.sql` (developer, `src/migrate.ts`) BEFORE deploying this code (after `0035`).** The new code selects `department_configs.case_log_fields` and `case_logs.custom_fields` and will fail queries if deployed before `0036` is applied.
 
 ## What changed (in-scope files only)
-- `lib/api-zod/src/department-settings.ts`: Added `studentNavOrder: "mochi"`, `DepartmentSettingValueType = "boolean" | "path_list"`, `DepartmentSettingValue = boolean | string[]`, `studentNavOrderSchema` (max 30 unique paths, max 64 chars, `^\/[a-z0-9/-]*$`), per-key `DEPARTMENT_SETTING_VALUE_TYPES` / `departmentSettingValueSchemas`, and `departmentSettingUpdateSchemaFor(key)`.
-- `artifacts/api-server/src/lib/department-settings.ts`: Added `readStoredValue` (supports `"boolean"` and `"path_list"`, returns `null` on wrong type), structural equality (`JSON.stringify`) for 409 and no-op checks, and `DepartmentSettingValue` types.
-- `artifacts/api-server/src/routes/department-config-settings.ts`: Validated `PATCH /:key` per key using `departmentSettingKeySchema` + `departmentSettingUpdateSchemaFor(key)`. Auth/scope (`requireAuth`, `requireRole(["hod"])`, `requireDepartment`, `req.user.departmentId`) unchanged.
-- `artifacts/api-server/tests/department-config-settings.test.ts`: Updated line 96 to check `DEPARTMENT_SETTING_VALUE_TYPES[row.key]` and added full `studentNavOrder` test suite (200 set, 200 no-op without audit row, 409 stale `expectedValue`, 400 invalid cases, 200 `[]`, 401/403/mirror 403, `actor: "mochi"`).
-- `artifacts/mockup-sandbox/src/lib/academic-navigation.ts`: Added `readStudentNavOrder`, `applyNavOrder` (Dashboard `/` always first, listed items next, unlisted items in default relative order, unknown paths ignored), and `hasCustomOrder` parameter on `mobileNavigationItems`.
-- `artifacts/mockup-sandbox/src/components/layout/AppLayout.tsx`: Exported `navigationForRole`, applied `applyNavOrder` to Student `navigationItems`, and passed `hasCustomOrder` to `MobileBottomNav`.
-- `artifacts/mockup-sandbox/src/components/layout/MobileBottomNav.tsx`: Accepted `hasCustomOrder` and passed it to `mobileNavigationItems`.
-- `artifacts/mockup-sandbox/src/components/NavOrderSettings.tsx` (new): "Residents' menu order" HOD panel with pinned Dashboard, Move up/down `aria-label` buttons, Save order, Reset to default (`[]`), 409 conflict reload/message, visible error states, `refresh()` on save, and `readOnlyConfig` support.
-- `artifacts/mockup-sandbox/src/components/DepartmentSettings.tsx`: Added `"menu-order"` section entry and `<NavOrderSettings />` render branch.
-- `artifacts/mockup-sandbox/tests/academic-navigation.test.ts`: Added unit tests for `applyNavOrder`, `readStudentNavOrder`, and `mobileNavigationItems(..., true/false)`.
+- `lib/db/migrations/0036_case_log_custom_fields.sql` (new, DRAFT): Adds nullable `department_configs.case_log_fields jsonb` and `case_logs.custom_fields jsonb NOT NULL DEFAULT '{}'::jsonb`.
+- `lib/db/src/migrations.ts`: Registered `0036_case_log_custom_fields.sql`.
+- `lib/db/src/schema/department_configs.ts`: Added `StoredLogCustomFieldDefinition` and `caseLogFields`.
+- `lib/db/src/schema/logs.ts`: Added `customFields` to `caseLogsTable` only.
+- `lib/api-zod/src/log-custom-fields.ts` (new) & `lib/api-zod/src/index.ts`: Added `logCustomFieldDefinitionSchema`, `logCustomFieldDefinitionsSchema` (max 40, unique keys and case-insensitive labels, `requiredWhen` and type rules), `logCustomFieldVisible`, `validateLogCustomFieldValues` (returns field-label messages only, never values), and `normalizeLogCustomFieldValues`.
+- `artifacts/api-server/src/lib/department-features.ts`: Returns `caseLogFields` resolved from `configSourceId`.
+- `artifacts/api-server/src/routes/admin.ts`: Added `GET /api/admin/department/case-log-fields` and `PATCH /api/admin/department/case-log-fields` (HOD-only, `req.user.departmentId` only, mirrored test dept `403`, last-write-wins matching `procedure-fields` since `department_configs` has no `updatedAt` column).
+- `artifacts/api-server/src/routes/department.ts`: `GET /:departmentId/catalog` now returns `caseLogFields` alongside `procedureFields`.
+- `artifacts/api-server/src/routes/student.ts`: `POST /:studentId/case-logs` and `PATCH /:studentId/case-logs/:logId` validate and normalize `customFields` (enforcing required fields on older log edits per developer decision; null/empty clears keys; orphan keys survive PATCH; catch blocks log nothing). `professor.ts` and `logs.ts` required no changes (`caseLogsTable` whole row is already selected and `updateData` does not touch `customFields`).
+- `artifacts/api-server/tests/migrations.test.ts`: Bumped migration count from `35` to `36`.
+- `artifacts/api-server/tests/case-log-custom-fields.test.ts` (new): §11 cases, validation, orphan preservation, null clearing, unchanged legacy rendering, and professor review preservation.
+- Frontend (`artifacts/mockup-sandbox/src/`): `lib/log-custom-fields.ts` (new), `lib/department-context.tsx`, `components/LogCustomFields.tsx` (new), `components/CaseLogFieldsCard.tsx` (new), `components/DepartmentSettings.tsx`, `components/pages/CaseLogsPage.tsx`, `components/CaseLogDetails.tsx`, `components/ProfessorPortal.tsx`, `components/pages/PrintableLogbook.tsx`.
 
 ## Verification
 
@@ -37,30 +32,74 @@ artifacts/api-server typecheck: Done
 artifacts/mockup-sandbox typecheck: Done
 ```
 
-### Targeted `department-config-settings.test.ts` + `arogya-department-actions.test.ts` — 27/27 passed (0 failures)
-```json
-{"case":"studentNavOrder unauthenticated","request":{"method":"PATCH","path":"/api/admin/department/config/settings/studentNavOrder","body":{"value":["/academics","/cases","/postings"],"expectedValue":null}},"response":{"status":401,"body":{"message":"No token found in cookies or authorization header"}}}
-{"case":"studentNavOrder student","request":{"method":"PATCH","path":"/api/admin/department/config/settings/studentNavOrder","body":{"value":["/academics","/cases","/postings"],"expectedValue":null}},"response":{"status":403,"body":{"message":"Forbidden: Insufficient role permissions"}}}
-{"case":"studentNavOrder professor","request":{"method":"PATCH","path":"/api/admin/department/config/settings/studentNavOrder","body":{"value":["/academics","/cases","/postings"],"expectedValue":null}},"response":{"status":403,"body":{"message":"Forbidden: Insufficient role permissions"}}}
-{"case":"studentNavOrder mirror HOD","request":{"method":"PATCH","path":"/api/admin/department/config/settings/studentNavOrder","body":{"value":["/academics","/cases","/postings"],"expectedValue":null}},"response":{"status":403,"body":{"message":"Test departments cannot modify mirrored settings"}}}
-{"case":"studentNavOrder set","request":{"method":"PATCH","path":"/api/admin/department/config/settings/studentNavOrder","body":{"value":["/academics","/cases","/postings"],"expectedValue":null}},"response":{"status":200,"body":{"key":"studentNavOrder","before":null,"after":["/academics","/cases","/postings"],"auditId":"641e0b27-d7a6-4404-9dd2-886c1214e9f1"}}}
-{"case":"studentNavOrder no-op","request":{"method":"PATCH","path":"/api/admin/department/config/settings/studentNavOrder","body":{"value":["/academics","/cases","/postings"],"expectedValue":["/academics","/cases","/postings"]}},"response":{"status":200,"body":{"key":"studentNavOrder","before":["/academics","/cases","/postings"],"after":["/academics","/cases","/postings"],"auditId":null}}}
-{"case":"studentNavOrder stale 409","request":{"method":"PATCH","path":"/api/admin/department/config/settings/studentNavOrder","body":{"value":["/cases"],"expectedValue":["/postings"]}},"response":{"status":409,"body":{"message":"This setting changed since you loaded it. Reload and try again."}}}
-{"case":"studentNavOrder invalid (not an array)","request":{"method":"PATCH","path":"/api/admin/department/config/settings/studentNavOrder","body":{"value":"/cases","expectedValue":["/academics","/cases","/postings"]}},"response":{"status":400,"body":{"message":"Expected array, received string"}}}
-{"case":"studentNavOrder invalid (non-string item)","request":{"method":"PATCH","path":"/api/admin/department/config/settings/studentNavOrder","body":{"value":[123],"expectedValue":["/academics","/cases","/postings"]}},"response":{"status":400,"body":{"message":"Expected string, received number"}}}
-{"case":"studentNavOrder invalid (duplicates)","request":{"method":"PATCH","path":"/api/admin/department/config/settings/studentNavOrder","body":{"value":["/cases","/cases"],"expectedValue":["/academics","/cases","/postings"]}},"response":{"status":400,"body":{"message":"Menu paths must be unique"}}}
-{"case":"studentNavOrder invalid (more than 30 items)","request":{"method":"PATCH","path":"/api/admin/department/config/settings/studentNavOrder","body":{"value":["/p0","/p1","/p2","/p3","/p4","/p5","/p6","/p7","/p8","/p9","/p10","/p11","/p12","/p13","/p14","/p15","/p16","/p17","/p18","/p19","/p20","/p21","/p22","/p23","/p24","/p25","/p26","/p27","/p28","/p29","/p30"],"expectedValue":["/academics","/cases","/postings"]}},"response":{"status":400,"body":{"message":"At most 30 menu paths are allowed"}}}
-{"case":"studentNavOrder invalid (missing leading slash)","request":{"method":"PATCH","path":"/api/admin/department/config/settings/studentNavOrder","body":{"value":["cases"],"expectedValue":["/academics","/cases","/postings"]}},"response":{"status":400,"body":{"message":"Menu paths must start with / and use lowercase letters, digits, - or /"}}}
-{"case":"studentNavOrder invalid (longer than 64 chars)","request":{"method":"PATCH","path":"/api/admin/department/config/settings/studentNavOrder","body":{"value":["/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],"expectedValue":["/academics","/cases","/postings"]}},"response":{"status":400,"body":{"message":"String must contain at most 64 character(s)"}}}
-{"case":"studentNavOrder reset []","request":{"method":"PATCH","path":"/api/admin/department/config/settings/studentNavOrder","body":{"value":[],"expectedValue":["/academics","/cases","/postings"]}},"response":{"status":200,"body":{"key":"studentNavOrder","before":["/academics","/cases","/postings"],"after":[],"auditId":"9d7e67e5-5463-4ad9-9927-86c7cd7a127f"}}}
+### §8 grep check (`git grep -n -E "customFields|custom_fields" artifacts/api-server/src`, raw output)
+Zero logger, `console`, or error-payload references to custom field values:
+```
+artifacts/api-server/src/lib/voice-log/provider.ts:98:            if (!procFields.customFields?.[field.id] && !missing.includes(field.id)) {
+artifacts/api-server/src/lib/voice-log/provider.ts:204:      customFields: {
+artifacts/api-server/src/lib/voice-log/provider.ts:328:        customFields: {},
+artifacts/api-server/src/lib/voice-log/provider.ts:617:    const customFields: Record<string, string> = {};
+artifacts/api-server/src/lib/voice-log/provider.ts:618:    if (procCtx.dynamicProcedureFields && rawFields.customFields && typeof rawFields.customFields === "object") {
+artifacts/api-server/src/lib/voice-log/provider.ts:619:      const rawCustom = rawFields.customFields as Record<string, unknown>;
+artifacts/api-server/src/lib/voice-log/provider.ts:628:              customFields[field.id] = matchedOpt;
+artifacts/api-server/src/lib/voice-log/provider.ts:633:            customFields[field.id] = trimmed;
+artifacts/api-server/src/lib/voice-log/provider.ts:649:      customFields,
+artifacts/api-server/src/routes/professor.ts:533:              const value = isBuiltInProcedureField(field) ? item.log[field] : item.log.customFields?.[field];
+artifacts/api-server/src/routes/professor.ts:607:        customFields: (p.log as any).customFields ?? {},
+artifacts/api-server/src/routes/student.ts:1434:const customFieldsInputSchema = z.record(procedureFieldIdSchema, z.string().max(8000).nullable()).refine(
+artifacts/api-server/src/routes/student.ts:1448:  customFields: caseCustomFieldsInputSchema }).strict()), async (req, res) => {
+artifacts/api-server/src/routes/student.ts:1460:    const rawCustomFields = req.body.customFields ?? {};
+artifacts/api-server/src/routes/student.ts:1479:      customFields: normalizedCustomFields,
+artifacts/api-server/src/routes/student.ts:1499:  customFields: customFieldsInputSchema,
+artifacts/api-server/src/routes/student.ts:1533:      if (req.body.customFields && Object.keys(req.body.customFields).length > 0) {
+artifacts/api-server/src/routes/student.ts:1609:      finalCustomFields = normalizeCustomProcedureFieldValues(req.body.customFields, customFieldIds);
+artifacts/api-server/src/routes/student.ts:1624:      customFields: finalCustomFields,
+artifacts/api-server/src/routes/student.ts:1953:  customFields: caseCustomFieldsInputSchema }).strict().partial()), async (req, res) => {
+artifacts/api-server/src/routes/student.ts:1969:    const previousCustomFields = (guard.log?.customFields ?? {}) as Record<string, string>;
+artifacts/api-server/src/routes/student.ts:1971:    if (req.body.customFields) {
+artifacts/api-server/src/routes/student.ts:1972:      for (const [k, v] of Object.entries(req.body.customFields as Record<string, string | null>)) {
+artifacts/api-server/src/routes/student.ts:1987:    const updateBody = { ...req.body, customFields: normalizedCustomFields, status: "pending", facultyRemarks: null };
+artifacts/api-server/src/routes/student.ts:2007:  customFields: customFieldsInputSchema,
+artifacts/api-server/src/routes/student.ts:2038:      if (req.body.customFields && Object.keys(req.body.customFields).length > 0) {
+artifacts/api-server/src/routes/student.ts:2069:      const { customFields: _ignoredCustomFields, ...restBody } = req.body;
+artifacts/api-server/src/routes/student.ts:2075:      const prevCustom = (existingLog.customFields && typeof existingLog.customFields === "object" && !Array.isArray(existingLog.customFields))
+artifacts/api-server/src/routes/student.ts:2076:        ? { ...(existingLog.customFields as Record<string, string>) }
+artifacts/api-server/src/routes/student.ts:2080:      if (req.body.customFields) {
+artifacts/api-server/src/routes/student.ts:2081:        for (const [key, rawVal] of Object.entries(req.body.customFields as Record<string, string | null>)) {
+artifacts/api-server/src/routes/student.ts:2104:        entry: { ...resulting, customFields: mergedCustom },
+artifacts/api-server/src/routes/student.ts:2128:      if (req.body.customFields !== undefined) updateBody.customFields = mergedCustom;
 ```
 
-### `academic-navigation.test.ts` — 7/8 passed
-- New test `✔ student menu ordering keeps Dashboard first, drops unknown paths, appends unlisted items, and updates phone slots` passed.
-- 1 pre-existing failure (`year restrictions remain the existing 15/15/18 sections, partitioned by category`, `16 !== 15`) matches `origin/main`.
+### `<CaseLogDetails` grep in `ProfessorPortal.tsx` (only 2 occurrences exist; both receive `customFieldDefinitions={caseLogFields}`)
+```
+artifacts/mockup-sandbox/src/components/ProfessorPortal.tsx:602:                  <CaseLogDetails caseLog={currentItem as CaseLogDetailRecord} hideUhid={hideUhid} medicalSummaryCaseFields={Boolean(config?.enabledFeatures?.medicalSummaryCaseFields)} microbiologyCaseFields={microbiologyCaseFields} customFieldDefinitions={caseLogFields} />
+artifacts/mockup-sandbox/src/components/ProfessorPortal.tsx:1150:                              <CaseLogDetails caseLog={log} hideUhid={hideUhid} showReview medicalSummaryCaseFields={Boolean(config?.enabledFeatures?.medicalSummaryCaseFields)} microbiologyCaseFields={microbiologyCaseFields} customFieldDefinitions={caseLogFields} />
+```
+
+### §11 verbatim evidence (`tests/case-log-custom-fields.test.ts`)
+- Note on `PATCH /api/admin/department/case-log-fields`: `404` is **not applicable** because the route has no row id — the department always comes from `req.user`. Instead, `case-fields HOD with no config row` proves that a HOD with no `department_configs` row gets `200` and creates the row.
+- Note on `POST /api/students/:studentId/case-logs`: `studentAccess` collapses nonexistent `studentId` to `403` by design (`enumeration-collapse.test.ts`).
+```json
+{"case":"case-fields unauthenticated","request":{"method":"PATCH","path":"/api/admin/department/case-log-fields","body":{"fields":[{"key":"ward","label":"Ward","type":"select","required":true,"options":["PICU","NICU","General"]},{"key":"icu_days","label":"ICU days","type":"number","required":true,"min":0,"max":365,"requiredWhen":{"field":"ward","value":"PICU"}},{"key":"followup_date","label":"Follow-up date","type":"date"},{"key":"short_note","label":"Short note","type":"text","maxLength":100},{"key":"summary","label":"Summary","type":"textarea"}]}},"response":{"status":401,"body":{"message":"No token found in cookies or authorization header"}}}
+{"case":"case-fields student","request":{"method":"PATCH","path":"/api/admin/department/case-log-fields","body":{"fields":[{"key":"ward","label":"Ward","type":"select","required":true,"options":["PICU","NICU","General"]},{"key":"icu_days","label":"ICU days","type":"number","required":true,"min":0,"max":365,"requiredWhen":{"field":"ward","value":"PICU"}},{"key":"followup_date","label":"Follow-up date","type":"date"},{"key":"short_note","label":"Short note","type":"text","maxLength":100},{"key":"summary","label":"Summary","type":"textarea"}]}},"response":{"status":403,"body":{"message":"Forbidden: Insufficient role permissions"}}}
+{"case":"case-fields professor","request":{"method":"PATCH","path":"/api/admin/department/case-log-fields","body":{"fields":[{"key":"ward","label":"Ward","type":"select","required":true,"options":["PICU","NICU","General"]},{"key":"icu_days","label":"ICU days","type":"number","required":true,"min":0,"max":365,"requiredWhen":{"field":"ward","value":"PICU"}},{"key":"followup_date","label":"Follow-up date","type":"date"},{"key":"short_note","label":"Short note","type":"text","maxLength":100},{"key":"summary","label":"Summary","type":"textarea"}]}},"response":{"status":403,"body":{"message":"Forbidden: Insufficient role permissions"}}}
+{"case":"case-fields mirror HOD","request":{"method":"PATCH","path":"/api/admin/department/case-log-fields","body":{"fields":[{"key":"ward","label":"Ward","type":"select","required":true,"options":["PICU","NICU","General"]},{"key":"icu_days","label":"ICU days","type":"number","required":true,"min":0,"max":365,"requiredWhen":{"field":"ward","value":"PICU"}},{"key":"followup_date","label":"Follow-up date","type":"date"},{"key":"short_note","label":"Short note","type":"text","maxLength":100},{"key":"summary","label":"Summary","type":"textarea"}]}},"response":{"status":403,"body":{"message":"Test departments cannot modify mirrored settings"}}}
+{"case":"case-fields HOD0","request":{"method":"PATCH","path":"/api/admin/department/case-log-fields","body":{"fields":[{"key":"ward","label":"Ward","type":"select","required":true,"options":["PICU","NICU","General"]},{"key":"icu_days","label":"ICU days","type":"number","required":true,"min":0,"max":365,"requiredWhen":{"field":"ward","value":"PICU"}},{"key":"followup_date","label":"Follow-up date","type":"date"},{"key":"short_note","label":"Short note","type":"text","maxLength":100},{"key":"summary","label":"Summary","type":"textarea"}]}},"response":{"status":200,"body":{"readOnlyConfig":false,"fields":[{"key":"ward","label":"Ward","type":"select","required":true,"options":["PICU","NICU","General"]},{"key":"icu_days","label":"ICU days","type":"number","required":true,"min":0,"max":365,"requiredWhen":{"field":"ward","value":"PICU"}},{"key":"followup_date","label":"Follow-up date","type":"date"},{"key":"short_note","label":"Short note","type":"text","maxLength":100},{"key":"summary","label":"Summary","type":"textarea"}]}}}
+{"case":"case-fields HOD with no config row","request":{"method":"PATCH","path":"/api/admin/department/case-log-fields","body":{"fields":[{"key":"short_note","label":"Short note","type":"text","maxLength":100}]}},"response":{"status":200,"body":{"readOnlyConfig":false,"fields":[{"key":"short_note","label":"Short note","type":"text","maxLength":100}]}}}
+{"case":"case-fields invalid definition","request":{"method":"PATCH","path":"/api/admin/department/case-log-fields","body":{"fields":[{"key":"bad_select","label":"Bad Select","type":"select"}]}},"response":{"status":400,"body":{"message":"fields.0: Dropdown fields need choices"}}}
+{"case":"case POST unauthenticated","request":{"method":"POST","path":"/api/students/1/case-logs","body":{"supervisorId":2,"date":"2026-10-20","patientAge":"5y","patientGender":"female","diagnosisFinal":"Acute bronchiolitis","customFields":{"ward":"PICU","icu_days":"3","followup_date":"2026-11-01","short_note":"Stable"}}},"response":{"status":401,"body":{"message":"No token found in cookies or authorization header"}}}
+{"case":"case POST wrong owner (student20 on student0)","request":{"method":"POST","path":"/api/students/1/case-logs","body":{"supervisorId":2,"date":"2026-10-20","patientAge":"5y","patientGender":"female","diagnosisFinal":"Acute bronchiolitis","customFields":{"ward":"PICU","icu_days":"3","followup_date":"2026-11-01","short_note":"Stable"}}},"response":{"status":403,"body":{"message":"Student is outside your access scope"}}}
+{"case":"case POST nonexistent studentId (collapsed 403 by studentAccess)","request":{"method":"POST","path":"/api/students/99999999/case-logs","body":{"supervisorId":2,"date":"2026-10-20","patientAge":"5y","patientGender":"female","diagnosisFinal":"Acute bronchiolitis","customFields":{"ward":"PICU","icu_days":"3","followup_date":"2026-11-01","short_note":"Stable"}}},"response":{"status":403,"body":{"message":"Student is outside your access scope"}}}
+{"case":"case POST owner","request":{"method":"POST","path":"/api/students/1/case-logs","body":{"supervisorId":2,"date":"2026-10-20","patientAge":"5y","patientGender":"female","diagnosisFinal":"Acute bronchiolitis","customFields":{"ward":"PICU","icu_days":"3","followup_date":"2026-11-01","short_note":"Stable"}}},"response":{"status":201,"body":{"id":2,"studentId":1,"supervisorId":2,"date":"2026-10-20","attemptNumber":1,"patientUhid":null,"patientAge":"5y","patientGender":"female","chiefComplaints":null,"diagnosisProvisional":null,"diagnosisFinal":"Acute bronchiolitis","history":null,"examination":null,"investigations":null,"differentialDiagnosis":null,"managementPlan":null,"outcome":null,"learningPoints":null,"category":null,"customFields":{"ward":"PICU","icu_days":"3","short_note":"Stable","followup_date":"2026-11-01"},"status":"pending","facultyRemarks":null,"facultyGrade":null,"reviewedBy":null,"reviewedAt":null,"deletedAt":null,"createdAt":"2026-11-25T12:24:59.460Z"}}}
+{"case":"case PATCH unauthenticated","request":{"method":"PATCH","path":"/api/students/1/case-logs/2","body":{"diagnosisFinal":"Updated"}},"response":{"status":401,"body":{"message":"No token found in cookies or authorization header"}}}
+{"case":"case PATCH wrong owner","request":{"method":"PATCH","path":"/api/students/1/case-logs/2","body":{"diagnosisFinal":"Updated"}},"response":{"status":403,"body":{"message":"Student is outside your access scope"}}}
+{"case":"case PATCH nonexistent id","request":{"method":"PATCH","path":"/api/students/1/case-logs/99999999","body":{"diagnosisFinal":"Updated"}},"response":{"status":404,"body":{"message":"Log not found"}}}
+{"case":"case PATCH owner","request":{"method":"PATCH","path":"/api/students/1/case-logs/2","body":{"customFields":{"short_note":null}}},"response":{"status":200,"body":{"id":2,"studentId":1,"supervisorId":2,"date":"2026-10-20","attemptNumber":1,"patientUhid":null,"patientAge":"5y","patientGender":"female","chiefComplaints":null,"diagnosisProvisional":null,"diagnosisFinal":"Acute bronchiolitis","history":null,"examination":null,"investigations":null,"differentialDiagnosis":null,"managementPlan":null,"outcome":null,"learningPoints":null,"category":null,"customFields":{"ward":"PICU","icu_days":"3","followup_date":"2026-11-01"},"status":"pending","facultyRemarks":null,"facultyGrade":null,"reviewedBy":null,"reviewedAt":null,"deletedAt":null,"createdAt":"2026-11-25T12:24:59.460Z"}}}
+```
 
 ### Full `pnpm test` (`artifacts/api-server`, `DATABASE_URL` unset)
-- `ℹ tests 477 / ℹ pass 459 / ℹ fail 18` — exact 18 pre-existing baseline failures on `origin/main` (0 new failures):
+- `ℹ tests 480 / ℹ pass 462 / ℹ fail 18` (all 3 migration tests including `0036` and all 4 `case-log-custom-fields` tests pass; 0 new failures).
+- Exact sorted list of 18 pre-existing baseline failures:
 ```
 DELETE clinical-works: 401 / 403 / 200 / 404, and a deleted row cannot be edited
 HOD adds sub-types under a category; bad parents, wrong kinds and in-use categories are refused
@@ -82,5 +121,5 @@ the supplied SQL creates Surgery, its config and exactly the four requested role
 validation covers participation, year, date ranges, attendance, appraisal ratings and discussion
 ```
 
-### Browser verification
+### Screenshots / Browser verification
 - Not run in this headless pass (recorded as unverified here).

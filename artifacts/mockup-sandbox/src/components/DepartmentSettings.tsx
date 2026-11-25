@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LogbookSectionSettings } from "./LogbookSectionSettings";
 import { NavOrderSettings } from "./NavOrderSettings";
+import { CaseLogFieldsCard } from "./CaseLogFieldsCard";
 import {
   DepartmentProcedureFieldsCard,
   DynamicProcedureFieldChecklist,
@@ -580,6 +581,12 @@ export function DepartmentSettings() {
               groupsError={groupsError}
               fetchGroups={fetchGroups}
             />
+          )}
+
+          {activeSection.kind === "case_category" && (
+            <div className="mb-4">
+              <CaseLogFieldsCard />
+            </div>
           )}
 
           {activeSection.kind === "clinical_work_category" && (
