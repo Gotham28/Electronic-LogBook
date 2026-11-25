@@ -28,8 +28,6 @@ export type AcademicLogbookSection = {
 export type AcademicLogbookProfile = {
   id: string;
   title: string;
-  departmentNames: string[];
-  departmentCodes: string[];
   sections: AcademicLogbookSection[];
   navigationCategories?: AcademicLogbookCategory[];
   legacySections?: AcademicLogbookSection[];

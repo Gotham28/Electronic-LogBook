@@ -35,8 +35,6 @@ function section(value: string, years = allYears, options: Partial<AcademicLogbo
 export const physiologyLogbook: AcademicLogbookProfile = {
   id: "physiology",
   title: "Physiology logbook",
-  departmentNames: ["Physiology"],
-  departmentCodes: ["PSI", "PHYS", "PHYSIO", "PHY", "PHYSIOLOGY"],
   navigationCategories: [
     { id: "teaching-learning", title: "Teaching & Learning", icon: "teaching", sectionValues: [
       "Lectures attended in the department", "Lectures attended in allied departments",

@@ -116,10 +116,9 @@ export function CaseLogsPage() {
   const [professors, setProfessors] = React.useState<any[]>([]);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
-  const { caseCategories, config: deptConfig, department } = useDepartment();
+  const { caseCategories, config: deptConfig } = useDepartment();
   const medicalSummaryCaseFields = Boolean(deptConfig?.enabledFeatures?.medicalSummaryCaseFields);
-  const isMicroDept = department?.code?.toLowerCase() === "microbiology" || department?.name?.toLowerCase().includes("microbiology");
-  const microbiologyCaseFields = Boolean(deptConfig?.enabledFeatures?.microbiologyCaseFields || isMicroDept);
+  const microbiologyCaseFields = Boolean(deptConfig?.enabledFeatures?.microbiologyCaseFields);
 
   const totalRequired = React.useMemo(() => 
     caseCategories?.reduce((acc: number, c: any) => acc + c.required, 0) || 50,

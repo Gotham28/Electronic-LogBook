@@ -44,38 +44,13 @@ export function DepartmentProvider({ departmentId, children }: { departmentId: n
     if (!departmentId) { setError("Your account has no department. Contact the database administrator."); return false; }
     try {
       const result = await apiGet<DepartmentData>(`/api/departments/${departmentId}/catalog`);
-      const isMicro = result.department?.code?.toLowerCase() === "microbiology" || result.department?.name?.toLowerCase().includes("microbiology");
-      const enabledFeatures = { ...(result.config?.enabledFeatures || {}) };
-      if (isMicro) {
-        if (enabledFeatures.microbiologyCaseFields === undefined) enabledFeatures.microbiologyCaseFields = true;
-        if (enabledFeatures.freeTextProcedures === undefined) enabledFeatures.freeTextProcedures = true;
-        if (enabledFeatures.hideProcedureAge === undefined) enabledFeatures.hideProcedureAge = true;
-        if (enabledFeatures.procedureExperience === undefined) enabledFeatures.procedureExperience = false;
-        if (enabledFeatures.useThesisAndMandatoryCertificationsLabel === undefined) enabledFeatures.useThesisAndMandatoryCertificationsLabel = true;
-        if (enabledFeatures.attendedConferences === undefined) enabledFeatures.attendedConferences = true;
-        if (enabledFeatures.hideLeaveRecords === undefined) enabledFeatures.hideLeaveRecords = true;
-        if (enabledFeatures.dailyAttendance === undefined) enabledFeatures.dailyAttendance = true;
-        if (enabledFeatures.yearlyAttendance === undefined) enabledFeatures.yearlyAttendance = true;
-        if (enabledFeatures.conferenceLevels === undefined) enabledFeatures.conferenceLevels = true;
-        if (enabledFeatures.freeTextPostingUnit === undefined) enabledFeatures.freeTextPostingUnit = true;
-        if (enabledFeatures.conferenceDateRange === undefined) enabledFeatures.conferenceDateRange = true;
-        if (enabledFeatures.hideHodQuarterlyAppraisal === undefined) enabledFeatures.hideHodQuarterlyAppraisal = true;
-      }
+      // The stored configuration is the only source of behaviour. Nothing here reads the department's name or code.
       const resolvedConfig: DepartmentConfig | null = result.config ? {
         ...result.config,
-        enabledFeatures,
-      } : isMicro ? {
-        requiredCases: null,
-        requiredProcedures: null,
-        requiredAcademic: null,
-        enabledFeatures,
+        enabledFeatures: { ...(result.config.enabledFeatures || {}) },
       } : null;
 
-      const academics = isMicro ? [
-        { id: 1, name: "Journal club", value: "journal_club", required: 0, period: "total" as const },
-        { id: 2, name: "UG teaching", value: "ug_teaching", required: 0, period: "total" as const },
-        { id: 3, name: "Seminars", value: "seminars", required: 0, period: "total" as const },
-      ] : ((result.academics && result.academics.length > 0) ? result.academics : []);
+      const academics = (result.academics && result.academics.length > 0) ? result.academics : [];
 
       setData({
         ...result,
@@ -85,10 +60,7 @@ export function DepartmentProvider({ departmentId, children }: { departmentId: n
         caseCategories: result.caseCategories || [],
         competencyLevels: result.competencyLevels || [],
         leaveTypes: result.leaveTypes || [],
-        conferenceLevels: isMicro ? [
-          { id: 1, name: "National", value: "national", required: 0, period: "total" as const },
-          { id: 2, name: "State", value: "state", required: 0, period: "total" as const },
-        ] : (result.conferenceLevels || []),
+        conferenceLevels: result.conferenceLevels || [],
         clinicalWorkCategories: result.clinicalWorkCategories || [],
         clinicalWorkSubtypes: result.clinicalWorkSubtypes || [],
         postingSchedule: result.postingSchedule || [],

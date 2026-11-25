@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, timestamp, jsonb, text } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { departmentsTable } from "./users.js";
 
@@ -19,6 +19,8 @@ export const departmentConfigsTable = pgTable("department_configs", {
   requiredAcademic: integer("required_academic"),
   enabledFeatures: jsonb("enabled_features").$type<Record<string, boolean>>().notNull().default({ procedureExperience: true }),
   procedureLogFields: jsonb("procedure_log_fields").$type<StoredProcedureFieldDefinition[] | null>(),
+  // Names a declarative academic logbook profile (today only "physiology"); null means none.
+  academicLogbookProfile: text("academic_logbook_profile"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

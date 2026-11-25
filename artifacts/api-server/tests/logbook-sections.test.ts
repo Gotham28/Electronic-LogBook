@@ -2,7 +2,7 @@ import { before, after, test } from "node:test";
 import assert from "node:assert/strict";
 import { eq } from "drizzle-orm";
 import { setup, request, accounts, departmentIds } from "./support.js";
-import { db, engine, departmentsTable, academicLogsTable } from "./database.js";
+import { db, engine, departmentConfigsTable, departmentsTable, academicLogsTable } from "./database.js";
 import { academicRecordText, readAcademicRecord, writeAcademicRecord, logbookSectionSettingsSchema,
   type LogbookSectionSettings } from "@workspace/api-zod";
 import { categorySections, filterAcademicLogs } from "../../mockup-sandbox/src/lib/academic-navigation.js";
@@ -29,6 +29,7 @@ const entry = (values = details) => ({ activityType: value, topic: "Synthetic ac
 before(async () => {
   runtime = await setup();
   await db.update(departmentsTable).set({ name: "Physiology", code: "PSI" }).where(eq(departmentsTable.id, departmentIds[2]));
+  await db.update(departmentConfigsTable).set({ academicLogbookProfile: "physiology" }).where(eq(departmentConfigsTable.departmentId, departmentIds[2]));
 });
 after(async () => {
   if (runtime) await new Promise<void>((resolve) => runtime.server.close(() => resolve()));
