@@ -31,3 +31,4 @@ export * from "./department_label_overrides.js";
 export * from "./support_tickets.js";
 export * from "./assistant_usage_events.js";
 export * from "./assistant_department_weekly_digests.js";
+export * from "./psychiatry.js";

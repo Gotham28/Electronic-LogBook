@@ -8,3 +8,6 @@ export * from "./logbook-section-settings.js";
 export * from "./voice-log.js";
 export * from "./department-labels.js";
 export * from "./log-custom-fields.js";
+export * from "./psychiatry-short-cases.js";
+export * from "./psychiatry-case-id.js";
+export * from "./psychiatry-workspace.js";

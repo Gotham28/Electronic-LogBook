@@ -1,4 +1,5 @@
 import { and, eq, or, inArray, sql } from "drizzle-orm";
+import { psychiatryEntriesTable } from "@workspace/db";
 import { usersTable, studentsTable, caseLogsTable, procedureLogsTable, academicLogsTable, paymentsTable, leaveRecordsTable, leaveApplicationsTable, assessmentsTable, appraisalsTable, assignmentRecipientsTable, attendanceLogsTable, certificationsTable, postingsTable, thesisMilestonesTable, researchTable, auditTable, assignmentsTable, assignmentTypesTable, clinicalWorkLogsTable, conferencesTable, awardsTable, supportTicketsTable } from "@workspace/db";
 
 // Permanently deletes a student or professor and every row tied to them, inside
@@ -31,6 +32,9 @@ export async function hardDeleteUserCascade(tx: any, targetUserId: number, role:
 
       const _clinical = await tx.delete(clinicalWorkLogsTable).where(eq(clinicalWorkLogsTable.studentId, studentId)).returning({ id: clinicalWorkLogsTable.id });
       deletedCounts.clinicalWorkLogs = _clinical.length;
+
+      const psychiatry = await tx.delete(psychiatryEntriesTable).where(eq(psychiatryEntriesTable.studentId, studentId)).returning({ id: psychiatryEntriesTable.id });
+      if (psychiatry.length) deletedCounts.psychiatryEntries = psychiatry.length;
 
       const _acad = await tx.delete(academicLogsTable).where(eq(academicLogsTable.studentId, studentId)).returning({ id: academicLogsTable.id });
       deletedCounts.academicLogs = _acad.length;
@@ -84,6 +88,10 @@ export async function hardDeleteUserCascade(tx: any, targetUserId: number, role:
 
     const _clinical = await tx.delete(clinicalWorkLogsTable).where(or(eq(clinicalWorkLogsTable.supervisorId, targetUserId), eq(clinicalWorkLogsTable.reviewedBy, targetUserId))).returning({ id: clinicalWorkLogsTable.id });
     deletedCounts.clinicalWorkLogs = _clinical.length;
+
+    const psychiatry = await tx.delete(psychiatryEntriesTable).where(or(eq(psychiatryEntriesTable.reviewerId, targetUserId),
+      eq(psychiatryEntriesTable.reviewedBy, targetUserId))).returning({ id: psychiatryEntriesTable.id });
+    if (psychiatry.length) deletedCounts.psychiatryEntries = psychiatry.length;
 
     const _acad = await tx.delete(academicLogsTable).where(or(eq(academicLogsTable.supervisorId, targetUserId), eq(academicLogsTable.reviewedBy, targetUserId))).returning({ id: academicLogsTable.id });
     deletedCounts.academicLogs = _acad.length;
