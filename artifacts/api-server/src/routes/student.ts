@@ -21,6 +21,10 @@ import {
   isBuiltInProcedureField,
   normalizeCustomProcedureFieldValues,
   normalizeLogCustomFieldValues,
+  isPsychiatryShortCase,
+  psychiatryShortCaseSchema,
+  psychiatryShortCaseValues,
+  SHORT_CASE_CATEGORY,
   resolveProcedureFieldDefinitions,
   validateDynamicProcedureLogFields,
   validateLogCustomFieldValues,
@@ -1445,7 +1449,7 @@ router.post("/:studentId/case-logs", validate(z.object({ supervisorId: idSchema,
   patientUhid: optionalText, chiefComplaints: optionalText, diagnosisProvisional: optionalText, history: optionalText,
   examination: optionalText, investigations: optionalText, differentialDiagnosis: optionalText, managementPlan: optionalText,
   outcome: optionalText, learningPoints: optionalText, category: optionalText,
-  customFields: caseCustomFieldsInputSchema }).strict()), async (req, res) => {
+  customFields: caseCustomFieldsInputSchema, psychiatryShortCase: psychiatryShortCaseSchema.optional() }).strict()), async (req, res) => {
   try {
     const studentId = parseInt(String(req.params.studentId), 10);
     const { supervisorId, date, patientAge, patientGender, diagnosisFinal } = req.body;
@@ -1455,10 +1459,21 @@ router.post("/:studentId/case-logs", validate(z.object({ supervisorId: idSchema,
       return;
     }
 
-    const { caseLogFields } = await getDepartmentFeatures(req.user!.departmentId!);
+    const { caseLogFields, features } = await getDepartmentFeatures(req.user!.departmentId!);
+    const isShortCase = Boolean(req.body.psychiatryShortCase);
+    if (isShortCase && features.psychiatryWorkspace !== true) {
+      res.status(403).json({ message: "Short cases are unavailable for your department" }); return;
+    }
+    if (isShortCase && req.body.category !== SHORT_CASE_CATEGORY) {
+      res.status(400).json({ message: "Short-case details and category must be submitted together" }); return;
+    }
+    if (isShortCase && (!req.body.patientUhid || !/^\d+$/.test(patientAge))) {
+      res.status(400).json({ message: "Short cases require an ID number and a whole-number age" }); return;
+    }
+    const shortCase = isShortCase ? psychiatryShortCaseValues(req.body.psychiatryShortCase) : undefined;
     const defs = caseLogFields ?? [];
     const rawCustomFields = req.body.customFields ?? {};
-    const customFieldError = validateLogCustomFieldValues(defs, rawCustomFields);
+    const customFieldError = !shortCase && validateLogCustomFieldValues(defs, rawCustomFields);
     if (customFieldError) {
       res.status(400).json({ message: customFieldError });
       return;
@@ -1467,7 +1482,7 @@ router.post("/:studentId/case-logs", validate(z.object({ supervisorId: idSchema,
     
     const [inserted] = await db.insert(caseLogsTable).values({
       studentId, supervisorId: supervisorIdNum, date, patientAge, patientGender, 
-      diagnosisFinal,
+      diagnosisFinal: shortCase?.diagnosisFinal ?? diagnosisFinal,
       patientUhid: req.body.patientUhid,
       chiefComplaints: req.body.chiefComplaints,
       diagnosisProvisional: req.body.diagnosisProvisional,
@@ -1476,7 +1491,7 @@ router.post("/:studentId/case-logs", validate(z.object({ supervisorId: idSchema,
       examination: req.body.examination, investigations: req.body.investigations, 
       differentialDiagnosis: req.body.differentialDiagnosis, managementPlan: req.body.managementPlan, 
       outcome: req.body.outcome, learningPoints: req.body.learningPoints,
-      customFields: normalizedCustomFields,
+      customFields: shortCase?.customFields ?? normalizedCustomFields,
       status: "pending"
     }).returning();
     res.status(201).json(inserted);
@@ -1950,12 +1965,14 @@ router.patch("/:studentId/case-logs/:logId", requireAuth, validate(z.object({ su
   patientUhid: optionalText, chiefComplaints: optionalText, diagnosisProvisional: optionalText, history: optionalText,
   examination: optionalText, investigations: optionalText, differentialDiagnosis: optionalText, managementPlan: optionalText,
   outcome: optionalText, learningPoints: optionalText, category: optionalText,
-  customFields: caseCustomFieldsInputSchema }).strict().partial()), async (req, res) => {
+  customFields: caseCustomFieldsInputSchema, psychiatryShortCase: psychiatryShortCaseSchema }).strict().partial()), async (req, res) => {
   try {
     const studentId = parseInt(String(req.params.studentId), 10);
     const logId = parseInt(String(req.params.logId), 10);
     const guard = await studentEditGuard(req, res, caseLogsTable, logId, studentId);
     if (guard.error) { res.status(guard.error).json({ message: guard.message }); return; }
+    const currentLog = guard.log;
+    if (!currentLog) { res.status(404).json({ message: "Log not found" }); return; }
     
     if (req.body.supervisorId) {
       if (!(await validateSupervisor(parseInt(req.body.supervisorId, 10), guard.caller.departmentId!))) {
@@ -1964,9 +1981,23 @@ router.patch("/:studentId/case-logs/:logId", requireAuth, validate(z.object({ su
       req.body.supervisorId = parseInt(req.body.supervisorId, 10);
     }
 
-    const { caseLogFields } = await getDepartmentFeatures(guard.caller.departmentId!);
+    const { caseLogFields, features } = await getDepartmentFeatures(guard.caller.departmentId!);
+    const { psychiatryShortCase, ...changes } = req.body;
+    const isShortCase = isPsychiatryShortCase(currentLog);
+    const nextCategory = changes.category === undefined ? currentLog.category : changes.category;
+    if ((isShortCase && nextCategory !== SHORT_CASE_CATEGORY) || isShortCase !== Boolean(psychiatryShortCase)) {
+      res.status(400).json({ message: "Use the matching case form to update this entry" }); return;
+    }
+    if (isShortCase && features.psychiatryWorkspace !== true) {
+      res.status(403).json({ message: "Short cases are unavailable for your department" }); return;
+    }
+    if (isShortCase && (!(changes.patientUhid === undefined ? currentLog.patientUhid : changes.patientUhid) ||
+      !/^\d+$/.test(changes.patientAge ?? currentLog.patientAge))) {
+      res.status(400).json({ message: "Short cases require an ID number and a whole-number age" }); return;
+    }
+    const shortCase = isShortCase ? psychiatryShortCaseValues(psychiatryShortCase) : undefined;
     const defs = caseLogFields ?? [];
-    const previousCustomFields = (guard.log?.customFields ?? {}) as Record<string, string>;
+    const previousCustomFields = (currentLog.customFields ?? {}) as Record<string, string>;
     const mergedCustomFields: Record<string, string | null | undefined> = { ...previousCustomFields };
     if (req.body.customFields) {
       for (const [k, v] of Object.entries(req.body.customFields as Record<string, string | null>)) {
@@ -1977,16 +2008,18 @@ router.patch("/:studentId/case-logs/:logId", requireAuth, validate(z.object({ su
         }
       }
     }
-    const customFieldError = validateLogCustomFieldValues(defs, mergedCustomFields, previousCustomFields);
+    const customFieldError = !shortCase && validateLogCustomFieldValues(defs, mergedCustomFields, previousCustomFields);
     if (customFieldError) {
       res.status(400).json({ message: customFieldError });
       return;
     }
     const normalizedCustomFields = normalizeLogCustomFieldValues(defs, mergedCustomFields, previousCustomFields);
 
-    const updateBody = { ...req.body, customFields: normalizedCustomFields, status: "pending", facultyRemarks: null };
+    const updateBody = { ...changes, customFields: normalizedCustomFields, ...shortCase, status: "pending", facultyRemarks: null };
     const [updated] = await db.update(caseLogsTable).set(updateBody)
-      .where(and(eq(caseLogsTable.id, logId), eq(caseLogsTable.studentId, studentId), isNull(caseLogsTable.deletedAt))).returning();
+      .where(and(eq(caseLogsTable.id, logId), eq(caseLogsTable.studentId, studentId), isNull(caseLogsTable.deletedAt),
+        isShortCase ? eq(caseLogsTable.status, currentLog.status) : undefined)).returning();
+    if (!updated && isShortCase) { res.status(409).json({ message: "The short case changed. Reload it before editing." }); return; }
     if (!updated) { res.status(400).json({ message: "Log not found" }); return; }
     res.json(updated);
   } catch { res.status(500).json({ message: "Internal server error" }); }

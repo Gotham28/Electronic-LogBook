@@ -25,6 +25,7 @@ export const DEPARTMENT_SETTING_TIERS = {
   hideCaseLogs: "hod_only",
   hideProcedureLogs: "hod_only",
   clinicalWorks: "hod_only",
+  psychiatryWorkspace: "hod_only",
   dailyAttendance: "hod_only",
   yearlyAttendance: "hod_only",
   hideLeaveRecords: "hod_only",
