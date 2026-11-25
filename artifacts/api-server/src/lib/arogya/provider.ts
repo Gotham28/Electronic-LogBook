@@ -304,11 +304,56 @@ function parseFinal(message: any) {
   return { reply, steps };
 }
 
-function containsUnverifiedNumber(text: string, workflows: readonly RetrievedWorkflow[]): boolean {
+function containsUnverifiedNumber(
+  text: string,
+  workflows: readonly RetrievedWorkflow[],
+  facts: readonly AssistantFact[] = [],
+): boolean {
   const allowed = new Set<string>();
   const knowledge = workflows.flatMap((entry) => [...entry.steps, ...entry.rules, ...entry.blockers]).join(" ");
   for (const value of knowledge.match(/\b\d+\b/g) ?? []) allowed.add(value);
+  for (const f of facts) {
+    for (const value of `${f.label} ${f.value}`.match(/\b\d+\b/g) ?? []) allowed.add(value);
+  }
   return (text.match(/\b\d+\b/g) ?? []).some((value) => !allowed.has(value));
+}
+
+function progressSummaryAnswer(
+  evidence: ToolEvidence,
+  sources: Array<{ id: string; title: string }>,
+  actions: ArogyaAction[],
+  signature: string,
+): AssistantResult {
+  const data = evidence.data as Awaited<ReturnType<typeof getProgressSummary>>;
+  const completionText = data.completionPercent !== null
+    ? `Overall target completion: ${data.completionPercent}%.`
+    : "No department completion targets are currently tracked.";
+
+  const categoryLines = (data.categories || []).map((c: any) => {
+    if (c.target === null || c.target <= 0) {
+      return `${c.label}: ${c.verified} verified (${c.pending} pending; target not configured).`;
+    }
+    const deficit = Math.max(0, c.target - c.verified);
+    if (deficit === 0) {
+      return `${c.label}: ${c.verified}/${c.target} verified (target achieved!).`;
+    }
+    return `${c.label}: ${c.verified}/${c.target} verified (${deficit} remaining to meet target${c.pending > 0 ? `, ${c.pending} pending review` : ""}).`;
+  });
+
+  const reply = `Progress report: ${completionText} ${categoryLines.join(" ")}`;
+
+  return {
+    reply,
+    kind: "diagnostic",
+    steps: [],
+    sources,
+    facts: evidence.displayFacts ?? evidence.facts,
+    grounding: { scope: "resident_logs", logCount: (data.categories || []).reduce((s: number, c: any) => s + c.verified + c.pending + c.rejected, 0) },
+    actions,
+    checkedAt: evidence.checkedAt,
+    knowledgeVersion,
+    capabilitySignature: signature,
+  };
 }
 
 function departmentSummaryAnswer(
@@ -477,6 +522,9 @@ export async function answerArogya(input: ArogyaTurnInput, accountNames: readonl
     if (diagnosticName === "get_department_summary") {
       return departmentSummaryAnswer(evidence, sources, actions, signature);
     }
+    if (diagnosticName === "get_progress_summary" && /\b(?:progress|target|deficit|summary|what.*progress|how.*doing|completion)\b/i.test(safeQuestion)) {
+      return progressSummaryAnswer(evidence, sources, actions, signature);
+    }
   }
   let requestCount = 0;
 
@@ -487,7 +535,7 @@ export async function answerArogya(input: ArogyaTurnInput, accountNames: readonl
     if (!calls.length) {
       const parsed = parseFinal(message);
       if (!parsed) throw new ArogyaProviderError("AROGYA_INVALID_OUTPUT");
-      if (containsUnverifiedNumber(`${parsed.reply} ${parsed.steps.join(" ")}`, selected)) throw new ArogyaProviderError("AROGYA_INVALID_OUTPUT");
+      if (containsUnverifiedNumber(`${parsed.reply} ${parsed.steps.join(" ")}`, selected, displayFacts)) throw new ArogyaProviderError("AROGYA_INVALID_OUTPUT");
       return {
         ...parsed,
         kind: usedDiagnosticTool ? "diagnostic" : "help",
@@ -523,6 +571,9 @@ export async function answerArogya(input: ArogyaTurnInput, accountNames: readonl
       evidence = await executeTool(name, input);
     }
     if (name === "get_department_summary") return departmentSummaryAnswer(evidence, sources, actions, signature);
+    if (name === "get_progress_summary" && /\b(?:progress|target|deficit|summary|what.*progress|how.*doing|completion)\b/i.test(safeQuestion)) {
+      return progressSummaryAnswer(evidence, sources, actions, signature);
+    }
     toolFacts.push(...evidence.facts);
     displayFacts.push(...(evidence.displayFacts ?? evidence.facts));
     checkedAt = evidence.checkedAt;
