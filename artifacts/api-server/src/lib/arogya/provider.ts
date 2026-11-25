@@ -4,6 +4,10 @@ import { containsSensitiveClinicalInput, scrubAccountNames } from "./input-priva
 import { checkAppraisalPeriod, getDepartmentSummary, getLogState, getProgressSummary, getReviewSummary, type ArogyaLogType } from "./facts.js";
 import type { ArogyaActor } from "./policy.js";
 import { reasoningEffortParam } from "./model-params.js";
+import { DEPARTMENT_LABEL_KEYS } from "@workspace/api-zod";
+import { listDepartmentLabels } from "../department-labels.js";
+import { ALL_SETTING_KEYS, MOCHI_SETTING_KEYS, classifyAction, hodEditsEnabled, settingTitle, type ProposalRequest } from "./department-actions.js";
+import type { MochiProposal, MochiRefusal } from "./department-action-schemas.js";
 
 export interface ArogyaTurnContext {
   workflowId?: string;
@@ -34,6 +38,9 @@ export interface AssistantResult {
   facts: AssistantFact[];
   grounding?: AssistantGrounding;
   actions: ArogyaAction[];
+  // Task 4: a preview the HOD may confirm, or a refusal. Built by the server from the allowlist, never by the model.
+  proposal?: MochiProposal;
+  refusal?: MochiRefusal;
   clarification?: { type: "workflow" | "student" | "appraisal_period" | "log"; choices?: Array<{ id: string; label: string }> };
   checkedAt?: string;
   knowledgeVersion: string;
@@ -66,6 +73,70 @@ const tools = [
   { type: "function", function: { name: "get_review_summary", description: "Count pending records available in the signed-in professor's assignment scope or HOD queue.", strict: true, parameters: NO_ARGS_SCHEMA } },
   { type: "function", function: { name: "get_department_summary", description: "Read approved-resident counts, per-resident configured-target classification and gaps, HOD queue counts and enabled workflows. Resident names and clinical text are excluded from model evidence.", strict: true, parameters: NO_ARGS_SCHEMA } },
 ];
+
+// Task 4: tools that let Mochi PROPOSE one department edit for a HOD. They never write: the server turns the
+// call into a preview (or a refusal) and only the HOD's Confirm, a separate request, applies anything. They
+// exist only for a HOD while AROGYA_HOD_EDITS_ENABLED is exactly "true". Every setting key is in the enum, not
+// just the Mochi-changeable ones, so a HOD-only request is refused by the server and not left to the model.
+const EDIT_TOOL_NAMES = ["propose_label_change", "propose_label_reset", "propose_setting_change", "report_unsupported_change"] as const;
+type EditToolName = typeof EDIT_TOOL_NAMES[number];
+const isEditTool = (name: unknown): name is EditToolName => (EDIT_TOOL_NAMES as readonly unknown[]).includes(name);
+
+// Explicit edit phrasing only. Everyday words (show, use, set, name, change, hide) are not enough on their own,
+// so an ordinary HOD question never pays for the edit tools. A false positive only offers the tools (the model
+// is told not to call them for questions); a false negative means the question is answered as before.
+const EXPLICIT_EDIT = [
+  /\b(?:rename|re-?label|re-?word)\b/i,
+  /\b(?:turn|switch)\b[^.?!]{0,60}\b(?:on|off)\b/i,
+  /\bchange\s+(?:the\s+|my\s+|our\s+)?(?:wording|label|labels|name|text)\b/i,
+  /\bcall\s+(?:the|this|that|it|them|our|my)\b/i,
+  /\binstead of\b/i,
+  /\b(?:reset|revert|restore|put)\b[^.?!]{0,40}\b(?:wording|label|default)\b/i,
+];
+// Asking Mochi to add or remove structure is not allowed, but it should get the "raise a ticket" answer
+// instead of a canned "couldn't match". How-to questions ("how do I add a case log") are left alone.
+const STRUCTURAL_EDIT = /\b(?:add|remove|delete|hide|reorder)\b[^.?!]{0,40}\b(?:sections?|fields?|columns?|pages?|logs?|procedures?|targets?|categor(?:y|ies))\b/i;
+const QUESTION_START = /^\s*(?:how|what|where|why|when|which|who)\b/i;
+const looksLikeEditRequest = (question: string) =>
+  EXPLICIT_EDIT.some((pattern) => pattern.test(question)) || (!QUESTION_START.test(question) && STRUCTURAL_EDIT.test(question));
+
+async function editToolDefinitions(departmentId: number) {
+  const { labels } = await listDepartmentLabels(departmentId);
+  const wording = labels.map((label) => `${label.key} (currently "${label.value}")`).join("; ");
+  const changeable = MOCHI_SETTING_KEYS.map((key) => `${key}: ${settingTitle(key)}`).join("; ");
+  const hodOnly = ALL_SETTING_KEYS.filter((key) => !MOCHI_SETTING_KEYS.includes(key)).join(", ");
+  return [
+    { type: "function", function: { name: "propose_label_change", description: `Propose new wording for one department label when the HOD asks to rename something. The HOD must confirm before anything changes. Wording keys: ${wording}. The value is the new wording only (one line, at most 80 characters).`, strict: true, parameters: { type: "object", properties: { key: { type: "string", enum: DEPARTMENT_LABEL_KEYS }, value: { type: "string" } }, required: ["key", "value"], additionalProperties: false } } },
+    { type: "function", function: { name: "propose_label_reset", description: "Propose putting one department label back to its default wording. The HOD must confirm before anything changes.", strict: true, parameters: { type: "object", properties: { key: { type: "string", enum: DEPARTMENT_LABEL_KEYS } }, required: ["key"], additionalProperties: false } } },
+    { type: "function", function: { name: "propose_setting_change", description: `Propose switching one department setting on or off. The HOD must confirm before anything changes. Settings Mochi may change: ${changeable}. Other settings exist only so they can be refused; Mochi cannot change them and the HOD must switch them in Department Settings: ${hodOnly}.`, strict: true, parameters: { type: "object", properties: { key: { type: "string", enum: ALL_SETTING_KEYS }, value: { type: "boolean" } }, required: ["key", "value"], additionalProperties: false } } },
+    { type: "function", function: { name: "report_unsupported_change", description: "Use when the HOD asks Mochi to change, add, remove or delete anything that is not one department wording label or one of the settings above (for example logbook sections, procedures, targets, accounts or records).", strict: true, parameters: NO_ARGS_SCHEMA } },
+  ];
+}
+
+const EDIT_INSTRUCTIONS = "The signed-in HOD may ask you to change department wording or switch a setting. For such a request call exactly one propose_ tool, or report_unsupported_change when it is not one of those. Never say a change has been made: the HOD must press Confirm first. Do not call these tools for questions.";
+
+// Turns one edit tool call into the answer. The tool call is untrusted model output: its arguments must be
+// exactly the expected shape, and anything else (extra arguments, a key outside the enum) is "unsupported".
+async function editToolAnswer(name: EditToolName, argsText: string, input: ArogyaTurnInput, base: {
+  sources: Array<{ id: string; title: string }>; actions: ArogyaAction[]; signature: string;
+}): Promise<AssistantResult> {
+  let args: unknown;
+  try { args = JSON.parse(argsText); } catch { args = null; }
+  const record = args && typeof args === "object" && !Array.isArray(args) ? args as Record<string, unknown> : null;
+  const exactKeys = (...keys: string[]) => record !== null && Object.keys(record).length === keys.length && keys.every((key) => key in record);
+  let request: ProposalRequest | null = null;
+  if (name === "propose_label_change" && exactKeys("key", "value")) request = { type: "label_set", key: String(record!.key), value: record!.value as string };
+  else if (name === "propose_label_reset" && exactKeys("key")) request = { type: "label_reset", key: String(record!.key) };
+  else if (name === "propose_setting_change" && exactKeys("key", "value")) request = { type: "setting_set", key: String(record!.key), value: record!.value as boolean };
+  const classified = request ? await classifyAction(input.actor.departmentId!, request) : { kind: "unsupported" as const };
+  const common = { steps: [], sources: base.sources, facts: [], actions: base.actions, knowledgeVersion, capabilitySignature: base.signature };
+  if (classified.kind === "proposal") return { ...common, kind: "help", proposal: classified.proposal,
+    reply: "Here is the change I can make. Nothing changes until you press Confirm." };
+  if (classified.kind === "hod_only_refusal") return { ...common, kind: "unsupported", refusal: classified.refusal,
+    reply: `${classified.refusal.title} is a setting only you can switch, so I can't change it for you. You can switch it yourself in Department Settings.` };
+  return { ...common, kind: "unsupported", refusal: { type: "unsupported" },
+    reply: "I can't make that change for you. I can send it to the support team as a request instead." };
+}
 
 function fact(id: string, label: string, value: string | number | null): AssistantFact { return { id, label, value }; }
 
@@ -188,7 +259,7 @@ function safeHistory(history: ArogyaTurnInput["history"], accountNames: readonly
   ]);
 }
 
-async function providerRequest(messages: Array<Record<string, unknown>>, useTools: boolean) {
+async function providerRequest(messages: Array<Record<string, unknown>>, toolList: readonly unknown[] = tools) {
   const apiKey = process.env.OPENAI_API_KEY;
   const model = process.env.OPENAI_MODEL;
   if (!apiKey || !model) throw new ArogyaProviderError("AROGYA_UNAVAILABLE");
@@ -202,7 +273,7 @@ async function providerRequest(messages: Array<Record<string, unknown>>, useTool
         max_completion_tokens: 800,
         ...reasoningEffortParam(),
         messages,
-        ...(useTools ? { tools, tool_choice: "auto", parallel_tool_calls: false } : {}),
+        ...(toolList.length ? { tools: toolList, tool_choice: "auto", parallel_tool_calls: false } : {}),
         response_format: { type: "json_schema", json_schema: {
           name: "arogya_reply",
           strict: true,
@@ -291,13 +362,18 @@ export async function answerArogya(input: ArogyaTurnInput, accountNames: readonl
   const retrieval = retrieveWorkflows({ query: safeQuestion, role: input.actor.role, features: input.features, workflowId: input.context.workflowId });
   const selected = [...retrieval.matches];
   const signature = capabilitySignature(input.actor.role, input.configSourceId, input.features);
+  // Task 4: edit tools exist for a HOD with a department, while the switch is on, and are built only when the
+  // question is phrased as an edit. An edit-shaped request that matches no workflow still reaches the model so
+  // it can be proposed or reported as unsupported; an ambiguous one still gets the workflow clarification.
+  const editsOn = input.actor.role === "hod" && hodEditsEnabled() && Number.isSafeInteger(input.actor.departmentId) && input.actor.departmentId! > 0;
+  const editIntent = editsOn && looksLikeEditRequest(safeQuestion);
 
   if (retrieval.ambiguous) return {
     reply: "Which part of ELogbook do you mean? Choose a workflow and I can give the steps for your role.",
     kind: "clarification", steps: [], sources: [], facts: [], actions: [],
     clarification: { type: "workflow", choices: retrieval.choices }, knowledgeVersion, capabilitySignature: signature,
   };
-  if (!selected.length) return {
+  if (!selected.length && !editIntent) return {
     reply: "I couldn't match that to a supported ELogbook workflow. Which page or task do you mean?",
     kind: "unsupported", steps: [], sources: [], facts: [], actions: [], knowledgeVersion, capabilitySignature: signature,
   };
@@ -329,7 +405,10 @@ export async function answerArogya(input: ArogyaTurnInput, accountNames: readonl
     `Applicable workflow evidence: ${JSON.stringify(selected.map(publicWorkflow))}`,
     `Selected-record hints available to server tools only: ${JSON.stringify({ selectedResident: input.studentId !== undefined, selectedLog: input.context.log?.type, selectedAppraisalPeriod: input.context.appraisalPeriod })}`,
     input.context.validationCodes?.length ? `The form reports these allowlisted validation codes (user-side hints only): ${input.context.validationCodes.join(", ")}.` : "",
+    editIntent ? EDIT_INSTRUCTIONS : "",
   ].filter(Boolean).join("\n\n");
+  // If the edit tools cannot be built (a read failed), the question is answered as an ordinary one.
+  const toolList = editIntent ? [...tools, ...await editToolDefinitions(input.actor.departmentId!).catch(() => [])] : tools;
 
   const diagnosticName = diagnosticToolFor(safeQuestion, input);
   if (diagnosticName === "check_appraisal_period" && (!input.studentId || !input.context.appraisalPeriod)) return {
@@ -403,7 +482,7 @@ export async function answerArogya(input: ArogyaTurnInput, accountNames: readonl
 
   while (requestCount < 3) {
     requestCount++;
-    const message = await providerRequest(messages, true);
+    const message = await providerRequest(messages, toolList);
     const calls = Array.isArray(message?.tool_calls) ? message.tool_calls : [];
     if (!calls.length) {
       const parsed = parseFinal(message);
@@ -423,6 +502,10 @@ export async function answerArogya(input: ArogyaTurnInput, accountNames: readonl
     }
     if (calls.length !== 1 || toolExecutions >= 4) throw new ArogyaProviderError("AROGYA_INVALID_OUTPUT");
     const call = calls[0];
+    if (editIntent && isEditTool(call?.function?.name) && typeof call?.id === "string") {
+      // A proposal or refusal ends the turn: nothing is written here and the model writes none of the reply.
+      return editToolAnswer(call.function.name, call.function.arguments ?? "{}", input, { sources, actions, signature });
+    }
     const name = call?.function?.name as ToolName;
     const allowedNames: ToolName[] = ["get_workflow_help", "get_progress_summary", "check_appraisal_period", "get_log_state", "get_review_summary", "get_department_summary"];
     if (!allowedNames.includes(name) || typeof call?.id !== "string") throw new ArogyaProviderError("AROGYA_INVALID_OUTPUT");

@@ -16,6 +16,7 @@ import { normalizeHistory, scrubAccountNames, containsSensitiveClinicalInput } f
 import { answerArogya, ArogyaProviderError, validateV2Enabled } from "../lib/arogya/provider.js";
 import type { ArogyaLogType } from "../lib/arogya/facts.js";
 import { getWeeklyDepartmentDigest } from "../lib/arogya/weekly-digest.js";
+import { actionErrorStatus, applyAction, hodEditsEnabled, undoAction } from "../lib/arogya/department-actions.js";
 
 const router = Router();
 
@@ -42,7 +43,7 @@ const usageEventSchema = z.object({
 
 const postgresIntegerMax = 2_147_483_647;
 const usageCountQuery = z.object({ departmentId: idSchema.max(postgresIntegerMax).optional() }).strict();
-type UsageFeature = "ask" | "progress-coach" | "appraisal-draft" | "department-report" | "department-report-weekly";
+type UsageFeature = "ask" | "progress-coach" | "appraisal-draft" | "department-report" | "department-report-weekly" | "hod-edit-apply" | "hod-edit-undo";
 
 function trackMochiRequest(feature: UsageFeature): RequestHandler {
   return (req, res, next) => {
@@ -567,6 +568,40 @@ router.post("/department-report/weekly", requireAuth, requireDepartment, require
       res.status(digest.status === "pending" ? 202 : 200).json(digest);
     } catch {
       res.status(500).json({ error: "The Mochi digest could not be loaded." });
+    }
+  });
+
+// Task 4: Mochi's department edits. The model only proposes (see /ask); these two routes are the only writes,
+// they need the HOD's own request, and the department is always the signed-in HOD's (req.user.departmentId).
+// They make no model call, so they do not count against the daily Mochi limit. Only ids and status codes are
+// logged: never wording, setting values, the HOD's question or ticket text.
+const requireHodEditsEnabled: RequestHandler = (_req, res, next) => {
+  if (!hodEditsEnabled()) { res.status(403).json({ error: "Department edits through Mochi are not enabled." }); return; }
+  next();
+};
+
+function sendActionError(req: Parameters<RequestHandler>[0], res: Parameters<RequestHandler>[1], error: unknown, what: string) {
+  const known = actionErrorStatus(error);
+  if (known) { res.status(known.status).json({ error: known.message }); return; }
+  req.log.error({ departmentId: req.user!.departmentId, status: 500 }, `Error ${what}`);
+  res.status(500).json({ error: "Mochi could not make that change." });
+}
+
+router.post("/actions/apply", requireAuth, requireRole(["hod"]), requireDepartment, requireHodEditsEnabled,
+  trackMochiRequest("hod-edit-apply"), async (req, res) => {
+    try {
+      res.json(await applyAction({ id: req.user!.id, departmentId: req.user!.departmentId }, req.body));
+    } catch (error) {
+      sendActionError(req, res, error, "applying a Mochi department edit");
+    }
+  });
+
+router.post("/actions/:auditId/undo", requireAuth, requireRole(["hod"]), requireDepartment, requireHodEditsEnabled,
+  trackMochiRequest("hod-edit-undo"), async (req, res) => {
+    try {
+      res.json(await undoAction({ id: req.user!.id, departmentId: req.user!.departmentId }, String(req.params.auditId)));
+    } catch (error) {
+      sendActionError(req, res, error, "undoing a Mochi department edit");
     }
   });
 

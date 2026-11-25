@@ -4,10 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SendHorizontal, X } from "lucide-react";
 import { ArogyaCharacter, type ArogyaState } from "./ArogyaCharacter";
-import { apiGet, apiPost, type ArogyaAnswer, type ArogyaContextResponse } from "@/lib/apiClient";
+import { apiGet, apiPost, applyMochiAction, submitSupportTicket, undoMochiAction, type ArogyaAnswer, type ArogyaContextResponse } from "@/lib/apiClient";
 import { isDemoMode } from "@/lib/session";
 import { AROGYA_CONTEXT_EVENT, type ArogyaSelectedContext } from "@/lib/arogya-context";
-import { AssistantAnswer } from "./AssistantAnswer";
+import { useDepartment } from "@/lib/department-context";
+import { AssistantAnswer, type MochiEditHandlers } from "./AssistantAnswer";
 import { displayAssistantError } from "./assistantCopy";
 import { playDemoSound } from "@/lib/demoSounds";
 import { DemoTypedText } from "../demo-movie/DemoTypedText";
@@ -60,6 +61,16 @@ export function ArogyaPanel({ open, onOpenChange, role, actorKey, workflowId, st
   const [selectedContext, setSelectedContext] = React.useState<ArogyaSelectedContext>({ studentId: studentProfileId });
   const requestSequence = React.useRef(0);
   const wasOpen = React.useRef(false);
+  const { refresh: refreshDepartment } = useDepartment();
+
+  // Department edits exist for the HOD only. After an apply or undo the department wording and settings
+  // are reloaded so the new wording shows without a page refresh. The department is never sent.
+  const editHandlers = React.useMemo<MochiEditHandlers | undefined>(() => role === "HOD" && !isDemoMode() ? {
+    onApply: async (proposal) => { const result = await applyMochiAction(proposal); void refreshDepartment(); return result; },
+    onUndo: async (auditId) => { const result = await undoMochiAction(auditId); void refreshDepartment(); return result; },
+    // The ticket text is the HOD's own question, edited by them; Mochi writes none of it.
+    onTicket: (message) => submitSupportTicket({ category: "feature_request", message, pageUrl: window.location.pathname }),
+  } : undefined, [role, refreshDepartment]);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -447,7 +458,9 @@ export function ArogyaPanel({ open, onOpenChange, role, actorKey, workflowId, st
                 )}
                 <div className={`max-w-[88%] rounded-2xl border px-3.5 py-3 text-sm shadow-sm ${msg.role === "user" ? "rounded-tr-md border-teal-200/80 bg-teal-50/90 text-right text-teal-950" : "rounded-tl-md border-white/90 bg-white/85 text-left text-slate-700"}`}>
                   {msg.answer ? (
-                    <AssistantAnswer answer={msg.answer} onNavigate={(href) => { onNavigate(href); onOpenChange(false); }} />
+                    <AssistantAnswer answer={msg.answer} edit={editHandlers}
+                      question={idx > 0 && messages[idx - 1].role === "user" ? messages[idx - 1].text ?? "" : ""}
+                      onNavigate={(href) => { onNavigate(href); onOpenChange(false); }} />
                   ) : msg.links !== undefined ? (
                     <div className="flex flex-col gap-2">
                       <p className="mb-1 font-semibold text-teal-950">{msg.heading}</p>

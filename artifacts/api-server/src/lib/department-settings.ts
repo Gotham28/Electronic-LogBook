@@ -56,8 +56,9 @@ export async function setDepartmentSetting(input: {
   value: unknown;
   expectedValue: boolean | null;
   actor: DepartmentSettingActor;
+  undoOf?: string; // audit id of the change this one reverses; written with the audit row, in the same transaction
 }): Promise<DepartmentSettingChange> {
-  const { departmentId, userId, expectedValue, actor } = input;
+  const { departmentId, userId, expectedValue, actor, undoOf } = input;
   const parsedKey = departmentSettingKeySchema.safeParse(input.key);
   if (!parsedKey.success) throw new DepartmentSettingError(400, "Unknown setting");
   const key = parsedKey.data;
@@ -104,7 +105,7 @@ export async function setDepartmentSetting(input: {
       action: existing ? "UPDATE" : "CREATE",
       performedById: userId,
       beforeState: { eventType: "department_setting_change", key, value: before },
-      afterState: { eventType: "department_setting_change", key, value, actor },
+      afterState: { eventType: "department_setting_change", key, value, actor, ...(undoOf ? { undoOf } : {}) },
     }).returning({ id: auditTable.id });
     return { key, before, after: value, auditId: audit.id };
   });

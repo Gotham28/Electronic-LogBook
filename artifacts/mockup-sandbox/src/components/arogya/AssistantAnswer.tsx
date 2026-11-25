@@ -1,5 +1,5 @@
 import * as React from "react";
-import type { ArogyaAnswer } from "@/lib/apiClient";
+import type { ArogyaAnswer, MochiActionResult, MochiProposal, MochiRefusal } from "@/lib/apiClient";
 
 const safeRoutes: Record<string, string> = {
   dashboard: "/", cases: "/cases", procedures: "/procedures", academics: "/academics",
@@ -10,15 +10,132 @@ const safeRoutes: Record<string, string> = {
   "department-dashboard": "/roster", "review-queue": "/review-queue",
   "student-approval": "/student-access", "faculty-management": "/professors",
   "leave-approvals": "/leave-approvals", requirements: "/requirements",
+  // Department Settings is the requirements page; the HOD-only refusal links here.
+  "department-settings": "/requirements",
 };
 
 function displayWorkflowTitle(id: string, title: string) {
   return id === "assistant-scope" ? "What Mochi can check" : title;
 }
 
-export function AssistantAnswer({ answer, onNavigate }: { answer: ArogyaAnswer; onNavigate: (href: string) => void }) {
+export interface MochiEditHandlers {
+  onApply: (proposal: MochiProposal) => Promise<MochiActionResult>;
+  onUndo: (auditId: string) => Promise<MochiActionResult>;
+  onTicket: (message: string) => Promise<{ referenceCode: string }>;
+}
+
+const buttonClass = "rounded-full border border-teal-200 bg-white px-3 py-1.5 text-xs font-semibold text-teal-900 hover:bg-teal-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 disabled:opacity-60";
+const primaryButtonClass = "rounded-full bg-teal-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-1 disabled:opacity-60";
+
+type EditState =
+  | { step: "preview" }
+  | { step: "applying" }
+  | { step: "done"; result: MochiActionResult }
+  | { step: "undoing"; result: MochiActionResult }
+  | { step: "undone" }
+  | { step: "cancelled" }
+  | { step: "stale" }
+  | { step: "error"; message: string; from: "apply" | "undo"; result?: MochiActionResult; retry?: boolean };
+
+// The preview Mochi shows before anything changes. Nothing is written until the HOD presses Confirm.
+function ProposalCard({ proposal, handlers }: { proposal: MochiProposal; handlers: MochiEditHandlers }) {
+  const [state, setState] = React.useState<EditState>({ step: "preview" });
+  const apply = async () => {
+    setState({ step: "applying" });
+    try {
+      setState({ step: "done", result: await handlers.onApply(proposal) });
+    } catch (error: any) {
+      setState(error?.status === 409 ? { step: "stale" } : { step: "error", from: "apply", message: error?.data?.message || error?.data?.error || "That change could not be made." });
+    }
+  };
+  const undo = async (result: MochiActionResult) => {
+    if (!result.auditId) return;
+    setState({ step: "undoing", result });
+    try {
+      await handlers.onUndo(result.auditId);
+      setState({ step: "undone" });
+    } catch (error: any) {
+      setState(error?.status === 409
+        ? { step: "error", from: "undo", result, message: error?.data?.error ?? error?.data?.message ?? "This changed since Mochi made it, so it was not undone.", retry: false }
+        : { step: "error", from: "undo", result, message: error?.data?.error ?? error?.data?.message ?? "That change could not be undone.", retry: true });
+    }
+  };
+  return <section aria-label="Proposed change" className="rounded-xl border border-teal-200 bg-teal-50/60 p-3">
+    <p className="text-xs font-semibold text-teal-950">{proposal.title}</p>
+    <dl className="mt-2 grid gap-1 text-xs">
+      <div className="flex justify-between gap-3"><dt className="text-slate-600">Current</dt><dd className="text-right font-semibold text-slate-800">{proposal.before}</dd></div>
+      <div className="flex justify-between gap-3"><dt className="text-slate-600">New</dt><dd className="text-right font-semibold text-teal-900">{proposal.after}</dd></div>
+    </dl>
+    {(state.step === "preview" || state.step === "applying") && <div className="mt-2 flex flex-wrap gap-2">
+      <button type="button" className={primaryButtonClass} disabled={state.step === "applying"} onClick={() => void apply()}>
+        {state.step === "applying" ? "Applying…" : "Confirm"}
+      </button>
+      <button type="button" className={buttonClass} disabled={state.step === "applying"} onClick={() => setState({ step: "cancelled" })}>Cancel</button>
+    </div>}
+    {state.step === "cancelled" && <p role="status" className="mt-2 text-xs text-slate-600">Cancelled. Nothing was changed.</p>}
+    {state.step === "stale" && <p role="alert" className="mt-2 text-xs font-medium text-amber-800">This changed since Mochi checked — ask again.</p>}
+    {(state.step === "done" || state.step === "undoing") && <div className="mt-2 flex flex-wrap items-center gap-2">
+      <p role="status" className="text-xs font-semibold text-teal-900">
+        {state.result.auditId === null ? "Done. It was already set that way." : "Done."}
+      </p>
+      {state.result.auditId !== null && state.result.undoable !== false && <button type="button" className={buttonClass}
+        disabled={state.step === "undoing"} onClick={() => void undo(state.result)}>{state.step === "undoing" ? "Undoing…" : "Undo"}</button>}
+      {state.result.auditId !== null && state.result.undoable === false && <p className="w-full text-[11px] text-slate-600">
+        This can't be undone from here. Switch it back in Department Settings.</p>}
+    </div>}
+    {state.step === "undone" && <p role="status" className="mt-2 text-xs font-semibold text-teal-900">Undone. The previous value is back.</p>}
+    {state.step === "error" && <div className="mt-2 flex flex-wrap items-center gap-2">
+      <p role="alert" className="text-xs font-medium text-rose-800">{state.message}</p>
+      {state.from === "undo" && state.result && state.retry !== false && <button type="button" className={buttonClass} onClick={() => void undo(state.result!)}>Try undo again</button>}
+      {state.from === "apply" && <button type="button" className={buttonClass} onClick={() => setState({ step: "preview" })}>Back</button>}
+    </div>}
+  </section>;
+}
+
+function RefusalCard({ refusal, question, onNavigate, handlers }: {
+  refusal: MochiRefusal; question: string; onNavigate: (href: string) => void; handlers: MochiEditHandlers;
+}) {
+  const [message, setMessage] = React.useState(question);
+  const [ticket, setTicket] = React.useState<{ step: "form" } | { step: "sending" } | { step: "sent"; referenceCode: string } | { step: "error"; message: string }>({ step: "form" });
+  const ticketFieldId = React.useId();
+  if (refusal.type === "hod_only") {
+    const allowed = refusal.settingsHref === safeRoutes["department-settings"];
+    return <section aria-label="Change not made" className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+      <p className="text-xs text-slate-700">{refusal.title} is a setting only you can switch. Mochi can't change it for you.</p>
+      {allowed && <button type="button" className={`${buttonClass} mt-2`} onClick={() => onNavigate(refusal.settingsHref)}>Open Department Settings</button>}
+    </section>;
+  }
+  const send = async () => {
+    setTicket({ step: "sending" });
+    try {
+      setTicket({ step: "sent", ...(await handlers.onTicket(message.trim())) });
+    } catch (error: any) {
+      setTicket({ step: "error", message: error?.data?.message || error?.data?.error || "The support ticket could not be sent." });
+    }
+  };
+  const length = message.trim().length;
+  return <section aria-label="Raise a support ticket" className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+    {ticket.step === "sent"
+      ? <p role="status" className="text-xs font-semibold text-teal-900">Support ticket sent. Reference {ticket.referenceCode}.</p>
+      : <>
+        <label htmlFor={ticketFieldId} className="text-xs font-semibold text-slate-700">Raise a support ticket</label>
+        <textarea id={ticketFieldId} value={message} onChange={(event) => setMessage(event.target.value)} rows={3} maxLength={2000}
+          className="mt-1 w-full rounded-lg border border-slate-200 bg-white p-2 text-xs text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600" />
+        {ticket.step === "error" && <p role="alert" className="mt-1 text-xs font-medium text-rose-800">{ticket.message}</p>}
+        <button type="button" className={`${primaryButtonClass} mt-2`} disabled={ticket.step === "sending" || length < 10 || length > 2000} onClick={() => void send()}>
+          {ticket.step === "sending" ? "Sending…" : "Send ticket"}
+        </button>
+      </>}
+  </section>;
+}
+
+export function AssistantAnswer({ answer, onNavigate, question = "", edit }: {
+  answer: ArogyaAnswer; onNavigate: (href: string) => void; question?: string; edit?: MochiEditHandlers;
+}) {
   return <div className="flex flex-col gap-2">
     <p className="whitespace-pre-wrap font-medium text-slate-800">{answer.reply}</p>
+    {edit && answer.proposal && <ProposalCard proposal={answer.proposal} handlers={edit} />}
+    {edit && answer.refusal && <RefusalCard refusal={answer.refusal} question={question} onNavigate={onNavigate} handlers={edit} />}
     {answer.grounding && <p className="text-xs text-slate-600">
       {answer.grounding.scope === "department"
         ? "Based on department data"

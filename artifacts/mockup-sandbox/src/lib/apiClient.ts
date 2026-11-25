@@ -20,6 +20,15 @@ export class ApiError extends Error {
 const API_BASE_URL = import.meta.env.VITE_API_URL || "";
 
 export interface ArogyaAction { id: string; label: string; href: string }
+// Mochi's department edits (task 4): a preview the HOD confirms, or a refusal. Mirrors
+// artifacts/api-server/src/lib/arogya/department-action-schemas.ts.
+export type MochiProposal =
+  | { type: "label_set"; key: string; title: string; before: string; after: string; value: string; expected: number }
+  | { type: "label_reset"; key: string; title: string; before: string; after: string; expected: number }
+  | { type: "setting_set"; key: string; title: string; before: string; after: string; value: boolean; expected: boolean | null };
+export type MochiRefusal =
+  | { type: "hod_only"; key: string; title: string; settingsHref: string }
+  | { type: "unsupported" };
 export interface ArogyaAnswer {
   reply: string;
   kind: "help" | "diagnostic" | "clarification" | "unsupported";
@@ -29,10 +38,13 @@ export interface ArogyaAnswer {
   actions: ArogyaAction[];
   clarification?: { type: "workflow" | "student" | "appraisal_period" | "log"; choices?: Array<{ id: string; label: string }> };
   grounding?: { scope: "resident_logs"; logCount: number } | { scope: "department" };
+  proposal?: MochiProposal;
+  refusal?: MochiRefusal;
   checkedAt?: string;
   knowledgeVersion: string;
   capabilitySignature: string;
 }
+export interface MochiActionResult { auditId: string | null; before: string; after: string; undoable?: boolean }
 export interface ArogyaContextResponse {
   mode: "legacy" | "v2";
   role: "student" | "professor" | "hod";
@@ -453,6 +465,17 @@ export interface SubmitSupportTicketPayload {
   pageUrl?: string | null;
   userAgent?: string | null;
   honeypot?: string | null;
+}
+
+// Mochi's department edits. The department is never sent: the server uses the signed-in HOD's own.
+export function applyMochiAction(proposal: MochiProposal): Promise<MochiActionResult> {
+  const body = proposal.type === "label_reset"
+    ? { type: proposal.type, key: proposal.key, expected: proposal.expected }
+    : { type: proposal.type, key: proposal.key, value: proposal.value, expected: proposal.expected };
+  return apiPost<MochiActionResult>("/api/arogya/actions/apply", body);
+}
+export function undoMochiAction(auditId: string): Promise<MochiActionResult> {
+  return apiPost<MochiActionResult>(`/api/arogya/actions/${encodeURIComponent(auditId)}/undo`, {});
 }
 
 export function submitSupportTicket(data: SubmitSupportTicketPayload): Promise<{ referenceCode: string }> {
