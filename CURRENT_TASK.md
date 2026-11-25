@@ -1,4 +1,4 @@
 # Current Task
 
 ## Status
-IDLE — Task 4 (`task/mochi-hod-edits`) closed out and submitted for PR.
+IDLE — Task 2b (`task/department-behaviour-settings`) closed out and submitted for PR.

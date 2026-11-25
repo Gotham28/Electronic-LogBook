@@ -11,11 +11,14 @@ export const DEPARTMENT_SETTING_TIERS = {
   useCaseTypeLabel: "mochi",
   academicsFirstInNav: "mochi",
   freeTextPostingUnit: "hod_only",
+  freeTextPostingSupervisor: "hod_only",
   freeTextProcedures: "hod_only",
   dynamicProcedureFields: "hod_only",
   procedureClinicalDetails: "hod_only",
+  procedureDetailsField: "hod_only",
   procedureExperience: "hod_only",
   hideProcedureAge: "hod_only",
+  hideProcedureProgress: "hod_only",
   microbiologyCaseFields: "hod_only",
   medicalSummaryCaseFields: "hod_only",
   hideCaseLogs: "hod_only",
@@ -32,6 +35,7 @@ export const DEPARTMENT_SETTING_TIERS = {
   conferenceDateRange: "hod_only",
   hideConferenceLocation: "hod_only",
   awards: "hod_only",
+  extendedAssessmentTypes: "hod_only",
   hideHodQuarterlyAppraisal: "hod_only",
 } as const satisfies Record<string, DepartmentSettingTier>;
 

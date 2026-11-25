@@ -27,8 +27,8 @@ type Assessment = {
 export function AssessmentsPage() {
   const [assessments, setAssessments] = React.useState<Assessment[]>([]);
   const user = React.useMemo(() => getCurrentUser(), []);
-  const { department } = useDepartment();
-  const isMicrobiology = department?.code?.toLowerCase() === "microbiology" || department?.name?.toLowerCase().includes("microbiology");
+  const { config } = useDepartment();
+  const extendedAssessmentTypes = Boolean(config?.enabledFeatures?.extendedAssessmentTypes);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [appraisals, setAppraisals] = React.useState<QuarterlyAppraisal[]>([]);
@@ -80,7 +80,7 @@ export function AssessmentsPage() {
         <div>
           <p className="page-eyebrow flex items-center gap-2">Training progress</p>
           <h2 className="page-title mt-1">Assessments</h2>
-          <p className="mt-2 text-sm text-slate-500">Your {isMicrobiology ? "continuous, quarterly, half yearly, and annual" : "quarterly and annual"} assessment results, entered by your faculty assessor.</p>
+          <p className="mt-2 text-sm text-slate-500">Your {extendedAssessmentTypes ? "continuous, quarterly, half yearly, and annual" : "quarterly and annual"} assessment results, entered by your faculty assessor.</p>
         </div>
       </div>
 

@@ -53,7 +53,7 @@ type ProcedureLog = {
 
 
 export function ProcedureLogsPage() {
-  const { procedures: PROCEDURE_REQUIREMENTS, competencyLevels, config, department, procedureFields } = useDepartment();
+  const { procedures: PROCEDURE_REQUIREMENTS, competencyLevels, config, procedureFields } = useDepartment();
   const dynamicProcedureFields = Boolean(config?.enabledFeatures?.dynamicProcedureFields);
   const activeProcedureFields: ProcedureFieldDefinition[] = React.useMemo(
     () => (dynamicProcedureFields ? (procedureFields ?? []) : []),
@@ -62,19 +62,21 @@ export function ProcedureLogsPage() {
   const roleField = dynamicProcedureFields ? activeProcedureFields.find((f) => f.id === "competencyLevel") : undefined;
   const ageField = dynamicProcedureFields ? activeProcedureFields.find((f) => f.id === "patientAge") : undefined;
   const recordDetailsEnabled = dynamicProcedureFields || !!config?.enabledFeatures?.procedureClinicalDetails || PROCEDURE_REQUIREMENTS.some((item) => item.requiredLogFields?.length);
-  const isMicrobiology = department?.code?.toLowerCase() === "microbiology" || department?.name?.toLowerCase().includes("microbiology");
+  // A single "Details" textarea (stored in diagnosis) replaces the Diagnosis and Sex inputs.
+  const procedureDetailsField = Boolean(config?.enabledFeatures?.procedureDetailsField);
+  const hideProcedureProgress = Boolean(config?.enabledFeatures?.hideProcedureProgress);
   const hideProcedureAge = dynamicProcedureFields
     ? !ageField
-    : (!recordDetailsEnabled && Boolean(config?.enabledFeatures?.hideProcedureAge || isMicrobiology));
+    : (!recordDetailsEnabled && Boolean(config?.enabledFeatures?.hideProcedureAge));
   const showProcedureExperience = dynamicProcedureFields
     ? Boolean(roleField)
-    : (recordDetailsEnabled || Boolean(config?.enabledFeatures?.procedureExperience && !isMicrobiology));
+    : (recordDetailsEnabled || Boolean(config?.enabledFeatures?.procedureExperience));
   const PROCEDURE_GROUPS = React.useMemo(() => Object.fromEntries([...new Set(PROCEDURE_REQUIREMENTS.map((p) => p.group))].map((group) => [group, PROCEDURE_REQUIREMENTS.filter((p) => p.group === group).map((p) => p.name)])), [PROCEDURE_REQUIREMENTS]);
   const REQUIRED_PROCEDURE_COUNT = PROCEDURE_REQUIREMENTS.reduce((sum, p) => sum + p.required, 0);
   const groupNames: Record<string, string> = Object.fromEntries(Object.keys(PROCEDURE_GROUPS).map((group) => [group, group]));
   const user = React.useMemo(() => getCurrentUser(), []);
   const hideUhid = !recordDetailsEnabled;
-  const isFreeTextProcedures = Boolean(config?.enabledFeatures?.freeTextProcedures || isMicrobiology);
+  const isFreeTextProcedures = Boolean(config?.enabledFeatures?.freeTextProcedures);
   const hasProcedureTarget = config?.requiredProcedures !== null && config?.requiredProcedures !== undefined;
   const initialGroup = hideUhid ? PROCEDURE_REQUIREMENTS[0]?.group ?? "" : "";
   const [open, setOpen] = React.useState(false);
@@ -545,7 +547,7 @@ export function ProcedureLogsPage() {
                 </Select>
                 )}
               </Field>
-              {isMicrobiology ? (
+              {procedureDetailsField ? (
                 <Field label="Details" isAiFilled={aiFilledFields.has("diagnosis")}>
                   <Textarea
                     value={form.diagnosis}
@@ -661,7 +663,7 @@ export function ProcedureLogsPage() {
               ) : (
                 <>
                   <div className={`grid gap-4 ${hideUhid ? "sm:grid-cols-1" : "sm:grid-cols-2"}`}>
-                    {isFreeTextProcedures && !isMicrobiology && !recordDetailsEnabled && (
+                    {isFreeTextProcedures && !procedureDetailsField && !recordDetailsEnabled && (
                       <>
                         <Field label="Diagnosis" isAiFilled={aiFilledFields.has("diagnosis")}><Input value={form.diagnosis} onChange={(e) => { setForm({ ...form, diagnosis: e.target.value }); recordManualEdit("diagnosis"); }} placeholder="e.g. Tinea Corporis" required /></Field>
                         <Field label="Sex" isAiFilled={aiFilledFields.has("sex")}><Input value={form.sex} onChange={(e) => { setForm({ ...form, sex: e.target.value }); recordManualEdit("sex"); }} placeholder="e.g. Male" required /></Field>
@@ -740,7 +742,7 @@ export function ProcedureLogsPage() {
         </Dialog>
       </div>
 
-      {!isMicrobiology && (
+      {!hideProcedureProgress && (
         <>
           {!PROCEDURE_REQUIREMENTS.length && <p className="rounded-xl bg-teal-50 p-4 text-sm text-teal-800">{hideUhid && isFreeTextProcedures ? "Procedure names can be entered directly. This demo department has no configured procedure list or target." : "Your HOD has not configured procedure types for this department yet."}</p>}
           {(PROCEDURE_REQUIREMENTS.length > 0 || !hideUhid) && <div className="grid gap-4 md:grid-cols-2">
@@ -821,7 +823,7 @@ export function ProcedureLogsPage() {
             </Empty>
           ) : (
             <Table>
-              <TableHeader><TableRow><TableHead>Number</TableHead><TableHead>Date</TableHead>{!isFreeTextProcedures && <TableHead>Group</TableHead>}<TableHead>Procedure</TableHead>{isMicrobiology && <TableHead>Details</TableHead>}{!hideProcedureAge && <TableHead>{ageField?.label || "Age"}</TableHead>}{showProcedureExperience && <TableHead>{roleField?.label || "Competency level"}</TableHead>}{showProcedureExperience && <TableHead>Verified competency</TableHead>}<TableHead>Remarks</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Number</TableHead><TableHead>Date</TableHead>{!isFreeTextProcedures && <TableHead>Group</TableHead>}<TableHead>Procedure</TableHead>{procedureDetailsField && <TableHead>Details</TableHead>}{!hideProcedureAge && <TableHead>{ageField?.label || "Age"}</TableHead>}{showProcedureExperience && <TableHead>{roleField?.label || "Competency level"}</TableHead>}{showProcedureExperience && <TableHead>Verified competency</TableHead>}<TableHead>Remarks</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
               <TableBody>
                 {logs.map((log) => (
                   <TableRow key={log.id}>
@@ -836,7 +838,7 @@ export function ProcedureLogsPage() {
                         </details>
                       )}
                     </TableCell>
-                    {isMicrobiology && <TableCell className="text-xs max-w-[200px] truncate" title={log.diagnosis || ""}>{log.diagnosis || "—"}</TableCell>}
+                    {procedureDetailsField && <TableCell className="text-xs max-w-[200px] truncate" title={log.diagnosis || ""}>{log.diagnosis || "—"}</TableCell>}
                     {!hideProcedureAge && <TableCell>{dynamicProcedureFields && (log.patientAge === "N/A" || !log.patientAge) ? "—" : (log.patientAge || log.age)}</TableCell>}
                     {showProcedureExperience && <TableCell className="text-xs">{dynamicProcedureFields && (log.competencyLevel === "N/A" || !log.competencyLevel) ? "—" : log.competencyLevel}</TableCell>}
                     {showProcedureExperience && <TableCell className="text-xs">{log.facultyVerifiedLevel ? (competencyLevels.find(c => c.value === log.facultyVerifiedLevel)?.name || log.facultyVerifiedLevel) : 'Pending verification'}</TableCell>}

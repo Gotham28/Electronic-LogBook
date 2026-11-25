@@ -280,23 +280,21 @@ describe("the milestone defaults follow the same effective wording flag the cata
     }
   });
 
-  it("a department with no stored flag that the catalog treats as mandatory-certifications gets the same defaults", async () => {
-    // No config row at all, and a name the catalog's existing defaults act on. The label route adds no name check of its own:
-    // it asks the same feature helper the other routes use, so it agrees with the catalog.
+  it("a department named Microbiology with no stored flag gets generic wording defaults", async () => {
     const [department] = await db.insert(departmentsTable).values({ name: "Parity Microbiology", code: "LABEL-PARITY",
       collegeId: await getTestCollegeId() }).returning();
     const hod = await mintAccount(department.id, "label-parity-hod@example.test");
     const catalog = await request(runtime.base, `/departments/${department.id}/catalog`, hod);
     assert.equal(catalog.status, 200);
-    assert.equal(catalog.body.config.enabledFeatures.useThesisAndMandatoryCertificationsLabel, true, "the catalog computes the flag on");
+    assert.equal(catalog.body.config?.enabledFeatures?.useThesisAndMandatoryCertificationsLabel, undefined, "no name-based flag");
     const result = await request(runtime.base, endpoint, hod);
     assert.equal(result.status, 200);
-    for (const key of ["milestones.pageTitle", "nav.milestones"]) {
+    for (const [key, expected] of [["milestones.pageTitle", "Thesis & certifications"], ["nav.milestones", "Thesis & Certifications"]]) {
       const item = byKey(result.body, key);
-      assert.deepEqual([item.value, item.default, item.override], ["Thesis and mandatory certifications", "Thesis and mandatory certifications", null], key);
+      assert.deepEqual([item.value, item.default, item.override], [expected, expected, null], key);
     }
     const written = await request(runtime.base, `${endpoint}/milestones.pageTitle`, hod, "PATCH", { value: "Thesis (renamed)" });
-    assert.equal(written.body.default, "Thesis and mandatory certifications");
+    assert.equal(written.body.default, "Thesis & certifications");
   });
 });
 
