@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Link } from "wouter";
 import {
+  AlertCircle,
   AlertTriangle,
   ArrowRight,
   Award,
@@ -13,10 +14,15 @@ import {
   Loader2,
   RefreshCcw,
   RotateCcw,
+  Target,
+  Sparkles,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import { DemoCount, DemoProgress, useDemoAnimatedValue } from "@/components/DemoMotion";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
@@ -40,6 +46,7 @@ export function Dashboard() {
   const [error, setError] = React.useState<string | null>(null);
   const [progressGapsState, setProgressGapsState] = React.useState<ProgressGapsState | null>(null);
   const [progressRetry, setProgressRetry] = React.useState(0);
+  const [isTargetsExpanded, setIsTargetsExpanded] = React.useState(false);
   const fetchDashboardData = React.useCallback(async () => {
     if (!user?.studentProfileId) {
       setError("No student profile ID found. Please log in as a student.");
@@ -65,7 +72,24 @@ export function Dashboard() {
   React.useEffect(() => {
     const userId = user?.id;
     setProgressGapsState(null);
-    if (!userId || isDemoMode()) return;
+    if (!userId) return;
+
+    if (isDemoMode()) {
+      setProgressGapsState({
+        userId,
+        gaps: [
+          { label: "Cases", verified: 10, target: 150 },
+          { label: "Procedures", verified: 0, target: 50 },
+          { label: "Academic Activities", verified: 0, target: 10 },
+          { label: "Emergency Procedures: CPR Pediatrics", verified: 1, target: 5 },
+          { label: "Emergency Procedures: Endotracheal intubation (NEONATAL/PED)", verified: 0, target: 25 },
+          { label: "Psychomotor skills: Behavioral Disorders Screening", verified: 0, target: 2 },
+          { label: "Invasive procedures: Bone marrow aspiration", verified: 1, target: 2 },
+          { label: "Neonatal procedures: Surfactant administration INSU/LISA/MIST", verified: 3, target: 20 },
+        ],
+      });
+      return;
+    }
 
     let active = true;
     void apiGet<{ gaps: ProgressGap[] }>("/api/arogya/progress-gaps").then(({ gaps }) => {
@@ -151,33 +175,160 @@ export function Dashboard() {
 
   const hasAnyNumericTargets = configured.length > 0;
   const progressGaps = progressGapsState?.userId === user?.id ? progressGapsState : null;
+  const allGaps = progressGaps && "gaps" in progressGaps ? progressGaps.gaps : [];
+  const hasSubCategories = allGaps.some((g) => g.label.includes(":"));
+  const categoryGaps = hasSubCategories ? allGaps.filter((g) => !g.label.includes(":")) : [];
+  const procedureGaps = hasSubCategories ? allGaps.filter((g) => g.label.includes(":")) : allGaps;
 
   return (
     <div className="section-spacing pb-12">
       {progressGaps && ("error" in progressGaps || progressGaps.gaps.length > 0) && (
-        <Card>
-          <CardHeader><CardTitle className="text-base">Training targets to work on</CardTitle></CardHeader>
-          <CardContent>
+        <Card className="overflow-hidden border-slate-200/80 bg-white/95 shadow-sm layer-1 animate-float-up">
+          <CardHeader className="flex flex-row items-center justify-between gap-4 border-b border-slate-100/90 bg-slate-50/60 px-4 sm:px-6 py-3.5">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-50 text-teal-700 shadow-sm border border-teal-100/60">
+                <Target className="h-4 w-4" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <CardTitle className="text-sm font-semibold text-slate-900">
+                    Training targets to work on
+                  </CardTitle>
+                  {"gaps" in progressGaps && progressGaps.gaps.length > 0 && (
+                    <Badge variant="secondary" className="h-5 px-1.5 text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-200/80">
+                      {progressGaps.gaps.length} {progressGaps.gaps.length === 1 ? "deficit" : "deficits"}
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500">
+                  Focus areas where verified entries are below departmental requirements
+                </p>
+              </div>
+            </div>
+            {"gaps" in progressGaps && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 shrink-0 gap-1.5 border-teal-200 bg-white text-xs font-semibold text-teal-800 shadow-sm hover:bg-teal-50 hover:text-teal-900"
+                onClick={() => {
+                  void apiPost("/api/arogya/usage", { eventType: "nudge_click" }).catch(() => {});
+                  openArogya("What are my current training targets and progress deficits?");
+                }}
+              >
+                <Sparkles className="h-3.5 w-3.5 text-teal-600" />
+                Ask Mochi about this
+              </Button>
+            )}
+          </CardHeader>
+          <CardContent className="p-4 sm:p-6">
             {"error" in progressGaps ? (
-              <div role="alert" className="flex flex-wrap items-center gap-3">
-                <p className="text-sm text-rose-700">{progressGaps.error}</p>
-                <Button type="button" variant="outline" size="sm" onClick={() => setProgressRetry((value) => value + 1)}>Try again</Button>
+              <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50/80 p-3.5 text-rose-900">
+                <div className="flex items-center gap-2 text-sm font-medium text-rose-800">
+                  <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
+                  <span>{progressGaps.error}</span>
+                </div>
+                <Button type="button" variant="outline" size="sm" className="h-8 border-rose-300 bg-white text-xs font-medium text-rose-800 hover:bg-rose-100" onClick={() => setProgressRetry((value) => value + 1)}>
+                  <RefreshCcw className="mr-1.5 h-3 w-3" /> Try again
+                </Button>
               </div>
             ) : (
-              <>
-                <ul className="space-y-2 text-sm">
-                  {progressGaps.gaps.map((gap, index) => (
-                    <li key={`${gap.label}-${index}`} className="flex flex-wrap justify-between gap-2">
-                      <span>{gap.label}</span>
-                      <span className="text-slate-600">{gap.verified} of {gap.target} verified</span>
-                    </li>
-                  ))}
-                </ul>
-                <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => {
-                  void apiPost("/api/arogya/usage", { eventType: "nudge_click" }).catch(() => {});
-                  openArogya();
-                }}>Ask Mochi about this</Button>
-              </>
+              <div className="space-y-4">
+                {/* Core Category Targets (e.g. Cases, Procedures, Academics) */}
+                {categoryGaps.length > 0 && (
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {categoryGaps.map((gap, index) => {
+                      const pct = Math.min(100, Math.round((gap.verified / gap.target) * 100));
+                      return (
+                        <div key={`${gap.label}-${index}`} className="flex flex-col justify-between rounded-xl border border-slate-100 bg-slate-50/70 p-3.5 transition-colors hover:bg-slate-50">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-semibold text-slate-800 truncate">{gap.label}</span>
+                            <Badge variant="secondary" className="h-5 px-1.5 text-[10px] font-medium bg-white text-slate-700 border border-slate-200">
+                              {gap.verified} / {gap.target}
+                            </Badge>
+                          </div>
+                          <div className="mt-2.5 flex items-center gap-2">
+                            <Progress value={pct} className="h-1.5 flex-1 bg-slate-200" />
+                            <span className="text-[10px] font-medium text-slate-500 w-7 text-right">{pct}%</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Specific Procedure Requirements */}
+                {procedureGaps.length > 0 && (
+                  <div className="space-y-2.5">
+                    {categoryGaps.length > 0 && (
+                      <div className="flex items-center justify-between pt-1">
+                        <span className="text-xs font-medium uppercase tracking-wider text-slate-400">
+                          Specific Procedure Requirements ({procedureGaps.length})
+                        </span>
+                        {procedureGaps.length > 3 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs text-teal-700 hover:text-teal-800 p-0 hover:bg-transparent font-medium"
+                            onClick={() => setIsTargetsExpanded(!isTargetsExpanded)}
+                          >
+                            {isTargetsExpanded ? (
+                              <span className="flex items-center gap-1">Show fewer <ChevronUp className="h-3.5 w-3.5" /></span>
+                            ) : (
+                              <span className="flex items-center gap-1">View all {procedureGaps.length} requirements <ChevronDown className="h-3.5 w-3.5" /></span>
+                            )}
+                          </Button>
+                        )}
+                      </div>
+                    )}
+
+                    <div className={`space-y-2 ${isTargetsExpanded ? "max-h-64 overflow-y-auto pr-1" : ""}`}>
+                      {(isTargetsExpanded ? procedureGaps : procedureGaps.slice(0, categoryGaps.length > 0 ? 3 : 5)).map((gap, index) => {
+                        const pct = Math.min(100, Math.round((gap.verified / gap.target) * 100));
+                        const parts = gap.label.split(":");
+                        const group = parts.length > 1 ? parts[0].trim() : null;
+                        const name = parts.length > 1 ? parts.slice(1).join(":").trim() : gap.label;
+
+                        return (
+                          <div key={`${gap.label}-${index}`} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border border-slate-100 bg-white p-2.5 px-3.5 text-xs hover:border-slate-200 hover:bg-slate-50/40 transition-colors">
+                            <div className="min-w-0 flex-1">
+                              {group && (
+                                <span className="inline-block text-[10px] font-semibold text-teal-800 bg-teal-50 border border-teal-100/70 px-1.5 py-0.5 rounded-md mr-2">
+                                  {group}
+                                </span>
+                              )}
+                              <span className="font-medium text-slate-800 truncate" title={gap.label}>{name}</span>
+                            </div>
+                            <div className="flex items-center gap-3 shrink-0">
+                              <div className="w-24 hidden sm:block">
+                                <Progress value={pct} className="h-1.5 bg-slate-100" />
+                              </div>
+                              <span className="text-slate-600 font-mono text-[11px] min-w-16 text-right">
+                                {gap.verified} of {gap.target}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {!isTargetsExpanded && procedureGaps.length > (categoryGaps.length > 0 ? 3 : 5) && (
+                      <div className="text-center pt-1">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs text-slate-500 hover:text-teal-700 hover:bg-slate-50 gap-1 font-medium"
+                          onClick={() => setIsTargetsExpanded(true)}
+                        >
+                          + {procedureGaps.length - (categoryGaps.length > 0 ? 3 : 5)} more procedure requirements <ChevronDown className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             )}
           </CardContent>
         </Card>

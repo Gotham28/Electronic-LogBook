@@ -158,7 +158,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
   const yearlyAttendance = Boolean(config?.enabledFeatures?.yearlyAttendance);
   const isHodUser = Boolean(embedded || currentUser?.role === "hod");
   const askMochiButton = (
-    <Button type="button" variant="outline" size="sm" onClick={openArogya}>
+    <Button type="button" variant="outline" size="sm" onClick={() => openArogya("Why is this record flagged or pending review?")}>
       Ask Mochi about this
     </Button>
   );
@@ -589,7 +589,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                           variant="outline"
                           size="sm"
                           onClick={() => {
-                            openArogya();
+                            openArogya("Why is this log flagged or pending review?");
                             void apiPost("/api/arogya/usage", { eventType: "nudge_click" }).catch(() => {});
                           }}
                         >

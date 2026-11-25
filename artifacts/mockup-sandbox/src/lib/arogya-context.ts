@@ -12,6 +12,7 @@ export function publishArogyaContext(context: ArogyaSelectedContext | null): voi
   window.dispatchEvent(new CustomEvent(AROGYA_CONTEXT_EVENT, { detail: context }));
 }
 
-export function openArogya(): void {
-  window.dispatchEvent(new Event(AROGYA_OPEN_EVENT));
+export function openArogya(initialPrompt?: string | unknown): void {
+  const prompt = typeof initialPrompt === "string" ? initialPrompt : undefined;
+  window.dispatchEvent(new CustomEvent(AROGYA_OPEN_EVENT, { detail: { prompt } }));
 }
