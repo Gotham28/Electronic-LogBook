@@ -6,7 +6,7 @@ import { SendHorizontal, X } from "lucide-react";
 import { ArogyaCharacter, type ArogyaState } from "./ArogyaCharacter";
 import { apiGet, apiPost, applyMochiAction, submitSupportTicket, undoMochiAction, type ArogyaAnswer, type ArogyaContextResponse } from "@/lib/apiClient";
 import { isDemoMode } from "@/lib/session";
-import { AROGYA_CONTEXT_EVENT, type ArogyaSelectedContext } from "@/lib/arogya-context";
+import { AROGYA_CONTEXT_EVENT, AROGYA_OPEN_EVENT, type ArogyaSelectedContext } from "@/lib/arogya-context";
 import { useDepartment } from "@/lib/department-context";
 import { AssistantAnswer, type MochiEditHandlers } from "./AssistantAnswer";
 import { displayAssistantError } from "./assistantCopy";
@@ -285,6 +285,31 @@ export function ArogyaPanel({ open, onOpenChange, role, actorKey, workflowId, st
 
   const handleAskRef = React.useRef(handleAsk);
   handleAskRef.current = handleAsk;
+
+  const pendingPromptRef = React.useRef<string | null>(null);
+
+  React.useEffect(() => {
+    const handleOpenWithPrompt = (event: Event) => {
+      const detail = (event as CustomEvent<{ prompt?: string }>).detail;
+      if (detail?.prompt) {
+        if (assistantContext) {
+          handleAskRef.current(new Event("submit"), detail.prompt);
+        } else {
+          pendingPromptRef.current = detail.prompt;
+        }
+      }
+    };
+    window.addEventListener(AROGYA_OPEN_EVENT, handleOpenWithPrompt);
+    return () => window.removeEventListener(AROGYA_OPEN_EVENT, handleOpenWithPrompt);
+  }, [assistantContext]);
+
+  React.useEffect(() => {
+    if (assistantContext && pendingPromptRef.current) {
+      const prompt = pendingPromptRef.current;
+      pendingPromptRef.current = null;
+      handleAskRef.current(new Event("submit"), prompt);
+    }
+  }, [assistantContext]);
 
   React.useEffect(() => {
     if (!open || !isDemoMode() || !isDemoMovieActive()) return undefined;
