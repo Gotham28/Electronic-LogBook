@@ -23,7 +23,12 @@ import {
   resolveProcedureFieldDefinitions,
   validateDynamicProcedureLogFields,
   validateProcedureLogFields,
+  voiceLogTypeSchema,
 } from "@workspace/api-zod";
+import { detectAudioFileType, VOICE_LOG_MAX_BYTES, VOICE_LOG_MIN_BYTES } from "../lib/voice-log/audio.js";
+import { checkVoiceLogLimit, VoiceLogError } from "../lib/voice-log/rate-limit.js";
+import { loadVoiceLogDepartmentContext } from "../lib/voice-log/context.js";
+import { extractVoiceLog } from "../lib/voice-log/provider.js";
 import { clinicalWorkTarget } from "../lib/clinical-work-progress.js";
 import { validateAcademicRecord, readAcademicRecord, writeAcademicRecord, academicSectionForRecord } from "@workspace/api-zod";
 import { getAcademicLogbook } from "../lib/academic-logbook.js";
@@ -1330,6 +1335,93 @@ router.patch("/:studentId/certifications/:certId/review", requireAuth, requireRo
     res.json(withoutCertificateFileKey(updated));
   } catch (error) {
     req.log.error({ studentId: req.params.studentId, certId: req.params.certId, status: 500 }, "Error reviewing certification");
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// VOICE LOG EXTRACTION
+
+const voiceLogRawParser = express.raw({ type: () => true, limit: "10mb" });
+const parseVoiceLogAudio: express.RequestHandler = (req, res, next) => {
+  voiceLogRawParser(req, res, (err) => {
+    if (err) {
+      if ((err as any).type === "entity.too.large" || (err as any).status === 413) {
+        res.status(413).json({ message: "Audio recording exceeds the 10 MB limit." });
+        return;
+      }
+      next(err);
+      return;
+    }
+    next();
+  });
+};
+
+router.post("/:studentId/voice-log/extract", parseVoiceLogAudio, async (req, res) => {
+  try {
+    const parsedLogType = voiceLogTypeSchema.safeParse(req.query.logType);
+    if (!parsedLogType.success) {
+      res.status(400).json({ message: "Invalid logType. Must be 'case' or 'procedure'." });
+      return;
+    }
+    const logType = parsedLogType.data;
+
+    const bytes = req.body;
+    if (!Buffer.isBuffer(bytes) || bytes.length < VOICE_LOG_MIN_BYTES) {
+      res.status(400).json({ message: "Audio recording is too small or missing." });
+      return;
+    }
+    if (bytes.length > VOICE_LOG_MAX_BYTES) {
+      res.status(413).json({ message: "Audio recording exceeds the 10 MB limit." });
+      return;
+    }
+    const detected = detectAudioFileType(bytes);
+    if (!detected) {
+      res.status(400).json({ message: "Unsupported audio format. Supported formats: WebM, MP4/M4A, OGG, WAV." });
+      return;
+    }
+
+    try {
+      checkVoiceLogLimit(String(req.user!.id));
+    } catch (limitErr: any) {
+      if (limitErr instanceof VoiceLogError && limitErr.code === "VOICE_LOG_LIMIT_REACHED") {
+        res.status(429).json({ message: "Voice log rate limit reached. Please try again later." });
+        return;
+      }
+      throw limitErr;
+    }
+
+    const departmentContext = await loadVoiceLogDepartmentContext(req.user!.departmentId!);
+    const result = await extractVoiceLog({
+      bytes,
+      logType,
+      departmentContext,
+    });
+    res.status(200).json(result);
+  } catch (err: any) {
+    if (err instanceof VoiceLogError) {
+      if (err.code === "VOICE_LOG_UNAVAILABLE") {
+        res.status(503).json({ message: "Voice logging service is currently unavailable." });
+        return;
+      }
+      if (err.code === "VOICE_LOG_INVALID_OUTPUT") {
+        res.status(502).json({ message: "Failed to parse structured output from voice model." });
+        return;
+      }
+      if (err.code === "VOICE_LOG_INVALID_AUDIO") {
+        res.status(400).json({ message: "Invalid audio format." });
+        return;
+      }
+      if (err.code === "VOICE_LOG_TOO_LARGE") {
+        res.status(413).json({ message: "Audio recording exceeds the 10 MB limit." });
+        return;
+      }
+      if (err.code === "VOICE_LOG_LIMIT_REACHED") {
+        res.status(429).json({ message: "Voice log rate limit reached. Please try again later." });
+        return;
+      }
+    }
+    // AGENTS.md §8: Never log audio bytes, transcripts, or patient text
+    req.log.error({ status: 500 }, "Error extracting voice log");
     res.status(500).json({ message: "Internal server error" });
   }
 });
