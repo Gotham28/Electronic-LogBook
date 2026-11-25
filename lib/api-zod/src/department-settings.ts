@@ -10,6 +10,7 @@ export const DEPARTMENT_SETTING_TIERS = {
   useThesisAndPublicationsLabel: "mochi",
   useCaseTypeLabel: "mochi",
   academicsFirstInNav: "mochi",
+  studentNavOrder: "mochi",
   freeTextPostingUnit: "hod_only",
   freeTextPostingSupervisor: "hod_only",
   freeTextProcedures: "hod_only",
@@ -44,11 +45,26 @@ export type DepartmentSettingKey = keyof typeof DEPARTMENT_SETTING_TIERS;
 const settingKeys = Object.keys(DEPARTMENT_SETTING_TIERS) as [DepartmentSettingKey, ...DepartmentSettingKey[]];
 export const departmentSettingKeySchema = z.enum(settingKeys);
 
-// Every allowlisted setting is a boolean today. A future non-boolean key adds its own entries here.
-export const DEPARTMENT_SETTING_VALUE_TYPES: Record<DepartmentSettingKey, "boolean"> =
-  Object.fromEntries(settingKeys.map((key) => [key, "boolean"])) as Record<DepartmentSettingKey, "boolean">;
+export type DepartmentSettingValueType = "boolean" | "path_list";
+export type DepartmentSettingValue = boolean | string[];
+
+export const studentNavOrderSchema = z
+  .array(z.string().max(64).regex(/^\/[a-z0-9/-]*$/, "Menu paths must start with / and use lowercase letters, digits, - or /"))
+  .max(30, "At most 30 menu paths are allowed")
+  .refine((items) => new Set(items).size === items.length, { message: "Menu paths must be unique" });
+
+export const DEPARTMENT_SETTING_VALUE_TYPES: Record<DepartmentSettingKey, DepartmentSettingValueType> =
+  Object.fromEntries(settingKeys.map((key) => [key, key === "studentNavOrder" ? "path_list" : "boolean"])) as Record<DepartmentSettingKey, DepartmentSettingValueType>;
 export const departmentSettingValueSchemas: Record<DepartmentSettingKey, z.ZodTypeAny> =
-  Object.fromEntries(settingKeys.map((key) => [key, z.boolean()])) as Record<DepartmentSettingKey, z.ZodTypeAny>;
+  Object.fromEntries(settingKeys.map((key) => [key, key === "studentNavOrder" ? studentNavOrderSchema : z.boolean()])) as Record<DepartmentSettingKey, z.ZodTypeAny>;
+
+export function departmentSettingUpdateSchemaFor(key: DepartmentSettingKey) {
+  const valueSchema = departmentSettingValueSchemas[key];
+  return z.object({
+    value: valueSchema,
+    expectedValue: valueSchema.nullable(),
+  }).strict();
+}
 
 // `expectedValue` is the stored value the caller previewed: null means "unset". The server returns
 // 409 when the stored value differs.

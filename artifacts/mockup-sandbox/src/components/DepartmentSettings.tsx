@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LogbookSectionSettings } from "./LogbookSectionSettings";
+import { NavOrderSettings } from "./NavOrderSettings";
 import {
   DepartmentProcedureFieldsCard,
   DynamicProcedureFieldChecklist,
@@ -169,6 +170,7 @@ export function DepartmentSettings() {
     if (features.conferenceLevels) list.push({ id: "conference", label: "Conference levels", items: data.conferenceLevels ?? [], kind: "conference_level", addLabel: "+ Add conference level" });
     list.push({ id: "leaves", label: "Leave types", items: data.leaveTypes ?? [], kind: "leave_type", addLabel: "+ Add leave type" });
     list.push({ id: "wording", label: "Wording", items: (Object.keys(DEPARTMENT_LABELS) as DepartmentLabelKey[]).map((key, index) => ({ id: index, name: key, required: 0 })), kind: "wording", addLabel: "" });
+    list.push({ id: "menu-order", label: "Residents' menu order", items: [], kind: "menu_order", addLabel: "" });
     return list;
   }, [procedureTypesEnabled, features, data]);
 
@@ -459,7 +461,7 @@ export function DepartmentSettings() {
         </div>
 
         <div className="min-w-0 flex flex-col gap-4 pb-12">
-          {activeSection.kind === "logbook" ? <LogbookSectionSettings /> : activeSection.kind === "wording" ? <WordingSettings /> : <>
+          {activeSection.kind === "logbook" ? <LogbookSectionSettings /> : activeSection.kind === "wording" ? <WordingSettings /> : activeSection.kind === "menu_order" ? <NavOrderSettings /> : <>
           <div className="flex flex-col gap-2 border-b border-slate-200 pb-4">
             <div className="flex items-center justify-between gap-4">
               <h3 className="text-lg font-semibold text-slate-900">{activeSection.label}</h3>

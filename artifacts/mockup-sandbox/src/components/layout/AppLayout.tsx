@@ -68,7 +68,7 @@ import { AROGYA_OPEN_EVENT } from "@/lib/arogya-context";
 import { MaintenanceNoticeBubble } from "@/components/arogya/MaintenanceNoticeBubble";
 import { useDepartment, defaultDepartmentLabel, resolveDepartmentLabel, type DepartmentLabelKey } from "@/lib/department-context";
 import type { AcademicLogbookProfile } from "@/lib/academic-logbook";
-import { navigationIsActive, profileNavigation } from "@/lib/academic-navigation";
+import { applyNavOrder, navigationIsActive, profileNavigation, readStudentNavOrder } from "@/lib/academic-navigation";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { DemoBanner } from "@/components/layout/DemoBanner";
 import { DemoMovie } from "@/components/demo-movie/DemoMovie";
@@ -140,7 +140,7 @@ const navigationDescriptionsByRoute: Record<string, string> = {
   "/milestones": navigationDescriptions["Thesis & Certifications"],
 };
 
-function navigationForRole(role: RoleType, dashboardData?: any, loadingBadges?: boolean, config?: any, demoMode = false, academicLogbook?: AcademicLogbookProfile | null, department?: any, label?: (key: DepartmentLabelKey) => string, overrides?: Record<string, string>): NavigationItem[] {
+export function navigationForRole(role: RoleType, dashboardData?: any, loadingBadges?: boolean, config?: any, demoMode = false, academicLogbook?: AcademicLogbookProfile | null, department?: any, label?: (key: DepartmentLabelKey) => string, overrides?: Record<string, string>): NavigationItem[] {
   // Titles for the two label-driven entries; the registry default applies when no label function is passed.
   const postingsTitle = label ? label("nav.postings") : defaultDepartmentLabel("nav.postings");
   const milestonesTitle = label ? label("nav.milestones") : defaultDepartmentLabel("nav.milestones", { useThesisAndMandatoryCertificationsLabel: Boolean(config?.enabledFeatures?.useThesisAndMandatoryCertificationsLabel) });
@@ -516,10 +516,18 @@ export function AppLayout({
   }, [activeRole, currentUser?.id]);
 
 
-  const navigationItems = React.useMemo(
-    () => navigationForRole(activeRole, dashboardData, loadingBadges, config, demoMode, academicLogbook, department, label, labels)
-      .map((item) => item.href === "/academics" && academicLogbook ? { ...item, title: academicLogbook.title } : item),
-    [activeRole, dashboardData, loadingBadges, config, demoMode, academicLogbook, department, label, labels],
+  const studentNavOrder = React.useMemo(
+    () => (activeRole === "Student" ? readStudentNavOrder(config?.enabledFeatures) : []),
+    [activeRole, config?.enabledFeatures],
+  );
+  const navigationItems = React.useMemo(() => {
+    const items = navigationForRole(activeRole, dashboardData, loadingBadges, config, demoMode, academicLogbook, department, label, labels)
+      .map((item) => (item.href === "/academics" && academicLogbook ? { ...item, title: academicLogbook.title } : item));
+    return studentNavOrder.length ? applyNavOrder(items, studentNavOrder) : items;
+  }, [activeRole, dashboardData, loadingBadges, config, demoMode, academicLogbook, department, label, labels, studentNavOrder]);
+  const hasCustomStudentOrder = React.useMemo(
+    () => activeRole === "Student" && studentNavOrder.some((href) => href !== "/" && navigationItems.some((item) => item.href === href)),
+    [activeRole, studentNavOrder, navigationItems],
   );
   const visibleNavigationItems = isDepartmentSwitching ? [] : navigationItems;
   const closeTour = React.useCallback(() => {
@@ -851,7 +859,7 @@ export function AppLayout({
               ) : children}
             </main>
           </SidebarInset>
-          <MobileBottomNav role={activeRole} items={navigationItems} location={location} departmentKey={department.id} switching={isDepartmentSwitching} />
+          <MobileBottomNav role={activeRole} items={navigationItems} location={location} departmentKey={department.id} switching={isDepartmentSwitching} hasCustomOrder={hasCustomStudentOrder} />
           <Toaster position="top-right" richColors />
 
           <ArogyaPanel 

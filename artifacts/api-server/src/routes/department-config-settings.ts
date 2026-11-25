@@ -1,7 +1,6 @@
 import { Router } from "express";
-import { departmentSettingUpdateSchema } from "@workspace/api-zod";
+import { departmentSettingKeySchema, departmentSettingUpdateSchemaFor } from "@workspace/api-zod";
 import { requireAuth, requireRole, requireDepartment } from "../middlewares/auth.js";
-import { validate } from "../lib/validation.js";
 import { DepartmentSettingError, getDepartmentSettings, setDepartmentSetting } from "../lib/department-settings.js";
 
 const router = Router();
@@ -17,12 +16,19 @@ router.get("/", async (req, res) => {
   }
 });
 
-router.patch("/:key", validate(departmentSettingUpdateSchema), async (req, res) => {
+router.patch("/:key", async (req, res) => {
+  const parsedKey = departmentSettingKeySchema.safeParse(String(req.params.key));
+  if (!parsedKey.success) { res.status(400).json({ message: "Unknown setting" }); return; }
+  const parsedBody = departmentSettingUpdateSchemaFor(parsedKey.data).safeParse(req.body);
+  if (!parsedBody.success) {
+    res.status(400).json({ message: parsedBody.error.issues[0]?.message || "Invalid request" });
+    return;
+  }
   try {
     // The actor is fixed here: a client can never pick it. Task 4 calls the service with "mochi".
     const result = await setDepartmentSetting({
-      departmentId: req.user!.departmentId!, userId: req.user!.id, key: String(req.params.key),
-      value: req.body.value, expectedValue: req.body.expectedValue, actor: "hod",
+      departmentId: req.user!.departmentId!, userId: req.user!.id, key: parsedKey.data,
+      value: parsedBody.data.value, expectedValue: parsedBody.data.expectedValue, actor: "hod",
     });
     res.json(result);
   } catch (error) {

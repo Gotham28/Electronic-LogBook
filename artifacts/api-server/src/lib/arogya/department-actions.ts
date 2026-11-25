@@ -2,7 +2,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { auditTable, db } from "@workspace/db";
 import {
-  DEPARTMENT_LABELS, DEPARTMENT_SETTING_TIERS, departmentLabelValueSchema, departmentSettingKeySchema,
+  DEPARTMENT_LABELS, DEPARTMENT_SETTING_TIERS, DEPARTMENT_SETTING_VALUE_TYPES, departmentLabelValueSchema, departmentSettingKeySchema,
   isDepartmentLabelKey, type DepartmentLabelKey, type DepartmentSettingKey,
 } from "@workspace/api-zod";
 import { DepartmentLabelError, getDepartmentLabel, setDepartmentLabel } from "../department-labels.js";
@@ -25,7 +25,8 @@ export const hodEditsEnabled = (): boolean => process.env.AROGYA_HOD_EDITS_ENABL
 // Department Settings is the "requirements" page in the HOD portal.
 export const DEPARTMENT_SETTINGS_HREF = "/requirements";
 
-export const ALL_SETTING_KEYS = Object.keys(DEPARTMENT_SETTING_TIERS) as DepartmentSettingKey[];
+export const ALL_SETTING_KEYS = (Object.keys(DEPARTMENT_SETTING_TIERS) as DepartmentSettingKey[])
+  .filter((key) => DEPARTMENT_SETTING_VALUE_TYPES[key] === "boolean");
 export const MOCHI_SETTING_KEYS = ALL_SETTING_KEYS.filter((key) => DEPARTMENT_SETTING_TIERS[key] === "mochi");
 export const isMochiSettingKey = (key: string): key is DepartmentSettingKey =>
   (MOCHI_SETTING_KEYS as string[]).includes(key);
@@ -78,8 +79,9 @@ export async function buildProposal(departmentId: number, request: ProposalReque
       getDepartmentSettings(departmentId),
       getDepartmentFeatures(departmentId),
     ]);
-    const stored = settings.find((setting) => setting.key === key)?.value ?? null;
-    const effective = typeof features[key] === "boolean" ? features[key] : stored;
+    const rawStored = settings.find((setting) => setting.key === key)?.value;
+    const stored: boolean | null = typeof rawStored === "boolean" ? rawStored : null;
+    const effective: boolean | null = typeof features[key] === "boolean" ? features[key] : stored;
     return mochiProposalSchema.parse({ type: "setting_set", key, title: settingTitle(key), before: onOff(effective),
       after: onOff(request.value), value: request.value, expected: stored });
   }
@@ -105,7 +107,7 @@ export async function classifyAction(departmentId: number, request: unknown): Pr
   try {
     if (candidate.type === "setting_set") {
       const parsedKey = departmentSettingKeySchema.safeParse(candidate.key);
-      if (!parsedKey.success) return { kind: "unsupported" };
+      if (!parsedKey.success || DEPARTMENT_SETTING_VALUE_TYPES[parsedKey.data] !== "boolean") return { kind: "unsupported" };
       if (!isMochiSettingKey(parsedKey.data)) {
         return { kind: "hod_only_refusal", refusal: { type: "hod_only", key: parsedKey.data,
           title: settingTitle(parsedKey.data), settingsHref: DEPARTMENT_SETTINGS_HREF } };
@@ -141,7 +143,11 @@ export async function applyAction(user: ActionUser, body: unknown): Promise<Moch
   const { type, key } = envelope.data;
   if (!isMochiActionType(type)) throw new DepartmentActionError(404, "Unknown action");
   if (type === "setting_set") {
-    if (!departmentSettingKeySchema.safeParse(key).success) throw new DepartmentActionError(404, "Unknown setting");
+    const parsedKey = departmentSettingKeySchema.safeParse(key);
+    if (!parsedKey.success) throw new DepartmentActionError(404, "Unknown setting");
+    if (DEPARTMENT_SETTING_VALUE_TYPES[parsedKey.data] !== "boolean") {
+      throw new DepartmentActionError(400, "This setting cannot be changed as a boolean");
+    }
     if (!isMochiSettingKey(key)) throw new DepartmentActionError(403, "This setting can only be changed by the HOD directly");
   } else if (!isDepartmentLabelKey(key)) {
     throw new DepartmentActionError(404, "Unknown wording key");
@@ -154,9 +160,11 @@ export async function applyAction(user: ActionUser, body: unknown): Promise<Moch
     const { features } = await getDepartmentFeatures(departmentId);
     const change = await setDepartmentSetting({ departmentId, userId: user.id, key: action.key, value: action.value,
       expectedValue: action.expected, actor: "mochi" });
-    const effectiveBefore = typeof features[action.key] === "boolean" ? features[action.key] : change.before;
-    return { auditId: change.auditId, before: onOff(effectiveBefore), after: onOff(change.after),
-      undoable: change.auditId !== null && change.before !== null };
+    const changeBefore: boolean | null = typeof change.before === "boolean" ? change.before : null;
+    const changeAfter: boolean | null = typeof change.after === "boolean" ? change.after : null;
+    const effectiveBefore: boolean | null = typeof features[action.key] === "boolean" ? features[action.key] : changeBefore;
+    return { auditId: change.auditId, before: onOff(effectiveBefore), after: onOff(changeAfter),
+      undoable: change.auditId !== null && changeBefore !== null };
   }
   if (action.type === "label_set" && containsSensitiveClinicalInput(action.value)) {
     throw new DepartmentActionError(400, "Wording cannot contain patient details");
@@ -210,5 +218,7 @@ export async function undoAction(user: ActionUser, auditId: string): Promise<Moc
   }
   const change = await setDepartmentSetting({ departmentId, userId: user.id, key, value: before.data.value,
     expectedValue: after.data.value, actor: "mochi", undoOf: auditId });
-  return { auditId: change.auditId, before: onOff(change.before), after: onOff(change.after) };
+  const changeBefore: boolean | null = typeof change.before === "boolean" ? change.before : null;
+  const changeAfter: boolean | null = typeof change.after === "boolean" ? change.after : null;
+  return { auditId: change.auditId, before: onOff(changeBefore), after: onOff(changeAfter) };
 }
