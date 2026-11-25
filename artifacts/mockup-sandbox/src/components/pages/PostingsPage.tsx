@@ -38,8 +38,7 @@ import { apiGet, apiPost, apiPatch } from "@/lib/apiClient";
 import { getCurrentUser } from "@/lib/session";
 
 export function PostingsPage() {
-  const { postings: postingOptions, config, postingSchedule, department, label } = useDepartment();
-  const isMicrobiology = department?.code?.toLowerCase() === "microbiology" || department?.name?.toLowerCase().includes("microbiology");
+  const { postings: postingOptions, config, postingSchedule, label } = useDepartment();
   const postingLabelTitle = label("postings.unitTitle");
   const postingLabelLower = label("postings.unitPhrase");
   const [open, setOpen] = React.useState(false);
@@ -56,7 +55,9 @@ export function PostingsPage() {
   const [supervisorId, setSupervisorId] = React.useState("");
   const [editId, setEditId] = React.useState<number | null>(null);
 
-  const isFreeTextWard = Boolean(config?.enabledFeatures?.freeTextPostingUnit || isMicrobiology);
+  const isFreeTextWard = Boolean(config?.enabledFeatures?.freeTextPostingUnit);
+  // Free-text postings still offer an optional supervisor and show the Supervisor and Status columns when this is on.
+  const freeTextPostingSupervisor = Boolean(config?.enabledFeatures?.freeTextPostingSupervisor);
 
   const fetchPostings = React.useCallback(async () => {
     if (!user?.studentProfileId) return;
@@ -163,7 +164,7 @@ export function PostingsPage() {
                   <Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} required />
                 </div>
               </div>
-              {(!isFreeTextWard || (isMicrobiology && professors.length > 0)) && (
+              {(!isFreeTextWard || (freeTextPostingSupervisor && professors.length > 0)) && (
                 <div className="space-y-2">
                   <Label>Supervisor (Unit Chief) {isFreeTextWard && <span className="text-slate-400 font-normal text-xs">(optional)</span>}</Label>
                   <Select value={supervisorId} onValueChange={setSupervisorId}>
@@ -216,8 +217,8 @@ export function PostingsPage() {
                   <TableHead>{postingLabelTitle}</TableHead>
                   <TableHead>Start Date</TableHead>
                   <TableHead>End Date</TableHead>
-                  {(!isFreeTextWard || isMicrobiology) && <TableHead>Supervisor</TableHead>}
-                  {(!isFreeTextWard || isMicrobiology) && <TableHead>Status</TableHead>}
+                  {(!isFreeTextWard || freeTextPostingSupervisor) && <TableHead>Supervisor</TableHead>}
+                  {(!isFreeTextWard || freeTextPostingSupervisor) && <TableHead>Status</TableHead>}
                   <TableHead className="text-right">{isFreeTextWard ? "Action" : "Faculty Remarks"}</TableHead>
                 </TableRow>
               </TableHeader>
@@ -227,8 +228,8 @@ export function PostingsPage() {
                     <TableCell className="font-medium text-slate-900">{item.ward}</TableCell>
                     <TableCell>{formatLogbookDate(item.startDate)}</TableCell>
                     <TableCell>{formatLogbookDate(item.endDate)}</TableCell>
-                    {(!isFreeTextWard || isMicrobiology) && <TableCell>{item.supervisorName || "—"}</TableCell>}
-                    {(!isFreeTextWard || isMicrobiology) && (
+                    {(!isFreeTextWard || freeTextPostingSupervisor) && <TableCell>{item.supervisorName || "—"}</TableCell>}
+                    {(!isFreeTextWard || freeTextPostingSupervisor) && (
                       <TableCell>
                         <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
                           item.status === "verified" ? "bg-emerald-100 text-emerald-700" :

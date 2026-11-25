@@ -55,37 +55,8 @@ router.get("/:departmentId/catalog", async (req, res) => {
     ]);
     const labels = Object.fromEntries(labelRows.map((row) => [row.key, row.value]));
     const deptInfo = department[0];
-    const isMicro = deptInfo?.code?.toLowerCase() === "microbiology" || deptInfo?.name?.toLowerCase().includes("microbiology");
-    let resolvedConfig = config[0] ? { ...config[0] } : null;
-    if (resolvedConfig) {
-      const enabledFeatures = { ...((resolvedConfig.enabledFeatures as Record<string, boolean>) || {}) };
-      if (isMicro) {
-        if (enabledFeatures.microbiologyCaseFields === undefined) enabledFeatures.microbiologyCaseFields = true;
-        if (enabledFeatures.freeTextProcedures === undefined) enabledFeatures.freeTextProcedures = true;
-        if (enabledFeatures.hideProcedureAge === undefined) enabledFeatures.hideProcedureAge = true;
-        if (enabledFeatures.procedureExperience === undefined) enabledFeatures.procedureExperience = false;
-        if (enabledFeatures.useThesisAndMandatoryCertificationsLabel === undefined) enabledFeatures.useThesisAndMandatoryCertificationsLabel = true;
-        if (enabledFeatures.attendedConferences === undefined) enabledFeatures.attendedConferences = true;
-        if (enabledFeatures.hideLeaveRecords === undefined) enabledFeatures.hideLeaveRecords = true;
-        if (enabledFeatures.yearlyAttendance === undefined) enabledFeatures.yearlyAttendance = true;
-        if (enabledFeatures.conferenceLevels === undefined) enabledFeatures.conferenceLevels = true;
-        if (enabledFeatures.freeTextPostingUnit === undefined) enabledFeatures.freeTextPostingUnit = true;
-        if (enabledFeatures.conferenceDateRange === undefined) enabledFeatures.conferenceDateRange = true;
-        if (enabledFeatures.hideHodQuarterlyAppraisal === undefined) enabledFeatures.hideHodQuarterlyAppraisal = true;
-      }
-      resolvedConfig.enabledFeatures = enabledFeatures;
-    } else if (isMicro) {
-      resolvedConfig = {
-        id: 0,
-        departmentId: configSourceId,
-        requiredCases: null,
-        requiredProcedures: null,
-        requiredAcademic: null,
-        enabledFeatures: { procedureExperience: false, microbiologyCaseFields: true, freeTextProcedures: true, hideProcedureAge: true, useThesisAndMandatoryCertificationsLabel: true, attendedConferences: true, hideLeaveRecords: true, yearlyAttendance: true, conferenceLevels: true, freeTextPostingUnit: true, conferenceDateRange: true, hideHodQuarterlyAppraisal: true },
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      } as any;
-    }
+    // The stored configuration is the only source of behaviour: no defaults are keyed on the name or code.
+    const resolvedConfig = config[0] ? { ...config[0], enabledFeatures: { ...((config[0].enabledFeatures as Record<string, boolean>) || {}) } } : null;
     const dynamicProcedureFields = Boolean((resolvedConfig?.enabledFeatures as Record<string, boolean> | undefined)?.dynamicProcedureFields);
     const procedureFields = resolveProcedureFieldDefinitions(resolvedConfig?.procedureLogFields, dynamicProcedureFields);
     const roleField = dynamicProcedureFields ? procedureFields.find((field) => field.id === "competencyLevel") : undefined;
@@ -110,17 +81,10 @@ router.get("/:departmentId/catalog", async (req, res) => {
 
     res.json({ department: deptInfo, hod: hod[0] || null, config: resolvedConfig, procedures,
       procedureFields, readOnlyConfig: configSourceId !== departmentId,
-      postings: catalog.filter((item) => item.kind === "posting"), academics: isMicro ? [
-        { id: 1, departmentId: configSourceId, kind: "academic", name: "Journal club", value: "journal_club", required: 0, period: "total" as const, parentValue: null },
-        { id: 2, departmentId: configSourceId, kind: "academic", name: "UG teaching", value: "ug_teaching", required: 0, period: "total" as const, parentValue: null },
-        { id: 3, departmentId: configSourceId, kind: "academic", name: "Seminars", value: "seminars", required: 0, period: "total" as const, parentValue: null },
-      ] as any : catalog.filter((item) => item.kind === "academic"), caseCategories: catalog.filter((item) => item.kind === "case_category"),
+      postings: catalog.filter((item) => item.kind === "posting"), academics: catalog.filter((item) => item.kind === "academic"), caseCategories: catalog.filter((item) => item.kind === "case_category"),
       competencyLevels,
       leaveTypes: catalog.filter((item) => item.kind === "leave_type"),
-      conferenceLevels: isMicro ? [
-        { id: 1, departmentId: configSourceId, kind: "conference_level", name: "National", value: "national", required: 0, period: "total" as const, parentValue: null },
-        { id: 2, departmentId: configSourceId, kind: "conference_level", name: "State", value: "state", required: 0, period: "total" as const, parentValue: null },
-      ] as any : catalog.filter((item) => item.kind === "conference_level"),
+      conferenceLevels: catalog.filter((item) => item.kind === "conference_level"),
       clinicalWorkCategories: catalog.filter((item) => item.kind === "clinical_work_category"),
       clinicalWorkSubtypes: catalog.filter((item) => item.kind === "clinical_work_subtype"),
       postingSchedule, academicLogbook, labels });

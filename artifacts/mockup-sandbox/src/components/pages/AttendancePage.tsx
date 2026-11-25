@@ -380,8 +380,7 @@ function StudentYearlyAttendanceView() {
 
 export function AttendancePage() {
   const dept = useDepartment();
-  const isMicroDept = dept.department?.code?.toLowerCase() === "microbiology" || dept.department?.name?.toLowerCase().includes("microbiology");
-  const isYearlyAttendance = Boolean(dept.config?.enabledFeatures?.yearlyAttendance || isMicroDept);
+  const isYearlyAttendance = Boolean(dept.config?.enabledFeatures?.yearlyAttendance);
   const isDailyAttendance = Boolean(dept.config?.enabledFeatures?.dailyAttendance && !isYearlyAttendance);
 
   if (isYearlyAttendance) {

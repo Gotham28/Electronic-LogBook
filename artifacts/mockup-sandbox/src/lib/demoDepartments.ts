@@ -380,6 +380,11 @@ const microbiologyProfile = createEmptyDepartmentProfile({
     hideHodQuarterlyAppraisal: true,
     conferenceLevels: true,
     freeTextPostingUnit: true,
+    procedureExperience: false,
+    procedureDetailsField: true,
+    hideProcedureProgress: true,
+    freeTextPostingSupervisor: true,
+    extendedAssessmentTypes: true,
   },
 });
 
@@ -517,7 +522,7 @@ function buildYearOfActivity(profile: DemoDepartmentProfile) {
     const clinicalCount = hasClinicalWork ? seed.clinicalCount : 0;
 
     const cases = Array.from({ length: caseCount }, (_, index) => {
-      const isMicro = Boolean(features.microbiologyCaseFields);
+      const labCaseFields = Boolean(features.microbiologyCaseFields);
       const sampleCategories = ["Blood culture", "Sputum examination", "Urine C/S", "Stool microscopy", "Pus aspirate", "CSF analysis"];
       const microProvisional = ["Enteric fever workup", "Pulmonary tuberculosis suspect", "Urinary tract infection (E. coli suspect)", "Acute bacterial meningitis", "Staphylococcal wound infection"];
       const sampleProcessing = "Sample inoculated onto 5% Sheep Blood agar and MacConkey agar. Incubated aerobically at 37°C for 24 hours. Gram stain performed showing Gram-negative bacilli. Biochemical testing (catalase, oxidase, citrate, TSI) initiated for species identification and Kirby-Bauer disc diffusion for antimicrobial susceptibility.";
@@ -527,20 +532,20 @@ function buildYearOfActivity(profile: DemoDepartmentProfile) {
         number: index + 1,
         date: activityDate(index, caseCount, random),
         patientUhid: "",
-        patientAge: isMicro ? "28 years" : "",
-        patientGender: isMicro ? (index % 2 === 0 ? "Male" : "Female") : "",
-        age: isMicro ? "28 years" : "Sample",
-        gender: isMicro ? (index % 2 === 0 ? "Male" : "Female") : "Sample",
-        chiefComplaints: isMicro ? "" : "Generic sample summary for interface preview.",
-        history: isMicro ? "" : "Sample entry.",
-        examination: isMicro ? "" : "Sample entry.",
-        investigations: isMicro ? sampleProcessing : "",
-        diagnosisProvisional: isMicro ? microProvisional[index % microProvisional.length] : "Sample case entry " + String(index + 1).padStart(3, "0"),
-        diagnosisFinal: isMicro ? microProvisional[index % microProvisional.length] : "",
-        diagnosis: isMicro ? microProvisional[index % microProvisional.length] : "",
+        patientAge: labCaseFields ? "28 years" : "",
+        patientGender: labCaseFields ? (index % 2 === 0 ? "Male" : "Female") : "",
+        age: labCaseFields ? "28 years" : "Sample",
+        gender: labCaseFields ? (index % 2 === 0 ? "Male" : "Female") : "Sample",
+        chiefComplaints: labCaseFields ? "" : "Generic sample summary for interface preview.",
+        history: labCaseFields ? "" : "Sample entry.",
+        examination: labCaseFields ? "" : "Sample entry.",
+        investigations: labCaseFields ? sampleProcessing : "",
+        diagnosisProvisional: labCaseFields ? microProvisional[index % microProvisional.length] : "Sample case entry " + String(index + 1).padStart(3, "0"),
+        diagnosisFinal: labCaseFields ? microProvisional[index % microProvisional.length] : "",
+        diagnosis: labCaseFields ? microProvisional[index % microProvisional.length] : "",
         differentialDiagnosis: "",
-        management: isMicro ? sampleProcessing : "",
-        category: isMicro ? sampleCategories[index % sampleCategories.length] : catalog.caseCategories[index % Math.max(catalog.caseCategories.length, 1)]?.value ?? null,
+        management: labCaseFields ? sampleProcessing : "",
+        category: labCaseFields ? sampleCategories[index % sampleCategories.length] : catalog.caseCategories[index % Math.max(catalog.caseCategories.length, 1)]?.value ?? null,
         status: activityStatus(index, seed.id, residentIndex === 0 && index === caseCount - 1),
       };
     });
@@ -696,7 +701,8 @@ function buildYearOfActivity(profile: DemoDepartmentProfile) {
     clinicalWorks.sort((a, b) => b.date.localeCompare(a.date));
 
     const attendance: any[] = [];
-    if (profile.data.departmentCatalog.department.code === "microbiology") {
+    // Yearly attendance is a department setting, not something the department's code decides.
+    if (profile.data.departmentCatalog.config?.enabledFeatures?.yearlyAttendance) {
       attendance.push({
         id: profile.id * 1000 + seed.id * 100 + 1,
         studentId: seed.id,

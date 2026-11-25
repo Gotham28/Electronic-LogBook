@@ -144,15 +144,18 @@ const PROFESSOR_REVIEW_FLAG_LABELS: Record<string, string> = {
 export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; embedded?: boolean }) {
   const currentUser = useCurrentUser();
   const hideUhid = isDemoMode();
-  const { config, department, competencyLevels, caseCategories: deptCaseCategories, procedures: deptProcedures, procedureFields, academics: deptAcademics,
+  const { config, competencyLevels, caseCategories: deptCaseCategories, procedures: deptProcedures, procedureFields, academics: deptAcademics,
     clinicalWorkCategories, clinicalWorkSubtypes, academicLogbook, label } = useDepartment();
   const dynamicProcedureFields = Boolean(config?.enabledFeatures?.dynamicProcedureFields);
   const activeProcedureFields = dynamicProcedureFields ? (procedureFields ?? []) : undefined;
   const showProcedureDetails = dynamicProcedureFields || !!config?.enabledFeatures?.procedureClinicalDetails || deptProcedures.some((item) => item.requiredLogFields?.length);
   const canVerifyCompetency = Boolean(config?.enabledFeatures?.procedureExperience)
     && (!dynamicProcedureFields || Boolean(activeProcedureFields?.some((f) => f.id === "competencyLevel") && competencyLevels.length > 0));
-  const isMicroDept = department?.code?.toLowerCase() === "microbiology" || department?.name?.toLowerCase().includes("microbiology");
-  const microbiologyCaseFields = Boolean(config?.enabledFeatures?.microbiologyCaseFields || isMicroDept);
+  const microbiologyCaseFields = Boolean(config?.enabledFeatures?.microbiologyCaseFields);
+  // Behaviour comes only from the department's stored settings. A mentee always belongs to the viewer's department.
+  const procedureDetailsField = Boolean(config?.enabledFeatures?.procedureDetailsField);
+  const extendedAssessmentTypes = Boolean(config?.enabledFeatures?.extendedAssessmentTypes);
+  const yearlyAttendance = Boolean(config?.enabledFeatures?.yearlyAttendance);
   const isHodUser = Boolean(embedded || currentUser?.role === "hod");
   const askMochiButton = (
     <Button type="button" variant="outline" size="sm" onClick={openArogya}>
@@ -161,7 +164,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
   );
   const hideQuarterlyAppraisal = Boolean(
     config?.enabledFeatures?.hideQuarterlyAppraisal ||
-    (isHodUser && (config?.enabledFeatures?.hideHodQuarterlyAppraisal || isMicroDept))
+    (isHodUser && config?.enabledFeatures?.hideHodQuarterlyAppraisal)
   );
   const clinicalNames = React.useMemo(() => new Map([...clinicalWorkCategories, ...clinicalWorkSubtypes].map((item) => [item.value, item.name])),
     [clinicalWorkCategories, clinicalWorkSubtypes]);
@@ -179,7 +182,6 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
 
   // Selected mentee for Logbook Inspector Modal
   const [selectedMentee, setSelectedMentee] = React.useState<any | null>(null);
-  const isMenteeMicro = Boolean(isMicroDept || selectedMentee?.department?.toLowerCase().includes("microbiology") || selectedMentee?.departmentName?.toLowerCase().includes("microbiology"));
   const [menteeLogs, setMenteeLogs] = React.useState<any>(null);
   const [menteeProgress, setMenteeProgress] = React.useState<MenteeProgress | null>(null);
   const [menteeProgressError, setMenteeProgressError] = React.useState<string | null>(null);
@@ -509,9 +511,9 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
             <TabsTrigger value="assessments" className="gap-2 text-xs font-semibold">
               <Award className="h-4 w-4" /> Add Assessment
             </TabsTrigger>
-            {(config?.enabledFeatures?.dailyAttendance || config?.enabledFeatures?.yearlyAttendance || isMicroDept) && (
+            {(config?.enabledFeatures?.dailyAttendance || yearlyAttendance) && (
               <TabsTrigger value="daily-attendance" className="gap-2 text-xs font-semibold">
-                <CalendarDays className="h-4 w-4" /> {isMicroDept ? "Yearly Attendance" : "Daily Attendance"}
+                <CalendarDays className="h-4 w-4" /> {yearlyAttendance ? "Yearly Attendance" : "Daily Attendance"}
               </TabsTrigger>
             )}
           </TabsList>
@@ -627,10 +629,10 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                             fields={activeProcedureFields}
                           />
                         )}
-                        {currentItem.type === "Procedure" && !showProcedureDetails && (config?.enabledFeatures?.freeTextProcedures || isMicroDept) && (
+                        {currentItem.type === "Procedure" && !showProcedureDetails && (config?.enabledFeatures?.freeTextProcedures || procedureDetailsField) && (
                           <>
-                            {currentItem.diagnosis && <p className="text-xs text-slate-600 font-medium">{isMicroDept ? "Details" : "Diagnosis"}: {currentItem.diagnosis}</p>}
-                            {!isMicroDept && currentItem.sex && <p className="text-xs text-slate-600 font-medium">Sex: {currentItem.sex}</p>}
+                            {currentItem.diagnosis && <p className="text-xs text-slate-600 font-medium">{procedureDetailsField ? "Details" : "Diagnosis"}: {currentItem.diagnosis}</p>}
+                            {!procedureDetailsField && currentItem.sex && <p className="text-xs text-slate-600 font-medium">Sex: {currentItem.sex}</p>}
                           </>
                         )}
                         {currentItem.type === "Conference" && currentItem.certificateUrl && (
@@ -827,7 +829,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                     setAssessExamName("");
                     setAssessStudentId("");
                     setAssessMarks("");
-                    setAssessType(isMicroDept ? "continuous" : "quarterly");
+                    setAssessType(extendedAssessmentTypes ? "continuous" : "quarterly");
                     setAssessDate(new Date().toISOString().slice(0, 10));
                   } catch (err: any) {
                     toast.error(err.message || "Failed to record assessment");
@@ -882,7 +884,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {isMicroDept ? (
+                        {extendedAssessmentTypes ? (
                           <>
                             <SelectItem value="continuous">Continuous</SelectItem>
                             <SelectItem value="quarterly">Quarterly</SelectItem>
@@ -923,9 +925,9 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
         </TabsContent>
 
         {/* Tab 4: Attendance (Daily or Yearly) */}
-        {(config?.enabledFeatures?.dailyAttendance || config?.enabledFeatures?.yearlyAttendance || isMicroDept) && (
+        {(config?.enabledFeatures?.dailyAttendance || yearlyAttendance) && (
           <TabsContent value="daily-attendance" className="pt-4 space-y-4">
-            {isMicroDept ? (
+            {yearlyAttendance ? (
               <FacultyYearlyAttendanceSection allStudents={allStudents} />
             ) : (
               <FacultyDailyAttendanceSection allStudents={allStudents} />
@@ -978,9 +980,9 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                     <TabsTrigger value="awards" className="text-xs whitespace-nowrap">Awards & Achievements</TabsTrigger>
                   )}
                   <TabsTrigger value="assessments" className="text-xs whitespace-nowrap">Assessments</TabsTrigger>
-                  {(config?.enabledFeatures?.dailyAttendance || config?.enabledFeatures?.yearlyAttendance || isMenteeMicro) && (
+                  {(config?.enabledFeatures?.dailyAttendance || yearlyAttendance) && (
                     <TabsTrigger value="attendance" className="text-xs whitespace-nowrap">
-                      {isMenteeMicro ? "Yearly Attendance" : "Daily Attendance"}
+                      {yearlyAttendance ? "Yearly Attendance" : "Daily Attendance"}
                     </TabsTrigger>
                   )}
                 </TabsList>
@@ -1145,7 +1147,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                                   </TableCell>
                                 </TableRow>
                                 {expanded && <TableRow><TableCell id={`case-details-${log.id}`} colSpan={4} className="bg-slate-50 p-3">
-                                  <CaseLogDetails caseLog={log} hideUhid={hideUhid} showReview medicalSummaryCaseFields={Boolean(config?.enabledFeatures?.medicalSummaryCaseFields)} microbiologyCaseFields={microbiologyCaseFields || isMenteeMicro} />
+                                  <CaseLogDetails caseLog={log} hideUhid={hideUhid} showReview medicalSummaryCaseFields={Boolean(config?.enabledFeatures?.medicalSummaryCaseFields)} microbiologyCaseFields={microbiologyCaseFields} />
                                 </TableCell></TableRow>}
                               </React.Fragment>
                             );
@@ -1312,7 +1314,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                                       <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
                                         <section aria-labelledby={`proc-ctx-${log.id}`}>
                                           <h4 id={`proc-ctx-${log.id}`} className="mb-3 text-xs font-bold uppercase tracking-wide text-teal-800">Procedure &amp; patient context</h4>
-                                          {isMenteeMicro ? (
+                                          {procedureDetailsField ? (
                                             <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                               <div className="min-w-0">
                                                 <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Date</dt>
@@ -1740,7 +1742,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                     <div className="flex h-32 items-center justify-center">
                       <div className="animate-spin rounded-full border-4 border-slate-300 border-t-teal-600 h-8 w-8" />
                     </div>
-                  ) : isMenteeMicro ? (
+                  ) : yearlyAttendance ? (
                     <div className="space-y-4">
                       {(() => {
                         const y1 = menteeAttendance.find((a: any) => a.date === "YEAR_1");
