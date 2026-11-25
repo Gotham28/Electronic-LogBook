@@ -25,7 +25,7 @@ import { Kbd } from "@/components/ui/kbd";
 import { formatLogbookDate, todayForInput } from "@/lib/logbook-config";
 import { VoiceLogRecorder } from "@/components/VoiceLogRecorder";
 import { mergeCaseVoiceFields } from "@/lib/voiceLogMerge";
-import type { VoiceLogExtractResponse } from "@workspace/api-zod";
+import { isPsychiatryShortCase, type VoiceLogExtractResponse } from "@workspace/api-zod";
 import { useDepartment } from "@/lib/department-context";
 import { LogCustomFieldInputs, LogCustomFieldValues } from "@/components/LogCustomFields";
 import { logCustomFieldVisible } from "@/lib/log-custom-fields";
@@ -160,16 +160,17 @@ export function CaseLogsPage() {
     }
     try {
       setLoading(true);
-      const data = await apiGet(`/api/students/${user.studentProfileId}/logs`);
+      const data = await apiGet<{ caseLogs: Array<CaseLog & { id: number }> }>(`/api/students/${user.studentProfileId}/logs`);
       // Sort so newest are first
-      const sortedLogs = (data.caseLogs || []).sort((a: any, b: any) => b.id - a.id);
+      const sortedLogs = (data.caseLogs || []).filter((log) => !deptConfig?.enabledFeatures.psychiatryWorkspace || !isPsychiatryShortCase(log))
+        .sort((a, b) => b.id - a.id);
       setCaseLogs(sortedLogs.map((log: any, index: number) => ({ ...log, number: sortedLogs.length - index })));
     } catch (err: any) {
       setError(err.message || "Failed to load case logs");
     } finally {
       setLoading(false);
     }
-  }, [user?.studentProfileId]);
+  }, [user?.studentProfileId, deptConfig?.enabledFeatures.psychiatryWorkspace]);
 
   React.useEffect(() => {
     fetchLogs();
