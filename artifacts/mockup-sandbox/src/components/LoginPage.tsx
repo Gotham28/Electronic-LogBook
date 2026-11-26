@@ -229,9 +229,14 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
           <div className="absolute -bottom-24 -left-20 h-64 w-64 rounded-full bg-forest blur-2xl" />
           <div className="relative flex flex-col h-full justify-between">
             <div>
-              <div className="inline-flex items-center gap-3 font-semibold text-white">
-                <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white shadow-sm"><img src={`${import.meta.env.BASE_URL}gothos-owl.svg`} alt="" width={32} height={32} /></span>
-                <span>Gothos Labs</span>
+              <div className="inline-flex items-center">
+                <img
+                  src={`${import.meta.env.BASE_URL}gothos-logo.png`}
+                  alt="Gothos Labs"
+                  width={1254}
+                  height={1081}
+                  className="h-auto w-44"
+                />
               </div>
               <h1 className="mt-10 max-w-xl text-4xl font-bold leading-[1.05] md:text-5xl">
                 Clinical training, clearly organised.
