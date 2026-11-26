@@ -54,6 +54,7 @@
   }
 }
 
+#root:has(.signed-out-entry) > .support-widget-floating,
 #root:has(.signed-out-support-button) > .support-widget-floating {
   display: none;
 }

@@ -456,9 +456,11 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
             )}
 
             <div className="mt-4 text-center">
-              <SignedOutSupportButton>
-                {mode === "login" ? "Having trouble signing in? Contact support" : "Need help?"}
-              </SignedOutSupportButton>
+              {mode === "login" && (
+                <SignedOutSupportButton>
+                  Having trouble signing in? Contact support
+                </SignedOutSupportButton>
+              )}
               <p>
                 <a href="https://www.gothoslabs.com" className="inline-flex min-h-8 items-center gap-1 rounded-full px-2 text-[11px] text-helper hover:underline">
                   by <span className="font-bold text-forest">GOTHOS LABS</span>
