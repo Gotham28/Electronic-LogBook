@@ -146,7 +146,8 @@ export function navigationForRole(role: RoleType, dashboardData?: any, loadingBa
   const milestonesTitle = label ? label("nav.milestones") : defaultDepartmentLabel("nav.milestones", { useThesisAndMandatoryCertificationsLabel: Boolean(config?.enabledFeatures?.useThesisAndMandatoryCertificationsLabel) });
   if (role === "Faculty") {
     const items: NavigationItem[] = [
-      { title: "Evaluation Queue", icon: FileText, href: "/" },
+      { title: "Dashboard", icon: LayoutDashboard, href: "/", activePaths: ["/dashboard"] },
+      { title: "Evaluation Queue", icon: FileText, href: "/review-queue" },
       { title: "Student Progress", icon: UserCheck, href: "/mentees" },
       { title: "Assessments", icon: ClipboardCheck, href: "/assessments" },
     ];
@@ -276,7 +277,8 @@ export function navigationForRole(role: RoleType, dashboardData?: any, loadingBa
 function assistantWorkflowForPath(path: string, role: RoleType): string | undefined {
   const page = path.split("?")[0];
   if (page.startsWith("/academics/")) return "academics";
-  if (page === "/" || page === "/dashboard") return role === "Faculty" ? "evaluation-queue" : role === "HOD" ? "department-dashboard" : "dashboard";
+  if (page === "/" || page === "/dashboard") return role === "Faculty" ? "student-progress" : role === "HOD" ? "department-dashboard" : "dashboard";
+  if (page === "/review-queue") return role === "Faculty" ? "evaluation-queue" : "review-queue";
   const map: Record<string, string> = {
     "/cases": "cases", "/procedures": "procedures", "/clinical-works": "clinical-work",
     "/academics": "academics", "/conferences": "conferences", "/postings": "postings",
