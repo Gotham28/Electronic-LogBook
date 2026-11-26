@@ -240,8 +240,8 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
             {/* ── MODE: Picker ─────────────────────────────────────────── */}
             {mode === "picker" && (
               <div>
-                <h1 className="text-3xl font-bold text-ink sm:text-4xl">Welcome</h1>
-                <p className="mt-2 text-sm text-helper">
+                <h1 className="text-3xl font-bold text-forest sm:text-4xl">Welcome</h1>
+                <p className="mt-2 text-base leading-snug text-ink">
                   Already have an account? Sign in. New here? Explore the demo first.
                 </p>
 
@@ -254,7 +254,7 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
                       focusAfterNavigation.current = true;
                       setMode("login");
                     }}
-                    className="flex min-h-12 w-full items-center justify-center gap-2 rounded-full border border-forest bg-forest px-4 py-2.5 text-sm font-semibold text-white transition-[background-color] hover:bg-deep"
+                    className="flex min-h-12 w-full items-center justify-center gap-2 rounded-full border border-forest bg-forest px-4 py-2.5 text-base font-semibold text-white transition-[background-color] hover:bg-deep"
                   >
                     <LogIn className="h-4 w-4" aria-hidden="true" />
                     Sign in to my account
@@ -266,12 +266,12 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
                       onClick={handleMovieStart}
                       disabled={demoLoading}
                       aria-describedby="login-demo-description"
-                      className="flex min-h-12 w-full items-center justify-center gap-2 rounded-full border-2 border-forest bg-white px-4 py-2.5 text-sm font-semibold text-forest transition-[background-color,color] hover:bg-forest hover:text-white disabled:opacity-60"
+                      className="flex min-h-12 w-full items-center justify-center gap-2 rounded-full border-2 border-forest bg-white px-4 py-2.5 text-base font-semibold text-forest transition-[background-color,color] hover:bg-forest hover:text-white disabled:opacity-60"
                     >
                       {demoLoading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Sparkles className="h-4 w-4" aria-hidden="true" />}
                       Show demo
                     </button>
-                    <p id="login-demo-description" className="mt-2 text-center text-xs leading-5 text-helper">
+                    <p id="login-demo-description" className="mt-2 text-center text-sm leading-snug text-helper">
                       Watch the intro, then explore freely. Start a guided tour anytime. No sign-in needed.
                     </p>
                   </div>
@@ -292,8 +292,8 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
                   <ChevronLeft className="h-3 w-3" /> Back
                 </button>
 
-                <h1 ref={signInHeadingRef} tabIndex={-1} className="text-3xl font-bold text-ink sm:text-4xl">Sign in</h1>
-                <p className="mt-2 text-sm text-helper">
+                <h1 ref={signInHeadingRef} tabIndex={-1} className="text-3xl font-bold text-forest sm:text-4xl">Sign in</h1>
+                <p className="mt-2 text-base leading-snug text-ink">
                   Sign in with your university registration number or email address and password.
                 </p>
 
@@ -412,7 +412,7 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
                       </button>
                     </div>
 
-                    <Button type="submit" className="min-h-11 w-full" disabled={isLoading}>
+                    <Button type="submit" className="min-h-11 w-full text-base" disabled={isLoading}>
                       {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
                       {isLoading ? "Signing in…" : "Sign in to ELogBook"}
                     </Button>
@@ -447,13 +447,13 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
             </div>
           </div>
         </main>
-        <section className="relative overflow-hidden bg-deep p-6 text-white sm:p-8 lg:col-start-1 lg:row-start-1 lg:p-10">
-          <div aria-hidden="true" className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full border-[42px] border-white/10" />
+        <section className="relative overflow-hidden bg-mist p-6 text-ink sm:p-8 lg:col-start-1 lg:row-start-1 lg:p-10">
+          <div aria-hidden="true" className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full border-[42px] border-sage" />
           <div className="relative mx-auto max-w-lg">
-            <h2 className="max-w-md text-2xl font-bold leading-tight sm:text-3xl">
+            <h2 className="max-w-md text-2xl font-bold leading-tight text-forest sm:text-3xl">
               Clinical training, clearly organised.
             </h2>
-            <p className="mt-3 max-w-md text-sm leading-6">
+            <p className="mt-3 max-w-md text-base leading-6">
               Keep cases, procedures, academic work, assessments and milestones together.
             </p>
             <img
