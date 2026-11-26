@@ -30,10 +30,24 @@ export const SUPPORT_FEATURE_ENABLED = true;
 
 export const OPEN_SUPPORT_WIDGET_EVENT = "elogbook:open-support";
 
-export function openSupportWidget(preset?: { category?: SupportTicketCategory }) {
+export function openSupportWidget(preset?: { category?: SupportTicketCategory; trigger?: HTMLButtonElement }) {
   if (!SUPPORT_FEATURE_ENABLED) return;
   window.dispatchEvent(
     new CustomEvent(OPEN_SUPPORT_WIDGET_EVENT, { detail: preset })
+  );
+}
+
+export function SignedOutSupportButton({ children = "Need help?" }: { children?: React.ReactNode }) {
+  if (!SUPPORT_FEATURE_ENABLED) return null;
+
+  return (
+    <button
+      type="button"
+      className="signed-out-support-button min-h-11 rounded-full px-3 text-xs font-medium text-forest hover:underline"
+      onClick={(event) => openSupportWidget({ category: "login_issue", trigger: event.currentTarget })}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -50,6 +64,7 @@ export function SupportWidget() {
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [referenceCode, setReferenceCode] = React.useState<string | null>(null);
   const [copied, setCopied] = React.useState(false);
+  const signedOutTriggerRef = React.useRef<HTMLButtonElement | null>(null);
 
   const isDemo = isDemoMode();
 
@@ -82,7 +97,8 @@ export function SupportWidget() {
 
   React.useEffect(() => {
     const handleOpen = (e: Event) => {
-      const customEvent = e as CustomEvent<{ category?: SupportTicketCategory }>;
+      const customEvent = e as CustomEvent<Parameters<typeof openSupportWidget>[0]>;
+      signedOutTriggerRef.current = customEvent.detail?.trigger ?? null;
       const user = getCurrentUser();
       if (!user) {
         setCategory("login_issue");
@@ -188,7 +204,7 @@ export function SupportWidget() {
       <button
         type="button"
         onClick={() => handleOpenChange(true)}
-        className={`print:hidden fixed z-40 flex items-center gap-2 rounded-full border border-line-soft bg-card px-3.5 py-2 text-xs font-semibold text-forest shadow-md backdrop-blur-sm transition-all hover:bg-mist hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:px-4 sm:py-2.5 sm:text-sm ${
+        className={`support-widget-floating print:hidden fixed z-40 flex items-center gap-2 rounded-full border border-line-soft bg-card px-3.5 py-2 text-xs font-semibold text-forest shadow-md backdrop-blur-sm transition-all hover:bg-mist hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:px-4 sm:py-2.5 sm:text-sm ${
           hasArogyaLauncher
             ? "bottom-[calc(86px+env(safe-area-inset-bottom))] right-20 sm:bottom-[31px] sm:right-24"
             : "bottom-4 right-4 sm:bottom-6 sm:right-6"
@@ -201,7 +217,17 @@ export function SupportWidget() {
 
       {/* Support Dialog */}
       <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-        <DialogContent className="max-w-md sm:max-w-lg">
+        <DialogContent
+          className="max-w-md sm:max-w-lg"
+          onCloseAutoFocus={(event) => {
+            const trigger = signedOutTriggerRef.current;
+            signedOutTriggerRef.current = null;
+            if (trigger?.isConnected) {
+              event.preventDefault();
+              trigger.focus();
+            }
+          }}
+        >
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-lg text-ink">
               <HelpCircle className="h-5 w-5 text-forest" />

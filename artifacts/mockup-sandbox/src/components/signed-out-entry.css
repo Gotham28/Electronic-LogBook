@@ -1,0 +1,47 @@
+@font-face {
+  font-family: "Poppins Sign-In";
+  src: url("/fonts/poppins-400.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Poppins Sign-In";
+  src: url("/fonts/poppins-500.woff2") format("woff2");
+  font-weight: 500;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Poppins Sign-In";
+  src: url("/fonts/poppins-600.woff2") format("woff2");
+  font-weight: 600;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Poppins Sign-In";
+  src: url("/fonts/poppins-700.woff2") format("woff2");
+  font-weight: 700;
+  font-display: swap;
+}
+
+.signed-out-entry {
+  --font-sans: "Poppins Sign-In", system-ui, sans-serif;
+  --font-serif: var(--font-sans);
+  font-family: var(--font-sans);
+}
+
+.signed-out-entry [data-slot="button"] {
+  border-radius: 999px;
+  transition-property: background-color, border-color, color, box-shadow, opacity;
+}
+
+.signed-out-preview[data-playing="false"] * {
+  animation: none;
+  transition: none;
+}
+
+#root:has(.signed-out-support-button) > .support-widget-floating {
+  display: none;
+}

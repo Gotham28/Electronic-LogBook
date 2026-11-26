@@ -14,7 +14,8 @@ import { clearMaintenanceNoticeSession, saveToken } from "@/lib/session";
 import { PaymentStep } from "@/components/PaymentStep";
 import { unlockDemoAudio } from "@/lib/demoSounds";
 import { startDemoSession } from "@/lib/demoSession";
-import { openSupportWidget, SUPPORT_FEATURE_ENABLED } from "./SupportWidget";
+import { SignedOutSupportButton } from "./SupportWidget";
+import "./signed-out-entry.css";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -24,6 +25,9 @@ type Mode = "picker" | "login";
 
 export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRegister: () => void }) {
   const [mode, setMode] = React.useState<Mode>("picker");
+  const pickerActionRef = React.useRef<HTMLButtonElement>(null);
+  const signInHeadingRef = React.useRef<HTMLHeadingElement>(null);
+  const focusAfterNavigation = React.useRef(false);
   const [isMobileViewport, setIsMobileViewport] = React.useState(() =>
     typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches
   );
@@ -41,6 +45,13 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
   const [error, setError] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
   const [pendingPaymentToken, setPendingPaymentToken] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (!focusAfterNavigation.current) return;
+    focusAfterNavigation.current = false;
+    if (mode === "login") signInHeadingRef.current?.focus();
+    else pickerActionRef.current?.focus();
+  }, [mode]);
 
   React.useEffect(() => {
     const mobileQuery = window.matchMedia("(max-width: 767px)");
@@ -62,6 +73,7 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
   // ── Navigation ────────────────────────────────────────────────────────────
 
   const goBack = () => {
+    focusAfterNavigation.current = true;
     setMode("picker");
     setError(null);
     setForgotStep(0);
@@ -219,78 +231,50 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
   // ── Layout ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="signed-out-entry min-h-screen bg-background flex flex-col">
       <div className="flex flex-1 items-center justify-center p-4 md:p-8">
-        <div className="glass-panel grid w-full max-w-6xl overflow-hidden rounded-[30px] lg:grid-cols-[1.08fr_.92fr]">
-
-        {/* Left branding panel */}
-        <section className="relative overflow-hidden bg-deep p-8 text-white md:p-12 transition-colors">
-          <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full border-[42px] border-white/10" />
-          <div className="absolute -bottom-24 -left-20 h-64 w-64 rounded-full bg-forest blur-2xl" />
-          <div className="relative flex flex-col h-full justify-between">
-            <div>
-              <div className="inline-flex items-center">
-                <img
-                  src={`${import.meta.env.BASE_URL}gothos-logo.png`}
-                  alt="Gothos Labs"
-                  width={1254}
-                  height={1081}
-                  className="h-auto w-44"
-                />
-              </div>
-              <h1 className="mt-10 max-w-xl text-4xl font-bold leading-[1.05] md:text-5xl">
-                Clinical training, clearly organised.
-              </h1>
-              <p className="mt-5 max-w-xl text-sm leading-6 text-white">
-                Keep cases, procedures, academic work, assessments and milestones together.
-              </p>
-              <LoginProductPreview />
-            </div>
-          </div>
-        </section>
-
-        {/* Right panel */}
-        <section className="bg-card p-8 md:p-12 flex items-center">
+        <div className="glass-panel grid w-full max-w-6xl overflow-hidden rounded-[28px] lg:grid-cols-[1.08fr_.92fr]">
+        <main className="flex items-center bg-card p-6 sm:p-8 lg:col-start-2 lg:row-start-1 lg:p-12">
           <div className="mx-auto w-full max-w-sm">
+            <p className="mb-4 text-lg font-bold text-forest">ELogBook</p>
             {/* ── MODE: Picker ─────────────────────────────────────────── */}
             {mode === "picker" && (
-              <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
-                <p className="page-eyebrow">Arogya E-LogBook</p>
-                <h2 className="mt-2 text-4xl font-bold text-forest">Welcome</h2>
+              <div>
+                <h1 className="text-3xl font-bold text-ink sm:text-4xl">Welcome</h1>
                 <p className="mt-2 text-sm text-helper">
                   Already have an account? Sign in. New here? Explore the demo first.
                 </p>
 
-                <div className="mt-8 space-y-3">
+                <div className="mt-6 space-y-4">
                   {/* Sign In card */}
                   <button
-                    onClick={() => setMode("login")}
-                    className="flex w-full items-center gap-4 rounded-2xl border border-forest bg-forest p-4 text-left text-white shadow-[0_10px_24px_color-mix(in_srgb,var(--gothos-forest)_16%,transparent)] transition-[background-color,box-shadow] duration-150 hover:bg-deep hover:shadow-[0_14px_28px_color-mix(in_srgb,var(--gothos-forest)_20%,transparent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:p-5"
+                    ref={pickerActionRef}
+                    type="button"
+                    onClick={() => {
+                      focusAfterNavigation.current = true;
+                      setMode("login");
+                    }}
+                    className="flex min-h-12 w-full items-center justify-center gap-2 rounded-full border border-forest bg-forest px-4 py-2.5 text-sm font-semibold text-white transition-[background-color] hover:bg-deep"
                   >
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white/20">
-                      <LogIn className="h-6 w-6" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-bold text-base">Sign In to my account</p>
-                      <p className="mt-0.5 text-xs text-white">For registered residents, faculty and HOD</p>
-                    </div>
+                    <LogIn className="h-4 w-4" aria-hidden="true" />
+                    Sign in to my account
                   </button>
 
-                  {/* Demo card */}
-                  <button
-                    onClick={handleMovieStart}
-                    disabled={demoLoading}
-                    className="flex w-full items-center gap-4 rounded-2xl border border-forest bg-white p-4 text-left shadow-sm transition-[border-color,background-color,box-shadow] duration-150 hover:border-forest hover:bg-mist hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 sm:p-5"
-                  >
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-mist text-forest ring-1 ring-line-soft">
-                      {demoLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Sparkles className="h-5 w-5" strokeWidth={1.8} />}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-semibold text-ink">Show demo</p>
-                      <p className="mt-0.5 text-xs leading-5 text-helper">Watch the intro, then explore freely. Start a guided tour anytime. No sign-in needed.</p>
-                    </div>
-                  </button>
-                  <video src={introVideoSrc} preload="auto" className="hidden" aria-hidden="true" muted />
+                  <div>
+                    <button
+                      type="button"
+                      onClick={handleMovieStart}
+                      disabled={demoLoading}
+                      aria-describedby="login-demo-description"
+                      className="flex min-h-12 w-full items-center justify-center gap-2 rounded-full border-2 border-forest bg-white px-4 py-2.5 text-sm font-semibold text-forest transition-[background-color,color] hover:bg-forest hover:text-white disabled:opacity-60"
+                    >
+                      {demoLoading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Sparkles className="h-4 w-4" aria-hidden="true" />}
+                      Show demo
+                    </button>
+                    <p id="login-demo-description" className="mt-2 text-center text-xs leading-5 text-helper">
+                      Watch the intro, then explore freely. Start a guided tour anytime. No sign-in needed.
+                    </p>
+                  </div>
                 </div>
               </div>
             )}
@@ -299,26 +283,27 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
 
             {/* ── MODE: Login ──────────────────────────────────────────── */}
             {mode === "login" && (
-              <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
+              <div>
                 <button
                   type="button"
                   onClick={goBack}
-                  className="mb-6 flex items-center gap-1 text-xs font-medium text-forest hover:underline"
+                  className="mb-3 flex min-h-11 items-center gap-1 rounded-full px-2 text-xs font-medium text-forest hover:underline"
                 >
                   <ChevronLeft className="h-3 w-3" /> Back
                 </button>
 
-                <p className="page-eyebrow">Secure access</p>
-                <h2 className="mt-2 text-4xl font-bold text-forest">Sign in</h2>
+                <h1 ref={signInHeadingRef} tabIndex={-1} className="text-3xl font-bold text-ink sm:text-4xl">Sign in</h1>
                 <p className="mt-2 text-sm text-helper">
                   Sign in with your university registration number or email address and password.
                 </p>
 
-                {error && (
-                  <div className="mt-4 rounded-md bg-status p-3 text-sm text-status-foreground border border-status-border">
-                    {error}
-                  </div>
-                )}
+                <div id="login-credential-error" role="alert" aria-atomic="true">
+                  {error && (
+                    <p className="mt-4 rounded-md border border-status-border bg-status p-3 text-sm text-status-foreground">
+                      {error}
+                    </p>
+                  )}
+                </div>
 
                 {/* Forgot-password flow */}
                 {forgotStep > 0 ? (
@@ -378,16 +363,22 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
                     )}
                   </div>
                 ) : (
-                  <form onSubmit={signIn} className="mt-9 space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                  <form onSubmit={signIn} className="mt-6 space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="username">Registration number or Email</Label>
                       <div className="relative">
-                        <UserPlus className="absolute left-3 top-3 h-4 w-4 text-forest" />
+                        <UserPlus className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-forest" aria-hidden="true" />
                         <Input
                           id="username"
+                          name="username"
+                          autoComplete="username"
+                          autoCapitalize="none"
+                          spellCheck={false}
+                          aria-invalid={error ? true : undefined}
+                          aria-describedby={error ? "login-credential-error" : undefined}
                           value={username}
                           onChange={(e) => setUsername(e.target.value)}
-                          className="pl-10"
+                          className="h-11 pl-10"
                           disabled={isLoading}
                           required
                         />
@@ -395,33 +386,35 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
                     </div>
 
                     <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <Label htmlFor="password">Password</Label>
-                        <button
-                          type="button"
-                          onClick={() => { setResetEmail(username); setForgotStep(1); }}
-                          className="text-[11px] font-medium text-forest hover:underline"
-                        >
-                          Forgot password?
-                        </button>
-                      </div>
+                      <Label htmlFor="password">Password</Label>
                       <div className="relative">
-                        <KeyRound className="absolute left-3 top-3 h-4 w-4 text-forest" />
+                        <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-forest" aria-hidden="true" />
                         <Input
                           id="password"
+                          name="password"
                           type="password"
+                          autoComplete="current-password"
+                          aria-invalid={error ? true : undefined}
+                          aria-describedby={error ? "login-credential-error" : undefined}
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
-                          className="pl-10"
+                          className="h-11 pl-10"
                           disabled={isLoading}
                           required
                         />
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => { setResetEmail(username); setForgotStep(1); }}
+                        className="ml-auto flex min-h-11 items-center rounded-full px-2 text-xs font-medium text-forest hover:underline"
+                      >
+                        Forgot password?
+                      </button>
                     </div>
 
-                    <Button type="submit" className="h-11 w-full" disabled={isLoading}>
+                    <Button type="submit" className="min-h-11 w-full" disabled={isLoading}>
                       {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
-                      {isLoading ? "Signing in…" : "Sign in to E-Logbook"}
+                      {isLoading ? "Signing in…" : "Sign in to ELogBook"}
                     </Button>
                   </form>
                 )}
@@ -433,26 +426,44 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
                       <span className="text-[10px] font-bold uppercase tracking-wider text-helper">New here?</span>
                       <div className="h-px flex-1 bg-sage" />
                     </div>
-                    <Button type="button" variant="outline" onClick={onRegister} className="h-11 w-full text-forest">
+                    <Button type="button" variant="outline" onClick={onRegister} className="min-h-11 w-full border-2 text-forest hover:bg-forest hover:text-white">
                       <UserPlus className="h-4 w-4" /> Register &amp; Pay
                     </Button>
                   </>
                 )}
 
-                {SUPPORT_FEATURE_ENABLED && (
-                  <div className="mt-6 pt-2 text-center border-t border-line-soft">
-                    <button
-                      type="button"
-                      onClick={() => openSupportWidget({ category: "login_issue" })}
-                      className="text-xs font-medium text-forest hover:text-forest hover:underline"
-                    >
-                      Having trouble signing in? Contact support
-                    </button>
-                  </div>
-                )}
               </div>
             )}
 
+            <div className="mt-4 text-center">
+              <SignedOutSupportButton>
+                {mode === "login" ? "Having trouble signing in? Contact support" : "Need help?"}
+              </SignedOutSupportButton>
+              <p>
+                <a href="https://www.gothoslabs.com" className="inline-flex min-h-8 items-center gap-1 rounded-full px-2 text-[11px] text-helper hover:underline">
+                  by <span className="font-bold text-forest">GOTHOS LABS</span>
+                </a>
+              </p>
+            </div>
+          </div>
+        </main>
+        <section className="relative overflow-hidden bg-deep p-6 text-white sm:p-8 lg:col-start-1 lg:row-start-1 lg:p-10">
+          <div aria-hidden="true" className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full border-[42px] border-white/10" />
+          <div className="relative mx-auto max-w-lg">
+            <h2 className="max-w-md text-2xl font-bold leading-tight sm:text-3xl">
+              Clinical training, clearly organised.
+            </h2>
+            <p className="mt-3 max-w-md text-sm leading-6">
+              Keep cases, procedures, academic work, assessments and milestones together.
+            </p>
+            <img
+              src={`${import.meta.env.BASE_URL}gothos-logo.png`}
+              alt="Gothos Labs"
+              width={1254}
+              height={1081}
+              className="mt-4 h-auto w-32 rounded-xl"
+            />
+            <LoginProductPreview />
           </div>
         </section>
       </div>
@@ -479,7 +490,7 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
         <div
           role="dialog"
           aria-modal="true"
-          aria-label="Arogya E-LogBook Demo Video"
+          aria-label="ELogBook demo video"
           className="fixed inset-0 z-[10000] flex flex-col bg-deep text-white select-none animate-in fade-in duration-200"
         >
           {/* Top bar with branding and Skip to Demo button */}
@@ -487,7 +498,7 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
             <div className="pointer-events-auto flex items-center gap-3">
               <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-deep/80 px-3.5 py-1.5 text-xs font-semibold tracking-wide text-mint backdrop-blur-md">
                 <span className="h-2 w-2 rounded-full bg-forest animate-pulse" />
-                Arogya E-LogBook · Product Walkthrough
+                ELogBook · Product Walkthrough
               </span>
 
               {mutedByBrowser && (
@@ -512,7 +523,7 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
               type="button"
               onClick={enterDemoWorkspace}
               data-testid="demo-video-skip"
-              className="pointer-events-auto inline-flex items-center gap-2 rounded-xl bg-forest px-4 py-2.5 text-xs font-bold text-white shadow-[0_10px_28px_color-mix(in_srgb,var(--gothos-forest)_45%,transparent)] ring-1 ring-ring transition-all duration-150 hover:bg-forest hover:scale-[1.02] active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:px-5 sm:py-2.5 sm:text-sm cursor-pointer"
+              className="pointer-events-auto inline-flex items-center gap-2 rounded-full bg-forest px-4 py-2.5 text-xs font-bold text-white shadow-[0_10px_28px_color-mix(in_srgb,var(--gothos-forest)_45%,transparent)] ring-1 ring-ring transition-colors hover:bg-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:px-5 sm:py-2.5 sm:text-sm cursor-pointer"
             >
               Skip to Explore
               <ArrowRight className="h-4 w-4" />

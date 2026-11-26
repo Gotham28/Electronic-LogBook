@@ -7,6 +7,8 @@ import {
   GraduationCap,
   LayoutDashboard,
   MousePointer2,
+  Pause,
+  Play,
   Stethoscope,
 } from "lucide-react";
 
@@ -41,18 +43,47 @@ function Dashboard({ phase }: { phase: number }) {
 
 export function LoginProductPreview() {
   const [phase, setPhase] = React.useState(0);
+  const [playing, setPlaying] = React.useState(false);
+  const [reducedMotion, setReducedMotion] = React.useState(
+    () => window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  );
+  const isAnimating = playing && !reducedMotion;
   const moment = moments[phase];
+
   React.useEffect(() => {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const timer = window.setInterval(() => setPhase((current) => (current + 1) % moments.length), 1900);
-    return () => window.clearInterval(timer);
+    const preference = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const updatePreference = () => {
+      setReducedMotion(preference.matches);
+      if (preference.matches) setPlaying(false);
+    };
+    updatePreference();
+    preference.addEventListener("change", updatePreference);
+    return () => preference.removeEventListener("change", updatePreference);
   }, []);
 
-  return <div className="mt-8" role="img" aria-label="Looping preview of a resident using the E-Logbook dashboard">
+  React.useEffect(() => {
+    if (!isAnimating) return;
+    const timer = window.setInterval(() => setPhase((current) => (current + 1) % moments.length), 1900);
+    return () => window.clearInterval(timer);
+  }, [isAnimating]);
+
+  return <div className="signed-out-preview mt-5" data-playing={isAnimating}>
+    <div role="img" aria-label="Illustration of the ELogBook resident dashboard">
     <div className="overflow-hidden rounded-[22px] border border-white/25 bg-deep/90 shadow-[0_28px_70px_color-mix(in_srgb,var(--gothos-forest)_30%,transparent)] ring-1 ring-shadow/5">
       <div className="flex h-8 items-center gap-1.5 border-b border-white/10 bg-deep/90 px-3"><span className="h-2 w-2 rounded-full bg-white/85" /><span className="h-2 w-2 rounded-full bg-remaining-mark" /><span className="h-2 w-2 rounded-full bg-white/85" /><div className="mx-auto flex h-4 w-32 items-center justify-center rounded-full bg-white/10 text-[6px] font-medium tracking-wide text-white">elogbook.local/dashboard</div></div>
-      <div className="relative aspect-[16/10] overflow-hidden bg-background p-1.5"><div className="flex h-full overflow-hidden rounded-xl border border-white bg-background"><aside className="relative w-[23%] shrink-0 border-r border-line-soft bg-white p-1.5"><div className="mb-3 flex items-center gap-1"><div className="grid h-4 w-4 place-items-center rounded-md bg-forest text-white"><BookOpenCheck className="h-2.5 w-2.5" /></div><span className="text-[6px] font-bold text-ink">E-Logbook</span></div><p className="mb-1.5 text-[3.5px] font-bold uppercase tracking-[.15em] text-forest">Student workspace</p>{navigation.map(([label, Icon]) => <div key={label} className={`mb-0.5 flex items-center gap-1 rounded-md px-1 py-1 ${label === "Dashboard" ? "bg-forest text-white" : "text-helper"}`}><Icon className="h-2 w-2" /><span className="text-[4.5px] font-semibold">{label}</span></div>)}</aside><main className="min-w-0 flex-1"><header className="flex h-7 items-center justify-between border-b border-white bg-card px-2"><div><p className="text-[6px] font-bold text-ink">Your department</p><p className="text-[3.5px] text-helper">Student workspace</p></div><Bell className="h-2.5 w-2.5 text-forest" /></header><div className="h-[calc(100%-1.75rem)] overflow-hidden"><Dashboard phase={phase} /></div></main></div>{(phase === 0 || phase === 2) && <span key={`click-${phase}`} className="pointer-events-none absolute h-6 w-6 -translate-x-1/2 -translate-y-1/2 animate-ping rounded-full border border-forest/70" style={{ left: moment.cursor.left, top: moment.cursor.top }} />}<MousePointer2 className="pointer-events-none absolute h-4 w-4 fill-white text-ink drop-shadow-md transition-all duration-700 ease-in-out" style={{ left: moment.cursor.left, top: moment.cursor.top }} /></div>
+      <div className="relative aspect-[16/10] overflow-hidden bg-background p-1.5"><div className="flex h-full overflow-hidden rounded-xl border border-white bg-background"><aside className="relative w-[23%] shrink-0 border-r border-line-soft bg-white p-1.5"><div className="mb-3 flex items-center gap-1"><div className="grid h-4 w-4 place-items-center rounded-md bg-forest text-white"><BookOpenCheck className="h-2.5 w-2.5" /></div><span className="text-[6px] font-bold text-ink">ELogBook</span></div><p className="mb-1.5 text-[3.5px] font-bold uppercase tracking-[.15em] text-forest">Student workspace</p>{navigation.map(([label, Icon]) => <div key={label} className={`mb-0.5 flex items-center gap-1 rounded-md px-1 py-1 ${label === "Dashboard" ? "bg-forest text-white" : "text-helper"}`}><Icon className="h-2 w-2" /><span className="text-[4.5px] font-semibold">{label}</span></div>)}</aside><div className="min-w-0 flex-1"><header className="flex h-7 items-center justify-between border-b border-white bg-card px-2"><div><p className="text-[6px] font-bold text-ink">Your department</p><p className="text-[3.5px] text-helper">Student workspace</p></div><Bell className="h-2.5 w-2.5 text-forest" /></header><div className="h-[calc(100%-1.75rem)] overflow-hidden"><Dashboard phase={phase} /></div></div></div>{isAnimating && (phase === 0 || phase === 2) && <span key={`click-${phase}`} className="pointer-events-none absolute h-6 w-6 -translate-x-1/2 -translate-y-1/2 animate-ping rounded-full border border-forest/70" style={{ left: moment.cursor.left, top: moment.cursor.top }} />}<MousePointer2 className="pointer-events-none absolute h-4 w-4 fill-white text-ink drop-shadow-md transition-all duration-700 ease-in-out" style={{ left: moment.cursor.left, top: moment.cursor.top }} /></div>
     </div>
-    <div className="mt-4 flex items-center justify-between gap-4"><p key={moment.caption} className="animate-in fade-in slide-in-from-bottom-1 text-xs font-semibold text-white">{moment.caption}</p><div className="flex gap-1.5">{moments.map((item, index) => <span key={item.caption} className={`h-1.5 rounded-full transition-all duration-500 ${index === phase ? "w-6 bg-white" : "w-1.5 bg-white/35"}`} />)}</div></div>
+      <div aria-hidden="true" className="mt-3 flex items-center justify-between gap-4"><p key={moment.caption} className="text-xs font-semibold text-white">{moment.caption}</p><div className="flex gap-1.5">{moments.map((item, index) => <span key={item.caption} className={`h-1.5 rounded-full transition-all duration-500 ${index === phase ? "w-6 bg-white" : "w-1.5 bg-white/35"}`} />)}</div></div>
+    </div>
+    {!reducedMotion && (
+      <button
+        type="button"
+        className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-full border-2 border-white px-4 text-xs font-semibold text-white hover:bg-white hover:text-deep"
+        onClick={() => setPlaying((current) => !current)}
+      >
+        {playing ? <Pause className="size-4" aria-hidden="true" /> : <Play className="size-4" aria-hidden="true" />}
+        {playing ? "Pause dashboard preview" : "Play dashboard preview"}
+      </button>
+    )}
   </div>;
 }

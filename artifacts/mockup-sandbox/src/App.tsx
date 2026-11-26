@@ -8,6 +8,7 @@ import { HODPortal } from "@/components/HODPortal";
 import { AdminPortal } from "@/components/AdminPortal";
 import { LoginPage } from "@/components/LoginPage";
 import { RegistrationPage } from "@/components/RegistrationPage";
+import { SignedOutSupportButton } from "@/components/SupportWidget";
 import { CaseLogsPage } from "@/components/pages/CaseLogsPage";
 import { ProcedureLogsPage } from "@/components/pages/ProcedureLogsPage";
 import { AcademicLogsPage } from "@/components/pages/AcademicLogsPage";
@@ -290,6 +291,9 @@ function App() {
               setAuthScreen("login");
             }}
           />
+          <div className="bg-background pb-4 text-center print:hidden">
+            <SignedOutSupportButton />
+          </div>
           <Toaster position="top-right" />
         </>
       );
