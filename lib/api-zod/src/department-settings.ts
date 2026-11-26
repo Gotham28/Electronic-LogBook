@@ -13,6 +13,7 @@ export const DEPARTMENT_SETTING_TIERS = {
   studentNavOrder: "mochi",
   freeTextPostingUnit: "hod_only",
   freeTextPostingSupervisor: "hod_only",
+  postingAttachments: "hod_only",
   freeTextProcedures: "hod_only",
   dynamicProcedureFields: "hod_only",
   procedureClinicalDetails: "hod_only",

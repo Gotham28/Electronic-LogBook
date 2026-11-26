@@ -1,6 +1,7 @@
 import * as React from "react";
 import { toast } from "sonner";
 import { apiPost, apiPatch, apiGet, apiDelete } from "@/lib/apiClient";
+import { isDemoMode } from "@/lib/session";
 import { Trash2, AlertTriangle, ChevronDown, Search } from "lucide-react";
 import { useDepartment, DEPARTMENT_LABELS, DEPARTMENT_LABEL_GROUPS, defaultDepartmentLabel, type DepartmentLabelKey } from "@/lib/department-context";
 import { Button } from "@/components/ui/button";
@@ -153,6 +154,49 @@ function useSearch<T extends { name: string }>(items: T[], query: string): T[] {
   return React.useMemo(() => {
     return q ? items.filter((item) => item.name.toLowerCase().includes(q)) : items;
   }, [items, q]) as T[];
+}
+
+function PostingAttachmentSetting() {
+  const { config, readOnlyConfig, refresh } = useDepartment();
+  const enabled = config?.enabledFeatures?.postingAttachments ?? null;
+  const [saving, setSaving] = React.useState(false);
+  const [error, setError] = React.useState("");
+
+  async function save() {
+    setSaving(true);
+    setError("");
+    try {
+      await apiPatch("/api/admin/department/config/settings/postingAttachments", {
+        value: enabled !== true,
+        expectedValue: enabled,
+      });
+      if (await refresh()) toast.success(enabled ? "Posting attachments disabled" : "Posting attachments enabled");
+      else setError("The setting was saved. Reload this page to see it.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save the attachment setting.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="border-b border-slate-200 pb-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h4 className="text-sm font-semibold text-slate-900">Posting attachments</h4>
+          <p className="text-sm text-slate-600">
+            {enabled ? "Residents can attach PDF and JPEG files to postings." : "Posting attachments are disabled."}
+          </p>
+        </div>
+        {!readOnlyConfig && (
+          <Button type="button" size="sm" variant="outline" disabled={saving} onClick={() => void save()}>
+            {saving ? "Saving…" : enabled ? "Disable attachments" : "Enable attachments"}
+          </Button>
+        )}
+      </div>
+      {error && <p role="alert" className="mt-2 text-sm text-rose-700">{error}</p>}
+    </div>
+  );
 }
 
 export function DepartmentSettings() {
@@ -474,6 +518,8 @@ export function DepartmentSettings() {
             </div>
             {activeSection.desc && <p className="text-sm text-slate-500">{activeSection.desc}</p>}
           </div>
+
+          {activeSection.kind === "posting" && !isDemoMode() && <PostingAttachmentSetting />}
 
           {isAdding && (
             <div data-tour="hod-requirements-add-form" className="rounded-xl border border-slate-200 bg-slate-50 p-4 mb-2">

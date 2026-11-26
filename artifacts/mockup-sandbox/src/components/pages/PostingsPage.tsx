@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PostingAttachments } from "@/components/PostingAttachments";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
@@ -28,7 +29,7 @@ type Posting = {
   ward: PostingName;
   startDate: string;
   endDate: string;
-  supervisorId: number;
+  supervisorId: number | null;
   supervisorName: string;
   status: "pending" | "verified" | "rejected";
   facultyRemarks: string | null;
@@ -58,6 +59,7 @@ export function PostingsPage() {
   const isFreeTextWard = Boolean(config?.enabledFeatures?.freeTextPostingUnit);
   // Free-text postings still offer an optional supervisor and show the Supervisor and Status columns when this is on.
   const freeTextPostingSupervisor = Boolean(config?.enabledFeatures?.freeTextPostingSupervisor);
+  const showAttachments = config?.enabledFeatures?.postingAttachments === true && !user?.isDemoMode;
 
   const fetchPostings = React.useCallback(async () => {
     if (!user?.studentProfileId) return;
@@ -219,6 +221,7 @@ export function PostingsPage() {
                   <TableHead>End Date</TableHead>
                   {(!isFreeTextWard || freeTextPostingSupervisor) && <TableHead>Supervisor</TableHead>}
                   {(!isFreeTextWard || freeTextPostingSupervisor) && <TableHead>Status</TableHead>}
+                  {showAttachments && <TableHead>Files</TableHead>}
                   <TableHead className="text-right">{isFreeTextWard ? "Action" : "Faculty Remarks"}</TableHead>
                 </TableRow>
               </TableHeader>
@@ -238,6 +241,12 @@ export function PostingsPage() {
                         }`}>
                           {item.status === "verified" ? "Verified" : item.status === "rejected" ? "Rejected" : "Pending"}
                         </span>
+                      </TableCell>
+                    )}
+                    {showAttachments && user?.studentProfileId && (
+                      <TableCell>
+                        <PostingAttachments studentId={user.studentProfileId} postingId={item.id}
+                          editable={item.status === "pending" || item.status === "rejected" || (isFreeTextWard && item.status === "verified" && item.supervisorId === null)} />
                       </TableCell>
                     )}
                     <TableCell className="text-right max-w-[220px]">

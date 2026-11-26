@@ -13,7 +13,7 @@ test("fresh installation and rerunning migrations are safe and checksum-tracked"
   try {
     await applyMigrations(migrationConnection(database));
     await applyMigrations(migrationConnection(database));
-    assert.equal((await database.query("SELECT * FROM elogbook_migrations")).rows.length, 37);
+    assert.equal((await database.query("SELECT * FROM elogbook_migrations")).rows.length, 38);
     assert.equal((await database.query("SELECT to_regclass('assistant_department_weekly_digests') AS table_name")).rows[0].table_name, "assistant_department_weekly_digests");
     const assistantUsageColumns = await database.query<{ column_name: string }>(
       "SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'assistant_usage_events' ORDER BY ordinal_position",

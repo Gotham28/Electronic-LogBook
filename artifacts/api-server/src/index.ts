@@ -1,6 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { startNameChangeEmailDispatcher } from "./lib/name-change-email-dispatcher.js";
+import { startPostingAttachmentCleanup } from "./lib/posting-attachment-storage.js";
 
 // A missing value is visible at startup, while the app remains available. Email routes also
 // surface per-message acceptance failures to the actor who initiated the action.
@@ -31,16 +32,18 @@ const server = app.listen(port, "0.0.0.0", (err?: Error) => {
 
   logger.info({ port }, "Server listening");
   stopNameChangeEmailDispatcher = startNameChangeEmailDispatcher();
+  stopPostingAttachmentCleanup = startPostingAttachmentCleanup();
 });
 
 let stopNameChangeEmailDispatcher: (() => Promise<void>) | undefined;
+let stopPostingAttachmentCleanup: (() => Promise<void>) | undefined;
 let shuttingDown = false;
 
 async function shutdown(signal: NodeJS.Signals) {
   if (shuttingDown) return;
   shuttingDown = true;
   logger.info({ signal }, "Server shutting down");
-  if (stopNameChangeEmailDispatcher) await stopNameChangeEmailDispatcher();
+  await Promise.all([stopNameChangeEmailDispatcher?.(), stopPostingAttachmentCleanup?.()]);
   server.close((error) => {
     if (error) {
       logger.error({ status: 500 }, "Server shutdown failed");
