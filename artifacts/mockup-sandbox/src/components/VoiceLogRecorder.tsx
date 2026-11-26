@@ -8,11 +8,12 @@ import {
   ChevronDown,
   ChevronUp,
   X,
-  Sparkles,
+  Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiPostAudio, ApiError } from "@/lib/apiClient";
 import type { VoiceLogExtractResponse } from "@workspace/api-zod";
+import { ArogyaCharacter } from "./arogya/ArogyaCharacter";
 
 export interface VoiceLogRecorderProps {
   studentId: number | string | null | undefined;
@@ -348,14 +349,14 @@ export function VoiceLogRecorder({
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
             <div className="h-8 w-8 rounded-full bg-sage flex items-center justify-center shrink-0">
-              <Sparkles className="h-4 w-4 text-forest" />
+              <ArogyaCharacter state="resting" initialState="resting" size={24} decorative />
             </div>
             <div>
               <div className="text-xs font-semibold text-ink">
-                Dictate with AI
+                Dictate with Mochi
               </div>
-              <p className="text-[11px] text-muted-foreground line-clamp-1">
-                Speak naturally about the case — you'll review every field before saving.
+              <p className="text-[11px] text-muted-foreground">
+                Speak naturally, then review the fields before saving.
               </p>
             </div>
           </div>
@@ -446,10 +447,10 @@ export function VoiceLogRecorder({
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <div className="h-6 w-6 rounded-full bg-status flex items-center justify-center shrink-0">
-                <Sparkles className="h-3.5 w-3.5 text-status-foreground" />
+                <Check className="h-3.5 w-3.5 text-status-foreground" />
               </div>
               <span className="text-xs font-semibold text-status-foreground">
-                Fields extracted from dictation
+                Mochi filled these fields
               </span>
             </div>
             <div className="flex items-center gap-1.5 w-full sm:w-auto justify-end">
@@ -508,7 +509,7 @@ export function VoiceLogRecorder({
                 onClick={() => setIsTranscriptExpanded((prev) => !prev)}
                 className="w-full flex items-center justify-between text-[11px] font-medium text-muted-foreground hover:text-foreground py-1 transition-colors"
               >
-                <span>AI Transcript</span>
+                <span>Dictation transcript</span>
                 {isTranscriptExpanded ? (
                   <ChevronUp className="h-3.5 w-3.5" />
                 ) : (
