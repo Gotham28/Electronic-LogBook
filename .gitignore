@@ -76,6 +76,8 @@ artifacts/api-server/data/
 IMPLEMENTATION_PLAN_*.md
 
 *.md
+!/CLAUDE.md
+!/docs/DEPARTMENT_ONBOARDING.md
 
 # Local profile feature plan for review
 /IMPLEMENTATION_PLAN_PROFILE_NAME_CHANGES.md

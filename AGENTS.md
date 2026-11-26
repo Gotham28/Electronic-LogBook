@@ -32,6 +32,20 @@ so it requires no database and is safe to run.
 There is still **no staging environment.** Mistakes are caught by people, late, and cannot
 be rolled back. Every rule below exists because of that.
 
+### 0.1 Startup map and references
+
+Read these from repository root before starting any task:
+- `AGENTS.md` (this file) — canonical repository rules; `CLAUDE.md` is tracked at repository root and points here (`@AGENTS.md`).
+- `CURRENT_TASK.md` — active task file at repository root (there is no `.agents/CURRENT_TASK.md`, and `STATUS.md` is absent unless explicitly added).
+- `.ai-state/` (git-ignored) — numbered implementation plan (`.ai-state/PLAN.md`), session handoff (`.ai-state/HANDOFF.md`), review findings (`.ai-state/REVIEW.md`), and halt/blocker log (`.ai-state/BLOCKERS.md`).
+- `HANDOFF.md` and `.agents/runs/` — tracked handoff context and append-only dispatch history.
+- [`docs/DEPARTMENT_ONBOARDING.md`](docs/DEPARTMENT_ONBOARDING.md) — Superadmin department creation, college scope, real HOD setup, approved templates, copies vs. mirrors, test roster repair, Psychiatry activation, and verification commands.
+
+Baseline verification entry points (`DATABASE_URL` unset for in-process PGlite):
+- Workspace typecheck: `pnpm run typecheck`
+- Full API PGlite suite: `pnpm --dir artifacts/api-server test`
+- Migration check: `pnpm --dir artifacts/api-server exec tsx --tsconfig tests/tsconfig.json --test tests/migrations.test.ts`
+
 ---
 
 ## 1. Pull before every task
@@ -255,28 +269,36 @@ A second set of 14 scripts (`artifacts/api-server/run.mjs` and 13 `.cjs` files i
 
 ## 14. Execution model
 
-### 14.1 Antigravity writes, Claude Code reasons
+### 14.1 Antigravity writes, coordinator reasons
 
-Claude Code does not write implementation code in this repo. Every change to
-source, tests, config, or docs is dispatched to Antigravity. There is no
-small-change exception. A guard hook enforces this.
+Claude Code / the planning coordinator does not write implementation code in this repo.
+Every change to source, tests, config, or docs is dispatched to Antigravity in a **separate
+execution session**, working with file tools only strictly within the approved
+`CURRENT_TASK.md` and numbered `.ai-state/PLAN.md`. There is no small-change exception. A
+guard hook enforces this.
 
-Claude Code still runs, in its own shell: reads, `git` commands, and test,
-lint, and typecheck runs used to verify a claim. Running a test is
+The coordinator still runs, in its own shell: reads, `git` commands, and test,
+lint, typecheck, and isolated browser runs used to verify a claim. Running a test is
 verification. Editing the test is a dispatch.
 
 ### 14.2 The loop
 
-1. **Scope** — `CURRENT_TASK.md` is written in Claude Chat. One
-   feature per task, per §9.
-2. **Dispatch** — Claude Code turns the `## Agent` bucket into one
-   Antigravity prompt. It does not write code.
-3. **Build** — Antigravity works, and returns a branch plus `HANDOFF.md`.
-4. **Review** — Claude Code reviews the diff through dispatched reviewers,
-   and produces the report in §14.6.
+1. **Scope** — `CURRENT_TASK.md` (at repository root) and the numbered `.ai-state/PLAN.md`
+   are written in the planning session. One feature per task, per §9, with explicit written
+   developer approval (and pinned base commit) recorded before dispatch.
+2. **Dispatch** — The coordinator turns the `## Agent` bucket and approved `.ai-state/PLAN.md`
+   into one Antigravity prompt in a separate execution session. It does not write code.
+3. **Build** — Antigravity works via file tools only within the approved scope, records any
+   halt or ambiguity in `.ai-state/BLOCKERS.md`, and updates `.ai-state/HANDOFF.md` (at most
+   15 lines).
+4. **Review** — The coordinator runs verification commands and reviews the diff across **four
+   independent read-only lenses** (**scope**, **rules**, **evidence**, and **blast radius**)
+   at the scoped tier (§15), producing the seven-section report in §14.6.
 5. **Decide** — the developer accepts, rejects, or asks for changes, in
-   Claude Chat.
-6. **Close** — commit, push, open the PR. Never automated end to end.
+   the planning/decision chat.
+6. **Close** — Only after developer acceptance: stage only explicit scoped files (never
+   `.ai-state/`), reset `CURRENT_TASK.md` to idle, commit, and follow repository remote/PR
+   permissions (never force-push per §2). Never automated end to end.
 
 No pull request is opened before step 5. A PR opened early points automated
 review at unreviewed code.
@@ -309,8 +331,9 @@ decision, the agent stops and reports rather than deciding.
 
 ### 14.5 Halt conditions
 
-Stop and hand the decision to the developer when any of these appear. Do not
-work around them, and do not decide them.
+Stop, record the affected plan item, evidence, and decision needed in `.ai-state/BLOCKERS.md`,
+and hand the decision to the developer when any of these appear. Do not work around them,
+and do not decide them.
 
 - Any change to a route or query touching the clinical tables, or to
   anything resolving ownership server-side (§3).
@@ -325,14 +348,16 @@ work around them, and do not decide them.
 
 ### 14.6 The review report
 
-A completed review produces, in this order: scope adherence; rule violations
-by section number; evidence check; blast radius; what was expanded beyond
-scope; what was skipped; and a verdict of accept, accept with changes, or
-reject.
+A completed review runs four independent read-only lenses (scope, rules, evidence, and blast
+radius) at the scoped review tier (§15) and produces, in this order: scope adherence; rule
+violations by section number; evidence check; blast radius; what was expanded beyond scope;
+what was skipped; and a verdict of accept, accept with changes, or reject.
 
-The evidence check is decided by §11, not by the agent's summary. An
-ownership or authorization change without all four cases pasted individually
-is recorded as unverified, whatever the report claims.
+The evidence check is decided by §11, not by the agent's summary. For any ownership or
+authorization change, all four scenarios (`401` unauthenticated, `403` wrong owner/scope,
+`200` authorized, `404` nonexistent) must be shown individually with exact requests and
+responses; a summary without the four individual responses is recorded as unverified, whatever
+the report claims.
 
 ### 14.7 No MASTER_PLAN.md
 
@@ -343,8 +368,9 @@ file, not in a separate plan document.
 
 ### 14.8 The task file
 
-`CURRENT_TASK.md` holds the current task, not history. It is
-overwritten each task, never appended to. Reset it to idle at close-out.
+`CURRENT_TASK.md` lives at the repository root (not `.agents/CURRENT_TASK.md`) and holds
+the current task, not history. It is overwritten each task, never appended to. Reset it to
+idle at close-out, keeping `.ai-state/` git-ignored and out of commits.
 
 `.agents/runs/` holds one file per dispatch, append-only.
 

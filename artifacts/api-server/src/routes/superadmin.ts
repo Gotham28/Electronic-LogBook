@@ -8,7 +8,14 @@ import { randomBytes } from "node:crypto";
 import { requireAuth, requireRole } from "../middlewares/auth.js";
 import { emailSchema, nameSchema, profileNameSchema, passwordSchema, idSchema, validate } from "../lib/validation.js";
 import { getEmailFailure, sendAccountCreatedEmail, sendHODAppointmentEmail } from "../lib/mailer.js";
-import { provisionDepartment, provisionMirrorForRealDepartment } from "../lib/department-provisioning.js";
+import {
+  buildCanonicalMirrorEmails,
+  buildMirrorSafeName,
+  provisionDepartment,
+  provisionMirrorForRealDepartment,
+  resetMirrorTestCredentials,
+  restoreMirrorTestFaculty,
+} from "../lib/department-provisioning.js";
 import jwt from "jsonwebtoken";
 import { JWT_SECRET } from "../lib/env.js";
 import { IMPERSONATION_TOKEN_LIFETIME } from "../lib/session-tokens.js";
@@ -187,37 +194,69 @@ router.get("/departments", async (req, res) => {
       collegeId: departmentsTable.collegeId,
     }).from(departmentsTable).where(and(eq(departmentsTable.isTest, false), eq(departmentsTable.collegeId, collegeId))).orderBy(departmentsTable.name);
 
-    const mirrors = await db.select({
-      id: departmentsTable.id,
-      name: departmentsTable.name,
-      code: departmentsTable.code,
-      configSourceDepartmentId: departmentsTable.configSourceDepartmentId,
-    }).from(departmentsTable).where(and(eq(departmentsTable.isTest, true),
-      inArray(departmentsTable.configSourceDepartmentId, departments.map((department) => department.id))));
+    const departmentIdsList = departments.map((department) => department.id);
+    const mirrors = departmentIdsList.length
+      ? await db.select({
+          id: departmentsTable.id,
+          name: departmentsTable.name,
+          code: departmentsTable.code,
+          configSourceDepartmentId: departmentsTable.configSourceDepartmentId,
+        }).from(departmentsTable).where(and(
+          eq(departmentsTable.isTest, true),
+          eq(departmentsTable.collegeId, collegeId),
+          inArray(departmentsTable.configSourceDepartmentId, departmentIdsList),
+        )).orderBy(departmentsTable.id)
+      : [];
 
-    // Fetch HODs only for the selected college's real departments and mirrors.
-    const hods = await db.select({
-      id: usersTable.id,
-      fullName: usersTable.fullName,
-      email: usersTable.email,
-      departmentId: usersTable.departmentId,
-    }).from(usersTable).where(and(eq(usersTable.role, "hod"), eq(usersTable.status, "approved"),
-      inArray(usersTable.departmentId, [...departments.map((department) => department.id), ...mirrors.map((mirror) => mirror.id)])));
+    const mirrorsByRealDeptId = new Map<number, typeof mirrors>();
+    for (const mirror of mirrors) {
+      if (mirror.configSourceDepartmentId === null) continue;
+      const list = mirrorsByRealDeptId.get(mirror.configSourceDepartmentId) ?? [];
+      list.push(mirror);
+      mirrorsByRealDeptId.set(mirror.configSourceDepartmentId, list);
+    }
+
+    const singleMirrorIds = Array.from(mirrorsByRealDeptId.values())
+      .filter((list) => list.length === 1)
+      .map((list) => list[0].id);
+    const hodDepartmentIds = [...departmentIdsList, ...singleMirrorIds];
+
+    // Fetch HODs only for the selected college's real departments and unambiguous mirrors.
+    const hods = hodDepartmentIds.length
+      ? await db.select({
+          id: usersTable.id,
+          fullName: usersTable.fullName,
+          email: usersTable.email,
+          departmentId: usersTable.departmentId,
+        }).from(usersTable).where(and(
+          eq(usersTable.role, "hod"),
+          eq(usersTable.status, "approved"),
+          inArray(usersTable.departmentId, hodDepartmentIds),
+        ))
+      : [];
 
     const hodByDept = new Map(hods.map((h) => [h.departmentId, { id: h.id, fullName: h.fullName, email: h.email }]));
 
-    const mirrorByRealDeptId = new Map(mirrors.filter(m => m.configSourceDepartmentId !== null).map((m) => [m.configSourceDepartmentId!, {
-      id: m.id, name: m.name, code: m.code, hod: hodByDept.get(m.id) || null,
-    }]));
+    const [college] = await db.select({ code: collegesTable.code }).from(collegesTable)
+      .where(eq(collegesTable.id, collegeId)).limit(1);
 
-    return res.json(departments.map((d) => ({
-      ...d,
-      hod: hodByDept.get(d.id) || null,
-      mirrorDepartmentId: mirrorByRealDeptId.get(d.id)?.id ?? null,
-      mirrorDepartmentName: mirrorByRealDeptId.get(d.id)?.name ?? null,
-      mirrorHod: mirrorByRealDeptId.get(d.id)?.hod ?? null,
-      mirrorCode: mirrorByRealDeptId.get(d.id)?.code ?? null,
-    })));
+    return res.json(departments.map((d) => {
+      const linkedMirrors = mirrorsByRealDeptId.get(d.id) ?? [];
+      const mirrorAmbiguous = linkedMirrors.length > 1;
+      const mirror = linkedMirrors.length === 1 ? linkedMirrors[0] : null;
+      return {
+        ...d,
+        hod: hodByDept.get(d.id) || null,
+        mirrorDepartmentId: mirror?.id ?? null,
+        mirrorDepartmentName: mirror?.name ?? null,
+        mirrorHod: mirror ? (hodByDept.get(mirror.id) || null) : null,
+        mirrorCode: mirror?.code ?? null,
+        mirrorDefaultEmails: mirror
+          ? buildCanonicalMirrorEmails(buildMirrorSafeName(d.id, college?.code, mirror.code))
+          : null,
+        mirrorAmbiguous,
+      };
+    }));
   } catch (error) {
     req.log.error({ userId: req.user!.id, status: 500 }, "Error listing departments");
     return res.status(500).json({ message: "Internal server error" });
@@ -307,51 +346,138 @@ router.post("/departments/backfill-test-departments", async (req, res) => {
   }
 });
 
-// ---------------------------------------------------------------------------
-// POST /api/superadmin/departments/:id/reset-test-credentials
-// Resets all test accounts in a mirror department to the deterministic password
-// (= the mirror dept code, e.g. "TEST-2"). Safe to call repeatedly.
-// ---------------------------------------------------------------------------
-router.post("/departments/:id/reset-test-credentials", async (req, res) => {
-  const realDepartmentId = Number(req.params.id);
-  try {
-    const [mirror] = await db.select({
-      id: departmentsTable.id,
-      code: departmentsTable.code,
-    }).from(departmentsTable)
-      .where(and(eq(departmentsTable.configSourceDepartmentId, realDepartmentId), eq(departmentsTable.isTest, true)))
-      .limit(1);
+const restoreTestFacultyBody = z.preprocess(
+  (value) => (value === undefined ? {} : value),
+  z.object({ expectedMirrorDepartmentId: idSchema.optional() }).strict(),
+);
+const resetTestCredentialsBody = z.preprocess(
+  (value) => (value === undefined ? {} : value),
+  z.object({
+    collegeId: idSchema.optional(),
+    expectedMirrorDepartmentId: idSchema.optional(),
+  }).strict(),
+);
 
-    if (!mirror) {
+const STALE_MIRROR_CONFLICT_MESSAGE =
+  "The displayed test department is no longer the active test department for this department. Refresh and try again.";
+const MIRROR_LOCK_CONFLICT_MESSAGE =
+  "Another administrative change is currently updating accounts in this test department. Please try again.";
+
+// ---------------------------------------------------------------------------
+// POST /api/superadmin/departments/:id/restore-test-faculty
+// Restores a default approved Test Professor in the linked mirror department
+// when that mirror currently has no faculty. Scoped to the selected college.
+// ---------------------------------------------------------------------------
+router.post("/departments/:id/restore-test-faculty", validate(restoreTestFacultyBody), async (req, res) => {
+  const realDepartmentId = Number(req.params.id);
+  const { expectedMirrorDepartmentId } = req.body as { expectedMirrorDepartmentId?: number };
+  try {
+    const result = await restoreMirrorTestFaculty(realDepartmentId, req.adminCollegeId!, {
+      expectedMirrorDepartmentId,
+    });
+    if (result.status === "missing_department") {
+      res.status(404).json({ message: "Department not found" });
+      return;
+    }
+    if (result.status === "missing_mirror") {
       res.status(404).json({ message: "No test department found for this department" });
       return;
     }
+    if (result.status === "ambiguous_mirror") {
+      req.log.error({ adminId: req.user!.id, departmentId: realDepartmentId, status: 409 }, "Test faculty restore blocked by multiple linked test departments");
+      res.status(409).json({ message: "Multiple test departments are linked to this department" });
+      return;
+    }
+    if (result.status === "stale_mirror") {
+      req.log.error({
+        adminId: req.user!.id,
+        departmentId: realDepartmentId,
+        ...(expectedMirrorDepartmentId !== undefined ? { expectedMirrorDepartmentId } : {}),
+        status: 409,
+      }, "Test faculty restore blocked by stale or replaced test department");
+      res.status(409).json({ message: STALE_MIRROR_CONFLICT_MESSAGE });
+      return;
+    }
+    if (result.status === "lock_conflict") {
+      req.log.error({
+        adminId: req.user!.id,
+        departmentId: realDepartmentId,
+        ...(expectedMirrorDepartmentId !== undefined ? { expectedMirrorDepartmentId } : {}),
+        status: 409,
+      }, "Test faculty restore blocked by concurrent account lock");
+      res.status(409).json({ message: MIRROR_LOCK_CONFLICT_MESSAGE });
+      return;
+    }
+    if (result.status === "collision") {
+      req.log.error({ adminId: req.user!.id, departmentId: realDepartmentId, mirrorDepartmentId: result.mirrorDepartmentId, status: 409 }, "Test faculty restore blocked by email collision");
+      res.status(409).json({ message: "Default test faculty email is already assigned to a non-professor account in this test department or to an account in another department" });
+      return;
+    }
 
-    const [source] = await db.select({ id: departmentsTable.id, name: departmentsTable.name, collegeId: departmentsTable.collegeId })
-      .from(departmentsTable).where(eq(departmentsTable.id, realDepartmentId)).limit(1);
-    const [college] = source?.collegeId
-      ? await db.select({ code: collegesTable.code }).from(collegesTable).where(eq(collegesTable.id, source.collegeId)).limit(1)
-      : [undefined];
+    req.log.info({
+      adminId: req.user!.id,
+      departmentId: realDepartmentId,
+      mirrorDepartmentId: result.mirrorDepartmentId,
+      result: result.status,
+      status: 200,
+    }, "Test faculty restore checked");
+    return res.json(result);
+  } catch {
+    req.log.error({ adminId: req.user!.id, departmentId: realDepartmentId, status: 500 }, "Error restoring test faculty");
+    return res.status(500).json({ message: "Internal server error" });
+  }
+});
 
-    const newPasswordHash = await bcrypt.hash(mirror.code, 12);
-    const safeName = [college?.code, source?.id].filter(Boolean).join("-")
-      .toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || mirror.code.toLowerCase();
+// ---------------------------------------------------------------------------
+// POST /api/superadmin/departments/:id/reset-test-credentials
+// Resets only the exact canonical test accounts in a mirror department to the
+// deterministic password (= the mirror dept code) atomically. Custom logins
+// are preserved untouched.
+// ---------------------------------------------------------------------------
+router.post("/departments/:id/reset-test-credentials", validate(resetTestCredentialsBody), async (req, res) => {
+  const realDepartmentId = Number(req.params.id);
+  const { expectedMirrorDepartmentId } = req.body as { expectedMirrorDepartmentId?: number };
+  try {
+    const outcome = await resetMirrorTestCredentials(realDepartmentId, req.adminCollegeId!, {
+      expectedMirrorDepartmentId,
+    });
 
-    // Update password and email for each role to the clean, readable format
-    await db.update(usersTable)
-      .set({ passwordHash: newPasswordHash, email: `test.hod@${safeName}.test` })
-      .where(and(eq(usersTable.departmentId, mirror.id), eq(usersTable.role, "hod")));
+    if (outcome.status === "missing_department") {
+      res.status(404).json({ message: "Department not found" });
+      return;
+    }
+    if (outcome.status === "missing_mirror") {
+      res.status(404).json({ message: "No test department found for this department" });
+      return;
+    }
+    if (outcome.status === "ambiguous_mirror") {
+      req.log.error({ adminId: req.user!.id, departmentId: realDepartmentId, status: 409 }, "Test credentials reset blocked by multiple linked test departments");
+      res.status(409).json({ message: "Multiple test departments are linked to this department" });
+      return;
+    }
+    if (outcome.status === "stale_mirror") {
+      req.log.error({
+        adminId: req.user!.id,
+        departmentId: realDepartmentId,
+        ...(expectedMirrorDepartmentId !== undefined ? { expectedMirrorDepartmentId } : {}),
+        status: 409,
+      }, "Test credentials reset blocked by stale or replaced test department");
+      res.status(409).json({ message: STALE_MIRROR_CONFLICT_MESSAGE });
+      return;
+    }
+    if (outcome.status === "lock_conflict") {
+      req.log.error({
+        adminId: req.user!.id,
+        departmentId: realDepartmentId,
+        ...(expectedMirrorDepartmentId !== undefined ? { expectedMirrorDepartmentId } : {}),
+        status: 409,
+      }, "Test credentials reset blocked by concurrent account lock");
+      res.status(409).json({ message: MIRROR_LOCK_CONFLICT_MESSAGE });
+      return;
+    }
 
-    await db.update(usersTable)
-      .set({ passwordHash: newPasswordHash, email: `test.prof@${safeName}.test` })
-      .where(and(eq(usersTable.departmentId, mirror.id), eq(usersTable.role, "professor")));
-
-    await db.update(usersTable)
-      .set({ passwordHash: newPasswordHash, email: `test.student@${safeName}.test` })
-      .where(and(eq(usersTable.departmentId, mirror.id), eq(usersTable.role, "student")));
-
-    req.log.info({ adminId: req.user!.id, mirrorDepartmentId: mirror.id }, "Test credentials reset");
-    return res.json({ mirrorCode: mirror.code });
+    req.log.info({ adminId: req.user!.id, departmentId: outcome.departmentId, mirrorDepartmentId: outcome.mirrorDepartmentId, status: 200 }, "Test credentials reset");
+    return res.json({ mirrorCode: outcome.mirrorCode });
   } catch (error) {
     req.log.error({ userId: req.user!.id, status: 500 }, "Error resetting test credentials");
     return res.status(500).json({ message: "Internal server error" });

@@ -28,6 +28,7 @@ import {
   deleteAdminDepartment,
   impersonateAdminUser,
   backfillTestDepartments,
+  restoreTestFaculty,
   resetTestCredentials,
   deactivateAdminUser,
   reactivateAdminUser,
@@ -73,6 +74,9 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
   const [failedDepts, setFailedDepts] = useState<Set<number>>(new Set());
   const [loadingCounts, setLoadingCounts] = useState(true);
   const departmentLoadVersion = useRef(0);
+  const adminMountedRef = useRef(true);
+  const activeCollegeIdRef = useRef<number | null>(selectedCollegeId);
+  activeCollegeIdRef.current = selectedCollegeId;
 
   // New department form state
   const [newDeptForm, setNewDeptForm] = useState({ name: "", code: "", hodFullName: "", hodEmail: "", copyFromDepartmentId: "" });
@@ -82,6 +86,14 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
   const [openTicketCount, setOpenTicketCount] = useState<number>(0);
 
   useEffect(() => {
+    adminMountedRef.current = true;
+    return () => {
+      adminMountedRef.current = false;
+      departmentLoadVersion.current += 1;
+    };
+  }, []);
+
+  useEffect(() => {
     if (!SUPPORT_FEATURE_ENABLED) return;
     getAdminOpenSupportTicketsCount()
       .then((res) => setOpenTicketCount(res.count))
@@ -89,7 +101,9 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
   }, []);
 
   useEffect(() => {
+    let active = true;
     getAdminColleges().then((data) => {
+      if (!active) return;
       setColleges(data);
       if (data.length) {
         sessionStorage.setItem("admin.selectedCollegeId", String(data[0].id));
@@ -97,9 +111,11 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
       }
       else setLoading(false);
     }).catch((err: any) => {
+      if (!active) return;
       setError(err.message || "Failed to load colleges.");
       setLoading(false);
     });
+    return () => { active = false; };
   }, []);
 
   useEffect(() => {
@@ -124,20 +140,24 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
     return () => { current = false; };
   }, [colleges, showNewDeptPanel]);
 
-  const fetchDepartments = async (collegeId = selectedCollegeId) => {
-    if (collegeId === null) return;
+  const fetchDepartments = async (collegeId: number | null = selectedCollegeId) => {
+    if (collegeId === null || !adminMountedRef.current || activeCollegeIdRef.current !== collegeId) return;
     const loadVersion = ++departmentLoadVersion.current;
     setLoading(true);
     setError(null);
     try {
       const data = await getAdminDepartments(collegeId);
-      if (loadVersion !== departmentLoadVersion.current) return;
+      if (loadVersion !== departmentLoadVersion.current || !adminMountedRef.current || activeCollegeIdRef.current !== collegeId) return;
       setDepartments(data);
-      if (data.length > 0 && !selectedDeptId) {
-        setSelectedDeptId(data[0].id);
-      } else if (selectedDeptId && !data.find((d: any) => d.id === selectedDeptId)) {
-        setSelectedDeptId(null);
-      }
+      setSelectedDeptId((currentSelected) => {
+        if (data.length > 0 && !currentSelected) {
+          return data[0].id;
+        }
+        if (currentSelected && !data.find((d: any) => d.id === currentSelected)) {
+          return null;
+        }
+        return currentSelected;
+      });
       
       setLoadingCounts(true);
       const newFailed = new Set<number>();
@@ -151,7 +171,7 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
           }
         })
       );
-      if (loadVersion !== departmentLoadVersion.current) return;
+      if (loadVersion !== departmentLoadVersion.current || !adminMountedRef.current || activeCollegeIdRef.current !== collegeId) return;
       setFailedDepts(newFailed);
       
       const countsMap = new Map();
@@ -173,16 +193,12 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
       
       setDeptCounts(countsMap);
 
-      // Auto-sync test account passwords to their deterministic value (= mirrorCode)
-      // for all departments that have a mirror. Fire-and-forget — failures are silent.
-      data.filter((d: AdminDepartment) => d.mirrorDepartmentId).forEach((d: AdminDepartment) => {
-        resetTestCredentials(d.id).catch(() => {});
-      });
-
     } catch (err: any) {
-      if (loadVersion === departmentLoadVersion.current) setError(err.message || "Failed to load departments.");
+      if (loadVersion === departmentLoadVersion.current && adminMountedRef.current && activeCollegeIdRef.current === collegeId) {
+        setError(err.message || "Failed to load departments.");
+      }
     } finally {
-      if (loadVersion === departmentLoadVersion.current) {
+      if (loadVersion === departmentLoadVersion.current && adminMountedRef.current && activeCollegeIdRef.current === collegeId) {
         setLoading(false);
         setLoadingCounts(false);
       }
@@ -195,12 +211,13 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
       toast.error("Please fill in all fields.");
       return;
     }
+    const targetCollegeId = selectedCollegeId;
     setCreatingDept(true);
     try {
-      if (selectedCollegeId === null) throw new Error("Select a college first");
+      if (targetCollegeId === null) throw new Error("Select a college first");
       const result = await createAdminDepartment({
         setup: {
-          collegeId: selectedCollegeId,
+          collegeId: targetCollegeId,
           ...(newDeptForm.copyFromDepartmentId ? { copyFromDepartmentId: Number(newDeptForm.copyFromDepartmentId) } : {}),
           name: newDeptForm.name,
           code: newDeptForm.code,
@@ -212,13 +229,15 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
       });
       toast.success("Department and HOD created successfully");
       if (!result.emailAccepted) toast.warning("The HOD account was created, but the onboarding email could not be accepted by the email provider. Ask the HOD to use Forgot password if needed.");
-      setShowNewDeptPanel(false);
-      setNewDeptForm({ name: "", code: "", hodFullName: "", hodEmail: "", copyFromDepartmentId: "" });
-      fetchDepartments();
+      if (adminMountedRef.current && activeCollegeIdRef.current === targetCollegeId) {
+        setShowNewDeptPanel(false);
+        setNewDeptForm({ name: "", code: "", hodFullName: "", hodEmail: "", copyFromDepartmentId: "" });
+        void fetchDepartments(targetCollegeId);
+      }
     } catch (err: any) {
-      toast.error(err.message || "Failed to create department");
+      if (adminMountedRef.current) toast.error(err.message || "Failed to create department");
     } finally {
-      setCreatingDept(false);
+      if (adminMountedRef.current) setCreatingDept(false);
     }
   };
 
@@ -290,10 +309,12 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
   };
 
   const handleBackfillTestDepartments = async () => {
-    if (selectedCollegeId === null) return;
+    const targetCollegeId = selectedCollegeId;
+    if (targetCollegeId === null) return;
     setBackfilling(true);
     try {
-      const result = await backfillTestDepartments(selectedCollegeId);
+      const result = await backfillTestDepartments(targetCollegeId);
+      if (!adminMountedRef.current) return;
       if (result.provisioned.length > 0) {
         toast.success(`Provisioned ${result.provisioned.length} test department${result.provisioned.length === 1 ? '' : 's'}`);
       } else if (result.failed.length === 0) {
@@ -304,11 +325,13 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
         toast.error(`Failed to provision ${result.failed.length} test department${result.failed.length === 1 ? '' : 's'}`);
       }
       
-      fetchDepartments();
+      if (activeCollegeIdRef.current === targetCollegeId) {
+        void fetchDepartments(targetCollegeId);
+      }
     } catch (err: any) {
-      toast.error(err.message || "Failed to provision test departments");
+      if (adminMountedRef.current) toast.error(err.message || "Failed to provision test departments");
     } finally {
-      setBackfilling(false);
+      if (adminMountedRef.current) setBackfilling(false);
     }
   };
 
@@ -662,12 +685,30 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
 }
 
 function DepartmentDetail({ department, onRefresh }: { department: AdminDepartment, onRefresh: () => void }) {
+  type ViewSnapshot = {
+    epoch: number;
+    deptId: number;
+    mirrorId: number | null;
+    mirrorKey: string | null;
+    viewKey: string;
+  };
+
+  const currentMirrorId = !department.mirrorAmbiguous && department.mirrorDepartmentId
+    ? department.mirrorDepartmentId
+    : null;
+  const currentMirrorKey = currentMirrorId !== null
+    ? `${department.id}:${currentMirrorId}`
+    : null;
+  const currentViewKey = `${department.id}:${currentMirrorId ?? "none"}:${Boolean(department.mirrorAmbiguous)}`;
+
   const [roster, setRoster] = useState<AdminUserRow[]>([]);
+  const [loadedRosterDeptId, setLoadedRosterDeptId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const [mirrorRoster, setMirrorRoster] = useState<AdminUserRow[]>([]);
-  const [mirrorLoading, setMirrorLoading] = useState(false);
+  const [loadedMirror, setLoadedMirror] = useState<{ key: string; mirrorDepartmentId: number } | null>(null);
+  const [mirrorLoading, setMirrorLoading] = useState(Boolean(currentMirrorKey));
   const [mirrorError, setMirrorError] = useState<string | null>(null);
 
   const [showReplaceHod, setShowReplaceHod] = useState(false);
@@ -695,49 +736,197 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
   const [editingUserId, setEditingUserId] = useState<number | null>(null);
   const [editingName, setEditingName] = useState("");
   const [savingUserName, setSavingUserName] = useState(false);
+  const [restoringTestFaculty, setRestoringTestFaculty] = useState(false);
+  const [restoreFacultyError, setRestoreFacultyError] = useState<string | null>(null);
+  const [resettingCredentials, setResettingCredentials] = useState(false);
+  const [resetCredentialsError, setResetCredentialsError] = useState<string | null>(null);
+
+  const mountedRef = useRef(true);
+  const activeDeptIdRef = useRef(department.id);
+  activeDeptIdRef.current = department.id;
+  const activeMirrorKeyRef = useRef(currentMirrorKey);
+  activeMirrorKeyRef.current = currentMirrorKey;
+  const activeViewKeyRef = useRef(currentViewKey);
+  activeViewKeyRef.current = currentViewKey;
+  const rosterRequestIdRef = useRef(0);
+  const mirrorRequestIdRef = useRef(0);
+  const actionEpochRef = useRef(0);
+
+  const captureViewSnapshot = (): ViewSnapshot => ({
+    epoch: actionEpochRef.current,
+    deptId: department.id,
+    mirrorId: currentMirrorId,
+    mirrorKey: currentMirrorKey,
+    viewKey: currentViewKey,
+  });
+
+  const isViewSnapshotCurrent = (snapshot: ViewSnapshot): boolean =>
+    mountedRef.current &&
+    actionEpochRef.current === snapshot.epoch &&
+    activeDeptIdRef.current === snapshot.deptId &&
+    activeMirrorKeyRef.current === snapshot.mirrorKey &&
+    activeViewKeyRef.current === snapshot.viewKey;
 
   useEffect(() => {
-    fetchRoster();
-    fetchMirrorRoster();
+    mountedRef.current = true;
+    const initialSnapshot: ViewSnapshot = {
+      epoch: actionEpochRef.current,
+      deptId: department.id,
+      mirrorId: currentMirrorId,
+      mirrorKey: currentMirrorKey,
+      viewKey: currentViewKey,
+    };
+    rosterRequestIdRef.current += 1;
+    mirrorRequestIdRef.current += 1;
+
+    setRoster([]);
+    setLoadedRosterDeptId(null);
+    setLoading(true);
+    setError(null);
+
+    setMirrorRoster([]);
+    setLoadedMirror(null);
+    setMirrorError(null);
+    setMirrorLoading(Boolean(currentMirrorKey));
+
     setShowReplaceHod(false);
+    setReplaceHodEmail("");
+    setReplacingHod(false);
     setReplaceHodError(null);
     setShowAddForm(false);
     setAddTarget(null);
+    setAddingUser(false);
     setShowDeleteConfirm(false);
+    setDeleting(false);
     setDeleteError(null);
     setUserToDelete(null);
+    setDeletingUser(false);
+    setChangingUserId(null);
     setDeleteUserError(null);
     setEditingUserId(null);
     setEditingName("");
-  }, [department.id, department.mirrorDepartmentId]);
+    setSavingUserName(false);
+    setRestoringTestFaculty(false);
+    setRestoreFacultyError(null);
+    setResettingCredentials(false);
+    setResetCredentialsError(null);
 
-  const fetchRoster = async () => {
+    void fetchRoster(initialSnapshot);
+    void fetchMirrorRoster(initialSnapshot);
+
+    return () => {
+      mountedRef.current = false;
+      actionEpochRef.current += 1;
+      rosterRequestIdRef.current += 1;
+      mirrorRequestIdRef.current += 1;
+    };
+  }, [department.id, department.mirrorDepartmentId, department.mirrorAmbiguous]);
+
+  const fetchRoster = async (snapshot: ViewSnapshot = captureViewSnapshot()): Promise<boolean> => {
+    if (!isViewSnapshotCurrent(snapshot)) return false;
+    const requestId = ++rosterRequestIdRef.current;
     setLoading(true);
     setError(null);
     try {
-      const data = await getAdminDepartmentRoster(department.id);
+      const data = await getAdminDepartmentRoster(snapshot.deptId);
+      if (!isViewSnapshotCurrent(snapshot) || rosterRequestIdRef.current !== requestId) return false;
       setRoster(data);
+      setLoadedRosterDeptId(snapshot.deptId);
+      return true;
     } catch (err: any) {
+      if (!isViewSnapshotCurrent(snapshot) || rosterRequestIdRef.current !== requestId) return false;
+      setRoster([]);
+      setLoadedRosterDeptId(null);
       setError(err.message || "Failed to load roster");
+      return false;
     } finally {
-      setLoading(false);
+      if (isViewSnapshotCurrent(snapshot) && rosterRequestIdRef.current === requestId) {
+        setLoading(false);
+      }
     }
   };
 
-  const fetchMirrorRoster = async () => {
-    if (!department.mirrorDepartmentId) {
+  const fetchMirrorRoster = async (snapshot: ViewSnapshot = captureViewSnapshot()): Promise<boolean> => {
+    if (!isViewSnapshotCurrent(snapshot)) return false;
+    const { mirrorId, mirrorKey } = snapshot;
+    if (!mirrorId || !mirrorKey) {
+      mirrorRequestIdRef.current += 1;
       setMirrorRoster([]);
-      return;
+      setLoadedMirror(null);
+      setMirrorError(null);
+      setMirrorLoading(false);
+      return false;
     }
+    const requestId = ++mirrorRequestIdRef.current;
     setMirrorLoading(true);
     setMirrorError(null);
     try {
-      const data = await getAdminDepartmentRoster(department.mirrorDepartmentId);
+      const data = await getAdminDepartmentRoster(mirrorId);
+      if (!isViewSnapshotCurrent(snapshot) || mirrorRequestIdRef.current !== requestId) return false;
       setMirrorRoster(data);
+      setLoadedMirror({ key: mirrorKey, mirrorDepartmentId: mirrorId });
+      return true;
     } catch (err: any) {
+      if (!isViewSnapshotCurrent(snapshot) || mirrorRequestIdRef.current !== requestId) return false;
+      setMirrorRoster([]);
+      setLoadedMirror(null);
       setMirrorError(err.message || "Failed to load test accounts");
+      return false;
     } finally {
-      setMirrorLoading(false);
+      if (isViewSnapshotCurrent(snapshot) && mirrorRequestIdRef.current === requestId) {
+        setMirrorLoading(false);
+      }
+    }
+  };
+
+  const hasLoadedCurrentRoster = !loading && !error && loadedRosterDeptId === department.id;
+  const hasLoadedCurrentMirror =
+    currentMirrorKey !== null &&
+    !mirrorLoading &&
+    !mirrorError &&
+    loadedMirror?.key === currentMirrorKey;
+
+  const handleRestoreTestFaculty = async () => {
+    if (restoringTestFaculty || !hasLoadedCurrentMirror || !loadedMirror) return;
+    const snapshot = captureViewSnapshot();
+    const expectedMirrorDepartmentId = loadedMirror.mirrorDepartmentId;
+    setRestoringTestFaculty(true);
+    setRestoreFacultyError(null);
+    try {
+      const result = await restoreTestFaculty(snapshot.deptId, expectedMirrorDepartmentId);
+      if (!isViewSnapshotCurrent(snapshot)) return;
+      const refreshed = await fetchMirrorRoster(snapshot);
+      if (!isViewSnapshotCurrent(snapshot)) return;
+      if (refreshed) {
+        toast.success(result.status === "created" ? "Test faculty restored" : "Test faculty is already present");
+      }
+    } catch (err: any) {
+      if (!isViewSnapshotCurrent(snapshot)) return;
+      const message = err?.message || "Failed to restore test faculty";
+      setRestoreFacultyError(message);
+      toast.error(message);
+    } finally {
+      if (isViewSnapshotCurrent(snapshot)) setRestoringTestFaculty(false);
+    }
+  };
+
+  const handleResetTestCredentials = async () => {
+    if (resettingCredentials || !hasLoadedCurrentMirror || !loadedMirror || defaultTestAccounts.length === 0) return;
+    const snapshot = captureViewSnapshot();
+    const expectedMirrorDepartmentId = loadedMirror.mirrorDepartmentId;
+    setResettingCredentials(true);
+    setResetCredentialsError(null);
+    try {
+      await resetTestCredentials(snapshot.deptId, expectedMirrorDepartmentId);
+      if (!isViewSnapshotCurrent(snapshot)) return;
+      toast.success("Default test passwords reset");
+    } catch (err: any) {
+      if (!isViewSnapshotCurrent(snapshot)) return;
+      const message = err?.message || "Failed to reset default test passwords";
+      setResetCredentialsError(message);
+      toast.error(message);
+    } finally {
+      if (isViewSnapshotCurrent(snapshot)) setResettingCredentials(false);
     }
   };
 
@@ -759,23 +948,26 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
       return;
     }
 
+    const snapshot = captureViewSnapshot();
     setSavingUserName(true);
     try {
-      const updatedUser = await updateAdminDepartmentUserName(department.id, userId, fullName);
+      const updatedUser = await updateAdminDepartmentUserName(snapshot.deptId, userId, fullName);
+      if (!isViewSnapshotCurrent(snapshot)) return;
       setRoster(current => current.map(user => user.id === updatedUser.id ? updatedUser : user));
       toast.success("Name updated");
       cancelNameEdit();
       onRefresh();
     } catch (err: any) {
+      if (!isViewSnapshotCurrent(snapshot)) return;
       toast.error(err.message || "Failed to update name");
     } finally {
-      setSavingUserName(false);
+      if (isViewSnapshotCurrent(snapshot)) setSavingUserName(false);
     }
   };
 
   const handleReplaceHod = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!replaceHodEmail) return;
+    if (replacingHod || !replaceHodEmail || !hasLoadedCurrentRoster) return;
 
     const incomingFaculty = roster.find(u => u.email.toLowerCase() === replaceHodEmail.toLowerCase() && u.role === "professor" && u.status === "approved");
     
@@ -784,21 +976,24 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
       return;
     }
 
+    const snapshot = captureViewSnapshot();
     setReplacingHod(true);
     setReplaceHodError(null);
     try {
-      const result = await replaceAdminHod(department.id, incomingFaculty.id);
+      const result = await replaceAdminHod(snapshot.deptId, incomingFaculty.id);
+      if (!isViewSnapshotCurrent(snapshot)) return;
       toast.success("HOD replaced successfully");
       if (!result.emailAccepted) toast.warning("The HOD role changed, but the appointment email could not be accepted by the email provider.");
       setShowReplaceHod(false);
       setReplaceHodEmail("");
       onRefresh(); // Refresh parent to get updated HOD info
-      fetchRoster();
+      void fetchRoster(snapshot);
     } catch (err: any) {
+      if (!isViewSnapshotCurrent(snapshot)) return;
       setReplaceHodError(err.message || "Failed to replace HOD");
       toast.error(err.message || "Failed to replace HOD");
     } finally {
-      setReplacingHod(false);
+      if (isViewSnapshotCurrent(snapshot)) setReplacingHod(false);
     }
   };
 
@@ -809,9 +1004,9 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
     } else if (activeTab === "residents") {
       setAddFormType("resident");
       setAddTarget({ id: department.id, name: department.name, isTest: false });
-    } else if (department.mirrorDepartmentId && department.mirrorDepartmentName) {
+    } else if (hasLoadedCurrentMirror && loadedMirror && department.mirrorDepartmentName) {
       setAddFormType("resident");
-      setAddTarget({ id: department.mirrorDepartmentId, name: department.mirrorDepartmentName, isTest: true });
+      setAddTarget({ id: loadedMirror.mirrorDepartmentId, name: department.mirrorDepartmentName, isTest: true });
     } else {
       toast.error("Test department details are unavailable. Reload departments and try again.");
       return;
@@ -823,7 +1018,7 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!addTarget || !addForm.fullName || !addForm.email || (addFormType === "resident" && !addForm.password)) return;
+    if (addingUser || !addTarget || !addForm.fullName || !addForm.email || (addFormType === "resident" && !addForm.password)) return;
     
     if (addFormType === "resident") {
       if (!addForm.batch || !addForm.dateOfJoining || !addForm.kuhsId) {
@@ -831,14 +1026,18 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
         return;
       }
     }
-    
+
+    const target = addTarget;
+    const formType = addFormType;
+    const snapshot = captureViewSnapshot();
     setAddingUser(true);
     try {
-      if (addFormType === "faculty") {
-        const result = await createAdminFaculty(addTarget.id, {
+      if (formType === "faculty") {
+        const result = await createAdminFaculty(target.id, {
           fullName: addForm.fullName,
           email: addForm.email
         });
+        if (!isViewSnapshotCurrent(snapshot)) return;
         toast.success("Faculty account created");
         if (!result.emailAccepted) {
           const detail = result.emailFailure?.failure === "missing_configuration" ? "Email service configuration is missing"
@@ -847,7 +1046,7 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
           toast.warning(`Faculty account created. ${detail}; ask the faculty member to use Forgot password if needed.`);
         }
       } else {
-        const result = await createAdminStudent(addTarget.id, {
+        const result = await createAdminStudent(target.id, {
           fullName: addForm.fullName,
           email: addForm.email,
           password: addForm.password,
@@ -857,112 +1056,147 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
           kuhsId: addForm.kuhsId,
           approvalMode,
         });
+        if (!isViewSnapshotCurrent(snapshot)) return;
         if (result.student.status === "pending") {
-          toast.success(`Resident account created and is awaiting the ${addTarget.name} HOD's approval`);
+          toast.success(`Resident account created and is awaiting the ${target.name} HOD's approval`);
           if (!result.hodEmailAccepted) toast.warning("The resident is awaiting HOD approval, but the notification email could not be accepted by the email provider.");
         } else if (result.approvalFallback === "no_active_hod") {
-          toast.success(`Resident account approved automatically because no active HOD is assigned to ${addTarget.name}`);
+          toast.success(`Resident account approved automatically because no active HOD is assigned to ${target.name}`);
         } else {
           toast.success("Resident account created and approved");
         }
       }
       setAddForm(generateDefaultResidentForm());
       setShowAddForm(false);
-      const createdInTestDepartment = addTarget.isTest;
       setAddTarget(null);
       onRefresh(); // Refresh counts
-      if (createdInTestDepartment) await fetchMirrorRoster();
-      else await fetchRoster();
+      if (target.isTest) await fetchMirrorRoster(snapshot);
+      else await fetchRoster(snapshot);
     } catch (err: any) {
-      toast.error(err.message || `Failed to create ${addFormType} account`);
+      if (!isViewSnapshotCurrent(snapshot)) return;
+      toast.error(err.message || `Failed to create ${formType} account`);
     } finally {
-      setAddingUser(false);
+      if (isViewSnapshotCurrent(snapshot)) setAddingUser(false);
     }
   };
 
   const handleDeactivate = async (userId: number, role: string, isTest = false) => {
+    if (changingUserId === userId) return;
     const targetDepartmentName = isTest ? department.mirrorDepartmentName || "test department" : department.name;
     if (!window.confirm(`Deactivate this ${role === "student" ? "resident" : "faculty"} account in ${targetDepartmentName}? Their records will be retained.`)) return;
+    const snapshot = captureViewSnapshot();
     setChangingUserId(userId);
     try {
       await deactivateAdminUser(userId);
+      if (!isViewSnapshotCurrent(snapshot)) return;
       toast.success("User deactivated");
       onRefresh();
-      if (isTest) await fetchMirrorRoster();
-      else await fetchRoster();
+      if (isTest) await fetchMirrorRoster(snapshot);
+      else await fetchRoster(snapshot);
     } catch (err: any) {
+      if (!isViewSnapshotCurrent(snapshot)) return;
       toast.error(err.message || "Failed to deactivate user");
     } finally {
-      setChangingUserId(null);
+      if (isViewSnapshotCurrent(snapshot)) {
+        setChangingUserId((current) => current === userId ? null : current);
+      }
     }
   };
 
   const handleReactivate = async (userId: number, name: string, isTest = false) => {
+    if (changingUserId === userId) return;
     const targetDepartmentName = isTest ? department.mirrorDepartmentName || "test department" : department.name;
     if (!window.confirm(`Reactivate ${name} in ${targetDepartmentName}? They will be able to sign in again.`)) return;
+    const snapshot = captureViewSnapshot();
     setChangingUserId(userId);
     try {
       await reactivateAdminUser(userId);
+      if (!isViewSnapshotCurrent(snapshot)) return;
       toast.success(`${name} reactivated`);
       onRefresh();
-      if (isTest) await fetchMirrorRoster();
-      else await fetchRoster();
+      if (isTest) await fetchMirrorRoster(snapshot);
+      else await fetchRoster(snapshot);
     } catch (err: any) {
+      if (!isViewSnapshotCurrent(snapshot)) return;
       toast.error(err.message || "Failed to reactivate user");
     } finally {
-      setChangingUserId(null);
+      if (isViewSnapshotCurrent(snapshot)) {
+        setChangingUserId((current) => current === userId ? null : current);
+      }
     }
   };
 
   const handleHardDeleteUser = async () => {
-    if (!userToDelete) return;
+    if (!userToDelete || deletingUser) return;
+    const targetUser = userToDelete;
+    const snapshot = captureViewSnapshot();
     setDeletingUser(true);
     setDeleteUserError(null);
     try {
-      const res = await hardDeleteAdminUser(userToDelete.id);
+      const res = await hardDeleteAdminUser(targetUser.id);
+      if (!isViewSnapshotCurrent(snapshot)) return;
       const deletedCount = Object.values(res?.deletedRecords ?? {}).reduce((acc, val) => acc + (typeof val === "number" ? val : 0), 0);
       const summary = deletedCount > 0 ? ` (${deletedCount} related records removed)` : "";
-      toast.success(`${userToDelete.name} permanently deleted from ${userToDelete.departmentName}${summary}`);
-      const deletedInTestDepartment = userToDelete.isTest;
+      toast.success(`${targetUser.name} permanently deleted from ${targetUser.departmentName}${summary}`);
       setUserToDelete(null);
       onRefresh();
-      if (deletedInTestDepartment) await fetchMirrorRoster();
-      else await fetchRoster();
+      if (targetUser.isTest) await fetchMirrorRoster(snapshot);
+      else await fetchRoster(snapshot);
     } catch (err: any) {
+      if (!isViewSnapshotCurrent(snapshot)) return;
       setDeleteUserError(err.message || "Failed to permanently delete user");
     } finally {
-      setDeletingUser(false);
+      if (isViewSnapshotCurrent(snapshot)) setDeletingUser(false);
     }
   };
 
   const handleDeleteDepartment = async () => {
+    if (deleting) return;
+    const snapshot = captureViewSnapshot();
+    const targetDeptName = department.name;
     setDeleting(true);
     setDeleteError(null);
     try {
-      await deleteAdminDepartment(department.id);
-      toast.success(`Department "${department.name}" deleted`);
+      await deleteAdminDepartment(snapshot.deptId);
+      if (!isViewSnapshotCurrent(snapshot)) return;
+      toast.success(`Department "${targetDeptName}" deleted`);
       setShowDeleteConfirm(false);
       onRefresh();
     } catch (err: any) {
+      if (!isViewSnapshotCurrent(snapshot)) return;
       setDeleteError(err.message || "Failed to delete department");
     } finally {
-      setDeleting(false);
+      if (isViewSnapshotCurrent(snapshot)) setDeleting(false);
     }
   };
 
   const handleImpersonate = async (userId: number) => {
+    const snapshot = captureViewSnapshot();
     try {
       const result = await impersonateAdminUser(userId);
+      if (!isViewSnapshotCurrent(snapshot)) return;
       if (result.token) {
         window.open(`/?impersonationToken=${result.token}`, '_blank');
       }
     } catch (err: any) {
+      if (!isViewSnapshotCurrent(snapshot)) return;
       toast.error(err.message || "Failed to log in as user");
     }
   };
 
   const faculty = roster.filter(u => u.role === "professor" || u.role === "hod");
   const residents = roster.filter(u => u.role === "student");
+  const isCanonicalDefaultAccount = (user: AdminUserRow): boolean => {
+    const defaults = department.mirrorDefaultEmails;
+    if (!defaults) return false;
+    if (user.role === "hod") return user.email === defaults.hod;
+    if (user.role === "professor") return user.email === defaults.professor;
+    if (user.role === "student") return user.email === defaults.student;
+    return false;
+  };
+  const defaultTestAccounts = hasLoadedCurrentMirror ? mirrorRoster.filter(isCanonicalDefaultAccount) : [];
+  const customTestAccounts = hasLoadedCurrentMirror ? mirrorRoster.filter((user) => !isCanonicalDefaultAccount(user)) : [];
+  const mirrorHasProfessor = hasLoadedCurrentMirror && mirrorRoster.some((user) => user.role === "professor");
 
   const getInitials = (name: string) => {
     if (!name) return "?";
@@ -1152,9 +1386,9 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
       {error ? (
         <div className="flex h-40 flex-col items-center justify-center space-y-4 text-center rounded-xl border border-status-border bg-status" role="alert">
           <p className="text-sm font-medium text-status-foreground">{error}</p>
-          <Button onClick={fetchRoster} variant="outline" size="sm">Try again</Button>
+          <Button onClick={() => void fetchRoster()} variant="outline" size="sm">Try again</Button>
         </div>
-      ) : loading ? (
+      ) : !hasLoadedCurrentRoster ? (
         <div className="flex h-40 items-center justify-center border border-line-soft rounded-xl bg-white"><div className="animate-spin rounded-full border-4 border-line-soft border-t-forest h-8 w-8" /></div>
       ) : (
         <div className="bg-white rounded-xl border border-line-soft overflow-hidden shadow-sm">
@@ -1172,7 +1406,7 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
                 </TabsTrigger>
               </TabsList>
               <Button variant="ghost" size="sm" onClick={() => showAddForm ? (setShowAddForm(false), setAddTarget(null)) : openAddForm()}
-                disabled={activeTab === "test-accounts" && (!department.mirrorDepartmentId || !department.mirrorDepartmentName)}
+                disabled={activeTab === "test-accounts" && !hasLoadedCurrentMirror}
                 className="text-forest hover:text-forest hover:bg-mist">
                 <Plus className="h-4 w-4 mr-1" /> Add
               </Button>
@@ -1426,93 +1660,166 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
             </TabsContent>
 
             <TabsContent value="test-accounts" className="m-0 border-none outline-none">
-              {!department.mirrorDepartmentId ? (
+              {department.mirrorAmbiguous ? (
+                <div className="p-8 text-center text-sm font-medium text-status-foreground" role="alert">
+                  Multiple test departments are linked to {department.name}. Resolve the duplicate mirror link before managing test accounts.
+                </div>
+              ) : !department.mirrorDepartmentId ? (
                 <p className="p-8 text-center text-sm text-helper">
                   No test department has been provisioned for {department.name} yet. Use "Provision test departments" above to create one.
                 </p>
-              ) : mirrorLoading ? (
-                <div className="flex h-40 items-center justify-center bg-white"><div className="animate-spin rounded-full border-4 border-line-soft border-t-forest h-8 w-8" /></div>
               ) : mirrorError ? (
                 <div className="flex h-40 flex-col items-center justify-center space-y-4 text-center rounded-xl border border-status-border bg-status" role="alert">
                   <p className="text-sm font-medium text-status-foreground">{mirrorError}</p>
-                  <Button onClick={fetchMirrorRoster} variant="outline" size="sm">Try again</Button>
+                  <Button onClick={() => void fetchMirrorRoster()} variant="outline" size="sm">Try again</Button>
                 </div>
-              ) : !mirrorRoster.length ? (
-                <p className="p-8 text-center text-sm text-helper">No test accounts in this department.</p>
+              ) : !hasLoadedCurrentMirror ? (
+                <div className="flex h-40 items-center justify-center bg-white"><div className="animate-spin rounded-full border-4 border-line-soft border-t-forest h-8 w-8" /></div>
               ) : (
                 <div className="space-y-4 p-4">
-                  {/* Credentials card */}
-                  <div className="rounded-lg border border-line-soft bg-mist p-4">
-                    <p className="text-xs font-bold uppercase tracking-wider text-forest mb-3">Test Login Credentials</p>
-                    <p className="text-xs text-forest mb-3">
-                      Password for all accounts: <span className="font-mono font-bold text-forest bg-white px-2 py-0.5 rounded border border-line-soft">{department.mirrorCode}</span>
-                    </p>
-                    <div className="grid gap-2">
-                      {mirrorRoster.map(u => (
-                        <div key={u.id} className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 bg-white rounded border border-line-soft px-3 py-2 text-sm">
-                          <Badge variant="outline" className="capitalize w-fit shrink-0">{u.role}</Badge>
-                          <span className="font-mono text-ink text-xs break-all">{u.email}</span>
-                          <span className="text-helper text-xs shrink-0 sm:ml-auto">password: <span className="font-mono font-medium text-ink">{department.mirrorCode}</span></span>
+                  {!mirrorHasProfessor && (
+                    <div className="space-y-2">
+                      <div className="flex flex-col gap-3 rounded-lg border border-status-border bg-status p-4 sm:flex-row sm:items-center sm:justify-between" role="status">
+                        <div className="space-y-1">
+                          <p className="text-sm font-semibold text-status-foreground">No test professor in this test department</p>
+                          <p className="text-xs text-soft-ink">Restore the default test professor account without modifying existing HOD, resident, or custom accounts.</p>
                         </div>
-                      ))}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => void handleRestoreTestFaculty()}
+                          disabled={restoringTestFaculty || !hasLoadedCurrentMirror}
+                          className="shrink-0 border-status-border bg-white text-status-foreground hover:bg-mist"
+                        >
+                          {restoringTestFaculty ? "Restoring..." : "Restore test faculty"}
+                        </Button>
+                      </div>
+                      {restoreFacultyError && (
+                        <div role="alert" className="rounded-md border border-status-border bg-status p-3 text-sm font-medium text-status-foreground">
+                          {restoreFacultyError}
+                        </div>
+                      )}
                     </div>
-                  </div>
+                  )}
 
-                  {/* Roster table */}
-                  <Table>
-                    <TableHeader className="bg-white">
-                      <TableRow className="hover:bg-transparent">
-                        <TableHead>Name</TableHead>
-                        <TableHead>Email (login ID)</TableHead>
-                        <TableHead>Role</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Action</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {mirrorRoster.map(u => (
-                        <TableRow key={u.id}>
-                          <TableCell>
-                            <div className="font-semibold text-ink">{u.fullName}</div>
-                            {u.status === "pending" && <div className="text-xs text-status-foreground mt-0.5">Awaiting the {department.mirrorDepartmentName || "test department"} HOD's approval</div>}
-                          </TableCell>
-                          <TableCell className="text-helper text-sm font-mono">{u.email}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className="capitalize">{u.role}</Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={u.status === "approved" ? "default" : "secondary"} className={`rounded-full ${u.status === 'approved' ? 'bg-deep' : u.status === 'pending' ? 'bg-status text-status-foreground border-none' : ''}`}>
-                              {u.status === "rejected" ? "Deactivated" : u.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex flex-wrap justify-end gap-2">
-                              {u.role === "hod" ? (
-                                u.status === "approved" && <Button size="sm" variant="outline" onClick={() => handleImpersonate(u.id)} className="h-8 px-3">Log in as</Button>
-                              ) : (
-                                <>
-                                  {u.status === "approved" && (
-                                    <Button size="sm" variant="outline" onClick={() => handleImpersonate(u.id)} className="h-8 px-3">Log in as</Button>
-                                  )}
-                                  {u.status === "rejected" ? (
-                                    <Button size="sm" variant="outline" onClick={() => handleReactivate(u.id, u.fullName, true)} disabled={changingUserId === u.id} className="h-8 px-3">Reactivate</Button>
-                                  ) : (
-                                    <Button size="sm" variant="outline" onClick={() => handleDeactivate(u.id, u.role, true)} disabled={changingUserId === u.id} className="text-status-foreground border-status-border hover:bg-status h-8 px-3">Deactivate</Button>
-                                  )}
-                                  <Button size="sm" variant="outline" onClick={() => { setUserToDelete({
-                                    id: u.id, name: u.fullName, role: u.role, isTest: true,
-                                    departmentName: department.mirrorDepartmentName || "test department",
-                                  }); setDeleteUserError(null); }} className="text-status-foreground border-status-border hover:bg-status h-8 px-3">
-                                    <Trash2 className="h-4 w-4 mr-1" /> Delete
-                                  </Button>
-                                </>
-                              )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                  {!mirrorRoster.length ? (
+                    <p className="p-8 text-center text-sm text-helper">No test accounts in this department.</p>
+                  ) : (
+                    <>
+                      {/* Credentials card */}
+                      <div className="space-y-3 rounded-lg border border-line-soft bg-mist p-4">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="space-y-1">
+                            <p className="text-xs font-bold uppercase tracking-wider text-forest">Default Test Login Credentials</p>
+                            <p className="text-xs text-forest">
+                              Default password <span className="font-mono font-bold text-forest bg-white px-2 py-0.5 rounded border border-line-soft">{department.mirrorCode}</span> applies only to the canonical auto-provisioned test accounts listed below. Custom test accounts keep their own passwords.
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => void handleResetTestCredentials()}
+                            disabled={resettingCredentials || !hasLoadedCurrentMirror || defaultTestAccounts.length === 0}
+                            className="shrink-0 border-line bg-white text-forest hover:bg-sage"
+                          >
+                            {resettingCredentials ? "Resetting..." : "Reset default passwords"}
+                          </Button>
+                        </div>
+                        {resetCredentialsError && (
+                          <div role="alert" className="rounded-md border border-status-border bg-status p-2.5 text-xs font-medium text-status-foreground">
+                            {resetCredentialsError}
+                          </div>
+                        )}
+                        {defaultTestAccounts.length > 0 ? (
+                          <div className="grid gap-2">
+                            {defaultTestAccounts.map(u => (
+                              <div key={u.id} className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 bg-white rounded border border-line-soft px-3 py-2 text-sm">
+                                <Badge variant="outline" className="capitalize w-fit shrink-0">{u.role}</Badge>
+                                <span className="font-mono text-ink text-xs break-all">{u.email}</span>
+                                <span className="text-helper text-xs shrink-0 sm:ml-auto">default password: <span className="font-mono font-medium text-ink">{department.mirrorCode}</span></span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="rounded border border-line-soft bg-white px-3 py-2 text-xs text-soft-ink">
+                            No canonical default test accounts are present in this roster.
+                          </p>
+                        )}
+                        {customTestAccounts.length > 0 && (
+                          <p className="text-xs text-soft-ink">
+                            {customTestAccounts.length} custom test account{customTestAccounts.length === 1 ? "" : "s"} in the roster below use custom login credentials and are preserved during default password resets.
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Roster table */}
+                      <Table>
+                        <TableHeader className="bg-white">
+                          <TableRow className="hover:bg-transparent">
+                            <TableHead>Name</TableHead>
+                            <TableHead>Email (login ID)</TableHead>
+                            <TableHead>Role</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead className="text-right">Action</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {mirrorRoster.map(u => {
+                            const isDefaultAccount = isCanonicalDefaultAccount(u);
+                            return (
+                              <TableRow key={u.id}>
+                                <TableCell>
+                                  <div className="font-semibold text-ink">{u.fullName}</div>
+                                  {u.status === "pending" && <div className="text-xs text-status-foreground mt-0.5">Awaiting the {department.mirrorDepartmentName || "test department"} HOD's approval</div>}
+                                </TableCell>
+                                <TableCell className="text-helper text-sm">
+                                  <div className="font-mono">{u.email}</div>
+                                  <div className="mt-1">
+                                    <Badge variant="outline" className={isDefaultAccount ? "border-line bg-sage text-forest text-[10px]" : "border-line-soft bg-white text-helper text-[10px]"}>
+                                      {isDefaultAccount ? "Default login" : "Custom login"}
+                                    </Badge>
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant="outline" className="capitalize">{u.role}</Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant={u.status === "approved" ? "default" : "secondary"} className={`rounded-full ${u.status === 'approved' ? 'bg-deep' : u.status === 'pending' ? 'bg-status text-status-foreground border-none' : ''}`}>
+                                    {u.status === "rejected" ? "Deactivated" : u.status}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <div className="flex flex-wrap justify-end gap-2">
+                                    {u.role === "hod" ? (
+                                      u.status === "approved" && <Button size="sm" variant="outline" onClick={() => handleImpersonate(u.id)} className="h-8 px-3">Log in as</Button>
+                                    ) : (
+                                      <>
+                                        {u.status === "approved" && (
+                                          <Button size="sm" variant="outline" onClick={() => handleImpersonate(u.id)} className="h-8 px-3">Log in as</Button>
+                                        )}
+                                        {u.status === "rejected" ? (
+                                          <Button size="sm" variant="outline" onClick={() => handleReactivate(u.id, u.fullName, true)} disabled={changingUserId === u.id} className="h-8 px-3">Reactivate</Button>
+                                        ) : (
+                                          <Button size="sm" variant="outline" onClick={() => handleDeactivate(u.id, u.role, true)} disabled={changingUserId === u.id} className="text-status-foreground border-status-border hover:bg-status h-8 px-3">Deactivate</Button>
+                                        )}
+                                        <Button size="sm" variant="outline" onClick={() => { setUserToDelete({
+                                          id: u.id, name: u.fullName, role: u.role, isTest: true,
+                                          departmentName: department.mirrorDepartmentName || "test department",
+                                        }); setDeleteUserError(null); }} className="text-status-foreground border-status-border hover:bg-status h-8 px-3">
+                                          <Trash2 className="h-4 w-4 mr-1" /> Delete
+                                        </Button>
+                                      </>
+                                    )}
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </>
+                  )}
                 </div>
               )}
             </TabsContent>
