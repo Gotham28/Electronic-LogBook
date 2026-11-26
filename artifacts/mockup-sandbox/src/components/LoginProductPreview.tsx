@@ -1,89 +1,282 @@
 import * as React from "react";
-import {
-  Bell,
-  BookOpenCheck,
-  CalendarDays,
-  FileText,
-  GraduationCap,
-  LayoutDashboard,
-  MousePointer2,
-  Pause,
-  Play,
-  Stethoscope,
-} from "lucide-react";
+import { CheckCircle2, Mic, Play, RotateCcw } from "lucide-react";
+import { ArogyaCharacter, type ArogyaState } from "@/components/arogya/ArogyaCharacter";
 
-const moments = [
-  { caption: "Opening the resident dashboard", cursor: { left: "12%", top: "24%" }, scroll: 0 },
-  { caption: "Reviewing the resident summary", cursor: { left: "61%", top: "35%" }, scroll: 0 },
-  { caption: "Checking completion targets", cursor: { left: "78%", top: "65%" }, scroll: 0 },
-  { caption: "Viewing recent dashboard activity", cursor: { left: "65%", top: "80%" }, scroll: -42 },
+type PreviewPhase =
+  | "idle"
+  | "listening"
+  | "thinking"
+  | "filling-1"
+  | "filling-2"
+  | "filling-3"
+  | "ready";
+
+const SAMPLE_DICTATION =
+  "Performed peripheral IV cannulation under supervision on 12 May.";
+
+const SAMPLE_FIELDS = [
+  { key: "procedure", label: "Procedure", value: "Peripheral IV cannulation", fillAt: 1 },
+  { key: "supervision", label: "Supervision", value: "Supervised", fillAt: 2 },
+  { key: "date", label: "Date", value: "12 May", fillAt: 3 },
 ] as const;
 
-const navigation = [
-  ["Dashboard", LayoutDashboard], ["Postings", CalendarDays], ["Case Logs", FileText],
-  ["Procedures", Stethoscope], ["Academics", GraduationCap],
-] as const;
-
-function ProgressBar({ value, visible }: { value: number; visible: boolean }) {
-  return <div className="h-1 overflow-hidden rounded-full bg-sage"><div className="h-full rounded-full bg-forest transition-[width] duration-1000" style={{ width: visible ? `${value}%` : "0%" }} /></div>;
+function getFilledCount(phase: PreviewPhase): number {
+  if (phase === "filling-1") return 1;
+  if (phase === "filling-2") return 2;
+  if (phase === "filling-3" || phase === "ready") return 3;
+  return 0;
 }
 
-function Dashboard({ phase }: { phase: number }) {
-  return <div className="space-y-2 p-2 transition-transform duration-1000 ease-in-out" style={{ transform: `translateY(${moments[phase].scroll}px)` }}>
-    <div className="grid grid-cols-[.8fr_1.2fr] gap-2 overflow-hidden rounded-xl border border-line-soft bg-white p-2 shadow-sm">
-      <div className="rounded-[10px] bg-deep p-2.5 text-white"><p className="text-[4px] font-bold uppercase tracking-[.18em] text-white">Resident dashboard</p><p className="mt-1.5 text-[12px] font-semibold">Welcome back!</p><p className="mt-2 text-[4.5px] leading-2 text-white">Your clinical record and verification status are summarised here.</p></div>
-      {/* Illustrative preview only, not real data - every department sees this same login screen, so no
-          specific department name or resident identifier is shown here (AGENTS.md sec 5 and sec 7). */}
-      <div className="rounded-[10px] border border-line-soft bg-mist p-2"><p className="text-[4px] font-bold uppercase tracking-[.15em] text-forest">Resident profile</p><div className="mt-2 grid grid-cols-2 gap-1">{[["Registration", "—"], ["Department", "—"], ["Joined", "—"], ["Completion", "—"]].map(([label, value]) => <div key={label} className="rounded bg-white p-1"><p className="text-[3.5px] font-bold uppercase text-forest">{label}</p><p className="mt-0.5 truncate text-[4.5px] font-semibold text-ink">{value}</p></div>)}</div></div>
-    </div>
-    <div className="grid grid-cols-[1.05fr_.95fr] gap-2 rounded-xl border border-line-soft bg-white p-2 shadow-sm"><div><p className="text-[4px] font-bold uppercase tracking-[.14em] text-forest">Dashboard insights</p><p className="mt-1 text-[7px] font-bold text-ink">194 entries remain to complete core targets.</p><span className="mt-2 inline-block rounded-full bg-mist px-1.5 py-0.5 text-[4px] font-bold text-forest">Getting started</span></div><div className="space-y-1.5">{[["Clinical cases", 2], ["Procedures", 3], ["Academic activities", 6]].map(([label, value]) => <div key={String(label)}><div className="mb-0.5 flex justify-between text-[4px] font-semibold text-soft-ink"><span>{label}</span><span className="text-forest">{value}%</span></div><ProgressBar value={Number(value)} visible={phase >= 2} /></div>)}</div></div>
-    <div className="overflow-hidden rounded-xl border border-line-soft bg-white shadow-sm"><div className="flex items-center justify-between border-b border-line-soft px-2 py-1.5"><div><p className="text-[3.5px] font-bold uppercase text-forest">Student activity</p><p className="text-[6px] font-bold text-ink">Recent entries</p></div><Bell className="h-2.5 w-2.5 text-forest" /></div>{[["Academic", "Cerebral palsy", "Pending"], ["Procedure", "Arterial blood gas", "Verified"], ["Procedure", "Intubation", "Verified"]].map(([type, entry, status]) => <div key={entry} className="grid grid-cols-[.7fr_1.5fr_.65fr] gap-1 border-t border-line-soft px-2 py-1.5 text-[4px]"><span className="font-semibold text-forest">{type}</span><span className="truncate font-semibold text-ink">{entry}</span><span className={status === "Verified" ? "text-status-foreground" : "text-status-foreground"}>{status}</span></div>)}</div>
-  </div>;
+function getPhaseLabel(phase: PreviewPhase): string {
+  switch (phase) {
+    case "listening":
+      return "Listening";
+    case "thinking":
+      return "Thinking";
+    case "filling-1":
+    case "filling-2":
+    case "filling-3":
+      return "Filling";
+    case "ready":
+      return "Ready to review";
+    default:
+      return "Sample";
+  }
 }
 
-export function LoginProductPreview() {
-  const [phase, setPhase] = React.useState(0);
-  const [playing, setPlaying] = React.useState(false);
-  const [reducedMotion, setReducedMotion] = React.useState(
-    () => window.matchMedia("(prefers-reduced-motion: reduce)").matches
+function getInitialReducedMotion(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
   );
-  const isAnimating = playing && !reducedMotion;
-  const moment = moments[phase];
+}
+
+export function LoginProductPreview({ active = true }: { active?: boolean }) {
+  const [reducedMotion, setReducedMotion] = React.useState(getInitialReducedMotion);
+  const [phase, setPhase] = React.useState<PreviewPhase>(() =>
+    !active || getInitialReducedMotion() ? "ready" : "idle"
+  );
+  const [mascotState, setMascotState] = React.useState<ArogyaState>("resting");
+  const [hasStarted, setHasStarted] = React.useState(false);
+
+  const timersRef = React.useRef<number[]>([]);
+  const runIdRef = React.useRef(0);
+  const isRunningRef = React.useRef(false);
+
+  const clearScheduled = React.useCallback(() => {
+    for (const timerId of timersRef.current) {
+      window.clearTimeout(timerId);
+    }
+    timersRef.current = [];
+  }, []);
+
+  const scheduleStep = React.useCallback(
+    (delayMs: number, runId: number, callback: () => void) => {
+      const timerId = window.setTimeout(() => {
+        if (runIdRef.current !== runId) return;
+        callback();
+      }, delayMs);
+      timersRef.current.push(timerId);
+    },
+    []
+  );
 
   React.useEffect(() => {
     const preference = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const updatePreference = () => {
-      setReducedMotion(preference.matches);
-      if (preference.matches) setPlaying(false);
+    const syncPreference = (matches: boolean) => {
+      setReducedMotion(matches);
+      if (matches) {
+        runIdRef.current += 1;
+        clearScheduled();
+        isRunningRef.current = false;
+        setMascotState("resting");
+        setPhase("ready");
+      }
     };
-    updatePreference();
-    preference.addEventListener("change", updatePreference);
-    return () => preference.removeEventListener("change", updatePreference);
-  }, []);
+    syncPreference(preference.matches);
+    const onChange = () => syncPreference(preference.matches);
+    preference.addEventListener("change", onChange);
+    return () => preference.removeEventListener("change", onChange);
+  }, [clearScheduled]);
 
   React.useEffect(() => {
-    if (!isAnimating) return;
-    const timer = window.setInterval(() => setPhase((current) => (current + 1) % moments.length), 1900);
-    return () => window.clearInterval(timer);
-  }, [isAnimating]);
+    clearScheduled();
+    isRunningRef.current = false;
+    const runId = ++runIdRef.current;
 
-  return <div className="signed-out-preview mt-5" data-playing={isAnimating}>
-    <div role="img" aria-label="Illustration of the ELogBook resident dashboard">
-    <div className="overflow-hidden rounded-[22px] border border-line-soft bg-sage shadow-lg">
-      <div className="flex h-8 items-center gap-1.5 border-b border-line-soft bg-sage px-3"><span className="h-2 w-2 rounded-full bg-white" /><span className="h-2 w-2 rounded-full bg-remaining-mark" /><span className="h-2 w-2 rounded-full bg-white" /><div className="mx-auto flex h-4 w-32 items-center justify-center rounded-full bg-white text-[6px] font-semibold tracking-wide text-forest">elogbook.local/dashboard</div></div>
-      <div className="relative aspect-[16/10] overflow-hidden bg-background p-1.5"><div className="flex h-full overflow-hidden rounded-xl border border-white bg-background"><aside className="relative w-[23%] shrink-0 border-r border-line-soft bg-white p-1.5"><div className="mb-3 flex items-center gap-1"><div className="grid h-4 w-4 place-items-center rounded-md bg-forest text-white"><BookOpenCheck className="h-2.5 w-2.5" /></div><span className="text-[6px] font-bold text-ink">ELogBook</span></div><p className="mb-1.5 text-[3.5px] font-bold uppercase tracking-[.15em] text-forest">Student workspace</p>{navigation.map(([label, Icon]) => <div key={label} className={`mb-0.5 flex items-center gap-1 rounded-md px-1 py-1 ${label === "Dashboard" ? "bg-forest text-white" : "text-helper"}`}><Icon className="h-2 w-2" /><span className="text-[4.5px] font-semibold">{label}</span></div>)}</aside><div className="min-w-0 flex-1"><header className="flex h-7 items-center justify-between border-b border-white bg-card px-2"><div><p className="text-[6px] font-bold text-ink">Your department</p><p className="text-[3.5px] text-helper">Student workspace</p></div><Bell className="h-2.5 w-2.5 text-forest" /></header><div className="h-[calc(100%-1.75rem)] overflow-hidden"><Dashboard phase={phase} /></div></div></div>{isAnimating && (phase === 0 || phase === 2) && <span key={`click-${phase}`} className="pointer-events-none absolute h-6 w-6 -translate-x-1/2 -translate-y-1/2 animate-ping rounded-full border border-forest/70" style={{ left: moment.cursor.left, top: moment.cursor.top }} />}<MousePointer2 className="pointer-events-none absolute h-4 w-4 fill-white text-ink drop-shadow-md transition-all duration-700 ease-in-out" style={{ left: moment.cursor.left, top: moment.cursor.top }} /></div>
+    if (!active || reducedMotion) {
+      setMascotState("resting");
+      setHasStarted(false);
+      setPhase("ready");
+      return () => {
+        runIdRef.current += 1;
+        clearScheduled();
+        isRunningRef.current = false;
+      };
+    }
+
+    setHasStarted(false);
+    setPhase("idle");
+    setMascotState("waving");
+    scheduleStep(650, runId, () => {
+      setMascotState("resting");
+    });
+
+    return () => {
+      runIdRef.current += 1;
+      clearScheduled();
+      isRunningRef.current = false;
+    };
+  }, [active, reducedMotion, clearScheduled, scheduleStep]);
+
+  const startSequence = React.useCallback(() => {
+    const prefersReducedNow =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reducedMotion || prefersReducedNow || !active || isRunningRef.current) return;
+
+    clearScheduled();
+    const runId = ++runIdRef.current;
+    isRunningRef.current = true;
+    setHasStarted(true);
+    setPhase("listening");
+    setMascotState("listening");
+
+    scheduleStep(750, runId, () => {
+      setPhase("thinking");
+      setMascotState("thinking");
+    });
+    scheduleStep(1500, runId, () => {
+      setPhase("filling-1");
+      setMascotState("resting");
+    });
+    scheduleStep(1850, runId, () => {
+      setPhase("filling-2");
+    });
+    scheduleStep(2200, runId, () => {
+      setPhase("filling-3");
+    });
+    scheduleStep(2550, runId, () => {
+      isRunningRef.current = false;
+      setPhase("ready");
+      setMascotState("resting");
+    });
+  }, [active, reducedMotion, clearScheduled, scheduleStep]);
+
+  const filledCount = getFilledCount(phase);
+  const isRunning =
+    active &&
+    !reducedMotion &&
+    phase !== "idle" &&
+    phase !== "ready";
+  const isAnimating =
+    !reducedMotion &&
+    active &&
+    (mascotState === "waving" || isRunning);
+  const phaseLabel = getPhaseLabel(phase);
+
+  return (
+    <div className="signed-out-preview mt-5" data-playing={isAnimating}>
+      <div className="rounded-[22px] border border-line-soft bg-white p-4 shadow-sm sm:p-5">
+        <div className="flex items-center justify-between gap-3 border-b border-line-soft pb-3">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <ArogyaCharacter
+              state={mascotState}
+              initialState="resting"
+              size={44}
+              decorative
+              scopedSampleMotion
+              sampleReducedMotion={reducedMotion}
+            />
+            <p className="text-xs font-bold uppercase tracking-[0.12em] text-forest">
+              Sample entry
+            </p>
+          </div>
+
+          <span
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+            className={`inline-flex min-h-7 shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${
+              phase === "ready"
+                ? "border-line bg-sage text-ink"
+                : phase === "listening" || phase === "thinking"
+                  ? "border-forest bg-mist text-forest"
+                  : "border-line-soft bg-mist text-helper"
+            }`}
+          >
+            {phase === "ready" && (
+              <CheckCircle2 className="size-3.5 text-forest" aria-hidden="true" />
+            )}
+            {phase === "listening" && (
+              <Mic className="size-3.5 text-forest" aria-hidden="true" />
+            )}
+            <span>{phaseLabel}</span>
+          </span>
+        </div>
+
+        <div
+          className={`mt-3 rounded-xl border p-3 ${
+            phase === "listening"
+              ? "border-forest bg-mist"
+              : "border-line-soft bg-mist"
+          }`}
+        >
+          <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-forest">
+            Sample dictation
+          </p>
+          <p className="mt-1 text-sm leading-snug text-ink">
+            &ldquo;{SAMPLE_DICTATION}&rdquo;
+          </p>
+        </div>
+
+        <dl className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+          {SAMPLE_FIELDS.map((field) => {
+            const isFilled = filledCount >= field.fillAt;
+            return (
+              <div
+                key={field.key}
+                className="rounded-xl border border-line-soft bg-background px-3 py-2"
+              >
+                <dt className="text-[11px] font-bold uppercase tracking-[0.08em] text-forest">
+                  {field.label}
+                </dt>
+                <dd className="mt-1 min-h-5 text-sm font-semibold text-ink">
+                  {isFilled ? (
+                    field.value
+                  ) : (
+                    <span className="text-helper" aria-label="Pending">
+                      &mdash;
+                    </span>
+                  )}
+                </dd>
+              </div>
+            );
+          })}
+        </dl>
+
+        <p className="mt-3 text-xs font-medium text-helper">
+          Fictional example &mdash; no recording or live submit
+        </p>
+      </div>
+
+      {active && !reducedMotion && (
+        <button
+          type="button"
+          aria-disabled={isRunning || undefined}
+          className={`mt-3 inline-flex min-h-11 items-center gap-2 rounded-full border-2 border-forest bg-white px-4 text-sm font-semibold text-forest ${
+            isRunning ? "cursor-default" : "hover:bg-sage"
+          }`}
+          onClick={startSequence}
+        >
+          {hasStarted ? (
+            <RotateCcw className="size-4" aria-hidden="true" />
+          ) : (
+            <Play className="size-4" aria-hidden="true" />
+          )}
+          {hasStarted ? "Replay" : "See Mochi in action"}
+        </button>
+      )}
     </div>
-      <div aria-hidden="true" className="mt-3 flex items-center justify-between gap-4"><p key={moment.caption} className="text-sm font-semibold text-helper">{moment.caption}</p><div className="flex gap-1.5">{moments.map((item, index) => <span key={item.caption} className={`h-1.5 rounded-full transition-all duration-500 ${index === phase ? "w-6 bg-forest" : "w-1.5 bg-forest/30"}`} />)}</div></div>
-    </div>
-    {!reducedMotion && (
-      <button
-        type="button"
-        className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-full border-2 border-forest px-4 text-sm font-semibold text-forest hover:bg-sage"
-        onClick={() => setPlaying((current) => !current)}
-      >
-        {playing ? <Pause className="size-4" aria-hidden="true" /> : <Play className="size-4" aria-hidden="true" />}
-        {playing ? "Pause dashboard preview" : "Play dashboard preview"}
-      </button>
-    )}
-  </div>;
+  );
 }

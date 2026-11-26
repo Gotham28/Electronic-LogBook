@@ -2,6 +2,15 @@
   font-family: "Source Sans 3";
   src: url("/fonts/source-sans-3.woff2") format("woff2");
   font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Literata Display";
+  src: url("/fonts/literata-display.woff2") format("woff2");
+  font-weight: 600 700;
+  font-style: normal;
   font-display: swap;
 }
 
@@ -9,6 +18,13 @@
   --font-sans: "Source Sans 3", system-ui, sans-serif;
   --font-serif: var(--font-sans);
   font-family: var(--font-sans);
+}
+
+.signed-out-entry .signed-out-hero-title {
+  font-family: "Literata Display", Georgia, serif;
+  font-weight: 700;
+  font-optical-sizing: auto;
+  letter-spacing: -0.02em;
 }
 
 .signed-out-entry [data-slot="label"] {
@@ -24,6 +40,18 @@
 .signed-out-preview[data-playing="false"] * {
   animation: none;
   transition: none;
+}
+
+@media (max-height: 480px) and (max-width: 960px) {
+  .signed-out-entry .signed-out-shell {
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+  }
+
+  .signed-out-entry .signed-out-main {
+    padding-top: 1.25rem;
+    padding-bottom: 1.25rem;
+  }
 }
 
 #root:has(.signed-out-support-button) > .support-widget-floating {

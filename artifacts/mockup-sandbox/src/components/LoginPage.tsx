@@ -1,7 +1,7 @@
 import * as React from "react";
 import {
   KeyRound, ShieldCheck, UserPlus, Loader2,
-  Sparkles, LogIn, ChevronLeft, ArrowRight, VolumeX, Play,
+  LogIn, ChevronLeft, ArrowRight, VolumeX, Play,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -232,21 +232,23 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
 
   return (
     <div className="signed-out-entry min-h-screen bg-background flex flex-col">
-      <div className="flex flex-1 items-center justify-center p-4 md:p-8">
+      <div className="signed-out-shell flex flex-1 items-center justify-center p-4 md:p-8">
         <div className="glass-panel grid w-full max-w-6xl overflow-hidden rounded-[28px] lg:grid-cols-[1.08fr_.92fr]">
-        <main className="flex items-center bg-card p-6 sm:p-8 lg:col-start-2 lg:row-start-1 lg:p-12">
+        <main className="signed-out-main flex items-center bg-card p-6 sm:p-8 lg:col-start-2 lg:row-start-1 lg:p-12">
           <div className="mx-auto w-full max-w-sm">
-            <p className="mb-4 text-lg font-bold text-forest">ELogBook</p>
+            <p className="mb-3 text-lg font-bold text-forest">ELogBook</p>
             {/* ── MODE: Picker ─────────────────────────────────────────── */}
             {mode === "picker" && (
               <div>
-                <h1 className="text-3xl font-bold text-forest sm:text-4xl">Welcome</h1>
-                <p className="mt-2 text-base leading-snug text-ink">
-                  Already have an account? Sign in. New here? Explore the demo first.
+                <h1 className="signed-out-hero-title text-[1.75rem] font-bold leading-[1.15] text-forest sm:text-[2rem] lg:text-[2.25rem]">
+                  Speak your log entry. Mochi fills the form.
+                </h1>
+                <p className="mt-2.5 text-base leading-snug text-ink">
+                  Dictate a case or procedure, then review and edit the fields before you submit.
                 </p>
 
-                <div className="mt-6 space-y-4">
-                  {/* Sign In card */}
+                <div className="mt-5 space-y-3.5">
+                  {/* Sign In action */}
                   <button
                     ref={pickerActionRef}
                     type="button"
@@ -257,7 +259,7 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
                     className="flex min-h-12 w-full items-center justify-center gap-2 rounded-full border border-forest bg-forest px-4 py-2.5 text-base font-semibold text-white transition-[background-color] hover:bg-deep"
                   >
                     <LogIn className="h-4 w-4" aria-hidden="true" />
-                    Sign in to my account
+                    Sign in
                   </button>
 
                   <div>
@@ -268,14 +270,32 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
                       aria-describedby="login-demo-description"
                       className="flex min-h-12 w-full items-center justify-center gap-2 rounded-full border-2 border-forest bg-white px-4 py-2.5 text-base font-semibold text-forest transition-[background-color,color] hover:bg-forest hover:text-white disabled:opacity-60"
                     >
-                      {demoLoading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Sparkles className="h-4 w-4" aria-hidden="true" />}
-                      Show demo
+                      {demoLoading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Play className="h-4 w-4" aria-hidden="true" />}
+                      Explore the full demo
                     </button>
                     <p id="login-demo-description" className="mt-2 text-center text-sm leading-snug text-helper">
-                      Watch the intro, then explore freely. Start a guided tour anytime. No sign-in needed.
+                      Watch the walkthrough, then explore freely. No sign-in needed.
                     </p>
                   </div>
                 </div>
+
+                <ul
+                  aria-label="How ELogBook supports each role"
+                  className="mt-5 space-y-2 border-t border-line-soft pt-4 text-sm leading-snug text-ink"
+                >
+                  <li>
+                    <span className="font-semibold text-forest">Residents:</span>{" "}
+                    Dictate entries and check training targets.
+                  </li>
+                  <li>
+                    <span className="font-semibold text-forest">Professors:</span>{" "}
+                    Draft appraisal remarks and remediation suggestions.
+                  </li>
+                  <li>
+                    <span className="font-semibold text-forest">HODs:</span>{" "}
+                    See training gaps and the review queue.
+                  </li>
+                </ul>
               </div>
             )}
 
@@ -463,7 +483,7 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
               height={1081}
               className="mt-4 h-auto w-32 rounded-xl"
             />
-            <LoginProductPreview />
+            <LoginProductPreview active={mode === "picker"} />
           </div>
         </section>
       </div>
