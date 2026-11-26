@@ -329,6 +329,8 @@ export type AdminDepartment = {
   mirrorDepartmentName: string | null;
   mirrorHod: { id: number; fullName: string; email: string } | null;
   mirrorCode: string | null;
+  mirrorDefaultEmails?: { hod: string; professor: string; student: string } | null;
+  mirrorAmbiguous?: boolean;
 };
 
 export type AdminUserRow = {
@@ -418,12 +420,39 @@ export function impersonateAdminUser(userId: number) {
   return apiPost(adminCollegePath(`/api/superadmin/users/${userId}/impersonate`));
 }
 
+export type RestoreTestFacultyResult = {
+  status: "created" | "already_present";
+  mirrorDepartmentId: number;
+  professor: {
+    id: number;
+    fullName: string;
+    email: string;
+    status: string;
+  };
+};
+
 export function backfillTestDepartments(collegeId: number): Promise<{ provisioned: number[]; skipped: number[]; failed: { departmentId: number; message: string }[] }> {
   return apiPost("/api/superadmin/departments/backfill-test-departments", { collegeId });
 }
 
-export function resetTestCredentials(departmentId: number): Promise<{ mirrorCode: string }> {
-  return apiPost(adminCollegePath(`/api/superadmin/departments/${departmentId}/reset-test-credentials`));
+export function restoreTestFaculty(
+  departmentId: number,
+  expectedMirrorDepartmentId?: number,
+): Promise<RestoreTestFacultyResult> {
+  return apiPost(
+    adminCollegePath(`/api/superadmin/departments/${departmentId}/restore-test-faculty`),
+    expectedMirrorDepartmentId !== undefined ? { expectedMirrorDepartmentId } : {},
+  );
+}
+
+export function resetTestCredentials(
+  departmentId: number,
+  expectedMirrorDepartmentId?: number,
+): Promise<{ mirrorCode: string }> {
+  return apiPost(
+    adminCollegePath(`/api/superadmin/departments/${departmentId}/reset-test-credentials`),
+    expectedMirrorDepartmentId !== undefined ? { expectedMirrorDepartmentId } : {},
+  );
 }
 
 export function deleteAdminDepartment(id: number) {

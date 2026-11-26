@@ -1,7 +1,7 @@
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import crypto from "node:crypto";
-import { eq, and, sum } from "drizzle-orm";
+import { eq, and, or, sum, inArray } from "drizzle-orm";
 import { db, collegesTable, departmentsTable, usersTable, departmentConfigsTable, procedureTypesTable, departmentCatalogTable,
   departmentPostingScheduleTable, departmentLogbookSectionsTable, studentsTable, caseLogsTable, procedureLogsTable } from "@workspace/db";
 import { configSchema, emailSchema, nameSchema, passwordSchema, targetSchema } from "./validation.js";
@@ -142,6 +142,94 @@ export async function provisionDepartment(input: unknown, initialPassword: unkno
   return { ...result, emailAccepted };
 }
 
+export type MirrorProfessorSummary = {
+  id: number;
+  fullName: string;
+  email: string;
+  status: string;
+};
+
+export type RestoreMirrorFacultyResult =
+  | { status: "missing_department" }
+  | { status: "missing_mirror" }
+  | { status: "ambiguous_mirror" }
+  | { status: "stale_mirror" }
+  | { status: "lock_conflict" }
+  | { status: "already_present"; mirrorDepartmentId: number; professor: MirrorProfessorSummary }
+  | { status: "created"; mirrorDepartmentId: number; professor: MirrorProfessorSummary }
+  | { status: "collision"; mirrorDepartmentId: number };
+
+export type ResetMirrorCredentialsResult =
+  | { status: "missing_department" }
+  | { status: "missing_mirror" }
+  | { status: "ambiguous_mirror" }
+  | { status: "stale_mirror" }
+  | { status: "lock_conflict" }
+  | { status: "ok"; departmentId: number; mirrorDepartmentId: number; mirrorCode: string };
+
+const LOCK_CONFLICT_SQLSTATES = new Set(["55P03", "40P01"]);
+
+function getPgErrorCode(error: unknown): string | undefined {
+  let current: unknown = error;
+  for (let depth = 0; depth < 5 && current && typeof current === "object"; depth++) {
+    const code = (current as { code?: unknown }).code;
+    if (typeof code === "string" && code.length > 0) {
+      return code;
+    }
+    current = (current as { cause?: unknown }).cause;
+  }
+  return undefined;
+}
+
+function isLockConflictError(error: unknown): boolean {
+  const code = getPgErrorCode(error);
+  return code !== undefined && LOCK_CONFLICT_SQLSTATES.has(code);
+}
+
+export type MirrorTargetLookup =
+  | { status: "missing_department" }
+  | { status: "missing_mirror"; realDepartmentId: number; collegeId: number }
+  | { status: "ambiguous_mirror"; realDepartmentId: number; collegeId: number }
+  | { status: "stale_mirror"; realDepartmentId: number; collegeId: number }
+  | { status: "ok"; realDepartmentId: number; collegeId: number; mirror: { id: number; code: string } };
+
+export type MirrorMutationOptions = {
+  expectedMirrorDepartmentId?: number;
+  onBeforeLockTransaction?: () => Promise<void>;
+};
+
+export type RestoreMirrorFacultyOptions = MirrorMutationOptions;
+export type ResetMirrorCredentialsOptions = MirrorMutationOptions;
+
+export function buildMirrorSafeName(realDepartmentId: number, collegeCode?: string | null, fallbackCode?: string): string {
+  const safeName = [collegeCode, String(realDepartmentId)]
+    .filter(Boolean)
+    .join("-")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return safeName || (fallbackCode ? fallbackCode.toLowerCase() : `dept-${realDepartmentId}`);
+}
+
+export function buildCanonicalMirrorEmails(safeName: string) {
+  return {
+    hod: `test.hod@${safeName}.test`,
+    professor: `test.prof@${safeName}.test`,
+    student: `test.student@${safeName}.test`,
+  } as const;
+}
+
+function buildDefaultMirrorProfessor(mirrorDepartmentId: number, email: string, passwordHash: string) {
+  return {
+    fullName: "Test Professor",
+    email,
+    passwordHash,
+    role: "professor" as const,
+    status: "approved" as const,
+    departmentId: mirrorDepartmentId,
+  };
+}
+
 export async function provisionMirrorForRealDepartment(
   realDepartmentId: number,
   realDepartmentName: string,
@@ -171,31 +259,26 @@ export async function provisionMirrorForRealDepartment(
       configSourceDepartmentId: realDepartmentId
     }).returning();
 
-    const safeName = [college?.code, String(realDepartmentId)].filter(Boolean).join("-")
-      .toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    const safeName = buildMirrorSafeName(realDepartmentId, college?.code, testCode);
+    const canonicalEmails = buildCanonicalMirrorEmails(safeName);
     const testPasswordHash = await bcrypt.hash(testCode, 12);
 
     await tx.insert(usersTable).values({
       fullName: "Test HOD",
-      email: `test.hod@${safeName}.test`,
+      email: canonicalEmails.hod,
       passwordHash: testPasswordHash,
       role: "hod",
       status: "approved",
       departmentId: mirrorDept.id
     });
 
-    const [testProfUser] = await tx.insert(usersTable).values({
-      fullName: "Test Professor",
-      email: `test.prof@${safeName}.test`,
-      passwordHash: testPasswordHash,
-      role: "professor",
-      status: "approved",
-      departmentId: mirrorDept.id
-    }).returning({ id: usersTable.id });
+    const [testProfUser] = await tx.insert(usersTable)
+      .values(buildDefaultMirrorProfessor(mirrorDept.id, canonicalEmails.professor, testPasswordHash))
+      .returning({ id: usersTable.id });
 
     const [testStudentUser] = await tx.insert(usersTable).values({
       fullName: "Test Student",
-      email: `test.student@${safeName}.test`,
+      email: canonicalEmails.student,
       passwordHash: testPasswordHash,
       role: "student",
       status: "approved",
@@ -275,3 +358,312 @@ export async function provisionMirrorForRealDepartment(
   });
 }
 
+/**
+ * Resolves the single linked mirror department for a real department in the same
+ * college, failing closed if multiple mirrors point at the same source or if an
+ * expected displayed mirror ID no longer matches the unique resolved mirror.
+ */
+export async function resolveSingleMirrorDepartment(
+  executor: Pick<typeof db, "select">,
+  realDepartmentId: number,
+  collegeId: number,
+  expectedMirrorDepartmentId?: number,
+): Promise<MirrorTargetLookup> {
+  const [realDepartment] = await executor.select({
+    id: departmentsTable.id,
+    collegeId: departmentsTable.collegeId,
+  }).from(departmentsTable)
+    .where(and(
+      eq(departmentsTable.id, realDepartmentId),
+      eq(departmentsTable.collegeId, collegeId),
+      eq(departmentsTable.isTest, false),
+    ))
+    .limit(1);
+
+  if (!realDepartment) return { status: "missing_department" };
+
+  const mirrors = await executor.select({
+    id: departmentsTable.id,
+    code: departmentsTable.code,
+  }).from(departmentsTable)
+    .where(and(
+      eq(departmentsTable.configSourceDepartmentId, realDepartment.id),
+      eq(departmentsTable.isTest, true),
+      eq(departmentsTable.collegeId, realDepartment.collegeId),
+    ))
+    .orderBy(departmentsTable.id)
+    .limit(2);
+
+  if (mirrors.length > 1) {
+    return { status: "ambiguous_mirror", realDepartmentId: realDepartment.id, collegeId: realDepartment.collegeId };
+  }
+  if (mirrors.length === 0) {
+    return expectedMirrorDepartmentId !== undefined
+      ? { status: "stale_mirror", realDepartmentId: realDepartment.id, collegeId: realDepartment.collegeId }
+      : { status: "missing_mirror", realDepartmentId: realDepartment.id, collegeId: realDepartment.collegeId };
+  }
+  if (expectedMirrorDepartmentId !== undefined && mirrors[0].id !== expectedMirrorDepartmentId) {
+    return { status: "stale_mirror", realDepartmentId: realDepartment.id, collegeId: realDepartment.collegeId };
+  }
+
+  return {
+    status: "ok",
+    realDepartmentId: realDepartment.id,
+    collegeId: realDepartment.collegeId,
+    mirror: mirrors[0],
+  };
+}
+
+/**
+ * Locks the expected mirror row first and the source real department second
+ * (matching deleteDepartmentCascade's mirror -> real order to avoid deadlocks),
+ * then re-checks mirror uniqueness and identity. Locking the source real
+ * department with FOR UPDATE serializes against concurrent mirror inserts or
+ * relinks that take FOR KEY SHARE via departments_mirror_same_college_fk.
+ */
+async function resolveLockedMirrorDepartment(
+  tx: Pick<typeof db, "select">,
+  realDepartmentId: number,
+  collegeId: number,
+  expectedMirror: { id: number; code: string },
+): Promise<MirrorTargetLookup> {
+  const [lockedMirror] = await tx.select({
+    id: departmentsTable.id,
+    code: departmentsTable.code,
+  }).from(departmentsTable)
+    .where(and(
+      eq(departmentsTable.id, expectedMirror.id),
+      eq(departmentsTable.configSourceDepartmentId, realDepartmentId),
+      eq(departmentsTable.isTest, true),
+      eq(departmentsTable.collegeId, collegeId),
+    ))
+    .for("update")
+    .limit(1);
+
+  if (!lockedMirror) {
+    const [realDepartment] = await tx.select({ id: departmentsTable.id })
+      .from(departmentsTable)
+      .where(and(
+        eq(departmentsTable.id, realDepartmentId),
+        eq(departmentsTable.collegeId, collegeId),
+        eq(departmentsTable.isTest, false),
+      ))
+      .limit(1);
+    if (!realDepartment) return { status: "missing_department" };
+    return { status: "stale_mirror", realDepartmentId, collegeId };
+  }
+
+  const [lockedRealDepartment] = await tx.select({
+    id: departmentsTable.id,
+    collegeId: departmentsTable.collegeId,
+  }).from(departmentsTable)
+    .where(and(
+      eq(departmentsTable.id, realDepartmentId),
+      eq(departmentsTable.collegeId, collegeId),
+      eq(departmentsTable.isTest, false),
+    ))
+    .for("update")
+    .limit(1);
+
+  if (!lockedRealDepartment) return { status: "missing_department" };
+
+  const mirrors = await tx.select({
+    id: departmentsTable.id,
+    code: departmentsTable.code,
+  }).from(departmentsTable)
+    .where(and(
+      eq(departmentsTable.configSourceDepartmentId, lockedRealDepartment.id),
+      eq(departmentsTable.isTest, true),
+      eq(departmentsTable.collegeId, lockedRealDepartment.collegeId),
+    ))
+    .orderBy(departmentsTable.id)
+    .limit(2);
+
+  if (mirrors.length > 1) {
+    return { status: "ambiguous_mirror", realDepartmentId: lockedRealDepartment.id, collegeId: lockedRealDepartment.collegeId };
+  }
+  if (mirrors.length !== 1 || mirrors[0].id !== expectedMirror.id || mirrors[0].code !== expectedMirror.code) {
+    return { status: "stale_mirror", realDepartmentId: lockedRealDepartment.id, collegeId: lockedRealDepartment.collegeId };
+  }
+
+  return {
+    status: "ok",
+    realDepartmentId: lockedRealDepartment.id,
+    collegeId: lockedRealDepartment.collegeId,
+    mirror: mirrors[0],
+  };
+}
+
+/**
+ * Restores a default approved professor on an existing linked mirror department
+ * in the same college when that mirror currently has no faculty (including
+ * deactivated faculty). Fails with a conflict without writing if the displayed
+ * or pre-transaction mirror ceases to be the unique resolved mirror.
+ */
+export async function restoreMirrorTestFaculty(
+  realDepartmentId: number,
+  collegeId: number,
+  options?: RestoreMirrorFacultyOptions,
+): Promise<RestoreMirrorFacultyResult> {
+  const precheck = await resolveSingleMirrorDepartment(db, realDepartmentId, collegeId, options?.expectedMirrorDepartmentId);
+  if (precheck.status !== "ok") return { status: precheck.status };
+
+  const selectMirrorProfessor = (executor: Pick<typeof db, "select">, mirrorId: number) =>
+    executor.select({
+      id: usersTable.id,
+      fullName: usersTable.fullName,
+      email: usersTable.email,
+      status: usersTable.status,
+    }).from(usersTable)
+      .where(and(eq(usersTable.departmentId, mirrorId), eq(usersTable.role, "professor")))
+      .orderBy(usersTable.id)
+      .limit(1);
+
+  const [existingProfessor] = await selectMirrorProfessor(db, precheck.mirror.id);
+  if (existingProfessor) {
+    return { status: "already_present", mirrorDepartmentId: precheck.mirror.id, professor: existingProfessor };
+  }
+
+  const [college] = await db.select({ code: collegesTable.code }).from(collegesTable)
+    .where(eq(collegesTable.id, precheck.collegeId))
+    .limit(1);
+
+  const safeName = buildMirrorSafeName(precheck.realDepartmentId, college?.code, precheck.mirror.code);
+  const canonicalEmail = buildCanonicalMirrorEmails(safeName).professor;
+  const testPasswordHash = await bcrypt.hash(precheck.mirror.code, 12);
+
+  if (options?.onBeforeLockTransaction) {
+    await options.onBeforeLockTransaction();
+  }
+
+  try {
+    return await db.transaction(async (tx) => {
+      const target = await resolveLockedMirrorDepartment(tx, realDepartmentId, collegeId, precheck.mirror);
+      if (target.status !== "ok") return { status: target.status };
+
+      const [professorAfterLock] = await selectMirrorProfessor(tx, target.mirror.id);
+      if (professorAfterLock) {
+        return { status: "already_present", mirrorDepartmentId: target.mirror.id, professor: professorAfterLock };
+      }
+
+      // Pre-lock any existing row holding canonicalEmail without waiting while
+      // holding department locks (breaks lock inversion with deleteDepartmentCascade).
+      const [conflictingEmailUser] = await tx.select({
+        id: usersTable.id,
+        departmentId: usersTable.departmentId,
+        role: usersTable.role,
+      }).from(usersTable)
+        .where(eq(usersTable.email, canonicalEmail))
+        .for("update", { noWait: true })
+        .limit(1);
+
+      if (conflictingEmailUser) {
+        if (conflictingEmailUser.departmentId === target.mirror.id && conflictingEmailUser.role === "professor") {
+          const [recheckedProfessor] = await selectMirrorProfessor(tx, target.mirror.id);
+          if (recheckedProfessor) {
+            return { status: "already_present", mirrorDepartmentId: target.mirror.id, professor: recheckedProfessor };
+          }
+        }
+        return { status: "collision", mirrorDepartmentId: target.mirror.id };
+      }
+
+      const [inserted] = await tx.insert(usersTable)
+        .values(buildDefaultMirrorProfessor(target.mirror.id, canonicalEmail, testPasswordHash))
+        .onConflictDoNothing({ target: usersTable.email })
+        .returning({
+          id: usersTable.id,
+          fullName: usersTable.fullName,
+          email: usersTable.email,
+          status: usersTable.status,
+        });
+
+      if (inserted) {
+        return { status: "created", mirrorDepartmentId: target.mirror.id, professor: inserted };
+      }
+
+      const [concurrentProfessor] = await selectMirrorProfessor(tx, target.mirror.id);
+      if (concurrentProfessor) {
+        return { status: "already_present", mirrorDepartmentId: target.mirror.id, professor: concurrentProfessor };
+      }
+
+      return { status: "collision", mirrorDepartmentId: target.mirror.id };
+    });
+  } catch (error) {
+    if (isLockConflictError(error)) {
+      return { status: "lock_conflict" };
+    }
+    throw error;
+  }
+}
+
+/**
+ * Resets canonical test account passwords (= mirror department code) for the
+ * single resolved mirror department in the selected college, failing closed with
+ * a conflict if the displayed or pre-transaction mirror is replaced or becomes ambiguous,
+ * or if canonical user rows are currently locked by another transaction (NOWAIT).
+ */
+export async function resetMirrorTestCredentials(
+  realDepartmentId: number,
+  collegeId: number,
+  options?: ResetMirrorCredentialsOptions,
+): Promise<ResetMirrorCredentialsResult> {
+  const precheck = await resolveSingleMirrorDepartment(db, realDepartmentId, collegeId, options?.expectedMirrorDepartmentId);
+  if (precheck.status !== "ok") return { status: precheck.status };
+
+  const [college] = await db.select({ code: collegesTable.code }).from(collegesTable)
+    .where(eq(collegesTable.id, precheck.collegeId))
+    .limit(1);
+
+  const safeName = buildMirrorSafeName(precheck.realDepartmentId, college?.code, precheck.mirror.code);
+  const canonicalEmails = buildCanonicalMirrorEmails(safeName);
+  const passwordHash = await bcrypt.hash(precheck.mirror.code, 12);
+
+  if (options?.onBeforeLockTransaction) {
+    await options.onBeforeLockTransaction();
+  }
+
+  try {
+    return await db.transaction(async (tx) => {
+      const target = await resolveLockedMirrorDepartment(tx, realDepartmentId, collegeId, precheck.mirror);
+      if (target.status !== "ok") return { status: target.status };
+
+      const canonicalUsersWhere = and(
+        eq(usersTable.departmentId, target.mirror.id),
+        or(
+          and(eq(usersTable.role, "hod"), eq(usersTable.email, canonicalEmails.hod)),
+          and(eq(usersTable.role, "professor"), eq(usersTable.email, canonicalEmails.professor)),
+          and(eq(usersTable.role, "student"), eq(usersTable.email, canonicalEmails.student)),
+        ),
+      );
+
+      // Pre-lock the exact canonical rows with NOWAIT before updating so reset never
+      // waits on usersTable locks while holding departmentsTable locks (avoids
+      // deadlock / lock inversion with deleteDepartmentCascade). Concurrent user
+      // inserts into target.mirror.id are already serialized by FOR UPDATE on the
+      // mirror row via the users.department_id foreign key (FOR KEY SHARE).
+      const lockedUsers = await tx.select({ id: usersTable.id })
+        .from(usersTable)
+        .where(canonicalUsersWhere)
+        .orderBy(usersTable.id)
+        .for("update", { noWait: true });
+
+      if (lockedUsers.length > 0) {
+        await tx.update(usersTable)
+          .set({ passwordHash })
+          .where(and(canonicalUsersWhere, inArray(usersTable.id, lockedUsers.map((user) => user.id))));
+      }
+
+      return {
+        status: "ok",
+        departmentId: target.realDepartmentId,
+        mirrorDepartmentId: target.mirror.id,
+        mirrorCode: target.mirror.code,
+      };
+    });
+  } catch (error) {
+    if (isLockConflictError(error)) {
+      return { status: "lock_conflict" };
+    }
+    throw error;
+  }
+}
