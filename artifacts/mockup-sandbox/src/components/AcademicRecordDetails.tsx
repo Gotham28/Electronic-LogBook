@@ -11,7 +11,7 @@ export function AcademicRecordDetails({ activityType, description, presentationT
   const section = academicSectionForRecord(academicLogbook, activityType, description);
   const text = academicRecordText(description, section);
   if (!text && !presentationType) return null;
-  return <div className="mt-2 space-y-1 text-xs font-normal text-slate-700">
+  return <div className="mt-2 space-y-1 text-xs font-normal text-ink">
     {presentationType && presentationType !== "—" && <p>Participation / format: {presentationType}</p>}
     {text && <p className="whitespace-pre-wrap break-words">{text}</p>}
   </div>;

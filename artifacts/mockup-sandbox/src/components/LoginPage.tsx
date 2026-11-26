@@ -219,14 +219,14 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
   // ── Layout ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
-      <div className="medical-grid flex flex-1 items-center justify-center p-4 md:p-8">
+    <div className="min-h-screen bg-background flex flex-col">
+      <div className="flex flex-1 items-center justify-center p-4 md:p-8">
         <div className="glass-panel grid w-full max-w-6xl overflow-hidden rounded-[30px] lg:grid-cols-[1.08fr_.92fr]">
 
-        {/* Left branding panel — unchanged */}
-        <section className="relative overflow-hidden bg-gradient-to-br from-teal-700 via-teal-600 to-cyan-500 p-8 text-white md:p-12 transition-colors">
+        {/* Left branding panel */}
+        <section className="relative overflow-hidden bg-deep p-8 text-white md:p-12 transition-colors">
           <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full border-[42px] border-white/10" />
-          <div className="absolute -bottom-24 -left-20 h-64 w-64 rounded-full bg-cyan-300/15 blur-2xl" />
+          <div className="absolute -bottom-24 -left-20 h-64 w-64 rounded-full bg-forest blur-2xl" />
           <div className="relative flex flex-col h-full justify-between">
             <div>
               <div className="inline-flex items-center gap-3 font-semibold text-white">
@@ -236,7 +236,7 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
               <h1 className="mt-10 max-w-xl text-4xl font-bold leading-[1.05] md:text-5xl">
                 Clinical training, clearly organised.
               </h1>
-              <p className="mt-5 max-w-xl text-sm leading-6 text-teal-50/85">
+              <p className="mt-5 max-w-xl text-sm leading-6 text-white">
                 Keep cases, procedures, academic work, assessments and milestones together.
               </p>
               <LoginProductPreview />
@@ -245,14 +245,14 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
         </section>
 
         {/* Right panel */}
-        <section className="bg-white/80 p-8 md:p-12 flex items-center">
+        <section className="bg-card p-8 md:p-12 flex items-center">
           <div className="mx-auto w-full max-w-sm">
             {/* ── MODE: Picker ─────────────────────────────────────────── */}
             {mode === "picker" && (
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
                 <p className="page-eyebrow">Arogya E-LogBook</p>
-                <h2 className="mt-2 text-4xl font-bold text-slate-900">Welcome</h2>
-                <p className="mt-2 text-sm text-slate-500">
+                <h2 className="mt-2 text-4xl font-bold text-forest">Welcome</h2>
+                <p className="mt-2 text-sm text-helper">
                   Already have an account? Sign in. New here? Explore the demo first.
                 </p>
 
@@ -260,14 +260,14 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
                   {/* Sign In card */}
                   <button
                     onClick={() => setMode("login")}
-                    className="flex w-full items-center gap-4 rounded-2xl border border-[#0F766E] bg-[#0F766E] p-4 text-left text-white shadow-[0_10px_24px_rgba(15,118,110,0.16)] transition-[background-color,box-shadow] duration-150 hover:bg-[#0B665F] hover:shadow-[0_14px_28px_rgba(15,118,110,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0F766E] focus-visible:ring-offset-2 sm:p-5"
+                    className="flex w-full items-center gap-4 rounded-2xl border border-forest bg-forest p-4 text-left text-white shadow-[0_10px_24px_color-mix(in_srgb,var(--gothos-forest)_16%,transparent)] transition-[background-color,box-shadow] duration-150 hover:bg-deep hover:shadow-[0_14px_28px_color-mix(in_srgb,var(--gothos-forest)_20%,transparent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:p-5"
                   >
                     <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white/20">
                       <LogIn className="h-6 w-6" />
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="font-bold text-base">Sign In to my account</p>
-                      <p className="mt-0.5 text-xs text-teal-100">For registered residents, faculty and HOD</p>
+                      <p className="mt-0.5 text-xs text-white">For registered residents, faculty and HOD</p>
                     </div>
                   </button>
 
@@ -275,14 +275,14 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
                   <button
                     onClick={handleMovieStart}
                     disabled={demoLoading}
-                    className="flex w-full items-center gap-4 rounded-2xl border border-[#D9EAE7] bg-white p-4 text-left shadow-sm transition-[border-color,background-color,box-shadow] duration-150 hover:border-[#A9D4CF] hover:bg-[#F2F8F7] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0F766E] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 sm:p-5"
+                    className="flex w-full items-center gap-4 rounded-2xl border border-forest bg-white p-4 text-left shadow-sm transition-[border-color,background-color,box-shadow] duration-150 hover:border-forest hover:bg-mist hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 sm:p-5"
                   >
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#F2F8F7] text-[#0F766E] ring-1 ring-[#D9EAE7]">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-mist text-forest ring-1 ring-line-soft">
                       {demoLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Sparkles className="h-5 w-5" strokeWidth={1.8} />}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="font-semibold text-[#16323A]">Show demo</p>
-                      <p className="mt-0.5 text-xs leading-5 text-[#52696C]">Watch the intro, then explore freely. Start a guided tour anytime. No sign-in needed.</p>
+                      <p className="font-semibold text-ink">Show demo</p>
+                      <p className="mt-0.5 text-xs leading-5 text-helper">Watch the intro, then explore freely. Start a guided tour anytime. No sign-in needed.</p>
                     </div>
                   </button>
                   <video src={introVideoSrc} preload="auto" className="hidden" aria-hidden="true" muted />
@@ -298,19 +298,19 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
                 <button
                   type="button"
                   onClick={goBack}
-                  className="mb-6 flex items-center gap-1 text-xs font-medium text-teal-700 hover:underline"
+                  className="mb-6 flex items-center gap-1 text-xs font-medium text-forest hover:underline"
                 >
                   <ChevronLeft className="h-3 w-3" /> Back
                 </button>
 
                 <p className="page-eyebrow">Secure access</p>
-                <h2 className="mt-2 text-4xl font-bold text-slate-900">Sign in</h2>
-                <p className="mt-2 text-sm text-slate-500">
+                <h2 className="mt-2 text-4xl font-bold text-forest">Sign in</h2>
+                <p className="mt-2 text-sm text-helper">
                   Sign in with your university registration number or email address and password.
                 </p>
 
                 {error && (
-                  <div className="mt-4 rounded-md bg-red-50 p-3 text-sm text-red-700 border border-red-200">
+                  <div className="mt-4 rounded-md bg-status p-3 text-sm text-status-foreground border border-status-border">
                     {error}
                   </div>
                 )}
@@ -320,11 +320,11 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
                   <div className="mt-9 space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-300">
                     <div className="flex items-center justify-between mb-2">
                       {forgotStep > 1 ? (
-                        <button type="button" onClick={() => setForgotStep(forgotStep === 3 ? 2 : 1 as any)} className="text-xs text-teal-700 hover:underline block">
+                        <button type="button" onClick={() => setForgotStep(forgotStep === 3 ? 2 : 1 as any)} className="text-xs text-forest hover:underline block">
                           &larr; Back
                         </button>
                       ) : <div />}
-                      <button type="button" onClick={() => setForgotStep(0)} className="text-xs text-teal-700 hover:underline block">
+                      <button type="button" onClick={() => setForgotStep(0)} className="text-xs text-forest hover:underline block">
                         Exit to login
                       </button>
                     </div>
@@ -377,7 +377,7 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
                     <div className="space-y-2">
                       <Label htmlFor="username">Registration number or Email</Label>
                       <div className="relative">
-                        <UserPlus className="absolute left-3 top-3 h-4 w-4 text-teal-600" />
+                        <UserPlus className="absolute left-3 top-3 h-4 w-4 text-forest" />
                         <Input
                           id="username"
                           value={username}
@@ -395,13 +395,13 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
                         <button
                           type="button"
                           onClick={() => { setResetEmail(username); setForgotStep(1); }}
-                          className="text-[11px] font-medium text-teal-700 hover:underline"
+                          className="text-[11px] font-medium text-forest hover:underline"
                         >
                           Forgot password?
                         </button>
                       </div>
                       <div className="relative">
-                        <KeyRound className="absolute left-3 top-3 h-4 w-4 text-teal-600" />
+                        <KeyRound className="absolute left-3 top-3 h-4 w-4 text-forest" />
                         <Input
                           id="password"
                           type="password"
@@ -424,22 +424,22 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
                 {forgotStep === 0 && (
                   <>
                     <div className="my-6 flex items-center gap-3">
-                      <div className="h-px flex-1 bg-teal-100" />
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">New here?</span>
-                      <div className="h-px flex-1 bg-teal-100" />
+                      <div className="h-px flex-1 bg-sage" />
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-helper">New here?</span>
+                      <div className="h-px flex-1 bg-sage" />
                     </div>
-                    <Button type="button" variant="outline" onClick={onRegister} className="h-11 w-full border-teal-200 text-teal-800">
+                    <Button type="button" variant="outline" onClick={onRegister} className="h-11 w-full text-forest">
                       <UserPlus className="h-4 w-4" /> Register &amp; Pay
                     </Button>
                   </>
                 )}
 
                 {SUPPORT_FEATURE_ENABLED && (
-                  <div className="mt-6 pt-2 text-center border-t border-slate-100">
+                  <div className="mt-6 pt-2 text-center border-t border-line-soft">
                     <button
                       type="button"
                       onClick={() => openSupportWidget({ category: "login_issue" })}
-                      className="text-xs font-medium text-teal-700 hover:text-teal-800 hover:underline"
+                      className="text-xs font-medium text-forest hover:text-forest hover:underline"
                     >
                       Having trouble signing in? Contact support
                     </button>
@@ -453,17 +453,17 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
       </div>
       </div>
       {/* Footer */}
-      <footer className="w-full mt-auto py-6 border-t border-slate-200 bg-white">
-        <div className="max-w-6xl mx-auto px-4 md:px-8 flex flex-wrap justify-center gap-6 text-sm text-slate-500">
-          <a href="/privacy-policy" className="hover:text-teal-700 transition-colors">Privacy Policy</a>
-          <a href="/grievance-officer" className="hover:text-teal-700 transition-colors">Grievance Officer</a>
-          <a href="/data-rights" className="hover:text-teal-700 transition-colors">Data Rights</a>
+      <footer className="w-full mt-auto py-6 border-t border-line-soft bg-white">
+        <div className="max-w-6xl mx-auto px-4 md:px-8 flex flex-wrap justify-center gap-6 text-sm text-helper">
+          <a href="/privacy-policy" className="hover:text-forest transition-colors">Privacy Policy</a>
+          <a href="/grievance-officer" className="hover:text-forest transition-colors">Grievance Officer</a>
+          <a href="/data-rights" className="hover:text-forest transition-colors">Data Rights</a>
           <button 
             onClick={(e) => {
               e.preventDefault();
               window.dispatchEvent(new Event("open-cookie-consent"));
             }}
-            className="hover:text-teal-700 transition-colors cursor-pointer"
+            className="hover:text-forest transition-colors cursor-pointer"
           >
             Cookie Preferences
           </button>
@@ -475,13 +475,13 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
           role="dialog"
           aria-modal="true"
           aria-label="Arogya E-LogBook Demo Video"
-          className="fixed inset-0 z-[10000] flex flex-col bg-slate-950 text-white select-none animate-in fade-in duration-200"
+          className="fixed inset-0 z-[10000] flex flex-col bg-deep text-white select-none animate-in fade-in duration-200"
         >
           {/* Top bar with branding and Skip to Demo button */}
-          <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center justify-between bg-gradient-to-b from-slate-950/90 via-slate-950/50 to-transparent px-4 py-4 sm:px-8 sm:py-5">
+          <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center justify-between bg-deep/90 px-4 py-4 sm:px-8 sm:py-5">
             <div className="pointer-events-auto flex items-center gap-3">
-              <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-slate-900/80 px-3.5 py-1.5 text-xs font-semibold tracking-wide text-teal-300 backdrop-blur-md">
-                <span className="h-2 w-2 rounded-full bg-teal-400 animate-pulse" />
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-deep/80 px-3.5 py-1.5 text-xs font-semibold tracking-wide text-mint backdrop-blur-md">
+                <span className="h-2 w-2 rounded-full bg-forest animate-pulse" />
                 Arogya E-LogBook · Product Walkthrough
               </span>
 
@@ -495,7 +495,7 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
                     setMutedByBrowser(false);
                     void video.play().catch(() => {});
                   }}
-                  className="inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-amber-500/20 px-3.5 py-1.5 text-xs font-semibold text-amber-200 backdrop-blur-md transition hover:bg-amber-500/30 cursor-pointer"
+                  className="inline-flex items-center gap-2 rounded-full border border-white/40 bg-white/20 px-3.5 py-1.5 text-xs font-semibold text-white backdrop-blur-md transition hover:bg-white/30 cursor-pointer"
                 >
                   <VolumeX className="h-3.5 w-3.5" />
                   Click to unmute audio
@@ -507,7 +507,7 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
               type="button"
               onClick={enterDemoWorkspace}
               data-testid="demo-video-skip"
-              className="pointer-events-auto inline-flex items-center gap-2 rounded-xl bg-teal-600 px-4 py-2.5 text-xs font-bold text-white shadow-[0_10px_28px_rgba(13,148,136,0.45)] ring-1 ring-teal-400/40 transition-all duration-150 hover:bg-teal-500 hover:scale-[1.02] active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-300 sm:px-5 sm:py-2.5 sm:text-sm cursor-pointer"
+              className="pointer-events-auto inline-flex items-center gap-2 rounded-xl bg-forest px-4 py-2.5 text-xs font-bold text-white shadow-[0_10px_28px_color-mix(in_srgb,var(--gothos-forest)_45%,transparent)] ring-1 ring-ring transition-all duration-150 hover:bg-forest hover:scale-[1.02] active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:px-5 sm:py-2.5 sm:text-sm cursor-pointer"
             >
               Skip to Explore
               <ArrowRight className="h-4 w-4" />
@@ -515,7 +515,7 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
           </div>
 
           {/* Main video container */}
-          <div className="relative flex flex-1 items-center justify-center overflow-hidden bg-black">
+          <div className="relative flex flex-1 items-center justify-center overflow-hidden bg-deep">
             <video
               ref={introVideoRef}
               src={introVideoSrc}
@@ -536,9 +536,9 @@ export function LoginPage({ onSignIn, onRegister }: { onSignIn: () => void; onRe
               <button
                 type="button"
                 onClick={() => void startIntroPlayback()}
-                className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-slate-950/70 backdrop-blur-sm transition hover:bg-slate-950/60 cursor-pointer"
+                className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-deep/70 backdrop-blur-sm transition hover:bg-deep/60 cursor-pointer"
               >
-                <div className="flex h-20 w-20 items-center justify-center rounded-full bg-teal-600 text-white shadow-2xl ring-4 ring-teal-400/30">
+                <div className="flex h-20 w-20 items-center justify-center rounded-full bg-forest text-white shadow-2xl ring-4 ring-ring">
                   <Play className="h-9 w-9 fill-current ml-1" />
                 </div>
                 <span className="text-sm font-semibold text-white">Click to Play Demo Video</span>

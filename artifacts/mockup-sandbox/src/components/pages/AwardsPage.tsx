@@ -94,7 +94,7 @@ export function AwardsPage() {
         <div>
           <p className="page-eyebrow flex items-center gap-2">Student-managed achievements</p>
           <h2 className="page-title mt-1">Awards and Achievements</h2>
-          <p className="mt-2 text-sm text-slate-500">Record your awards, prizes, and other notable achievements.</p>
+          <p className="mt-2 text-sm text-helper">Record your awards, prizes, and other notable achievements.</p>
         </div>
         <Dialog open={open} onOpenChange={(val) => {
           setOpen(val);
@@ -130,17 +130,17 @@ export function AwardsPage() {
         </Dialog>
       </div>
 
-      <Card className="border-white/70 bg-white/76">
-        <CardHeader className="border-b border-white/70">
+      <Card className="border-card-edge bg-card">
+        <CardHeader className="border-b border-card-edge">
           <CardTitle className="text-lg">Achievement Records</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           {loading ? (
-             <div className="p-8 text-center text-slate-500">Loading...</div>
+             <div className="p-8 text-center text-helper">Loading...</div>
           ) : error ? (
             <div className="flex flex-col items-center justify-center gap-4 p-8 text-center" role="alert">
-              <p className="text-sm font-medium text-rose-700">{error}</p>
-              <Button size="sm" variant="outline" onClick={fetchAwards} className="border-rose-200 text-rose-700">Try again</Button>
+              <p className="text-sm font-medium text-status-foreground">{error}</p>
+              <Button size="sm" variant="outline" onClick={fetchAwards} className="border-status-border text-status-foreground">Try again</Button>
             </div>
           ) : awards.length === 0 ? (
             <Empty className="py-14">
@@ -155,7 +155,7 @@ export function AwardsPage() {
             </Empty>
           ) : (
             <Table>
-              <TableHeader className="bg-slate-50">
+              <TableHeader className="bg-mist">
                 <TableRow>
                   <TableHead>Date</TableHead>
                   <TableHead>Description</TableHead>
@@ -168,20 +168,20 @@ export function AwardsPage() {
                 {awards.map((item, index) => (
                   <TableRow key={item.id || index}>
                     <TableCell>{formatLogbookDate(item.date)}</TableCell>
-                    <TableCell className="font-medium text-slate-900">{item.description}</TableCell>
+                    <TableCell className="font-medium text-ink">{item.description}</TableCell>
                     <TableCell>{item.supervisorName}</TableCell>
                     <TableCell>
                       <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                        item.status === "verified" ? "bg-emerald-100 text-emerald-700" :
-                        item.status === "rejected" ? "bg-rose-100 text-rose-700" :
-                        "bg-amber-100 text-amber-700"
+                        item.status === "verified" ? "bg-status text-status-foreground" :
+                        item.status === "rejected" ? "bg-status text-status-foreground" :
+                        "bg-status text-status-foreground"
                       }`}>
                         {item.status === "verified" ? "Verified" : item.status === "rejected" ? "Rejected" : "Pending"}
                       </span>
                     </TableCell>
                     <TableCell className="text-right max-w-[220px]">
                       {item.status === "pending" ? (
-                        <Button variant="ghost" size="sm" className="text-teal-600 hover:text-teal-800 hover:bg-teal-50" onClick={() => {
+                        <Button variant="ghost" size="sm" className="text-forest hover:text-forest hover:bg-mist" onClick={() => {
                           setEditId(item.id);
                           setDate(item.date);
                           setDescription(item.description);
@@ -193,13 +193,13 @@ export function AwardsPage() {
                         <span
                           title={item.facultyRemarks}
                           className={`block truncate cursor-help text-sm font-medium ${
-                            item.status === "rejected" ? "text-rose-700" : "text-slate-600"
+                            item.status === "rejected" ? "text-status-foreground" : "text-soft-ink"
                           }`}
                         >
                           {item.facultyRemarks}
                         </span>
                       ) : (
-                        <span className="text-xs text-slate-400">No remark</span>
+                        <span className="text-xs text-helper">No remark</span>
                       )}
                     </TableCell>
                   </TableRow>

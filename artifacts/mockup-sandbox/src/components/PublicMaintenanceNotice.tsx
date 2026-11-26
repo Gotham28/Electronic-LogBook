@@ -47,9 +47,9 @@ export function PublicMaintenanceNotice() {
   return (
     <div className="sticky top-0 z-[100] print:hidden">
       {visibleNotices.map((notice) => (
-        <section key={notice.id} role="status" aria-label={notice.title} className="border-b border-amber-300 bg-amber-50 px-4 py-3 text-amber-950 shadow-sm sm:px-6">
+        <section key={notice.id} role="status" aria-label={notice.title} className="border-b border-status-border bg-status px-4 py-3 text-status-foreground shadow-sm sm:px-6">
           <div className="mx-auto flex max-w-7xl items-start gap-3">
-            <AlertTriangle aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
+            <AlertTriangle aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-status-foreground" />
             <div className="min-w-0 flex-1">
               <h2 className="text-sm font-bold">{notice.title}</h2>
               <p className="mt-0.5 text-sm leading-5">{notice.message}</p>
@@ -57,7 +57,7 @@ export function PublicMaintenanceNotice() {
             <button
               type="button"
               aria-label={`Dismiss maintenance notice: ${notice.title}`}
-              className="grid h-9 w-9 shrink-0 place-items-center rounded-md text-amber-800 hover:bg-amber-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-700"
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-md text-status-foreground hover:bg-status focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
               onClick={() => setDismissedIds((ids) => [...ids, notice.id])}
             >
               <X aria-hidden="true" className="h-4 w-4" />
@@ -66,7 +66,7 @@ export function PublicMaintenanceNotice() {
         </section>
       ))}
       {loadError && (
-        <div role="alert" className="border-b border-amber-300 bg-amber-100 px-4 py-2 text-center text-sm text-amber-950 sm:px-6">
+        <div role="alert" className="border-b border-status-border bg-status px-4 py-2 text-center text-sm text-status-foreground sm:px-6">
           Maintenance notice status could not be checked.
           <button type="button" className="ml-2 font-semibold underline" onClick={() => setRefreshToken((value) => value + 1)}>Retry</button>
         </div>

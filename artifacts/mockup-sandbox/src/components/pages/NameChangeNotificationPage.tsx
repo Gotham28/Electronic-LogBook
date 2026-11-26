@@ -52,23 +52,23 @@ export function NameChangeNotificationPage({ notificationId: explicitId }: { not
 
   useEffect(() => { void load(); }, [notificationId]);
 
-  if (loading) return <main className="mx-auto max-w-3xl p-2"><p role="status" className="text-sm text-slate-500">Loading notice…</p></main>;
-  if (!notice) return <main className="mx-auto max-w-3xl space-y-4 p-2"><Link href="/notifications" className="inline-flex items-center gap-2 text-sm font-semibold text-teal-800 hover:underline"><ArrowLeft className="h-4 w-4" />Back to notifications</Link><Card><CardContent className="space-y-3 p-6"><h1 className="text-xl font-bold">Notice could not be loaded</h1><p role="alert" className="text-sm text-rose-700">{error || "This notice is unavailable."}</p><Button onClick={() => void load()}>Retry</Button></CardContent></Card></main>;
+  if (loading) return <main className="mx-auto max-w-3xl p-2"><p role="status" className="text-sm text-helper">Loading notice…</p></main>;
+  if (!notice) return <main className="mx-auto max-w-3xl space-y-4 p-2"><Link href="/notifications" className="inline-flex items-center gap-2 text-sm font-semibold text-forest hover:underline"><ArrowLeft className="h-4 w-4" />Back to notifications</Link><Card><CardContent className="space-y-3 p-6"><h1 className="text-xl font-bold">Notice could not be loaded</h1><p role="alert" className="text-sm text-status-foreground">{error || "This notice is unavailable."}</p><Button onClick={() => void load()}>Retry</Button></CardContent></Card></main>;
 
   return <main className="mx-auto w-full max-w-3xl space-y-5 p-1 sm:p-2">
-    <Link href="/notifications" className="inline-flex items-center gap-2 text-sm font-semibold text-teal-800 hover:underline"><ArrowLeft className="h-4 w-4" />Back to notifications</Link>
-    <header><p className="text-xs font-bold uppercase tracking-[0.18em] text-teal-700">{notice.departmentName}</p><h1 className="mt-1 text-3xl font-bold text-slate-950">Resident profile name updated</h1><p className="mt-2 text-sm text-slate-600">A resident in your department has updated their profile name.</p></header>
-    {readError ? <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">The notice is open, but its read status could not be saved. {readError}<Button variant="link" className="ml-1 h-auto p-0" disabled={reading} onClick={() => void acknowledge(notice)}>Retry</Button></p> : null}
-    <Card className="rounded-2xl border-slate-200/80 shadow-sm"><CardHeader><CardTitle className="text-lg">Name update</CardTitle></CardHeader><CardContent className="space-y-5">
-      <dl className="grid gap-5 sm:grid-cols-2"><div><dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Previous name</dt><dd className="mt-1 font-medium text-slate-950">{notice.previousName}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Updated name</dt><dd className="mt-1 font-medium text-slate-950">{notice.newName}</dd></div>
-        {notice.registrationNumber ? <div><dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Registration number</dt><dd className="mt-1 text-sm text-slate-900">{notice.registrationNumber}</dd></div> : null}
-        <div><dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">KUHS ID</dt><dd className="mt-1 text-sm text-slate-900">{notice.kuhsId}</dd></div>
-        <div><dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Updated on</dt><dd className="mt-1 text-sm text-slate-900">{dateLabel(notice.changedAt)}</dd></div>
-        <div><dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Current account name</dt><dd className="mt-1 text-sm text-slate-900">{notice.currentStudentName}</dd></div>
+    <Link href="/notifications" className="inline-flex items-center gap-2 text-sm font-semibold text-forest hover:underline"><ArrowLeft className="h-4 w-4" />Back to notifications</Link>
+    <header><p className="text-xs font-bold uppercase tracking-[0.18em] text-forest">{notice.departmentName}</p><h1 className="mt-1 text-3xl font-bold text-ink">Resident profile name updated</h1><p className="mt-2 text-sm text-soft-ink">A resident in your department has updated their profile name.</p></header>
+    {readError ? <p role="alert" className="rounded-xl border border-status-border bg-status p-3 text-sm text-status-foreground">The notice is open, but its read status could not be saved. {readError}<Button variant="link" className="ml-1 h-auto p-0" disabled={reading} onClick={() => void acknowledge(notice)}>Retry</Button></p> : null}
+    <Card className="rounded-2xl border-line-soft shadow-sm"><CardHeader><CardTitle className="text-lg">Name update</CardTitle></CardHeader><CardContent className="space-y-5">
+      <dl className="grid gap-5 sm:grid-cols-2"><div><dt className="text-xs font-semibold uppercase tracking-wide text-helper">Previous name</dt><dd className="mt-1 font-medium text-ink">{notice.previousName}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-helper">Updated name</dt><dd className="mt-1 font-medium text-ink">{notice.newName}</dd></div>
+        {notice.registrationNumber ? <div><dt className="text-xs font-semibold uppercase tracking-wide text-helper">Registration number</dt><dd className="mt-1 text-sm text-ink">{notice.registrationNumber}</dd></div> : null}
+        <div><dt className="text-xs font-semibold uppercase tracking-wide text-helper">KUHS ID</dt><dd className="mt-1 text-sm text-ink">{notice.kuhsId}</dd></div>
+        <div><dt className="text-xs font-semibold uppercase tracking-wide text-helper">Updated on</dt><dd className="mt-1 text-sm text-ink">{dateLabel(notice.changedAt)}</dd></div>
+        <div><dt className="text-xs font-semibold uppercase tracking-wide text-helper">Current account name</dt><dd className="mt-1 text-sm text-ink">{notice.currentStudentName}</dd></div>
       </dl>
-      <p className="rounded-lg bg-slate-50 p-3 text-sm text-slate-600">This notice records a resident's profile update. No action is required.</p>
-      <div className="flex items-center gap-2 text-xs text-slate-500">{notice.readAt ? <><Check className="h-4 w-4 text-emerald-700" />Read {dateLabel(notice.readAt)}</> : reading ? "Saving read status…" : "Unread"}</div>
-      {notice.emailStatus ? <p className="text-xs text-slate-500">Email status: {emailStatusLabel(notice.emailStatus)}</p> : null}
+      <p className="rounded-lg bg-mist p-3 text-sm text-soft-ink">This notice records a resident's profile update. No action is required.</p>
+      <div className="flex items-center gap-2 text-xs text-helper">{notice.readAt ? <><Check className="h-4 w-4 text-status-foreground" />Read {dateLabel(notice.readAt)}</> : reading ? "Saving read status…" : "Unread"}</div>
+      {notice.emailStatus ? <p className="text-xs text-helper">Email status: {emailStatusLabel(notice.emailStatus)}</p> : null}
     </CardContent></Card>
   </main>;
 }

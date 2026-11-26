@@ -1,3 +1,4 @@
+import { ProgressRing } from "@/components/ui/progress";
 import * as React from "react";
 import { useLocation } from "wouter";
 import {
@@ -438,7 +439,7 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
   if (loading && !analyticsData) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <div className="animate-spin rounded-full border-4 border-slate-300 border-t-teal-600 h-8 w-8"></div>
+        <div className="animate-spin rounded-full border-4 border-line-soft border-t-forest h-8 w-8"></div>
       </div>
     );
   }
@@ -450,7 +451,7 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
   if (error) {
     return (
       <div className="flex h-64 flex-col items-center justify-center space-y-4 text-center" role="alert">
-        <p className="text-sm font-medium text-rose-700">{error}</p>
+        <p className="text-sm font-medium text-status-foreground">{error}</p>
         <Button onClick={fetchData} variant="outline">Try again</Button>
       </div>
     );
@@ -459,30 +460,30 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
   return (
     <div className="space-y-6 pb-12">
       {analyticsError && (
-        <div role="alert" className="flex items-center justify-between gap-4 rounded-md border border-rose-200 bg-rose-50 px-4 py-3">
-          <p className="text-sm font-medium text-rose-700">{analyticsError}</p>
+        <div role="alert" className="flex items-center justify-between gap-4 rounded-md border border-status-border bg-status px-4 py-3">
+          <p className="text-sm font-medium text-status-foreground">{analyticsError}</p>
           <Button size="sm" variant="outline" onClick={fetchData}>Try again</Button>
         </div>
       )}
 
-      <div data-tour="hod-overview" className="rounded-2xl bg-gradient-to-r from-slate-900 via-teal-950 to-slate-900 p-6 text-white shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div data-tour="hod-overview" className="rounded-2xl bg-deep p-6 text-white shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <Badge className="bg-teal-500/20 text-teal-300 border-teal-500/30 text-xs font-semibold mb-2">
+          <Badge className="bg-white/20 text-white border-forest/30 text-xs font-semibold mb-2">
             Head of Department Dashboard
           </Badge>
           <h2 className="text-2xl font-black">{department.name}</h2>
-          <p className="text-xs text-slate-300 mt-1">{currentUser?.name} · Department overview</p>
+          <p className="text-xs text-white mt-1">{currentUser?.name} · Department overview</p>
         </div>
         {analyticsData && (
           <div className="flex items-center gap-3 flex-wrap">
-            <div className="bg-slate-800/80 border border-slate-700 p-3 rounded-xl text-center">
-              <p className="text-lg font-black text-teal-300"><DemoCount value={analyticsData.totalStudents} /></p>
-              <p className="text-[10px] text-slate-400 font-semibold uppercase">Residents</p>
+            <div className="bg-deep/80 border border-forest p-3 rounded-xl text-center">
+              <p className="text-lg font-black text-mint"><DemoCount value={analyticsData.totalStudents} /></p>
+              <p className="text-[10px] text-white font-semibold uppercase">Residents</p>
             </div>
             {analyticsData.totalStudents > 0 && (
-              <div className="bg-slate-800/80 border border-slate-700 p-3 rounded-xl text-center">
-                <p className="text-lg font-black text-emerald-400"><DemoCount value={analyticsData.avgCompletion} />%</p>
-                <p className="text-[10px] text-slate-400 font-semibold uppercase">Average progress</p>
+              <div className="bg-deep/80 border border-forest p-3 rounded-xl text-center">
+                <p className="text-lg font-black text-white"><DemoCount value={analyticsData.avgCompletion} />%</p>
+                <p className="text-[10px] text-white font-semibold uppercase">Average progress</p>
               </div>
             )}
           </div>
@@ -498,19 +499,19 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
 
         <TabsContent value="mentees" className="pt-4">
           {activeDigest && (
-            <Card className="mb-4 border-slate-200 bg-white shadow-sm">
+            <Card className="mb-4 border-line-soft bg-white shadow-sm">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base font-semibold">This week</CardTitle>
               </CardHeader>
               <CardContent>
                 {activeDigest.status === "loading" && (
-                  <p role="status" className="text-sm text-slate-500">
+                  <p role="status" className="text-sm text-helper">
                     Loading this week’s Mochi digest…
                   </p>
                 )}
                 {activeDigest.status === "pending" && (
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <p className="text-sm text-slate-600">Mochi is preparing this week’s digest.</p>
+                    <p className="text-sm text-soft-ink">Mochi is preparing this week’s digest.</p>
                     <Button size="sm" variant="outline" onClick={retryWeeklyDigest}>
                       Check again
                     </Button>
@@ -518,7 +519,7 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
                 )}
                 {activeDigest.status === "error" && (
                   <div role="alert" className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <p className="text-sm font-medium text-rose-700">
+                    <p className="text-sm font-medium text-status-foreground">
                       This week’s Mochi digest is unavailable.
                     </p>
                     <Button size="sm" variant="outline" onClick={retryWeeklyDigest}>
@@ -528,8 +529,8 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
                 )}
                 {activeDigest.status === "ready" && (
                   <div className="space-y-2">
-                    <p className="text-sm text-slate-800 leading-relaxed">{activeDigest.summary}</p>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-sm text-ink leading-relaxed">{activeDigest.summary}</p>
+                    <p className="text-xs text-helper">
                       Snapshot from {formatDigestSnapshotDate(activeDigest.generatedAt)}
                     </p>
                   </div>
@@ -547,30 +548,30 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
         {/* Roster tab */}
         <TabsContent value="roster" className="space-y-6 pt-4">
           {rosterLoading ? (
-            <div className="flex h-40 items-center justify-center"><div className="animate-spin rounded-full border-4 border-slate-300 border-t-teal-600 h-8 w-8" /></div>
+            <div className="flex h-40 items-center justify-center"><div className="animate-spin rounded-full border-4 border-line-soft border-t-forest h-8 w-8" /></div>
           ) : rosterError ? (
             <div className="flex h-40 flex-col items-center justify-center space-y-4 text-center" role="alert">
-              <p className="text-sm font-medium text-rose-700">{rosterError}</p>
+              <p className="text-sm font-medium text-status-foreground">{rosterError}</p>
               <Button onClick={fetchRoster} variant="outline">Try again</Button>
             </div>
           ) : (
             <>
               {isDemoMode() && analyticsData && <DemoLogStatsChart logStats={analyticsData.logStats} />}
               {userToDelete && (
-                <Card className="border-rose-200 bg-rose-50/30 shadow-sm mb-6">
+                <Card className="border-status-border bg-status shadow-sm mb-6">
                   <CardContent className="p-4">
                     <div className="flex items-start gap-3">
-                      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-rose-100">
-                        <AlertTriangle className="h-4 w-4 text-rose-700" />
+                      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-status">
+                        <AlertTriangle className="h-4 w-4 text-status-foreground" />
                       </div>
                       <div className="flex-1 space-y-3">
                         <div>
-                          <h4 className="font-semibold text-rose-900">Permanently delete {userToDelete.name}?</h4>
-                          <p className="text-sm text-rose-800 mt-1 leading-relaxed">
+                          <h4 className="font-semibold text-status-foreground">Permanently delete {userToDelete.name}?</h4>
+                          <p className="text-sm text-status-foreground mt-1 leading-relaxed">
                             This will <strong>permanently delete</strong> the {userToDelete.role} and <strong>all</strong> of their associated data. This action is <strong>irreversible</strong>.
                           </p>
                           {userToDelete.role === "student" ? (
-                            <ul className="text-sm text-rose-800 mt-1 ml-4 list-disc space-y-0.5">
+                            <ul className="text-sm text-status-foreground mt-1 ml-4 list-disc space-y-0.5">
                               <li>Their account and profile</li>
                               <li>All of their clinical logs, case logs, and procedures</li>
                               <li>Their assessments, appraisals, and attendance records</li>
@@ -578,7 +579,7 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
                               <li>Their thesis milestones and research records</li>
                             </ul>
                           ) : (
-                            <ul className="text-sm text-rose-800 mt-1 ml-4 list-disc space-y-0.5">
+                            <ul className="text-sm text-status-foreground mt-1 ml-4 list-disc space-y-0.5">
                               <li>Their account and profile</li>
                               <li>Any assignment types and assignments they created</li>
                               <li><strong>Every clinical and academic record belonging to OTHER students</strong> where this faculty appears as reviewer, verifier, or supervisor</li>
@@ -588,7 +589,7 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
                         </div>
 
                         {deleteUserError && (
-                          <div className="p-3 bg-rose-100 border border-rose-300 rounded-md text-sm text-rose-900 font-medium">
+                          <div className="p-3 bg-status border border-status-border rounded-md text-sm text-status-foreground font-medium">
                             {deleteUserError}
                           </div>
                         )}
@@ -600,7 +601,7 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
                           <Button
                             onClick={handleHardDeleteUser}
                             disabled={deletingUser}
-                            className="bg-rose-600 hover:bg-rose-700 text-white"
+                            className="bg-destructive hover:bg-deep text-white"
                           >
                             {deletingUser ? "Deleting..." : `Yes, permanently delete ${userToDelete.name}`}
                           </Button>
@@ -622,14 +623,14 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
                 <SummaryCard label="Awaiting approval" value={pendingStudents.length} error={studentsError} />
               </div>
               <Card data-tour="hod-student-roster">
-                <CardHeader className="border-b border-teal-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <CardHeader className="border-b border-line-soft flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <CardTitle className="text-lg flex items-center gap-2">
-                    <GraduationCap className="h-5 w-5 text-teal-600" />
+                    <GraduationCap className="h-5 w-5 text-forest" />
                     PG Residents ({filteredStudents.length})
                   </CardTitle>
                   <div className="flex flex-col sm:flex-row gap-3">
                     <div className="relative">
-                      <Search className="absolute left-2 top-2.5 h-4 w-4 text-slate-500" />
+                      <Search className="absolute left-2 top-2.5 h-4 w-4 text-helper" />
                       <Input
                         placeholder="Search name or reg no..."
                         className="pl-8 h-9 w-full sm:w-64"
@@ -658,10 +659,10 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
                 </CardHeader>
                 <CardContent className="p-0">
                   {!roster?.students.length ? (
-                    <p className="p-6 text-center text-sm text-slate-500">No students in this department.</p>
+                    <p className="p-6 text-center text-sm text-helper">No students in this department.</p>
                   ) : (
                     <Table>
-                      <TableHeader className="bg-slate-50">
+                      <TableHeader className="bg-mist">
                         <TableRow>
                           <TableHead>Reg. No.</TableHead>
                           <TableHead>Full Name</TableHead>
@@ -677,14 +678,14 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
                           <TableRow key={s.id} className={isDemoMode() ? "demo-stagger-item" : undefined} style={isDemoMode() ? { "--demo-stagger-index": index } as React.CSSProperties : undefined}>
                             <TableCell className="font-mono text-xs font-semibold">{s.registrationNumber}</TableCell>
                             <TableCell className="font-semibold">{s.fullName}</TableCell>
-                            <TableCell className="text-xs text-slate-500">{s.email}</TableCell>
+                            <TableCell className="text-xs text-helper">{s.email}</TableCell>
                             <TableCell>{s.batch ?? "—"}</TableCell>
                             <TableCell>
                               <div className="flex items-center gap-3">
                                 {s.completion !== null && s.completion !== undefined && (
                                   <CompletionRing value={s.completion} />
                                 )}
-                                <div className="text-[11px] leading-5 text-slate-500">
+                                <div className="text-[11px] leading-5 text-helper">
                                   {!config?.enabledFeatures?.hideCaseLogs && <p>{config?.requiredCases !== null && config?.requiredCases !== undefined ? `${s.verified?.cases ?? 0}/${s.targets?.cases ?? 0} cases` : `${s.verified?.cases ?? 0} cases verified`}</p>}
                                   {!config?.enabledFeatures?.hideProcedureLogs && <p>{config?.requiredProcedures !== null && config?.requiredProcedures !== undefined ? `${s.verified?.procedures ?? 0}/${s.targets?.procedures ?? 0} procedures` : `${s.verified?.procedures ?? 0} procedures verified`}</p>}
                                   {config?.enabledFeatures?.clinicalWorks && <p>{s.targets?.clinicalWork ? `${s.verified?.clinicalWork ?? 0}/${s.targets.clinicalWork} clinical work` : `${s.verified?.clinicalWork ?? 0} clinical work verified`}</p>}
@@ -697,10 +698,10 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex justify-end gap-2">
-                                <Button size="sm" variant="outline" onClick={() => s.status === "rejected" ? reactivateUser(s.id, s.fullName) : removeUser(s.id, s.fullName)} className="text-rose-700 border-rose-200 hover:bg-rose-50">
+                                <Button size="sm" variant="outline" onClick={() => s.status === "rejected" ? reactivateUser(s.id, s.fullName) : removeUser(s.id, s.fullName)} className="text-status-foreground border-forest hover:bg-status">
                                   <XCircle className="h-4 w-4 mr-1" /> {s.status === "rejected" ? "Reactivate" : "Deactivate"}
                                 </Button>
-                                <Button size="sm" variant="outline" onClick={() => { setUserToDelete({ id: s.id, name: s.fullName, role: "student" }); setDeleteUserError(null); }} className="text-rose-700 border-rose-200 hover:bg-rose-50">
+                                <Button size="sm" variant="outline" onClick={() => { setUserToDelete({ id: s.id, name: s.fullName, role: "student" }); setDeleteUserError(null); }} className="text-status-foreground border-forest hover:bg-status">
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
                               </div>
@@ -714,18 +715,18 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
               </Card>
 
               <Card>
-                <CardHeader className="border-b border-teal-100">
+                <CardHeader className="border-b border-line-soft">
                   <CardTitle className="text-lg flex items-center gap-2">
-                    <Users className="h-5 w-5 text-teal-600" />
+                    <Users className="h-5 w-5 text-forest" />
                     Faculty ({roster?.professors.length ?? 0})
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
                   {!roster?.professors.length ? (
-                    <p className="p-6 text-center text-sm text-slate-500">No faculty in this department.</p>
+                    <p className="p-6 text-center text-sm text-helper">No faculty in this department.</p>
                   ) : (
                     <Table>
-                      <TableHeader className="bg-slate-50">
+                      <TableHeader className="bg-mist">
                         <TableRow>
                           <TableHead>Full Name</TableHead>
                           <TableHead>Email</TableHead>
@@ -737,16 +738,16 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
                         {roster.professors.map((p) => (
                           <TableRow key={p.id}>
                             <TableCell className="font-semibold">{p.fullName}</TableCell>
-                            <TableCell className="text-xs text-slate-500">{p.email}</TableCell>
+                            <TableCell className="text-xs text-helper">{p.email}</TableCell>
                             <TableCell>
                               <Badge variant={p.status === "approved" ? "default" : "secondary"} className="capitalize text-xs">{p.status}</Badge>
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex justify-end gap-2">
-                                <Button size="sm" variant="outline" onClick={() => p.status === "rejected" ? reactivateUser(p.id, p.fullName) : removeUser(p.id, p.fullName)} className="text-rose-700 border-rose-200 hover:bg-rose-50">
+                                <Button size="sm" variant="outline" onClick={() => p.status === "rejected" ? reactivateUser(p.id, p.fullName) : removeUser(p.id, p.fullName)} className="text-status-foreground border-forest hover:bg-status">
                                   <XCircle className="h-4 w-4 mr-1" /> {p.status === "rejected" ? "Reactivate" : "Deactivate"}
                                 </Button>
-                                <Button size="sm" variant="outline" onClick={() => { setUserToDelete({ id: p.id, name: p.fullName, role: "professor" }); setDeleteUserError(null); }} className="text-rose-700 border-rose-200 hover:bg-rose-50">
+                                <Button size="sm" variant="outline" onClick={() => { setUserToDelete({ id: p.id, name: p.fullName, role: "professor" }); setDeleteUserError(null); }} className="text-status-foreground border-forest hover:bg-status">
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
                               </div>
@@ -764,14 +765,14 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
 
         <TabsContent value="student-access" className="space-y-4 pt-4">
           <Card data-tour="hod-student-approvals">
-            <CardHeader className="border-b border-teal-100">
+            <CardHeader className="border-b border-line-soft">
               <CardTitle className="text-xl">Pending Student Approvals</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               {studentsError ? (
-                <p className="p-6 text-center text-sm text-red-500 font-medium">{studentsError}</p>
+                <p className="p-6 text-center text-sm text-status-foreground font-medium">{studentsError}</p>
               ) : pendingStudents.length === 0 ? (
-                <p className="p-6 text-center text-sm text-slate-500">No pending student registrations.</p>
+                <p className="p-6 text-center text-sm text-helper">No pending student registrations.</p>
               ) : (
                 <Table>
                   <TableHeader>
@@ -791,7 +792,7 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
                         <TableCell className="font-bold">{student.registrationNumber}</TableCell>
                         <TableCell className="font-semibold">{student.fullName}</TableCell>
                         <TableCell>{student.email}</TableCell>
-                        <TableCell><span className="font-medium">{student.department || student.specialty}</span><p className="text-xs text-slate-500">Batch {student.batch}</p></TableCell>
+                        <TableCell><span className="font-medium">{student.department || student.specialty}</span><p className="text-xs text-helper">Batch {student.batch}</p></TableCell>
                         <TableCell>{formatLogbookDate(student.dateOfJoining)}</TableCell>
                         <TableCell className="font-mono text-xs">{student.kuhsId}</TableCell>
                         <TableCell className="text-right">
@@ -799,7 +800,7 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
                               <Button data-tour="hod-approve-student" size="sm" onClick={() => approveStudent(student.id)}>
                                 <CheckCircle2 className="h-4 w-4 mr-2" /> Approve
                               </Button>
-                              <Button size="sm" variant="outline" onClick={() => rejectStudent(student.id)} className="text-rose-700 border-rose-200 hover:bg-rose-50">
+                              <Button size="sm" variant="outline" onClick={() => rejectStudent(student.id)} className="text-status-foreground border-status-border hover:bg-status">
                                 <XCircle className="h-4 w-4 mr-2" /> Reject
                               </Button>
                             </div>
@@ -815,7 +816,7 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
 
         <TabsContent value="professors" className="space-y-4 pt-4">
           <Card data-tour="hod-add-faculty" className="max-w-xl">
-            <CardHeader className="border-b border-teal-100">
+            <CardHeader className="border-b border-line-soft">
               <CardTitle className="text-xl">Add Faculty</CardTitle>
             </CardHeader>
             <CardContent className="p-5">
@@ -828,7 +829,7 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
                   <Label htmlFor="prof-email">Email Address</Label>
                   <Input id="prof-email" type="email" value={profForm.email} onChange={(e) => setProfForm({...profForm, email: e.target.value})} required />
                 </div>
-                <p className="text-sm text-slate-600">A secure temporary password will be generated and sent to the faculty member’s email. They can change it after signing in.</p>
+                <p className="text-sm text-soft-ink">A secure temporary password will be generated and sent to the faculty member’s email. They can change it after signing in.</p>
                 <Button type="submit" disabled={creatingProf} className="w-full">
                   <UserPlus className="h-4 w-4 mr-2" /> {creatingProf ? "Creating..." : "Create Faculty Account"}
                 </Button>
@@ -839,14 +840,14 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
 
         <TabsContent value="leave-approvals" className="pt-4">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between border-b border-teal-100">
+            <CardHeader className="flex flex-row items-center justify-between border-b border-line-soft">
               <CardTitle className="text-xl">Pending leave requests</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               {leavesError ? (
-                <p className="p-6 text-center text-sm text-red-500 font-medium">{leavesError}</p>
+                <p className="p-6 text-center text-sm text-status-foreground font-medium">{leavesError}</p>
               ) : leaves.length === 0 ? (
-                <p className="p-6 text-center text-sm text-slate-500">No pending leave requests.</p>
+                <p className="p-6 text-center text-sm text-helper">No pending leave requests.</p>
               ) : (
                 <Table>
                   <TableHeader><TableRow><TableHead>Number</TableHead><TableHead>Resident</TableHead><TableHead>Type</TableHead><TableHead>Leave Period</TableHead><TableHead>Reason</TableHead><TableHead className="text-right">Decision</TableHead></TableRow></TableHeader>
@@ -857,21 +858,21 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
                         <TableCell className="font-semibold">{leave.residentName}</TableCell>
                         <TableCell className="font-medium">{leave.type}</TableCell>
                         <TableCell>
-                          <div className="font-medium text-slate-700 mb-1">
+                          <div className="font-medium text-ink mb-1">
                             {formatLogbookDate(leave.fromDate)} -&gt; {formatLogbookDate(leave.toDate)} &middot; {leave.totalDays} day(s)
                           </div>
                           {!leave.availableByYear ? (
-                            <div className="text-[10px] text-slate-500">Availability unavailable</div>
+                            <div className="text-[10px] text-helper">Availability unavailable</div>
                           ) : (
                             leave.availableByYear.map((entry, i) => {
                               if (entry.available === null) {
-                                return <div key={i} className="text-[10px] text-slate-500">No limit</div>;
+                                return <div key={i} className="text-[10px] text-helper">No limit</div>;
                               }
                               const isMultiYear = leave.availableByYear!.length > 1;
                               const isNegative = entry.available < 0;
                               const label = isMultiYear ? `Available (${entry.year})` : "Available";
                               return (
-                                <div key={i} className={`text-[10px] ${isNegative ? 'text-red-600 font-semibold' : 'text-slate-500'}`}>
+                                <div key={i} className={`text-[10px] ${isNegative ? 'text-status-foreground font-semibold' : 'text-helper'}`}>
                                   {label}: {entry.available} days
                                 </div>
                               );
@@ -881,7 +882,7 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
                         <TableCell>{leave.reason}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
-                            <Button size="sm" variant="outline" onClick={() => decideLeave(leave.id, false)} className="text-rose-700"><XCircle className="h-4 w-4" /> Return</Button>
+                            <Button size="sm" variant="outline" onClick={() => decideLeave(leave.id, false)} className="text-status-foreground"><XCircle className="h-4 w-4" /> Return</Button>
                             <Button size="sm" onClick={() => decideLeave(leave.id, true)}><CheckCircle2 className="h-4 w-4" /> Approve</Button>
                           </div>
                         </TableCell>
@@ -916,15 +917,16 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
 }
 
 function SummaryCard({ label, value, error }: { label: string; value: string | number; error?: string | null }) {
-  return <Card className={`border-slate-200 bg-white ${isDemoMode() ? "demo-lift-card" : ""}`}><CardContent className="p-5"><p className="text-[10px] font-bold uppercase tracking-[.14em] text-slate-500">{label}</p>{error ? <p className="mt-2 text-sm font-medium text-red-500">{error}</p> : <p className="mt-2 text-3xl font-semibold text-slate-950">{typeof value === "number" && isDemoMode() ? <DemoCount value={value} /> : value}</p>}</CardContent></Card>;
+  return <Card className={`border-line-soft bg-white ${isDemoMode() ? "demo-lift-card" : ""}`}><CardContent className="p-5"><p className="text-[10px] font-bold uppercase tracking-[.14em] text-helper">{label}</p>{error ? <p className="mt-2 text-sm font-medium text-status-foreground">{error}</p> : <p className="mt-2 text-3xl font-semibold text-ink">{typeof value === "number" && isDemoMode() ? <DemoCount value={value} /> : value}</p>}</CardContent></Card>;
 }
 
 function CompletionRing({ value }: { value: number }) {
   const animatedValue = useDemoAnimatedValue(value);
   const safeValue = Math.max(0, Math.min(Math.round(animatedValue), 100));
   return (
-    <div className="relative grid h-14 w-14 shrink-0 place-items-center rounded-full" style={{ background: `conic-gradient(#0d9488 ${safeValue * 3.6}deg, #e2e8f0 0deg)` }}>
-      <div className="grid h-10 w-10 place-items-center rounded-full bg-white text-[11px] font-bold text-slate-900">{safeValue}%</div>
+    <div className="relative grid h-14 w-14 shrink-0 place-items-center rounded-full">
+      <ProgressRing value={safeValue} strokeWidth={14.2857} />
+      <div className="grid h-10 w-10 place-items-center relative rounded-full bg-white text-[11px] font-bold text-ink">{safeValue}%</div>
     </div>
   );
 }
@@ -932,22 +934,22 @@ function CompletionRing({ value }: { value: number }) {
 function DemoLogStatsChart({ logStats }: { logStats: AnalyticsData["logStats"] }) {
   const animateChart = useDemoMotionEnabled();
   const rows = [
-    { name: "Verified", value: logStats.verified, color: "#0f766e" },
-    { name: "Pending", value: logStats.pending, color: "#d97706" },
-    { name: "Returned", value: logStats.rejected, color: "#e11d48" },
+    { name: "Verified", value: logStats.verified, color: "var(--chart-1)" },
+    { name: "Pending", value: logStats.pending, color: "var(--chart-2)" },
+    { name: "Returned", value: logStats.rejected, color: "var(--chart-3)" },
   ];
   return (
-    <Card data-tour="hod-log-activity" className="mb-6 border-teal-100 bg-white shadow-sm">
+    <Card data-tour="hod-log-activity" className="mb-6 border-line-soft bg-white shadow-sm">
       <CardHeader className="pb-2">
         <CardTitle className="text-base">Department log activity</CardTitle>
-        <p className="text-sm text-slate-600">Sample records across the active department.</p>
+        <p className="text-sm text-soft-ink">Sample records across the active department.</p>
       </CardHeader>
       <CardContent>
         <div className="h-52 w-full" role="img" aria-label="Sample department log activity by review status">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={rows} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
-              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: "#475569" }} />
-              <Tooltip formatter={(value) => [value, "Entries"]} cursor={{ fill: "rgba(241, 245, 249, .6)" }} />
+              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: "var(--gothos-muted)" }} />
+              <Tooltip formatter={(value) => [value, "Entries"]} cursor={{ fill: "var(--gothos-mist)" }} />
               <Bar dataKey="value" radius={[7, 7, 0, 0]} isAnimationActive={animateChart} animationDuration={650}>
                 {rows.map((row) => <Cell key={row.name} fill={row.color} />)}
               </Bar>

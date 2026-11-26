@@ -357,10 +357,10 @@ export function CaseLogsPage() {
   return (
     <div className="space-y-6 pb-12">
       {error && (
-        <div className="flex flex-col items-center justify-center p-8 text-center border rounded-2xl bg-rose-50 border-rose-100">
-          <p className="text-rose-700 mb-4">{error}</p>
+        <div className="flex flex-col items-center justify-center p-8 text-center border rounded-2xl bg-status border-status-border">
+          <p className="text-status-foreground mb-4">{error}</p>
           <div className="flex flex-wrap items-center justify-center gap-2">
-            <Button onClick={fetchLogs} variant="outline" className="border-rose-200 text-rose-700">Try Again</Button>
+            <Button onClick={fetchLogs} variant="outline" className="border-status-border text-status-foreground">Try Again</Button>
             <Button type="button" variant="outline" size="sm" onClick={openArogya}>Ask Mochi about this</Button>
           </div>
         </div>
@@ -369,7 +369,7 @@ export function CaseLogsPage() {
         <div>
           <p className="page-eyebrow">Clinical case exposure</p>
           <h2 className="page-title mt-1">Cases presented</h2>
-          <p className="mt-2 max-w-2xl text-sm text-slate-500">
+          <p className="mt-2 max-w-2xl text-sm text-helper">
             Structured histories, examinations, investigations, management and learning reflections for every presented case.
           </p>
         </div>
@@ -388,7 +388,7 @@ export function CaseLogsPage() {
           </DialogTrigger>
           <DialogContent className="max-h-[90vh] overflow-y-auto rounded-2xl bg-white sm:max-w-3xl">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-xl"><FileText className="h-5 w-5 text-teal-600" /> {editLogStatus === "rejected" ? "Resubmit clinical case" : editLogId ? "Edit clinical case" : "New clinical case"}</DialogTitle>
+              <DialogTitle className="flex items-center gap-2 text-xl"><FileText className="h-5 w-5 text-forest" /> {editLogStatus === "rejected" ? "Resubmit clinical case" : editLogId ? "Edit clinical case" : "New clinical case"}</DialogTitle>
               <DialogDescription>{editLogStatus === "rejected" ? "Review the faculty feedback below, edit your case details, and resubmit for faculty review." : "Complete the clinical record before sending it to a faculty member."}</DialogDescription>
             </DialogHeader>
             <form data-tour="caselog-form" onSubmit={handleAddCase} className="space-y-5">
@@ -403,12 +403,12 @@ export function CaseLogsPage() {
                 resetKey={voiceResetKey}
               />
               {editLogStatus === "rejected" && (
-                <div className="rounded-xl border border-rose-200 bg-rose-50/90 p-3.5 text-xs text-rose-900">
-                  <div className="flex items-center gap-1.5 font-semibold text-rose-800">
-                    <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
+                <div className="rounded-xl border border-status-border bg-status p-3.5 text-xs text-status-foreground">
+                  <div className="flex items-center gap-1.5 font-semibold text-status-foreground">
+                    <AlertCircle className="h-4 w-4 shrink-0 text-status-foreground" />
                     <span>Faculty Feedback / Revision Reason:</span>
                   </div>
-                  <p className="mt-1.5 whitespace-pre-wrap rounded-lg bg-white/80 p-2.5 text-slate-800 border border-rose-100 font-medium leading-relaxed">
+                  <p className="mt-1.5 whitespace-pre-wrap rounded-lg bg-card p-2.5 text-ink border border-status-border font-medium leading-relaxed">
                     {editLogRemarks || "No specific feedback was provided. Please verify the case details and resubmit."}
                   </p>
                 </div>
@@ -503,7 +503,7 @@ export function CaseLogsPage() {
                 <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)} disabled={isSubmitting}>Save draft</Button>
                 <Button 
                   type="submit" 
-                  className={editLogStatus === "rejected" ? "bg-rose-600 hover:bg-rose-700 text-white" : ""}
+                  className={editLogStatus === "rejected" ? "bg-destructive hover:bg-deep text-white" : ""}
                   disabled={isSubmitting}
                 >
                   {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -526,8 +526,8 @@ export function CaseLogsPage() {
       {!microbiologyCaseFields && caseCategories && caseCategories.length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-slate-700">Progress by category</h3>
-            <span className="text-xs text-slate-500">
+            <h3 className="text-sm font-semibold text-ink">Progress by category</h3>
+            <span className="text-xs text-helper">
               {hasTarget ? `${caseLogs.filter(l => l.status !== "rejected").length} of ${totalRequired} total cases logged` : `${caseLogs.filter(l => l.status !== "rejected").length} cases logged`}
             </span>
           </div>
@@ -537,16 +537,16 @@ export function CaseLogsPage() {
               const pct = cat.required > 0 ? Math.min(Math.round((logged / cat.required) * 100), 100) : 0;
               const done = logged >= cat.required;
               return (
-                <div key={cat.value} className={`rounded-xl border p-4 ${done && hasTarget ? "border-emerald-200 bg-emerald-50/60" : "border-teal-100 bg-white"}`}>
+                <div key={cat.value} className={`rounded-xl border p-4 ${done && hasTarget ? "border-status-border bg-status" : "border-line-soft bg-white"}`}>
                   <div className="flex items-start justify-between gap-2">
-                    <p className="text-xs font-semibold leading-snug text-slate-700">{cat.name}</p>
-                    {done && hasTarget && <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />}
+                    <p className="text-xs font-semibold leading-snug text-ink">{cat.name}</p>
+                    {done && hasTarget && <CheckCircle2 className="h-4 w-4 shrink-0 text-status-foreground" />}
                   </div>
-                  <p className="mt-2 text-xl font-bold text-slate-900">{logged}{hasTarget && <span className="text-sm font-normal text-slate-400">/{cat.required}</span>}</p>
+                  <p className="mt-2 text-xl font-bold text-ink">{logged}{hasTarget && <span className="text-sm font-normal text-helper">/{cat.required}</span>}</p>
                   {hasTarget && (
-                    <div className="mt-2 h-1.5 w-full rounded-full bg-slate-100">
+                    <div className="mt-2 h-1.5 w-full rounded-full bg-sage">
                       <div
-                        className={`h-1.5 rounded-full transition-all ${done ? "bg-emerald-500" : "bg-teal-500"}`}
+                        className={`h-1.5 rounded-full transition-all ${done ? "bg-forest" : "bg-forest"}`}
                         style={{ width: `${pct}%` }}
                       />
                     </div>
@@ -557,7 +557,7 @@ export function CaseLogsPage() {
           </div>
           {caseCategories.length > 8 && (
             <div className="mt-1 flex justify-center">
-              <Button variant="ghost" size="sm" onClick={() => setShowAllCategories(!showAllCategories)} className="text-teal-700 hover:text-teal-800 hover:bg-teal-50/50">
+              <Button variant="ghost" size="sm" onClick={() => setShowAllCategories(!showAllCategories)} className="text-forest hover:text-forest hover:bg-mist">
                 {showAllCategories ? "Show less" : `Show all ${caseCategories.length} categories`}
               </Button>
             </div>
@@ -566,34 +566,34 @@ export function CaseLogsPage() {
       )}
 
       <Card data-tour="caselog-list">
-        <CardHeader className="flex flex-col justify-between gap-4 border-b border-teal-100 md:flex-row md:items-center">
+        <CardHeader className="flex flex-col justify-between gap-4 border-b border-line-soft md:flex-row md:items-center">
           <div className="relative w-full max-w-md">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-teal-600" />
+            <Search className="absolute left-3 top-3 h-4 w-4 text-forest" />
             <Input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="h-11 pl-9 pr-24" placeholder={microbiologyCaseFields ? "Search sample category, provisional diagnosis or lab processing..." : hideUhid ? "Search category or diagnosis..." : "Search patient, case ID, category or diagnosis..."} />
             <div className="pointer-events-none absolute right-3 top-2.5 flex items-center gap-1">
               <Kbd>Ctrl</Kbd>
-              <span className="text-[10px] text-slate-400">+</span>
+              <span className="text-[10px] text-helper">+</span>
               <Kbd>K</Kbd>
             </div>
           </div>
-          <Badge variant="outline" className="w-fit border-teal-100 bg-teal-50 px-3 py-1 text-teal-800">
+          <Badge variant="outline" className="w-fit border-line-soft bg-mist px-3 py-1 text-forest">
             {hasTarget ? `${caseLogs.length} of ${totalRequired} cases logged` : `${caseLogs.length} cases logged`}
           </Badge>
         </CardHeader>
         <CardContent className="p-0">
           {loading ? (
             <div className="flex h-48 flex-col items-center justify-center space-y-4">
-              <Loader2 className="h-8 w-8 animate-spin text-teal-600" />
-              <p className="text-sm font-medium text-slate-500">Loading cases...</p>
+              <Loader2 className="h-8 w-8 animate-spin text-forest" />
+              <p className="text-sm font-medium text-helper">Loading cases...</p>
             </div>
           ) : filteredLogs.length === 0 ? (
-            <div className="flex h-56 flex-col items-center justify-center space-y-4 text-slate-500">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-teal-50 text-teal-700">
+            <div className="flex h-56 flex-col items-center justify-center space-y-4 text-helper">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-mist text-forest">
                 <FileText className="h-6 w-6" />
               </div>
               <div className="space-y-1 text-center">
-                <p className="text-base font-semibold text-slate-950">No cases found</p>
-                <p className="max-w-sm text-sm leading-6 text-slate-500">{hideUhid ? "Try a different diagnosis or case number, or clear the search to see all records." : "Try a different case ID, diagnosis, or clear the search to see all records."}</p>
+                <p className="text-base font-semibold text-ink">No cases found</p>
+                <p className="max-w-sm text-sm leading-6 text-helper">{hideUhid ? "Try a different diagnosis or case number, or clear the search to see all records." : "Try a different case ID, diagnosis, or clear the search to see all records."}</p>
               </div>
             </div>
           ) : (
@@ -620,20 +620,20 @@ export function CaseLogsPage() {
                     <TableCell>{log.patientAge || log.age}</TableCell>
                     <TableCell>
                       {catName
-                        ? <Badge variant="outline" className="border-teal-100 bg-teal-50 text-teal-800">{catName}</Badge>
-                        : <span className="text-slate-400 text-xs">—</span>}
+                        ? <Badge variant="outline" className="border-line-soft bg-mist text-forest">{catName}</Badge>
+                        : <span className="text-helper text-xs">—</span>}
                     </TableCell>
-                    <TableCell><p className="max-w-sm font-semibold text-slate-900">{log.diagnosisProvisional || log.diagnosisFinal || log.diagnosis}</p></TableCell>
+                    <TableCell><p className="max-w-sm font-semibold text-ink">{log.diagnosisProvisional || log.diagnosisFinal || log.diagnosis}</p></TableCell>
                     <TableCell className="text-xs max-w-[160px]">
                       {log.status === "pending"
-                        ? <span className="text-slate-400">—</span>
+                        ? <span className="text-helper">—</span>
                         : log.status === "rejected"
-                          ? <span title={log.facultyRemarks || "No remark"} className={`block truncate cursor-help font-medium ${log.facultyRemarks ? "text-rose-700" : "text-slate-400"}`}>
+                          ? <span title={log.facultyRemarks || "No remark"} className={`block truncate cursor-help font-medium ${log.facultyRemarks ? "text-status-foreground" : "text-helper"}`}>
                               {log.facultyRemarks || "No remark"}
                             </span>
                           : log.facultyRemarks
-                            ? <span title={log.facultyRemarks} className="block truncate cursor-help text-slate-600">{log.facultyRemarks}</span>
-                            : <span className="text-slate-500">No remark</span>}
+                            ? <span title={log.facultyRemarks} className="block truncate cursor-help text-soft-ink">{log.facultyRemarks}</span>
+                            : <span className="text-helper">No remark</span>}
                     </TableCell>
                     <TableCell>{statusBadge(log.status)}</TableCell>
                     <TableCell className="text-right">
@@ -642,17 +642,17 @@ export function CaseLogsPage() {
                           <Button
                             size="sm"
                             variant="outline"
-                            className="border-rose-300 text-rose-700 bg-rose-50 hover:bg-rose-100 hover:text-rose-800 font-semibold text-xs gap-1.5 h-8 px-2.5"
+                            className="border-status-border text-status-foreground bg-status hover:bg-status hover:text-status-foreground font-semibold text-xs gap-1.5 h-8 px-2.5"
                             onClick={() => startEditCase(log)}
                           >
                             <RotateCcw className="h-3.5 w-3.5" /> Resubmit
                           </Button>
                         ) : log.status === "pending" ? (
                           <>
-                            <Button variant="ghost" size="sm" className="text-teal-600 hover:text-teal-800 hover:bg-teal-50" onClick={() => startEditCase(log)}>
+                            <Button variant="ghost" size="sm" className="text-forest hover:text-forest hover:bg-mist" onClick={() => startEditCase(log)}>
                               <Edit3 className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="sm" className="text-rose-500 hover:text-rose-700 hover:bg-rose-50" onClick={() => handleDeleteCaseLog(log.id)}>
+                            <Button variant="ghost" size="sm" className="text-status-foreground hover:text-status-foreground hover:bg-status" onClick={() => handleDeleteCaseLog(log.id)}>
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </>
@@ -712,15 +712,15 @@ export function CaseLogsPage() {
                   </>
                 )}
                 {selectedLog.status === "rejected" ? (
-                  <div className="rounded-2xl border border-rose-200 bg-rose-50/80 p-4 space-y-3">
+                  <div className="rounded-2xl border border-status-border bg-status p-4 space-y-3">
                     <div>
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-rose-700">Faculty remarks (revision requested)</p>
-                      <p className="mt-1 text-sm font-medium text-rose-950 whitespace-pre-wrap">{selectedLog.facultyRemarks || "No remark provided"}</p>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-status-foreground">Faculty remarks (revision requested)</p>
+                      <p className="mt-1 text-sm font-medium text-status-foreground whitespace-pre-wrap">{selectedLog.facultyRemarks || "No remark provided"}</p>
                     </div>
                     <div className="pt-1 flex justify-end">
                       <Button
                         size="sm"
-                        className="bg-rose-600 hover:bg-rose-700 text-white font-semibold gap-1.5"
+                        className="bg-destructive hover:bg-deep text-white font-semibold gap-1.5"
                         onClick={() => {
                           const logToEdit = selectedLog;
                           setSelectedLog(null);
@@ -732,9 +732,9 @@ export function CaseLogsPage() {
                     </div>
                   </div>
                 ) : selectedLog.status === "verified" ? (
-                  <div className="rounded-2xl border border-teal-100 bg-teal-50/70 p-4">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-teal-700">Faculty remarks</p>
-                    <p className="mt-1 text-sm text-teal-950">{selectedLog.facultyRemarks || "No remark"}</p>
+                  <div className="rounded-2xl border border-line-soft bg-mist p-4">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-forest">Faculty remarks</p>
+                    <p className="mt-1 text-sm text-forest">{selectedLog.facultyRemarks || "No remark"}</p>
                   </div>
                 ) : null}
               </div>
@@ -752,7 +752,7 @@ function Field({ label, children, isAiFilled }: { label: string; children: React
       <div className="flex items-center gap-1.5">
         <Label>{label}</Label>
         {isAiFilled && (
-          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-mist text-forest border border-line-soft">
             <Sparkles className="h-2.5 w-2.5" />
             <span>AI filled</span>
           </span>
@@ -764,11 +764,11 @@ function Field({ label, children, isAiFilled }: { label: string; children: React
 }
 
 function Detail({ label, value }: { label: string; value: string }) {
-  return <div><p className="text-[10px] font-bold uppercase tracking-wider text-teal-700">{label}</p><p className="mt-1 text-sm leading-6 text-slate-700">{value || "Not recorded"}</p></div>;
+  return <div><p className="text-[10px] font-bold uppercase tracking-wider text-forest">{label}</p><p className="mt-1 text-sm leading-6 text-ink">{value || "Not recorded"}</p></div>;
 }
 
 function statusBadge(status: CaseLog["status"]) {
-  if (status === "verified") return <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700"><CheckCircle2 className="mr-1 h-3 w-3" /> Verified</Badge>;
-  if (status === "rejected") return <Badge className="border-rose-200 bg-rose-50 text-rose-700"><AlertCircle className="mr-1 h-3 w-3" /> Rejected</Badge>;
-  return <Badge className="border-amber-200 bg-amber-50 text-amber-700"><Clock className="mr-1 h-3 w-3" /> Pending</Badge>;
+  if (status === "verified") return <Badge className="border-status-border bg-status text-status-foreground"><CheckCircle2 className="mr-1 h-3 w-3" /> Verified</Badge>;
+  if (status === "rejected") return <Badge className="border-status-border bg-status text-status-foreground"><AlertCircle className="mr-1 h-3 w-3" /> Rejected</Badge>;
+  return <Badge className="border-status-border bg-status text-status-foreground"><Clock className="mr-1 h-3 w-3" /> Pending</Badge>;
 }

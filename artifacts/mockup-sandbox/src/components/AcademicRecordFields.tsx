@@ -20,7 +20,7 @@ export function AcademicRecordFields({ section, values, onChange, disabled }: {
       const id = `${prefix}-${field.key}`;
       const change = (value: string) => onChange({ ...values, [field.key]: value });
       return <div key={field.key} className="space-y-2">
-        {showGroup && <h3 className="border-t border-slate-200 pt-4 text-sm font-semibold text-slate-900">{field.group}</h3>}
+        {showGroup && <h3 className="border-t border-line-soft pt-4 text-sm font-semibold text-ink">{field.group}</h3>}
         <Label htmlFor={id}>{field.label}{(field.required || field.requiredWhen) ? " *" : " (optional)"}</Label>
         {field.type === "select" ? (
           <Select value={values[field.key] || ""} onValueChange={change} disabled={disabled}>

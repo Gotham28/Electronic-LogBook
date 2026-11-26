@@ -77,7 +77,7 @@ const professors = [
 const pediatricsProfile: DemoDepartmentProfile = {
   id: 1,
   label: "Pediatrics",
-  accent: "#0f766e",
+  accent: "var(--gothos-forest)",
   data: {
     departmentCatalog: {
       department: { id: 1, name: "General Pediatrics", code: "peds" },
@@ -300,7 +300,7 @@ const radiologyProfile = createEmptyDepartmentProfile({
   label: "Radiology",
   name: "Radiology",
   code: "radiology",
-  accent: "#4338ca",
+  accent: "var(--gothos-forest)",
   enabledFeatures: { ...radiologyTemplate.features },
 });
 radiologyProfile.data.departmentCatalog.labels = {
@@ -326,7 +326,7 @@ const dermatologyProfile = createEmptyDepartmentProfile({
   label: "Dermatology",
   name: "Dermatology",
   code: "dermatology",
-  accent: "#9d174d",
+  accent: "var(--gothos-forest)",
   enabledFeatures: {
     medicalSummaryCaseFields: true,
     useCaseTypeLabel: true,
@@ -366,7 +366,7 @@ const microbiologyProfile = createEmptyDepartmentProfile({
   label: "Microbiology",
   name: "Microbiology",
   code: "microbiology",
-  accent: "#0d9488",
+  accent: "var(--gothos-forest)",
   enabledFeatures: {
     microbiologyCaseFields: true,
     freeTextProcedures: true,
@@ -413,7 +413,7 @@ const surgeryProfile = createEmptyDepartmentProfile({
   label: "Surgery",
   name: "Surgery",
   code: "SURG",
-  accent: "#0f766e",
+  accent: "var(--gothos-forest)",
   enabledFeatures: {
     procedureExperience: true,
     procedureClinicalDetails: true,

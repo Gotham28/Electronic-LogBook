@@ -329,7 +329,7 @@ export function ArogyaPanel({ open, onOpenChange, role, actorKey, workflowId, st
           type="button"
           data-tour="arogya-launcher"
           aria-label={open ? "Close Mochi assistant" : "Open Mochi assistant"}
-          className="print:hidden fixed bottom-[calc(76px+env(safe-area-inset-bottom))] right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full border-[3px] border-[#009689] bg-white shadow-[0_12px_24px_rgba(15,23,42,0.12)] transition-colors hover:bg-teal-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2 sm:bottom-6 sm:right-6"
+          className="print:hidden fixed bottom-[calc(76px+env(safe-area-inset-bottom))] right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full border-[3px] border-forest bg-white shadow-[0_12px_24px_color-mix(in_srgb,var(--gothos-forest)_12%,transparent)] transition-colors hover:bg-mist focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:bottom-6 sm:right-6"
         >
           <ArogyaCharacter state={characterState} size={44} closeUp />
         </button>
@@ -344,7 +344,7 @@ export function ArogyaPanel({ open, onOpenChange, role, actorKey, workflowId, st
         aria-describedby="arogya-panel-description"
         data-tour="arogya-panel"
         data-demo-assistant-state={characterState}
-        className="arogya-chat-surface flex h-[min(68dvh,38rem)] min-h-0 w-[min(26rem,calc(100vw-1.5rem),var(--radix-popover-content-available-width,100vw))] max-h-[calc(100dvh-1.5rem)] flex-col gap-0 overflow-hidden rounded-[1.5rem] border border-teal-900/10 bg-slate-50 p-0 text-slate-800 shadow-[0_24px_70px_rgba(15,23,42,0.22)]"
+        className="arogya-chat-surface flex h-[min(68dvh,38rem)] min-h-0 w-[min(26rem,calc(100vw-1.5rem),var(--radix-popover-content-available-width,100vw))] max-h-[calc(100dvh-1.5rem)] flex-col gap-0 overflow-hidden rounded-[1.5rem] border border-line-soft bg-white p-0 text-ink shadow-[0_24px_70px_color-mix(in_srgb,var(--gothos-forest)_22%,transparent)]"
       >
         <style>{`
           @keyframes arogya-expand {
@@ -364,14 +364,14 @@ export function ArogyaPanel({ open, onOpenChange, role, actorKey, workflowId, st
             .arogya-chat-surface[data-state] { animation: none; }
           }
         `}</style>
-        <header className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 py-3">
+        <header className="flex shrink-0 items-center justify-between border-b border-line-soft bg-white px-4 py-3">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-2xl border border-teal-100/80">
+            <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-2xl border border-line-soft">
               <img src={`${import.meta.env.BASE_URL}gothos-logo.png`} alt="Gothos Labs" width={66} height={57} className="absolute -top-1 left-1/2 h-auto w-[66px] max-w-none -translate-x-1/2" />
             </div>
             <div className="min-w-0">
-              <h2 id="arogya-panel-heading" className="font-display text-base font-bold leading-tight text-teal-950">Mochi</h2>
-              <p className="mt-0.5 text-xs font-medium text-slate-500">Your assistant</p>
+              <h2 id="arogya-panel-heading" className="font-display text-base font-bold leading-tight text-forest">Mochi</h2>
+              <p className="mt-0.5 text-xs font-medium text-helper">Your assistant</p>
             </div>
           </div>
           <Button
@@ -380,7 +380,7 @@ export function ArogyaPanel({ open, onOpenChange, role, actorKey, workflowId, st
             variant="ghost"
             aria-label="Close Mochi assistant"
             onClick={() => onOpenChange(false)}
-            className="h-11 w-11 shrink-0 rounded-full text-slate-500 hover:bg-white/80 hover:text-slate-800"
+            className="h-11 w-11 shrink-0 rounded-full text-helper hover:bg-card hover:text-ink"
           >
             <X className="h-4 w-4" aria-hidden="true" />
           </Button>
@@ -388,66 +388,66 @@ export function ArogyaPanel({ open, onOpenChange, role, actorKey, workflowId, st
         </header>
 
         <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-3">
-          {contextError && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-2 text-xs text-rose-800">{contextError}</p>}
+          {contextError && <p role="alert" className="rounded-lg border border-status-border bg-status p-2 text-xs text-status-foreground">{contextError}</p>}
           {maintenanceNotice && (
-            <section aria-label="ELogbook service notice" className="shrink-0 rounded-xl border border-slate-200 border-l-4 border-l-teal-700 bg-white/85 p-3 shadow-sm">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-teal-800">ELogbook service notice</p>
-              <h3 className="mt-1 text-sm font-semibold text-slate-900">{maintenanceNotice.title}</h3>
-              <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{maintenanceNotice.message}</p>
+            <section aria-label="ELogbook service notice" className="shrink-0 rounded-xl border border-line-soft border-l-4 border-l-forest bg-card p-3 shadow-sm">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-forest">ELogbook service notice</p>
+              <h3 className="mt-1 text-sm font-semibold text-ink">{maintenanceNotice.title}</h3>
+              <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-ink">{maintenanceNotice.message}</p>
             </section>
           )}
 
           <section aria-label="Sample prompts" className="shrink-0">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Try a prompt</p>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-helper">Try a prompt</p>
             <div className="flex flex-wrap gap-2">
               {role === "Student" && (
                 <>
-                  <Button type="button" variant="outline" size="sm" data-tour="arogya-coach" className="min-h-11 rounded-full border-teal-200/90 bg-white/80 px-3 text-xs text-teal-900 shadow-sm hover:bg-teal-50" onClick={handleProgressCoach}>
+                  <Button type="button" variant="outline" size="sm" data-tour="arogya-coach" className="min-h-11 rounded-full bg-card px-3 text-xs text-forest shadow-sm hover:bg-mist" onClick={handleProgressCoach}>
                     My progress coach
                   </Button>
-                  <Button type="button" variant="outline" size="sm" data-tour="arogya-due" className="min-h-11 rounded-full border-teal-200/90 bg-white/80 px-3 text-xs text-teal-900 shadow-sm hover:bg-teal-50" onClick={handleWhatsDue}>
+                  <Button type="button" variant="outline" size="sm" data-tour="arogya-due" className="min-h-11 rounded-full bg-card px-3 text-xs text-forest shadow-sm hover:bg-mist" onClick={handleWhatsDue}>
                     What's due?
                   </Button>
                 </>
               )}
               {role === "Faculty" && (
-                <Button type="button" variant="outline" size="sm" className="min-h-11 rounded-full border-teal-200/90 bg-white/80 px-3 text-xs text-teal-900 shadow-sm hover:bg-teal-50" onClick={handlePendingReviews}>
+                <Button type="button" variant="outline" size="sm" className="min-h-11 rounded-full bg-card px-3 text-xs text-forest shadow-sm hover:bg-mist" onClick={handlePendingReviews}>
                   My pending reviews
                 </Button>
               )}
               {role === "HOD" && (
                 <>
-                  <Button type="button" variant="outline" size="sm" data-tour="arogya-report" className="min-h-11 rounded-full border-teal-200/90 bg-white/80 px-3 text-xs text-teal-900 shadow-sm hover:bg-teal-50" onClick={() => handleDepartmentReport("report")}>
+                  <Button type="button" variant="outline" size="sm" data-tour="arogya-report" className="min-h-11 rounded-full bg-card px-3 text-xs text-forest shadow-sm hover:bg-mist" onClick={() => handleDepartmentReport("report")}>
                     Department report
                   </Button>
-                  <Button type="button" variant="outline" size="sm" data-tour="arogya-falling-behind" className="min-h-11 rounded-full border-teal-200/90 bg-white/80 px-3 text-xs text-teal-900 shadow-sm hover:bg-teal-50" onClick={() => handleDepartmentReport("falling_behind")}>
+                  <Button type="button" variant="outline" size="sm" data-tour="arogya-falling-behind" className="min-h-11 rounded-full bg-card px-3 text-xs text-forest shadow-sm hover:bg-mist" onClick={() => handleDepartmentReport("falling_behind")}>
                     Who's falling behind?
                   </Button>
                 </>
               )}
             </div>
             {assistantContext?.mode === "v2" && role !== "Student" && <div className="mt-2 space-y-1">
-              <label htmlFor="arogya-resident-context" className="text-xs font-medium text-slate-600">Resident for record checks</label>
+              <label htmlFor="arogya-resident-context" className="text-xs font-medium text-soft-ink">Resident for record checks</label>
               <select id="arogya-resident-context" value={selectedResidentId} onChange={(event) => {
                 const value = event.target.value;
                 requestSequence.current++;
                 setCharacterState("idle");
                 setSelectedResidentId(value);
                 setSelectedContext((current) => ({ ...current, studentId: value ? Number(value) : undefined }));
-              }} className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600">
+              }} className="h-10 w-full rounded-lg border border-input bg-white px-3 text-sm text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                 <option value="">Select a resident to check a record</option>
                 {residentOptions.map((student) => <option key={student.id} value={student.id}>{student.name}{student.registrationNumber ? ` · ${student.registrationNumber}` : ""}</option>)}
               </select>
-              {residentsError && <p role="status" className="text-[11px] text-slate-500">{residentsError}</p>}
+              {residentsError && <p role="status" className="text-[11px] text-helper">{residentsError}</p>}
             </div>}
           </section>
 
           <div role="log" aria-label="Mochi conversation" aria-live="polite" data-tour="arogya-messages" className="flex min-h-0 flex-1 flex-col gap-3">
             {messages.length === 0 ? (
-              <div className="my-auto flex min-h-32 flex-col items-center justify-center rounded-2xl border border-white/80 bg-white/55 px-5 py-5 text-center shadow-sm">
+              <div className="my-auto flex min-h-32 flex-col items-center justify-center rounded-2xl border border-card-edge bg-card px-5 py-5 text-center shadow-sm">
                 <ArogyaCharacter state={characterState} size={54} />
-                <p className="mt-2 text-sm font-semibold text-slate-800">What can I help with?</p>
-                <p className="mt-1 max-w-[18rem] text-xs leading-relaxed text-slate-500">Choose a sample prompt above or write your own below.</p>
+                <p className="mt-2 text-sm font-semibold text-ink">What can I help with?</p>
+                <p className="mt-1 max-w-[18rem] text-xs leading-relaxed text-helper">Choose a sample prompt above or write your own below.</p>
               </div>
             ) : messages.map((msg, idx) => (
               <div key={idx} className={`flex gap-2.5 ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
@@ -456,24 +456,24 @@ export function ArogyaPanel({ open, onOpenChange, role, actorKey, workflowId, st
                     <ArogyaCharacter state={idx === messages.length - 1 ? characterState : "idle"} size={28} />
                   </div>
                 )}
-                <div className={`max-w-[88%] rounded-2xl border px-3.5 py-3 text-sm shadow-sm ${msg.role === "user" ? "rounded-tr-md border-teal-200/80 bg-teal-50/90 text-right text-teal-950" : "rounded-tl-md border-white/90 bg-white/85 text-left text-slate-700"}`}>
+                <div className={`max-w-[88%] rounded-2xl border px-3.5 py-3 text-sm shadow-sm ${msg.role === "user" ? "rounded-tr-md border-forest bg-forest text-right text-white" : "rounded-tl-md border-line-soft bg-mist text-left text-ink"}`}>
                   {msg.answer ? (
                     <AssistantAnswer answer={msg.answer} edit={editHandlers}
                       question={idx > 0 && messages[idx - 1].role === "user" ? messages[idx - 1].text ?? "" : ""}
                       onNavigate={(href) => { onNavigate(href); onOpenChange(false); }} />
                   ) : msg.links !== undefined ? (
                     <div className="flex flex-col gap-2">
-                      <p className="mb-1 font-semibold text-teal-950">{msg.heading}</p>
+                      <p className="mb-1 font-semibold text-forest">{msg.heading}</p>
                       {/* Empty state wording MUST be exactly "No new notifications right now." — bell fetch errors are silent */}
                       {msg.links.length === 0 ? (
-                        <p className="text-slate-500">No new notifications right now.</p>
+                        <p className="text-helper">No new notifications right now.</p>
                       ) : (
                         msg.links.map((item) => (
                           <button
                             type="button"
                             key={item.id}
                             onClick={() => { onNavigate(item.href); onOpenChange(false); }}
-                            className="w-full rounded-lg border border-slate-100 bg-slate-50 p-2 text-left text-xs font-medium transition-colors hover:bg-teal-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600"
+                            className="w-full rounded-lg border border-line-soft bg-mist p-2 text-left text-xs font-medium transition-colors hover:bg-mist focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                           >
                             {item.text}
                           </button>
@@ -491,16 +491,16 @@ export function ArogyaPanel({ open, onOpenChange, role, actorKey, workflowId, st
                           </li>
                         ))}
                       </ol>
-                      {isDemoMode() && <p className="mt-2 text-[10px] text-slate-400 font-medium">Sample AI output</p>}
+                      {isDemoMode() && <p className="mt-2 text-[10px] text-helper font-medium">Sample AI output</p>}
                     </>
                   ) : (
                     <>
-                      <p className={`whitespace-pre-wrap font-medium ${msg.error ? "text-red-700" : "text-slate-800"}`}>
+                      <p className={`whitespace-pre-wrap font-medium ${msg.error ? "text-status-foreground" : "text-ink"}`}>
                         {isDemoMode() && !msg.error && msg.role === "arogya" && msg.text ? (
                           <DemoTypedText text={msg.text} onDone={idx === messages.length - 1 ? handleRevealDone : undefined} />
                         ) : msg.text}
                       </p>
-                      {isDemoMode() && !msg.error && msg.role === "arogya" && <p className="mt-2 text-[10px] text-slate-400 font-medium">Sample AI output</p>}
+                      {isDemoMode() && !msg.error && msg.role === "arogya" && <p className="mt-2 text-[10px] text-helper font-medium">Sample AI output</p>}
                     </>
                   )}
                 </div>
@@ -509,15 +509,15 @@ export function ArogyaPanel({ open, onOpenChange, role, actorKey, workflowId, st
           </div>
         </div>
 
-        <footer className="shrink-0 border-t border-slate-200 bg-white px-4 pb-3 pt-3.5">
+        <footer className="shrink-0 border-t border-line-soft bg-white px-4 pb-3 pt-3.5">
           {messages.length > 0 && <div className="mb-2 flex justify-end"><button type="button" onClick={() => {
             requestSequence.current++;
             setMessages([]);
             setQuestion("");
             setCharacterState("idle");
-          }} className="text-xs font-medium text-slate-500 underline decoration-slate-300 underline-offset-2 hover:text-slate-800">Clear conversation</button></div>}
+          }} className="text-xs font-medium text-helper underline decoration-input underline-offset-2 hover:text-ink">Clear conversation</button></div>}
           <form onSubmit={handleAsk} className="flex flex-col gap-1.5">
-            <label htmlFor="arogya-ask-input" className="text-xs font-semibold text-slate-700">Ask Mochi</label>
+            <label htmlFor="arogya-ask-input" className="text-xs font-semibold text-ink">Ask Mochi</label>
             <div className="relative">
               <Input
                 id="arogya-ask-input"
@@ -526,19 +526,19 @@ export function ArogyaPanel({ open, onOpenChange, role, actorKey, workflowId, st
                 onChange={(e) => setQuestion(e.target.value)}
                 disabled={characterState === "thinking" || assistantContext === null}
                 placeholder="Write a prompt..."
-                className="h-12 rounded-2xl border-slate-200 bg-slate-50 pr-14 text-sm focus-visible:ring-teal-600"
+                className="h-12 rounded-2xl border-input bg-mist pr-14 text-sm focus-visible:ring-ring"
               />
               <Button
                 type="submit"
                 aria-label="Send prompt to Mochi"
                 disabled={characterState === "thinking" || !question.trim() || assistantContext === null}
                 size="icon"
-                className="absolute right-0.5 top-0.5 h-11 w-11 rounded-lg bg-teal-700 text-white shadow-sm hover:bg-teal-800"
+                className="absolute right-0.5 top-0.5 h-11 w-11 rounded-lg bg-deep text-white shadow-sm hover:bg-deep"
               >
                 <SendHorizontal className="h-4 w-4" aria-hidden="true" />
               </Button>
             </div>
-            <p className="mt-1 text-center text-xs text-slate-500">Powered by Gothos Labs</p>
+            <p className="mt-1 text-center text-xs text-helper">Powered by Gothos Labs</p>
           </form>
         </footer>
       </PopoverContent>

@@ -121,10 +121,10 @@ export function ConferencesPage() {
   return (
     <div className="space-y-6 pb-12">
       {error && (
-        <div className="flex flex-col items-center justify-center p-8 text-center border rounded-2xl bg-rose-50 border-rose-100">
-          <p className="text-rose-700 mb-4">{error}</p>
+        <div className="flex flex-col items-center justify-center p-8 text-center border rounded-2xl bg-status border-status-border">
+          <p className="text-status-foreground mb-4">{error}</p>
           <div className="flex flex-wrap items-center justify-center gap-2">
-            <Button onClick={fetchLogs} variant="outline" className="border-rose-200 text-rose-700">Try Again</Button>
+            <Button onClick={fetchLogs} variant="outline" className="border-status-border text-status-foreground">Try Again</Button>
             <Button type="button" variant="outline" size="sm" onClick={openArogya}>Ask Mochi about this</Button>
           </div>
         </div>
@@ -133,7 +133,7 @@ export function ConferencesPage() {
         <div>
           <p className="page-eyebrow">Professional Development</p>
           <h2 className="page-title mt-1">Attended Conferences</h2>
-          <p className="mt-2 text-sm text-slate-500">Log conferences you have attended or presented at.</p>
+          <p className="mt-2 text-sm text-helper">Log conferences you have attended or presented at.</p>
         </div>
         <Dialog open={open} onOpenChange={(val) => { 
           setOpen(val); 
@@ -293,12 +293,12 @@ export function ConferencesPage() {
       </div>
 
       <Card>
-        <CardHeader className="border-b border-teal-100"><CardTitle className="flex items-center gap-2 text-lg"><Presentation className="h-5 w-5 text-teal-600" /> Conference record</CardTitle></CardHeader>
+        <CardHeader className="border-b border-line-soft"><CardTitle className="flex items-center gap-2 text-lg"><Presentation className="h-5 w-5 text-forest" /> Conference record</CardTitle></CardHeader>
         <CardContent className="p-0">
           {loading ? (
             <div className="flex h-48 flex-col items-center justify-center space-y-4">
-              <Loader2 className="h-8 w-8 animate-spin text-teal-600" />
-              <p className="text-sm font-medium text-slate-500">Loading conference logs...</p>
+              <Loader2 className="h-8 w-8 animate-spin text-forest" />
+              <p className="text-sm font-medium text-helper">Loading conference logs...</p>
             </div>
           ) : logs.length === 0 ? (
             <Empty className="py-14">
@@ -322,20 +322,20 @@ export function ConferencesPage() {
                     <TableCell className="uppercase text-xs font-semibold">{log.conferenceType === "cme" ? "CME" : "Conference"}</TableCell>
                     <TableCell className="max-w-sm font-semibold">{log.conferenceName}</TableCell>
                     <TableCell>{log.level ? <span className="capitalize">{conferenceLevels?.find((l: any) => l.value === log.level)?.name || log.level}</span> : "—"}</TableCell>
-                    <TableCell><Badge variant="outline" className="border-teal-100 bg-teal-50 text-teal-800 capitalize">{log.role}</Badge></TableCell>
+                    <TableCell><Badge variant="outline" className="border-line-soft bg-mist text-forest capitalize">{log.role}</Badge></TableCell>
                     {!config?.enabledFeatures?.hideConferenceLocation && <TableCell>{log.location ? <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{log.location}</span> : "—"}</TableCell>}
                     <TableCell>{log.faculty}</TableCell>
                     <TableCell className="text-xs max-w-[160px]">
                       {log.status === "pending"
-                        ? <span className="text-slate-400">—</span>
+                        ? <span className="text-helper">—</span>
                         : log.facultyRemarks
-                          ? <span title={log.facultyRemarks} className="block truncate cursor-help text-slate-600">{log.facultyRemarks}</span>
-                          : <span className="text-slate-500">No remark</span>}
+                          ? <span title={log.facultyRemarks} className="block truncate cursor-help text-soft-ink">{log.facultyRemarks}</span>
+                          : <span className="text-helper">No remark</span>}
                     </TableCell>
-                    <TableCell>{log.status === "verified" ? <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700"><CheckCircle2 className="mr-1 h-3 w-3" /> Verified</Badge> : log.status === "rejected" ? <Badge className="border-rose-200 bg-rose-50 text-rose-700"><CheckCircle2 className="mr-1 h-3 w-3" /> Rejected</Badge> : <Badge className="border-amber-200 bg-amber-50 text-amber-700"><Clock className="mr-1 h-3 w-3" /> Pending</Badge>}</TableCell>
+                    <TableCell>{log.status === "verified" ? <Badge className="border-status-border bg-status text-status-foreground"><CheckCircle2 className="mr-1 h-3 w-3" /> Verified</Badge> : log.status === "rejected" ? <Badge className="border-status-border bg-status text-status-foreground"><CheckCircle2 className="mr-1 h-3 w-3" /> Rejected</Badge> : <Badge className="border-status-border bg-status text-status-foreground"><Clock className="mr-1 h-3 w-3" /> Pending</Badge>}</TableCell>
                     <TableCell className="text-right">
                       {log.status === "pending" && (
-                        <Button variant="ghost" size="sm" className="text-teal-600 hover:text-teal-800 hover:bg-teal-50" onClick={() => {
+                        <Button variant="ghost" size="sm" className="text-forest hover:text-forest hover:bg-mist" onClick={() => {
                           setEditLogId(log.id);
                           if (log.date?.includes(" to ")) {
                             const [f, t] = log.date.split(" to ");
@@ -375,5 +375,5 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 function Summary({ label, value }: { label: string; value: number }) {
-  return <Card><CardContent className="p-3 sm:p-5"><p className="text-2xl font-bold text-teal-700 sm:text-3xl">{value}</p><p className="mt-1 text-[11px] font-bold uppercase leading-tight tracking-wide text-slate-500 sm:leading-[inherit] sm:tracking-wider">{label}</p></CardContent></Card>;
+  return <Card><CardContent className="p-3 sm:p-5"><p className="text-2xl font-bold text-forest sm:text-3xl">{value}</p><p className="mt-1 text-[11px] font-bold uppercase leading-tight tracking-wide text-helper sm:leading-[inherit] sm:tracking-wider">{label}</p></CardContent></Card>;
 }

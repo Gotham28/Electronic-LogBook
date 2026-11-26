@@ -96,43 +96,43 @@ export function CertificationsPage() {
   }
   return <div className="space-y-6 pb-12">
     <div><p className="page-eyebrow">Training</p><h2 className="page-title mt-1">Certifications</h2>
-      <p className="mt-2 text-sm text-slate-500">Record your completed training and certifications.</p></div>
-    {error && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-rose-700">{error} <Button variant="outline" onClick={load}>Try again</Button></div>}
+      <p className="mt-2 text-sm text-helper">Record your completed training and certifications.</p></div>
+    {error && <div role="alert" className="rounded-xl border border-status-border bg-status p-4 text-status-foreground">{error} <Button variant="outline" onClick={load}>Try again</Button></div>}
     {loading ? <p role="status">Loading certifications…</p> : !error && <>
-      <Card className="border-white/70 bg-white/80">
+      <Card className="border-card-edge bg-card">
         <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-4">
-          <CardTitle className="flex items-center gap-2 text-lg"><Award className="h-5 w-5 text-teal-600" /> Certifications</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-lg"><Award className="h-5 w-5 text-forest" /> Certifications</CardTitle>
           <Button size="sm" onClick={() => { setCertificate(emptyCertificate); setCertificateOpen(true); }}><PlusCircle className="h-4 w-4" /> Add certificate</Button>
         </CardHeader>
         <CardContent>
-          {!certificates.length ? <p className="text-sm text-slate-500">No certificates recorded yet.</p> : <Table>
+          {!certificates.length ? <p className="text-sm text-helper">No certificates recorded yet.</p> : <Table>
             <TableHeader><TableRow>{["Certificate", "Issuing body", "Date issued", "Expiry", "Status", ""].map((label) => <TableHead key={label}>{label}</TableHead>)}</TableRow></TableHeader>
             <TableBody>{certificates.map((item) => <TableRow key={item.id}>
               <TableCell className="font-semibold">{item.title}
                 <div className="mt-0.5 text-xs font-normal">
                   {item.certificateFileType
-                    ? <button type="button" className="text-teal-600 hover:underline" onClick={() => viewFile(item.id)}>View certificate ↗</button>
+                    ? <button type="button" className="text-forest hover:underline" onClick={() => viewFile(item.id)}>View certificate ↗</button>
                     : item.certificateUrl
-                      ? <a href={item.certificateUrl} target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline">View certificate ↗</a>
-                      : <span className="text-slate-500">No file attached</span>}
+                      ? <a href={item.certificateUrl} target="_blank" rel="noopener noreferrer" className="text-forest hover:underline">View certificate ↗</a>
+                      : <span className="text-helper">No file attached</span>}
                 </div>
               </TableCell><TableCell>{item.provider || "Not recorded"}</TableCell>
               <TableCell>{formatLogbookDate(item.issueDate)}</TableCell><TableCell>{formatLogbookDate(item.expiryDate)}</TableCell>
               <TableCell>
                 <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                  (item as any).status === "verified" ? "bg-emerald-100 text-emerald-700" :
-                  (item as any).status === "rejected" ? "bg-rose-100 text-rose-700" :
-                  "bg-amber-100 text-amber-700"
+                  (item as any).status === "verified" ? "bg-status text-status-foreground" :
+                  (item as any).status === "rejected" ? "bg-status text-status-foreground" :
+                  "bg-status text-status-foreground"
                 }`}>
                   {(item as any).status === "verified" ? "Verified" : (item as any).status === "rejected" ? "Rejected" : "Pending review"}
                 </span>
                 {(item as any).facultyRemarks && (
-                  <p className="mt-0.5 text-[10px] text-slate-500 italic">{(item as any).facultyRemarks}</p>
+                  <p className="mt-0.5 text-[10px] text-helper italic">{(item as any).facultyRemarks}</p>
                 )}
               </TableCell>
               <TableCell className="text-right">
                 {(item as any).status === "pending" && (
-                  <Button variant="ghost" size="sm" className="text-teal-600 hover:text-teal-800 hover:bg-teal-50" onClick={() => {
+                  <Button variant="ghost" size="sm" className="text-forest hover:text-forest hover:bg-mist" onClick={() => {
                     setEditId(item.id);
                     setMode(!item.certificateFileType && item.certificateUrl ? "link" : "file");
                     setCertificate({ title: item.title, provider: item.provider || "", issueDate: item.issueDate.split('T')[0], expiryDate: item.expiryDate.split('T')[0], certificateUrl: item.certificateUrl || "" });
@@ -158,14 +158,14 @@ export function CertificationsPage() {
             <Button type="button" size="sm" variant={mode === "file" ? "default" : "outline"} onClick={() => setMode("file")}>Upload file</Button>
             <Button type="button" size="sm" variant={mode === "link" ? "default" : "outline"} disabled={storedFileOnEdit} onClick={() => setMode("link")}>Paste link</Button>
           </div>
-          {storedFileOnEdit && <p className="text-xs text-slate-600">This certificate already has a stored file, so the stored file is what will be shown. Pasting a link is not available. Choose a new file below to replace it.</p>}
+          {storedFileOnEdit && <p className="text-xs text-soft-ink">This certificate already has a stored file, so the stored file is what will be shown. Pasting a link is not available. Choose a new file below to replace it.</p>}
           {mode === "link"
             ? <Field label="Certificate URL (HTTPS)"><Input required maxLength={2000} type="url" value={certificate.certificateUrl} onChange={(e) => setCertificate({ ...certificate, certificateUrl: e.target.value })} /></Field>
             : <><Field label="Certificate file (JPG, PNG, WebP or PDF)"><Input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" onChange={(e) => void chooseFile(e.target.files?.[0])} /></Field>
-              <p className="text-xs text-slate-500">Images are compressed before upload and may be up to 5 MB. PDFs may be up to 2 MB.</p></>}
-          {mode === "file" && preparing && <p role="status" className="text-xs text-slate-600">Preparing file…</p>}
-          {mode === "file" && file && !preparing && <p className="text-xs text-slate-600">{file.name} — {(file.size / 1024).toFixed(0)} KB{file.blob.type === "application/pdf" ? "" : " after compression"}</p>}
-          {fileError && <p role="alert" className="text-sm text-rose-700">{fileError}</p>}
+              <p className="text-xs text-helper">Images are compressed before upload and may be up to 5 MB. PDFs may be up to 2 MB.</p></>}
+          {mode === "file" && preparing && <p role="status" className="text-xs text-soft-ink">Preparing file…</p>}
+          {mode === "file" && file && !preparing && <p className="text-xs text-soft-ink">{file.name} — {(file.size / 1024).toFixed(0)} KB{file.blob.type === "application/pdf" ? "" : " after compression"}</p>}
+          {fileError && <p role="alert" className="text-sm text-status-foreground">{fileError}</p>}
           <DialogFooter><Button type="button" variant="outline" disabled={busy} onClick={() => setCertificateOpen(false)}>Cancel</Button><Button disabled={busy || preparing}>{busy ? "Saving…" : preparing ? "Preparing file…" : "Save certificate"}</Button></DialogFooter>
         </form>
       </DialogContent>

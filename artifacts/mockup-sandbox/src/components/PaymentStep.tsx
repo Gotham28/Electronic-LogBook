@@ -169,7 +169,7 @@ export function PaymentStep({
     <div className="medical-grid flex min-h-screen items-center justify-center p-4 md:p-8">
       <Card className="w-full max-w-md motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-4 motion-safe:duration-500 motion-reduce:animate-none">
         <CardHeader>
-          <div className="flex items-center gap-2 text-teal-800">
+          <div className="flex items-center gap-2 text-forest">
             <CreditCard className="h-5 w-5" />
             <span className="text-xs font-bold uppercase tracking-wider">Registration payment</span>
           </div>
@@ -181,24 +181,24 @@ export function PaymentStep({
         </CardHeader>
         <CardContent className="space-y-4">
           {uncertainPaymentMessage && (
-            <div role="alert" className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+            <div role="alert" className="rounded-md border border-status-border bg-status p-3 text-sm text-status-foreground">
               {uncertainPaymentMessage}
             </div>
           )}
           {scriptError && (
-            <div role="alert" className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            <div role="alert" className="rounded-md border border-status-border bg-status p-3 text-sm text-status-foreground">
               {scriptError}
             </div>
           )}
           {errorMessage && !uncertainPaymentMessage && (
-            <div role="alert" className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            <div role="alert" className="rounded-md border border-status-border bg-status p-3 text-sm text-status-foreground">
               {errorMessage}
             </div>
           )}
           {formattedAmount && (
-            <div className="rounded-xl border border-teal-100 bg-white/80 p-4">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-teal-700">Amount due</p>
-              <p className="mt-1 text-2xl font-bold text-slate-900">{formattedAmount}</p>
+            <div className="rounded-xl border border-line-soft bg-card p-4">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-forest">Amount due</p>
+              <p className="mt-1 text-2xl font-bold text-ink">{formattedAmount}</p>
             </div>
           )}
           {!uncertainPaymentMessage && (
@@ -220,7 +220,7 @@ export function PaymentStep({
             type="button"
             onClick={onExit}
             disabled={busy}
-            className="flex w-full items-center justify-center gap-2 text-xs font-medium text-teal-700 hover:underline disabled:opacity-50"
+            className="flex w-full items-center justify-center gap-2 text-xs font-medium text-forest hover:underline disabled:opacity-50"
           >
             <ArrowLeft className="h-3 w-3" /> Back to sign in
           </button>

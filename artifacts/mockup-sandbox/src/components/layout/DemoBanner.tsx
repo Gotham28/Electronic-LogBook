@@ -94,9 +94,9 @@ export function DemoBanner() {
       aria-label="Demo environment"
       className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2 transition-colors duration-200 sm:justify-between"
       style={{
-        borderColor: "color-mix(in srgb, var(--demo-accent) 22%, white)",
-        backgroundColor: "color-mix(in srgb, var(--demo-accent) 7%, white)",
-        color: "var(--demo-accent-readable)",
+        borderColor: "var(--gothos-line-soft)",
+        backgroundColor: "var(--gothos-mist)",
+        color: "var(--demo-accent)",
       }}
     >
       <p className="w-full min-w-0 text-xs font-medium leading-5 sm:w-auto sm:flex-1">
@@ -110,7 +110,7 @@ export function DemoBanner() {
           aria-label="Demo role"
           value={role}
           onChange={changeRole}
-          className="h-11 max-w-full rounded-lg border border-white/80 bg-white px-2.5 text-xs font-semibold text-slate-800 shadow-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-offset-1 sm:max-w-[13rem]"
+          className="h-11 max-w-full rounded-lg border border-input bg-white px-2.5 text-xs font-semibold text-ink shadow-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-offset-1 sm:max-w-[13rem]"
           style={{ "--tw-ring-color": "var(--demo-accent)" } as React.CSSProperties}
         >
           <option value="student">Resident</option>
@@ -125,7 +125,7 @@ export function DemoBanner() {
           aria-label="Demo department"
           value={String(getActiveDemoDepartmentId())}
           onChange={changeDepartment}
-          className="h-11 max-w-full rounded-lg border border-white/80 bg-white px-2.5 text-xs font-semibold text-slate-800 shadow-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-offset-1 sm:max-w-[13rem]"
+          className="h-11 max-w-full rounded-lg border border-input bg-white px-2.5 text-xs font-semibold text-ink shadow-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-offset-1 sm:max-w-[13rem]"
           style={{ "--tw-ring-color": "var(--demo-accent)" } as React.CSSProperties}
         >
           {demoDepartmentOptions.map((option) => (
@@ -141,8 +141,8 @@ export function DemoBanner() {
         variant="outline"
         size="sm"
         onClick={startGuidedDemo}
-        className="h-11 shrink-0 gap-1.5 border-white/80 bg-white/80 px-2.5 text-xs transition-colors hover:bg-white"
-        style={{ color: "var(--demo-accent-readable)" }}
+        className="h-11 shrink-0 gap-1.5 border-card-edge bg-card px-2.5 text-xs transition-colors hover:bg-white"
+        style={{ color: "var(--demo-accent)" }}
       >
         <Play aria-hidden="true" className="h-3.5 w-3.5" />
         Start guided demo
@@ -153,8 +153,8 @@ export function DemoBanner() {
         variant="outline"
         size="sm"
         onClick={resetDemo}
-        className="h-11 shrink-0 gap-1.5 border-white/80 bg-white/80 px-2.5 text-xs transition-colors hover:bg-white"
-        style={{ color: "var(--demo-accent-readable)" }}
+        className="h-11 shrink-0 gap-1.5 border-card-edge bg-card px-2.5 text-xs transition-colors hover:bg-white"
+        style={{ color: "var(--demo-accent)" }}
       >
         <RotateCcw aria-hidden="true" className="h-3.5 w-3.5" />
         Reset demo
@@ -171,8 +171,8 @@ export function DemoBanner() {
           setSoundMuted(!soundMuted);
           if (soundMuted) playDemoSound("click");
         }}
-        className="h-11 shrink-0 gap-1.5 border-white/80 bg-white/80 px-2.5 text-xs transition-colors hover:bg-white"
-        style={{ color: "var(--demo-accent-readable)" }}
+        className="h-11 shrink-0 gap-1.5 border-card-edge bg-card px-2.5 text-xs transition-colors hover:bg-white"
+        style={{ color: "var(--demo-accent)" }}
       >
         {soundMuted ? <VolumeX aria-hidden="true" className="h-3.5 w-3.5" /> : <Volume2 aria-hidden="true" className="h-3.5 w-3.5" />}
         <span className="hidden sm:inline">{soundMuted ? "Sound off" : "Sound on"}</span>

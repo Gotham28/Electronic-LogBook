@@ -67,23 +67,23 @@ function ResidentPreview({ features }: { features: Record<string, boolean> }) {
   return (
     <div className="space-y-5">
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Resident workspace</p>
-        <h3 className="mt-1 text-xl font-semibold text-slate-950">Navigation and forms</h3>
-        <p className="mt-1 text-sm text-slate-600">This preview reflects the active demo profile as you change its features.</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-helper">Resident workspace</p>
+        <h3 className="mt-1 text-xl font-semibold text-ink">Navigation and forms</h3>
+        <p className="mt-1 text-sm text-soft-ink">This preview reflects the active demo profile as you change its features.</p>
       </div>
       <div>
-        <p className="mb-2 text-sm font-medium text-slate-700">Navigation</p>
+        <p className="mb-2 text-sm font-medium text-ink">Navigation</p>
         <div className="flex flex-wrap gap-2">
           {navigation.map((item) => (
-            <span key={item} className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700">{item}</span>
+            <span key={item} className="rounded-full border border-line-soft bg-white px-3 py-1.5 text-sm text-ink">{item}</span>
           ))}
         </div>
       </div>
       <div className="grid gap-2 sm:grid-cols-2">
         {details.map(([label, value]) => (
-          <div key={label} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
-            <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">{label}</p>
-            <p className="mt-0.5 text-sm font-semibold text-slate-800">{value}</p>
+          <div key={label} className="rounded-xl border border-line-soft bg-white px-3 py-2.5">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-helper">{label}</p>
+            <p className="mt-0.5 text-sm font-semibold text-ink">{value}</p>
           </div>
         ))}
       </div>
@@ -115,15 +115,15 @@ export function DemoDepartmentCustomizer() {
   };
 
   const optionsPanel = (
-    <Card className="border-slate-200 shadow-sm">
-      <CardHeader className="border-b border-slate-100 pb-4">
-        <CardTitle className="flex items-center gap-2 text-base"><SlidersHorizontal className="h-4 w-4 text-teal-700" /> Department features</CardTitle>
-        <p className="text-sm text-slate-600">Switches update this demo profile in memory.</p>
+    <Card className="border-line-soft shadow-sm">
+      <CardHeader className="border-b border-line-soft pb-4">
+        <CardTitle className="flex items-center gap-2 text-base"><SlidersHorizontal className="h-4 w-4 text-forest" /> Department features</CardTitle>
+        <p className="text-sm text-soft-ink">Switches update this demo profile in memory.</p>
       </CardHeader>
-      <CardContent className="divide-y divide-slate-100 p-0">
+      <CardContent className="divide-y divide-line-soft p-0">
         {featureOptions.map(({ key, label }) => (
           <label key={key} className="flex min-h-14 items-center justify-between gap-4 px-4 py-3 sm:px-5">
-            <span className="text-sm font-medium text-slate-800">{label}</span>
+            <span className="text-sm font-medium text-ink">{label}</span>
             <Switch checked={Boolean(features[key])} onCheckedChange={(checked) => updateFeature(key, checked)} aria-label={label} />
           </label>
         ))}
@@ -135,9 +135,9 @@ export function DemoDepartmentCustomizer() {
   );
 
   const previewPanel = (
-    <Card className="border-teal-200 bg-teal-50/40 shadow-sm">
-      <CardHeader className="border-b border-teal-100 pb-4">
-        <CardTitle className="flex items-center gap-2 text-base"><Eye className="h-4 w-4 text-teal-700" /> Resident preview</CardTitle>
+    <Card className="border-line-soft bg-mist shadow-sm">
+      <CardHeader className="border-b border-line-soft pb-4">
+        <CardTitle className="flex items-center gap-2 text-base"><Eye className="h-4 w-4 text-forest" /> Resident preview</CardTitle>
       </CardHeader>
       <CardContent className="p-4 sm:p-5"><ResidentPreview features={features} /></CardContent>
     </Card>
@@ -146,9 +146,9 @@ export function DemoDepartmentCustomizer() {
   return (
     <section aria-labelledby="demo-customize-heading" className="mb-6 space-y-3">
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-teal-700">Demo only</p>
-        <h2 id="demo-customize-heading" className="mt-1 text-xl font-semibold text-slate-950">Customise department</h2>
-        <p className="mt-1 text-sm text-slate-600">Explore how department settings shape a resident workspace. Reset restores this department profile’s starting values.</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-forest">Demo only</p>
+        <h2 id="demo-customize-heading" className="mt-1 text-xl font-semibold text-ink">Customise department</h2>
+        <p className="mt-1 text-sm text-soft-ink">Explore how department settings shape a resident workspace. Reset restores this department profile’s starting values.</p>
       </div>
       {isMobile ? (
         <Tabs value={mobileTab} onValueChange={setMobileTab}>

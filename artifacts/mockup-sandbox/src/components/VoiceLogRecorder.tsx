@@ -334,24 +334,24 @@ export function VoiceLogRecorder({
 
   if (!isSupported) {
     return (
-      <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40 p-3 mb-4 text-xs text-muted-foreground flex items-center gap-2">
-        <Mic className="h-4 w-4 text-slate-400 shrink-0" />
+      <div className="rounded-lg border border-line-soft bg-mist p-3 mb-4 text-xs text-muted-foreground flex items-center gap-2">
+        <Mic className="h-4 w-4 text-helper shrink-0" />
         <span>Voice dictation is not supported in this browser.</span>
       </div>
     );
   }
 
   return (
-    <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/40 p-3.5 mb-4 shadow-xs transition-all">
+    <div className="rounded-lg border border-line-soft bg-mist p-3.5 mb-4 shadow-xs transition-all">
       {/* 1. IDLE STATE */}
       {state === "idle" && (
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
-            <div className="h-8 w-8 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center shrink-0">
-              <Sparkles className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+            <div className="h-8 w-8 rounded-full bg-sage flex items-center justify-center shrink-0">
+              <Sparkles className="h-4 w-4 text-forest" />
             </div>
             <div>
-              <div className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+              <div className="text-xs font-semibold text-ink">
                 Dictate with AI
               </div>
               <p className="text-[11px] text-muted-foreground line-clamp-1">
@@ -365,9 +365,9 @@ export function VoiceLogRecorder({
             size="sm"
             onClick={startRecording}
             disabled={disabled}
-            className="w-full sm:w-auto h-8 text-xs font-medium border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-950 text-blue-700 dark:text-blue-300 gap-1.5 shrink-0"
+            className="w-full sm:w-auto h-8 text-xs font-medium border-line-soft hover:bg-mist text-forest gap-1.5 shrink-0"
           >
-            <Mic className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+            <Mic className="h-3.5 w-3.5 text-forest" />
             <span>Dictate entry</span>
           </Button>
         </div>
@@ -378,18 +378,18 @@ export function VoiceLogRecorder({
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <span className="relative flex h-3 w-3 shrink-0">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-destructive opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-destructive"></span>
             </span>
-            <div className="font-mono text-xs font-bold text-red-600 dark:text-red-400">
+            <div className="font-mono text-xs font-bold text-status-foreground">
               {formatTimer(duration)} / 02:00
             </div>
             {/* Live Audio Level Bars */}
-            <div className="flex items-end gap-1 h-5 px-1.5 py-0.5 bg-slate-200/70 dark:bg-slate-800 rounded">
+            <div className="flex items-end gap-1 h-5 px-1.5 py-0.5 bg-sage rounded">
               {audioLevels.map((lvl, idx) => (
                 <div
                   key={idx}
-                  className="w-1 bg-red-500 rounded-xs transition-all duration-75"
+                  className="w-1 bg-destructive rounded-xs transition-all duration-75"
                   style={{ height: `${lvl}%` }}
                 />
               ))}
@@ -401,7 +401,7 @@ export function VoiceLogRecorder({
               variant="default"
               size="sm"
               onClick={stopRecordingAndSubmit}
-              className="flex-1 sm:flex-initial h-8 text-xs font-medium bg-red-600 hover:bg-red-700 text-white gap-1.5 shadow-xs"
+              className="flex-1 sm:flex-initial h-8 text-xs font-medium bg-destructive hover:bg-deep text-white gap-1.5 shadow-xs"
             >
               <Square className="h-3 w-3 fill-current" />
               <span>Stop & fill form</span>
@@ -423,8 +423,8 @@ export function VoiceLogRecorder({
       {state === "processing" && (
         <div className="flex items-center justify-between gap-3 py-1">
           <div className="flex items-center gap-2.5">
-            <Loader2 className="h-4 w-4 animate-spin text-blue-600 dark:text-blue-400" />
-            <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
+            <Loader2 className="h-4 w-4 animate-spin text-forest" />
+            <span className="text-xs font-medium text-ink">
               Transcribing and extracting fields...
             </span>
           </div>
@@ -445,10 +445,10 @@ export function VoiceLogRecorder({
         <div className="space-y-2.5">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <div className="h-6 w-6 rounded-full bg-emerald-100 dark:bg-emerald-950 flex items-center justify-center shrink-0">
-                <Sparkles className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+              <div className="h-6 w-6 rounded-full bg-status flex items-center justify-center shrink-0">
+                <Sparkles className="h-3.5 w-3.5 text-status-foreground" />
               </div>
-              <span className="text-xs font-semibold text-emerald-800 dark:text-emerald-300">
+              <span className="text-xs font-semibold text-status-foreground">
                 Fields extracted from dictation
               </span>
             </div>
@@ -459,7 +459,7 @@ export function VoiceLogRecorder({
                   variant="outline"
                   size="sm"
                   onClick={onOverwriteEdited}
-                  className="h-7 text-[11px] font-medium border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/50"
+                  className="h-7 text-[11px] font-medium border-status-border text-status-foreground hover:bg-status"
                 >
                   Apply to {skippedEditedCount} edited field{skippedEditedCount > 1 ? "s" : ""}
                 </Button>
@@ -480,8 +480,8 @@ export function VoiceLogRecorder({
 
           {/* Warnings callout */}
           {lastResult?.warnings && lastResult.warnings.length > 0 && (
-            <div className="rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 p-2.5 text-xs text-amber-800 dark:text-amber-300 flex items-start gap-2">
-              <AlertTriangle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+            <div className="rounded-md bg-status border border-status-border p-2.5 text-xs text-status-foreground flex items-start gap-2">
+              <AlertTriangle className="h-3.5 w-3.5 text-status-foreground mt-0.5 shrink-0" />
               <div className="space-y-0.5">
                 {lastResult.warnings.map((w, idx) => (
                   <div key={idx} className="text-[11px] leading-relaxed">
@@ -494,15 +494,15 @@ export function VoiceLogRecorder({
 
           {/* Missing required callout */}
           {missingRequiredLabels.length > 0 && (
-            <div className="text-[11px] text-slate-600 dark:text-slate-400 flex items-center gap-1.5 px-0.5">
-              <span className="font-medium text-slate-700 dark:text-slate-300">Still needed:</span>
+            <div className="text-[11px] text-soft-ink flex items-center gap-1.5 px-0.5">
+              <span className="font-medium text-ink">Still needed:</span>
               <span className="truncate">{missingRequiredLabels.join(", ")}</span>
             </div>
           )}
 
           {/* Collapsible Transcript */}
           {lastResult?.transcript && (
-            <div className="pt-1 border-t border-slate-200/80 dark:border-slate-800/80">
+            <div className="pt-1 border-t border-line-soft">
               <button
                 type="button"
                 onClick={() => setIsTranscriptExpanded((prev) => !prev)}
@@ -516,7 +516,7 @@ export function VoiceLogRecorder({
                 )}
               </button>
               {isTranscriptExpanded && (
-                <div className="mt-1 p-2 bg-white dark:bg-slate-950 rounded border border-slate-200 dark:border-slate-800 text-xs text-slate-700 dark:text-slate-300 italic max-h-32 overflow-y-auto leading-relaxed">
+                <div className="mt-1 p-2 bg-white rounded border border-line-soft text-xs text-ink italic max-h-32 overflow-y-auto leading-relaxed">
                   "{lastResult.transcript}"
                 </div>
               )}
@@ -528,15 +528,15 @@ export function VoiceLogRecorder({
       {/* 5. ERROR STATE */}
       {state === "error" && (
         <div className="space-y-2">
-          <div className="flex items-start justify-between gap-2 text-xs text-red-600 dark:text-red-400">
+          <div className="flex items-start justify-between gap-2 text-xs text-status-foreground">
             <div className="flex items-start gap-2">
-              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-red-600 dark:text-red-400" />
+              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-status-foreground" />
               <span className="leading-tight">{errorMessage}</span>
             </div>
             <button
               type="button"
               onClick={handleCancel}
-              className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 shrink-0"
+              className="text-helper hover:text-soft-ink shrink-0"
               aria-label="Dismiss error"
             >
               <X className="h-3.5 w-3.5" />
@@ -549,7 +549,7 @@ export function VoiceLogRecorder({
                 variant="outline"
                 size="sm"
                 onClick={handleRetry}
-                className="h-7 text-xs border-red-200 dark:border-red-900 text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/40"
+                className="h-7 text-xs border-status-border text-status-foreground hover:bg-status"
               >
                 Retry
               </Button>

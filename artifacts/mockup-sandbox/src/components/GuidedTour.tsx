@@ -180,14 +180,13 @@ export function GuidedTour({ open, steps, onClose }: GuidedTourProps) {
         <rect
           width={window.innerWidth}
           height={window.innerHeight}
-          fill="#334155"
-          fillOpacity="0.65"
+          fill="var(--gothos-scrim)"
           mask={`url(#${maskId})`}
         />
       </svg>
       <div
         aria-hidden="true"
-        className="pointer-events-none fixed z-[91] border-2 border-teal-400"
+        className="pointer-events-none fixed z-[91] border-2 border-line"
         style={{
           left: spotlight.left,
           top: spotlight.top,
@@ -198,34 +197,34 @@ export function GuidedTour({ open, steps, onClose }: GuidedTourProps) {
       />
 
       <section
-        className="pointer-events-auto fixed z-[92] rounded-[22px] border border-white/80 bg-white p-5 text-slate-900 shadow-[0_24px_70px_rgba(15,23,42,0.28)]"
+        className="pointer-events-auto fixed z-[92] rounded-[22px] border border-card-edge bg-white p-5 text-ink shadow-[0_24px_70px_color-mix(in_srgb,var(--gothos-forest)_28%,transparent)]"
         style={bubble}
       >
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-teal-700">
+            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-forest">
               Quick tour · {stepIndex + 1}/{activeSteps.length}
             </p>
-            <h2 id="tour-title" className="mt-1.5 text-lg font-bold text-slate-950">
+            <h2 id="tour-title" className="mt-1.5 text-lg font-bold text-ink">
               {activeStep.title}
             </h2>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
+            className="rounded-lg p-1.5 text-helper transition hover:bg-sage hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             aria-label="Skip website tour"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <p id="tour-description" className="mt-3 text-sm leading-6 text-slate-600">
+        <p id="tour-description" className="mt-3 text-sm leading-6 text-soft-ink">
           {activeStep.description}
         </p>
 
         <div className="mt-5 flex items-center justify-between gap-3">
-          <Button type="button" variant="ghost" size="sm" onClick={onClose} className="text-slate-500">
+          <Button type="button" variant="ghost" size="sm" onClick={onClose} className="text-helper">
             Skip tour
           </Button>
           <Button
@@ -233,7 +232,7 @@ export function GuidedTour({ open, steps, onClose }: GuidedTourProps) {
             type="button"
             size="sm"
             onClick={() => (isLastStep ? onClose() : setStepIndex((current) => current + 1))}
-            className="bg-teal-600 text-white hover:bg-teal-700"
+            className="bg-forest text-white hover:bg-deep"
           >
             {isLastStep ? (
               <><Check className="mr-2 h-4 w-4" /> Finish</>

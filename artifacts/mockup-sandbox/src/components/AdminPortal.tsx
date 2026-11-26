@@ -344,7 +344,7 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
   if (loading && departments.length === 0) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <div className="animate-spin rounded-full border-4 border-slate-300 border-t-teal-600 h-8 w-8"></div>
+        <div className="animate-spin rounded-full border-4 border-line-soft border-t-forest h-8 w-8"></div>
       </div>
     );
   }
@@ -352,7 +352,7 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
   if (error) {
     return (
       <div className="flex h-64 flex-col items-center justify-center space-y-4 text-center" role="alert">
-        <p className="text-sm font-medium text-rose-700">{error}</p>
+        <p className="text-sm font-medium text-status-foreground">{error}</p>
         <Button onClick={() => void fetchDepartments()} variant="outline">Try again</Button>
       </div>
     );
@@ -361,35 +361,35 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
   return (
     <div className="mx-auto w-full max-w-[1380px] space-y-4 px-4 pb-8 pt-3 font-sans md:p-6 lg:p-8">
       {/* Topbar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line-soft pb-3">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-600 text-white font-bold font-display shadow-sm">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-forest text-white font-bold font-display shadow-sm">
             EL
           </div>
           <div>
-            <h2 className="text-lg font-bold text-slate-900 leading-none">E-Logbook</h2>
-            <p className="text-sm font-medium text-slate-500">Admin console</p>
+            <h2 className="text-lg font-bold text-ink leading-none">E-Logbook</h2>
+            <p className="text-sm font-medium text-helper">Admin console</p>
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+          <label className="flex items-center gap-2 text-sm font-medium text-ink">
             College
-            <select aria-label="Select college" className="h-9 rounded-md border border-slate-200 bg-white px-3" value={selectedCollegeId ?? ""}
+            <select aria-label="Select college" className="h-9 rounded-md border border-input bg-white px-3" value={selectedCollegeId ?? ""}
               onChange={(event) => { const id = Number(event.target.value); departmentLoadVersion.current++; sessionStorage.setItem("admin.selectedCollegeId", String(id)); setShowNewDeptPanel(false); setDepartments([]); setSelectedDeptId(null); setDeptCounts(new Map()); setFailedDepts(new Set()); setSelectedCollegeId(id); }}>
               {colleges.map((college) => <option key={college.id} value={college.id}>{college.name}</option>)}
             </select>
           </label>
           <Button variant="outline" onClick={() => setShowNewCollegePanel((value) => !value)}>New college</Button>
-          <Button asChild variant="outline" className="border-slate-200 text-slate-700"><Link href="/profile">My Profile</Link></Button>
+          <Button asChild variant="outline" className="text-ink"><Link href="/profile">My Profile</Link></Button>
           {onSignOut && (
-            <Button variant="outline" onClick={onSignOut} className="border-slate-200 text-slate-700">
+            <Button variant="outline" onClick={onSignOut} className="text-ink">
               Sign out
             </Button>
           )}
-          <Button variant="outline" onClick={handleBackfillTestDepartments} disabled={backfilling} className="border-slate-200 text-slate-700">
+          <Button variant="outline" onClick={handleBackfillTestDepartments} disabled={backfilling} className="text-ink">
             {backfilling ? "Provisioning..." : "Provision test departments"}
           </Button>
-          <Button onClick={() => setShowNewDeptPanel(!showNewDeptPanel)} className="bg-teal-600 hover:bg-teal-700">
+          <Button onClick={() => setShowNewDeptPanel(!showNewDeptPanel)} className="bg-forest hover:bg-deep">
             <Plus className="mr-2 h-4 w-4" /> New department
           </Button>
         </div>
@@ -398,16 +398,16 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
       {/* Admin Top-Level Navigation */}
       <Tabs value={adminTab} onValueChange={(val) => setAdminTab(val as "departments" | "support")}>
         {SUPPORT_FEATURE_ENABLED && (
-          <TabsList className="bg-slate-100 p-1">
+          <TabsList className="bg-sage p-1">
             <TabsTrigger value="departments" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
               <Building2 className="mr-2 h-4 w-4" />
               Departments & Roster
             </TabsTrigger>
             <TabsTrigger value="support" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
-              <LifeBuoy className="mr-2 h-4 w-4 text-teal-600" />
+              <LifeBuoy className="mr-2 h-4 w-4 text-forest" />
               Support
               {openTicketCount > 0 && (
-                <span className="ml-2 inline-flex items-center justify-center rounded-full bg-rose-600 px-2 py-0.5 text-xs font-bold text-white leading-none">
+                <span className="ml-2 inline-flex items-center justify-center rounded-full bg-destructive px-2 py-0.5 text-xs font-bold text-white leading-none">
                   {openTicketCount}
                 </span>
               )}
@@ -418,9 +418,9 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
         <TabsContent value="departments" className={SUPPORT_FEATURE_ENABLED ? "space-y-4 mt-3" : "space-y-4"}>
           {/* Hero */}
           <div className="space-y-1">
-        <p className="text-xs font-bold uppercase tracking-wider text-teal-600">College administration</p>
-        <h1 className="text-xl font-bold text-slate-900 tracking-tight">Departments, faculty and HODs, college-wide</h1>
-        <p className="text-sm text-slate-500 max-w-2xl">
+        <p className="text-xs font-bold uppercase tracking-wider text-forest">College administration</p>
+        <h1 className="text-xl font-bold text-ink tracking-tight">Departments, faculty and HODs, college-wide</h1>
+        <p className="text-sm text-helper max-w-2xl">
           Create and manage departments, appoint HODs, and provision faculty accounts. Students added through this console bypass the payment gate and are immediately approved; faculty accounts are created pre-approved.
         </p>
       </div>
@@ -431,17 +431,17 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
           <CardContent className="p-3">
             <div className="flex justify-between items-start">
               <div className="space-y-1">
-                <p className="text-sm font-medium text-slate-500 flex items-center gap-2"><Building2 className="h-4 w-4 text-slate-400"/> Departments</p>
-                <p className="text-2xl font-bold text-slate-900">{stats.deptsTotal}</p>
+                <p className="text-sm font-medium text-helper flex items-center gap-2"><Building2 className="h-4 w-4 text-helper"/> Departments</p>
+                <p className="text-2xl font-bold text-ink">{stats.deptsTotal}</p>
               </div>
             </div>
             <div className="mt-2">
               {stats.deptsWithNoHod > 0 ? (
-                <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700 ring-1 ring-inset ring-amber-600/20">
+                <span className="inline-flex items-center rounded-full bg-status px-2 py-1 text-xs font-medium text-status-foreground ring-1 ring-inset ring-ring">
                   {stats.deptsWithNoHod} without a HOD
                 </span>
               ) : (
-                <span className="text-xs text-slate-500 font-medium">All departments staffed</span>
+                <span className="text-xs text-helper font-medium">All departments staffed</span>
               )}
             </div>
           </CardContent>
@@ -449,8 +449,8 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
         <Card>
           <CardContent className="p-3">
             <div className="space-y-1">
-              <p className="text-sm font-medium text-slate-500 flex items-center gap-2"><Users className="h-4 w-4 text-slate-400"/> Faculty</p>
-              <p className="text-2xl font-bold text-slate-900">
+              <p className="text-sm font-medium text-helper flex items-center gap-2"><Users className="h-4 w-4 text-helper"/> Faculty</p>
+              <p className="text-2xl font-bold text-ink">
                 {loadingCounts ? "—" : (
                   stats.hasFailedCounts ? (
                     <span title="Partial data: Couldn't load counts for some departments">{stats.totalFaculty}*</span>
@@ -458,16 +458,16 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
                 )}
               </p>
             </div>
-            <div className="mt-2 text-xs text-slate-500 font-medium">
-              {stats.hasFailedCounts ? <span className="text-amber-600 font-semibold">*Partial data</span> : `Across ${stats.deptsTotal} departments`}
+            <div className="mt-2 text-xs text-helper font-medium">
+              {stats.hasFailedCounts ? <span className="text-status-foreground font-semibold">*Partial data</span> : `Across ${stats.deptsTotal} departments`}
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-3">
             <div className="space-y-1">
-              <p className="text-sm font-medium text-slate-500 flex items-center gap-2"><GraduationCap className="h-4 w-4 text-slate-400"/> Residents</p>
-              <p className="text-2xl font-bold text-slate-900">
+              <p className="text-sm font-medium text-helper flex items-center gap-2"><GraduationCap className="h-4 w-4 text-helper"/> Residents</p>
+              <p className="text-2xl font-bold text-ink">
                 {loadingCounts ? "—" : (
                   stats.hasFailedCounts ? (
                     <span title="Partial data: Couldn't load counts for some departments">{stats.totalResidents}*</span>
@@ -475,16 +475,16 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
                 )}
               </p>
             </div>
-            <div className="mt-2 text-xs text-slate-500 font-medium">
-              {stats.hasFailedCounts ? <span className="text-amber-600 font-semibold">*Partial data</span> : "Enrolled college-wide"}
+            <div className="mt-2 text-xs text-helper font-medium">
+              {stats.hasFailedCounts ? <span className="text-status-foreground font-semibold">*Partial data</span> : "Enrolled college-wide"}
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-3">
             <div className="space-y-1">
-              <p className="text-sm font-medium text-slate-500 flex items-center gap-2"><UserCheck className="h-4 w-4 text-slate-400"/> Awaiting HOD approval</p>
-              <p className="text-2xl font-bold text-slate-900">
+              <p className="text-sm font-medium text-helper flex items-center gap-2"><UserCheck className="h-4 w-4 text-helper"/> Awaiting HOD approval</p>
+              <p className="text-2xl font-bold text-ink">
                 {loadingCounts ? "—" : (
                   stats.hasFailedCounts ? (
                     <span title="Partial data: Couldn't load counts for some departments">{stats.totalPending}*</span>
@@ -494,13 +494,13 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
             </div>
             <div className="mt-2">
               {stats.hasFailedCounts ? (
-                 <span className="text-xs text-amber-600 font-semibold">*Partial data</span>
+                 <span className="text-xs text-status-foreground font-semibold">*Partial data</span>
               ) : stats.totalPending > 0 ? (
-                <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700 ring-1 ring-inset ring-amber-600/20">
+                <span className="inline-flex items-center rounded-full bg-status px-2 py-1 text-xs font-medium text-status-foreground ring-1 ring-inset ring-ring">
                   Action required by HODs
                 </span>
               ) : (
-                <span className="text-xs text-slate-500 font-medium">Handled by each department's HOD</span>
+                <span className="text-xs text-helper font-medium">Handled by each department's HOD</span>
               )}
             </div>
           </CardContent>
@@ -512,15 +512,15 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
       {selectedCollegeId !== null && <Card><CardHeader><CardTitle>College settings</CardTitle><CardDescription>Update the selected college’s name and public registration availability.</CardDescription></CardHeader>
         <CardContent className="space-y-4"><form onSubmit={handleUpdateCollege} className="flex flex-wrap items-end gap-3">
           <div className="space-y-2"><Label htmlFor="selected-college-name">College name</Label><Input id="selected-college-name" value={collegeSettings.name} onChange={(event) => setCollegeSettings({ ...collegeSettings, name: event.target.value })} required /></div>
-          <label className="flex items-center gap-2 pb-2 text-sm text-slate-700"><input type="checkbox" checked={collegeSettings.acceptingRegistrations} onChange={(event) => setCollegeSettings({ ...collegeSettings, acceptingRegistrations: event.target.checked })} />Allow public registration</label>
+          <label className="flex items-center gap-2 pb-2 text-sm text-ink"><input type="checkbox" checked={collegeSettings.acceptingRegistrations} onChange={(event) => setCollegeSettings({ ...collegeSettings, acceptingRegistrations: event.target.checked })} />Allow public registration</label>
           <Button type="submit" disabled={savingCollegeSettings} variant="outline">{savingCollegeSettings ? "Saving…" : "Save college settings"}</Button>
         </form>
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line-soft pt-4">
           <div>
-            <p className="text-sm font-medium text-slate-800">Delete college</p>
+            <p className="text-sm font-medium text-ink">Delete college</p>
             {departments.length > 0
-              ? <p className="mt-1 flex items-center gap-1.5 text-sm text-amber-700"><XCircle className="h-4 w-4" />Delete all {departments.length} department{departments.length === 1 ? "" : "s"} first.</p>
-              : <p className="mt-1 text-sm text-slate-500">A college can be deleted only when it has no departments.</p>}
+              ? <p className="mt-1 flex items-center gap-1.5 text-sm text-status-foreground"><XCircle className="h-4 w-4" />Delete all {departments.length} department{departments.length === 1 ? "" : "s"} first.</p>
+              : <p className="mt-1 text-sm text-helper">A college can be deleted only when it has no departments.</p>}
           </div>
           <Button type="button" variant={departments.length > 0 ? "outline" : "destructive"}
             disabled={loading || deletingCollege || departments.length > 0} onClick={() => void handleDeleteCollege()}>
@@ -532,15 +532,15 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
       {showNewCollegePanel && <Card><CardHeader><CardTitle>New College</CardTitle><CardDescription>Create a college, then add departments under it.</CardDescription></CardHeader>
         <CardContent><form onSubmit={handleCreateCollege} className="flex flex-wrap items-end gap-3">
           <div className="space-y-2"><Label htmlFor="college-name">College name</Label><Input id="college-name" value={newCollegeForm.name} onChange={(event) => setNewCollegeForm({ ...newCollegeForm, name: event.target.value })} required /></div>
-          <label className="flex items-center gap-2 pb-2 text-sm text-slate-700"><input type="checkbox" checked={newCollegeForm.acceptingRegistrations} onChange={(event) => setNewCollegeForm({ ...newCollegeForm, acceptingRegistrations: event.target.checked })} />Allow public registration</label>
-          <Button type="submit" className="bg-teal-600 hover:bg-teal-700">Create college</Button>
+          <label className="flex items-center gap-2 pb-2 text-sm text-ink"><input type="checkbox" checked={newCollegeForm.acceptingRegistrations} onChange={(event) => setNewCollegeForm({ ...newCollegeForm, acceptingRegistrations: event.target.checked })} />Allow public registration</label>
+          <Button type="submit" className="bg-forest hover:bg-deep">Create college</Button>
         </form></CardContent></Card>}
 
       {/* New department panel */}
       {showNewDeptPanel && (
-        <Card className="border-teal-200 bg-teal-50/30 shadow-sm">
+        <Card className="border-line-soft bg-mist shadow-sm">
           <CardHeader>
-            <CardTitle className="text-lg text-teal-900">New Department</CardTitle>
+            <CardTitle className="text-lg text-forest">New Department</CardTitle>
             <CardDescription>Provision a new department and its initial HOD account.</CardDescription>
           </CardHeader>
           <CardContent>
@@ -556,16 +556,16 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
                 </div>
                 <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="dept-config-source">Copy settings from (optional)</Label>
-                  <select id="dept-config-source" className="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
+                  <select id="dept-config-source" className="h-9 w-full rounded-md border border-input bg-white px-3 text-sm"
                     value={newDeptForm.copyFromDepartmentId} onChange={(e) => setNewDeptForm({ ...newDeptForm, copyFromDepartmentId: e.target.value })}>
                     <option value="">Start with default settings</option>
                       {copySourceDepartments.map((department) => <option key={department.id} value={department.id}>
                         {department.collegeName} · {department.name}
                       </option>)}
                   </select>
-                    {loadingCopySources && <p role="status" className="text-xs text-slate-500">Loading settings sources…</p>}
-                    {copySourceError && <p role="alert" className="text-xs text-rose-700">{copySourceError}</p>}
-                    <p className="text-xs text-slate-500">Copies settings, catalogs, schedules and logbook sections from any college. Accounts and records are not copied.</p>
+                    {loadingCopySources && <p role="status" className="text-xs text-helper">Loading settings sources…</p>}
+                    {copySourceError && <p role="alert" className="text-xs text-status-foreground">{copySourceError}</p>}
+                    <p className="text-xs text-helper">Copies settings, catalogs, schedules and logbook sections from any college. Accounts and records are not copied.</p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="hod-name">HOD Full Name</Label>
@@ -575,11 +575,11 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
                   <Label htmlFor="hod-email">HOD Email</Label>
                   <Input id="hod-email" type="email" placeholder="sarah.smith@example.com" value={newDeptForm.hodEmail} onChange={e => setNewDeptForm({...newDeptForm, hodEmail: e.target.value})} required />
                 </div>
-                <p className="text-sm text-slate-600 md:col-span-2">A secure initial password will be generated and emailed to the HOD. They can change it after signing in.</p>
+                <p className="text-sm text-soft-ink md:col-span-2">A secure initial password will be generated and emailed to the HOD. They can change it after signing in.</p>
               </div>
               <div className="flex justify-end gap-2 pt-2">
                 <Button type="button" variant="outline" onClick={() => setShowNewDeptPanel(false)}>Cancel</Button>
-                <Button type="submit" className="bg-teal-600 hover:bg-teal-700" disabled={creatingDept}>
+                <Button type="submit" className="bg-forest hover:bg-deep" disabled={creatingDept}>
                   {creatingDept ? "Creating..." : "Create department + HOD"}
                 </Button>
               </div>
@@ -592,43 +592,43 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
       <div className="grid grid-cols-1 md:grid-cols-[340px_1fr] gap-4 lg:gap-6 items-start">
         {/* Left column: Department list */}
         <div className="space-y-2">
-          <h3 className="text-sm font-semibold text-slate-900 px-1">Departments</h3>
+          <h3 className="text-sm font-semibold text-ink px-1">Departments</h3>
           <div className="flex flex-col gap-1.5">
             {departments.map(dept => (
               <button 
                 key={dept.id} 
                 onClick={() => setSelectedDeptId(dept.id)}
-                className={`text-left p-3 rounded-xl border transition-all ${selectedDeptId === dept.id ? 'border-teal-500 ring-1 ring-teal-500 bg-teal-50/50 shadow-sm' : 'border-slate-200 bg-white hover:border-teal-200 hover:shadow-sm'}`}
+                className={`text-left p-3 rounded-xl border transition-all ${selectedDeptId === dept.id ? 'border-forest ring-1 ring-ring bg-mist shadow-sm' : 'border-line-soft bg-white hover:border-line-soft hover:shadow-sm'}`}
               >
                 <div className="flex justify-between items-start mb-1">
-                  <div className="text-sm font-semibold text-slate-900 leading-tight">{dept.name}</div>
-                  <Badge variant="outline" className="text-[10px] uppercase font-mono text-slate-500 tracking-wider bg-slate-50">{dept.code}</Badge>
+                  <div className="text-sm font-semibold text-ink leading-tight">{dept.name}</div>
+                  <Badge variant="outline" className="text-[10px] uppercase font-mono text-helper tracking-wider bg-mist">{dept.code}</Badge>
                 </div>
                 
                 <div className="text-xs mb-1.5">
                   {dept.hod?.id ? (
-                    <span className="text-slate-600 font-medium">HOD: {dept.hod.fullName}</span>
+                    <span className="text-soft-ink font-medium">HOD: {dept.hod.fullName}</span>
                   ) : (
-                    <span className="text-rose-600 font-medium flex items-center gap-1"><XCircle className="h-3 w-3" /> No HOD appointed</span>
+                    <span className="text-status-foreground font-medium flex items-center gap-1"><XCircle className="h-3 w-3" /> No HOD appointed</span>
                   )}
                 </div>
                 
-                <div className="flex items-center gap-3 text-xs text-slate-500 font-medium">
+                <div className="flex items-center gap-3 text-xs text-helper font-medium">
                   {failedDepts.has(dept.id) ? (
-                    <span className="text-amber-600 flex items-center gap-1" title="Couldn't load this department's counts">
+                    <span className="text-status-foreground flex items-center gap-1" title="Couldn't load this department's counts">
                       <span className="font-bold">—</span> Data unavailable
                     </span>
                   ) : (
                     <>
-                      <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5 text-slate-400" /> {loadingCounts ? "—" : (deptCounts.get(dept.id)?.facultyCount || 0)}</span>
-                      <span className="flex items-center gap-1"><GraduationCap className="h-3.5 w-3.5 text-slate-400" /> {loadingCounts ? "—" : (deptCounts.get(dept.id)?.residentCount || 0)}</span>
+                      <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5 text-helper" /> {loadingCounts ? "—" : (deptCounts.get(dept.id)?.facultyCount || 0)}</span>
+                      <span className="flex items-center gap-1"><GraduationCap className="h-3.5 w-3.5 text-helper" /> {loadingCounts ? "—" : (deptCounts.get(dept.id)?.residentCount || 0)}</span>
                     </>
                   )}
                 </div>
               </button>
             ))}
             {departments.length === 0 && (
-              <div className="text-sm text-slate-500 text-center p-8 border border-dashed rounded-xl">
+              <div className="text-sm text-helper text-center p-8 border border-dashed rounded-xl">
                 No departments found.
               </div>
             )}
@@ -643,8 +643,8 @@ export function AdminPortal({ onSignOut }: { onSignOut?: () => void }) {
               onRefresh={fetchDepartments}
             />
           ) : (
-            <div className="h-full min-h-[400px] flex items-center justify-center border border-dashed border-slate-200 rounded-xl bg-slate-50/50">
-              <p className="text-sm text-slate-500">Select a department to view details.</p>
+            <div className="h-full min-h-[400px] flex items-center justify-center border border-dashed border-line-soft rounded-xl bg-mist">
+              <p className="text-sm text-helper">Select a department to view details.</p>
             </div>
           )}
         </div>
@@ -972,24 +972,24 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
   return (
     <div className="space-y-4">
       {/* HOD Strip */}
-      <Card className="overflow-hidden border-slate-200">
-        <div className="bg-slate-50/80 p-3 sm:p-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+      <Card className="overflow-hidden border-line-soft">
+        <div className="bg-mist p-3 sm:p-4 border-b border-line-soft flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
           <div className="flex items-center gap-3">
             <Avatar className="h-10 w-10 border-2 border-white shadow-sm">
-              <AvatarFallback className={department.hod?.id ? "bg-teal-100 text-teal-800 font-bold" : "bg-slate-100 text-slate-400 font-bold"}>
+              <AvatarFallback className={department.hod?.id ? "bg-sage text-forest font-bold" : "bg-sage text-helper font-bold"}>
                 {department.hod?.fullName ? getInitials(department.hod.fullName) : "?"}
               </AvatarFallback>
             </Avatar>
             <div>
               {department.hod?.id ? (
                 <>
-                  <h3 className="font-semibold text-base text-slate-900 leading-tight">{department.hod.fullName}</h3>
-                  <p className="text-sm text-slate-500 font-medium">HOD, {department.name} • {department.hod.email}</p>
+                  <h3 className="font-semibold text-base text-ink leading-tight">{department.hod.fullName}</h3>
+                  <p className="text-sm text-helper font-medium">HOD, {department.name} • {department.hod.email}</p>
                 </>
               ) : (
                 <>
-                  <h3 className="font-semibold text-base text-rose-700 leading-tight">No HOD appointed</h3>
-                  <p className="text-sm text-slate-500 font-medium">Department of {department.name}</p>
+                  <h3 className="font-semibold text-base text-status-foreground leading-tight">No HOD appointed</h3>
+                  <p className="text-sm text-helper font-medium">Department of {department.name}</p>
                 </>
               )}
             </div>
@@ -1001,7 +1001,7 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
             <Button
               variant="outline"
               onClick={() => { setShowDeleteConfirm(!showDeleteConfirm); setDeleteError(null); }}
-              className="text-rose-700 border-rose-200 hover:bg-rose-50 shadow-sm"
+              className="text-status-foreground border-status-border hover:bg-status shadow-sm"
             >
               <Trash2 className="h-4 w-4 mr-1" /> Delete
             </Button>
@@ -1010,14 +1010,14 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
         
         {/* Replace HOD inline panel */}
         {showReplaceHod && (
-          <div className="bg-white p-3 sm:p-4 border-t border-slate-100">
+          <div className="bg-white p-3 sm:p-4 border-t border-line-soft">
             <form onSubmit={handleReplaceHod} className="space-y-4">
-              <p className="text-sm font-medium text-slate-700">
+              <p className="text-sm font-medium text-ink">
                 {department.hod?.id ? "Promote an existing faculty member to Head of Department." : "Promote an existing faculty member to Head of Department."}
               </p>
               
               {replaceHodError && (
-                <div className="p-3 bg-rose-50 border border-rose-200 rounded-md text-sm text-rose-700">
+                <div className="p-3 bg-status border border-status-border rounded-md text-sm text-status-foreground">
                   {replaceHodError}
                 </div>
               )}
@@ -1029,7 +1029,7 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
                 </div>
                 <div className="flex gap-2 w-full sm:w-auto">
                   <Button type="button" variant="outline" onClick={() => { setShowReplaceHod(false); setReplaceHodError(null); }} className="flex-1 sm:flex-none">Cancel</Button>
-                  <Button type="submit" disabled={replacingHod} className="flex-1 sm:flex-none bg-slate-900 hover:bg-slate-800 text-white">
+                  <Button type="submit" disabled={replacingHod} className="flex-1 sm:flex-none bg-deep hover:bg-deep text-white">
                     {replacingHod ? "Confirming..." : "Confirm swap"}
                   </Button>
                 </div>
@@ -1041,31 +1041,31 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
 
       {/* Delete Department confirmation panel */}
       {showDeleteConfirm && (
-        <Card className="border-rose-200 bg-rose-50/30 shadow-sm">
+        <Card className="border-status-border bg-status shadow-sm">
           <CardContent className="p-4">
             <div className="flex items-start gap-3">
-              <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-rose-100">
-                <AlertTriangle className="h-4 w-4 text-rose-700" />
+              <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-status">
+                <AlertTriangle className="h-4 w-4 text-status-foreground" />
               </div>
               <div className="flex-1 space-y-3">
                 <div>
-                  <h4 className="font-semibold text-rose-900">Delete {department.name}?</h4>
-                  <p className="text-sm text-rose-800 mt-1 leading-relaxed">
+                  <h4 className="font-semibold text-status-foreground">Delete {department.name}?</h4>
+                  <p className="text-sm text-status-foreground mt-1 leading-relaxed">
                     This will <strong>permanently delete</strong> the department and <strong>all</strong> of its:
                   </p>
-                  <ul className="text-sm text-rose-800 mt-1 ml-4 list-disc space-y-0.5">
+                  <ul className="text-sm text-status-foreground mt-1 ml-4 list-disc space-y-0.5">
                     <li>Faculty accounts (professors)</li>
                     <li>Resident accounts (students)</li>
                     <li>Head of Department (HOD) account</li>
                     <li>Department configuration, procedure types, training options, and assignment types</li>
                   </ul>
-                  <p className="text-sm text-rose-800 mt-2 leading-relaxed">
+                  <p className="text-sm text-status-foreground mt-2 leading-relaxed">
                     If any faculty or resident has clinical logs, assessments, or other records that reference them, the delete will be <strong>refused</strong> by the database. This is not an error — remove or reassign those records first.
                   </p>
                 </div>
 
                 {deleteError && (
-                  <div className="p-3 bg-rose-100 border border-rose-300 rounded-md text-sm text-rose-900 font-medium">
+                  <div className="p-3 bg-status border border-status-border rounded-md text-sm text-status-foreground font-medium">
                     {deleteError}
                   </div>
                 )}
@@ -1077,7 +1077,7 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
                   <Button
                     onClick={handleDeleteDepartment}
                     disabled={deleting}
-                    className="bg-rose-600 hover:bg-rose-700 text-white"
+                    className="bg-destructive hover:bg-deep text-white"
                   >
                     {deleting ? "Deleting..." : `Yes, delete ${department.name}`}
                   </Button>
@@ -1090,20 +1090,20 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
 
       {/* Permanently delete a faculty member or resident: confirmation panel */}
                     {userToDelete && (
-        <Card className="border-rose-200 bg-rose-50/30 shadow-sm">
+        <Card className="border-status-border bg-status shadow-sm">
           <CardContent className="p-4">
             <div className="flex items-start gap-3">
-              <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-rose-100">
-                <AlertTriangle className="h-4 w-4 text-rose-700" />
+              <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-status">
+                <AlertTriangle className="h-4 w-4 text-status-foreground" />
               </div>
               <div className="flex-1 space-y-3">
                 <div>
-                          <h4 className="font-semibold text-rose-900">Permanently delete {userToDelete.name} from {userToDelete.departmentName}?</h4>
-                  <p className="text-sm text-rose-800 mt-1 leading-relaxed">
+                          <h4 className="font-semibold text-status-foreground">Permanently delete {userToDelete.name} from {userToDelete.departmentName}?</h4>
+                  <p className="text-sm text-status-foreground mt-1 leading-relaxed">
                     This will <strong>permanently delete</strong> the {userToDelete.role === "student" ? "resident" : "faculty member"} and <strong>all</strong> of their associated data. This action is <strong>irreversible</strong>.
                   </p>
                   {userToDelete.role === "student" ? (
-                    <ul className="text-sm text-rose-800 mt-1 ml-4 list-disc space-y-0.5">
+                    <ul className="text-sm text-status-foreground mt-1 ml-4 list-disc space-y-0.5">
                       <li>Their account and profile</li>
                       <li>All of their clinical logs, case logs, and procedures</li>
                       <li>Their assessments, appraisals, and attendance records</li>
@@ -1111,7 +1111,7 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
                       <li>Their thesis milestones and research records</li>
                     </ul>
                   ) : (
-                    <ul className="text-sm text-rose-800 mt-1 ml-4 list-disc space-y-0.5">
+                    <ul className="text-sm text-status-foreground mt-1 ml-4 list-disc space-y-0.5">
                       <li>Their account and profile</li>
                       <li>Any assignments they created (assignment types pass to {userToDelete.isTest
                         ? department.mirrorHod?.fullName ? `${department.mirrorHod.fullName}, the ${userToDelete.departmentName} HOD` : "the acting admin because the test department has no active HOD"
@@ -1120,13 +1120,13 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
                       <li>Their assessments and appraisals of residents</li>
                     </ul>
                   )}
-                  <p className="text-sm text-rose-800 mt-2 leading-relaxed">
+                  <p className="text-sm text-status-foreground mt-2 leading-relaxed">
                     To remove access but keep all records, use <strong>Deactivate</strong> instead.
                   </p>
                 </div>
 
                 {deleteUserError && (
-                  <div className="p-3 bg-rose-100 border border-rose-300 rounded-md text-sm text-rose-900 font-medium">
+                  <div className="p-3 bg-status border border-status-border rounded-md text-sm text-status-foreground font-medium">
                     {deleteUserError}
                   </div>
                 )}
@@ -1138,7 +1138,7 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
                   <Button
                     onClick={handleHardDeleteUser}
                     disabled={deletingUser}
-                    className="bg-rose-600 hover:bg-rose-700 text-white"
+                    className="bg-destructive hover:bg-deep text-white"
                   >
                     {deletingUser ? "Deleting..." : `Yes, permanently delete ${userToDelete.name}`}
                   </Button>
@@ -1150,17 +1150,17 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
       )}
 
       {error ? (
-        <div className="flex h-40 flex-col items-center justify-center space-y-4 text-center rounded-xl border border-rose-100 bg-rose-50" role="alert">
-          <p className="text-sm font-medium text-rose-700">{error}</p>
+        <div className="flex h-40 flex-col items-center justify-center space-y-4 text-center rounded-xl border border-status-border bg-status" role="alert">
+          <p className="text-sm font-medium text-status-foreground">{error}</p>
           <Button onClick={fetchRoster} variant="outline" size="sm">Try again</Button>
         </div>
       ) : loading ? (
-        <div className="flex h-40 items-center justify-center border border-slate-100 rounded-xl bg-white"><div className="animate-spin rounded-full border-4 border-slate-300 border-t-teal-600 h-8 w-8" /></div>
+        <div className="flex h-40 items-center justify-center border border-line-soft rounded-xl bg-white"><div className="animate-spin rounded-full border-4 border-line-soft border-t-forest h-8 w-8" /></div>
       ) : (
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+        <div className="bg-white rounded-xl border border-line-soft overflow-hidden shadow-sm">
           <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as typeof activeTab)}>
-            <div className="border-b border-slate-100 px-3 pt-3 flex flex-wrap justify-between items-center gap-2 bg-slate-50/50">
-              <TabsList className="h-auto flex-wrap bg-slate-200/50">
+            <div className="border-b border-line-soft px-3 pt-3 flex flex-wrap justify-between items-center gap-2 bg-mist">
+              <TabsList className="h-auto flex-wrap bg-sage">
                 <TabsTrigger value="faculty" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
                   Faculty ({faculty.length})
                 </TabsTrigger>
@@ -1173,15 +1173,15 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
               </TabsList>
               <Button variant="ghost" size="sm" onClick={() => showAddForm ? (setShowAddForm(false), setAddTarget(null)) : openAddForm()}
                 disabled={activeTab === "test-accounts" && (!department.mirrorDepartmentId || !department.mirrorDepartmentName)}
-                className="text-teal-700 hover:text-teal-800 hover:bg-teal-50">
+                className="text-forest hover:text-forest hover:bg-mist">
                 <Plus className="h-4 w-4 mr-1" /> Add
               </Button>
             </div>
 
             {showAddForm && (
-              <div className="p-3 sm:p-4 bg-slate-50 border-b border-slate-100">
-                <h4 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
-                  <UserPlus className="h-4 w-4 text-teal-600" />
+              <div className="p-3 sm:p-4 bg-mist border-b border-line-soft">
+                <h4 className="font-semibold text-ink mb-3 flex items-center gap-2">
+                  <UserPlus className="h-4 w-4 text-forest" />
                   Add {addFormType === "faculty" ? "faculty" : "resident"} to {department.name}
                 </h4>
                 <form onSubmit={handleAddUser} className="flex flex-col gap-4">
@@ -1200,16 +1200,16 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
                         <Input type="password" placeholder="At least 8 characters" value={addForm.password} onChange={e => setAddForm({...addForm, password: e.target.value})} required minLength={8} maxLength={72} />
                       </div>
                     ) : (
-                      <p className="flex-1 text-sm text-slate-600">A secure initial password will be generated and emailed to the faculty member. They can change it after signing in.</p>
+                      <p className="flex-1 text-sm text-soft-ink">A secure initial password will be generated and emailed to the faculty member. They can change it after signing in.</p>
                     )}
                   </div>
                   {addFormType === "resident" && (
                     <>
-                    <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900" role="status">
+                    <div className="rounded-md border border-line-soft bg-mist p-3 text-sm text-forest" role="status">
                       Adding this resident to <strong>{addTarget?.name}</strong>{addTarget?.isTest ? " (test department)" : ""}.
                     </div>
                     <fieldset className="space-y-2">
-                      <legend className="text-sm font-medium text-slate-800">Approval</legend>
+                      <legend className="text-sm font-medium text-ink">Approval</legend>
                       <div className="flex flex-col sm:flex-row gap-3">
                         <label className="flex items-start gap-2 rounded-md border bg-white p-3 text-sm">
                           <input type="radio" name="resident-approval" value="hod" checked={approvalMode === "hod"} onChange={() => setApprovalMode("hod")} />
@@ -1245,7 +1245,7 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
                   )}
                   <div className="flex gap-2 justify-end mt-2">
                     <Button type="button" variant="outline" onClick={() => { setShowAddForm(false); setAddTarget(null); }}>Cancel</Button>
-                    <Button type="submit" disabled={addingUser} className="bg-teal-600 hover:bg-teal-700">{addingUser ? "Creating..." : "Create account"}</Button>
+                    <Button type="submit" disabled={addingUser} className="bg-forest hover:bg-deep">{addingUser ? "Creating..." : "Create account"}</Button>
                   </div>
                 </form>
               </div>
@@ -1253,7 +1253,7 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
 
             <TabsContent value="faculty" className="m-0 border-none outline-none">
               {!faculty.length ? (
-                <p className="p-8 text-center text-sm text-slate-500">No faculty in this department.</p>
+                <p className="p-8 text-center text-sm text-helper">No faculty in this department.</p>
               ) : (
                 <Table>
                   <TableHeader className="bg-white">
@@ -1267,7 +1267,7 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
                   <TableBody>
                     {faculty.map(u => (
                       <TableRow key={u.id}>
-                        <TableCell className="font-semibold text-slate-900">
+                        <TableCell className="font-semibold text-ink">
                           {editingUserId === u.id ? (
                             <div>
                               <Input
@@ -1282,12 +1282,12 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
                             </div>
                           ) : u.fullName}
                         </TableCell>
-                        <TableCell className="text-slate-500 text-sm">{u.email}</TableCell>
+                        <TableCell className="text-helper text-sm">{u.email}</TableCell>
                         <TableCell>
                           {u.role === "hod" ? (
-                            <Badge className="bg-teal-100 text-teal-800 hover:bg-teal-100 border-none shadow-none rounded-full">HOD</Badge>
+                            <Badge className="bg-sage text-forest hover:bg-sage border-none shadow-none rounded-full">HOD</Badge>
                           ) : (
-                            <Badge variant={u.status === "approved" ? "default" : "secondary"} className={`rounded-full ${u.status === 'approved' ? 'bg-slate-900' : ''}`}>
+                            <Badge variant={u.status === "approved" ? "default" : "secondary"} className={`rounded-full ${u.status === 'approved' ? 'bg-deep' : ''}`}>
                               {u.status === "rejected" ? "Deactivated" : u.status}
                             </Badge>
                           )}
@@ -1309,7 +1309,7 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
                                   <Pencil className="h-4 w-4" /> Edit name
                                 </Button>
                                 {u.role === "hod" ? (
-                                  <span className="text-xs text-slate-400 font-medium self-center">Use 'Replace HOD' above</span>
+                                  <span className="text-xs text-helper font-medium self-center">Use 'Replace HOD' above</span>
                                 ) : (
                                   <>
                                     {u.status === "rejected" ? (
@@ -1317,11 +1317,11 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
                                         Reactivate
                                       </Button>
                                     ) : (
-                                      <Button size="sm" variant="outline" onClick={() => handleDeactivate(u.id, u.role)} className="text-rose-700 border-rose-200 hover:bg-rose-50 h-8 px-3">
+                                      <Button size="sm" variant="outline" onClick={() => handleDeactivate(u.id, u.role)} className="text-status-foreground border-status-border hover:bg-status h-8 px-3">
                                         Deactivate
                                       </Button>
                                     )}
-                                    <Button size="sm" variant="outline" onClick={() => { setUserToDelete({ id: u.id, name: u.fullName, role: u.role, isTest: false, departmentName: department.name }); setDeleteUserError(null); }} className="text-rose-700 border-rose-200 hover:bg-rose-50 h-8 px-3">
+                                    <Button size="sm" variant="outline" onClick={() => { setUserToDelete({ id: u.id, name: u.fullName, role: u.role, isTest: false, departmentName: department.name }); setDeleteUserError(null); }} className="text-status-foreground border-status-border hover:bg-status h-8 px-3">
                                       <Trash2 className="h-4 w-4 mr-1" /> Delete
                                     </Button>
                                   </>
@@ -1338,15 +1338,15 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
             </TabsContent>
 
             <TabsContent value="residents" className="m-0 border-none outline-none">
-              <div className="bg-blue-50/50 border-b border-blue-100 p-3 sm:px-6 flex items-start gap-3">
-                <Info className="h-5 w-5 text-blue-500 shrink-0 mt-0.5" />
-                <p className="text-sm text-blue-800 leading-relaxed">
+              <div className="bg-mist border-b border-line-soft p-3 sm:px-6 flex items-start gap-3">
+                <Info className="h-5 w-5 text-forest shrink-0 mt-0.5" />
+                <p className="text-sm text-forest leading-relaxed">
                   <strong>Immediately approved.</strong> A resident added here is created with approved status and does not enter {department.name}'s HOD queue. Self-registered students still go through the HOD's approval flow.
                 </p>
               </div>
 
               {!residents.length ? (
-                <p className="p-8 text-center text-sm text-slate-500">No residents in this department.</p>
+                <p className="p-8 text-center text-sm text-helper">No residents in this department.</p>
               ) : (
                 <Table>
                   <TableHeader className="bg-white">
@@ -1374,15 +1374,15 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
                               />
                             </div>
                           ) : (
-                            <div className="font-semibold text-slate-900">{u.fullName}</div>
+                            <div className="font-semibold text-ink">{u.fullName}</div>
                           )}
                           {u.status === "pending" && (
-                            <div className="text-xs text-amber-600 mt-0.5">Awaiting the {department.name} HOD's approval</div>
+                            <div className="text-xs text-status-foreground mt-0.5">Awaiting the {department.name} HOD's approval</div>
                           )}
                         </TableCell>
-                        <TableCell className="text-slate-500 text-sm">{u.email}</TableCell>
+                        <TableCell className="text-helper text-sm">{u.email}</TableCell>
                         <TableCell>
-                          <Badge variant={u.status === "approved" ? "default" : "secondary"} className={`rounded-full ${u.status === 'approved' ? 'bg-slate-900' : u.status === 'pending' ? 'bg-amber-100 text-amber-800 border-none' : ''}`}>
+                          <Badge variant={u.status === "approved" ? "default" : "secondary"} className={`rounded-full ${u.status === 'approved' ? 'bg-deep' : u.status === 'pending' ? 'bg-status text-status-foreground border-none' : ''}`}>
                             {u.status === "rejected" ? "Deactivated" : u.status}
                           </Badge>
                         </TableCell>
@@ -1407,11 +1407,11 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
                                     Reactivate
                                   </Button>
                                 ) : (
-                                  <Button size="sm" variant="outline" onClick={() => handleDeactivate(u.id, u.role)} className="text-rose-700 border-rose-200 hover:bg-rose-50 h-8 px-3">
+                                  <Button size="sm" variant="outline" onClick={() => handleDeactivate(u.id, u.role)} className="text-status-foreground border-status-border hover:bg-status h-8 px-3">
                                     Deactivate
                                   </Button>
                                 )}
-                                <Button size="sm" variant="outline" onClick={() => { setUserToDelete({ id: u.id, name: u.fullName, role: u.role, isTest: false, departmentName: department.name }); setDeleteUserError(null); }} className="text-rose-700 border-rose-200 hover:bg-rose-50 h-8 px-3">
+                                <Button size="sm" variant="outline" onClick={() => { setUserToDelete({ id: u.id, name: u.fullName, role: u.role, isTest: false, departmentName: department.name }); setDeleteUserError(null); }} className="text-status-foreground border-status-border hover:bg-status h-8 px-3">
                                   <Trash2 className="h-4 w-4 mr-1" /> Delete
                                 </Button>
                               </>
@@ -1427,32 +1427,32 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
 
             <TabsContent value="test-accounts" className="m-0 border-none outline-none">
               {!department.mirrorDepartmentId ? (
-                <p className="p-8 text-center text-sm text-slate-500">
+                <p className="p-8 text-center text-sm text-helper">
                   No test department has been provisioned for {department.name} yet. Use "Provision test departments" above to create one.
                 </p>
               ) : mirrorLoading ? (
-                <div className="flex h-40 items-center justify-center bg-white"><div className="animate-spin rounded-full border-4 border-slate-300 border-t-teal-600 h-8 w-8" /></div>
+                <div className="flex h-40 items-center justify-center bg-white"><div className="animate-spin rounded-full border-4 border-line-soft border-t-forest h-8 w-8" /></div>
               ) : mirrorError ? (
-                <div className="flex h-40 flex-col items-center justify-center space-y-4 text-center rounded-xl border border-rose-100 bg-rose-50" role="alert">
-                  <p className="text-sm font-medium text-rose-700">{mirrorError}</p>
+                <div className="flex h-40 flex-col items-center justify-center space-y-4 text-center rounded-xl border border-status-border bg-status" role="alert">
+                  <p className="text-sm font-medium text-status-foreground">{mirrorError}</p>
                   <Button onClick={fetchMirrorRoster} variant="outline" size="sm">Try again</Button>
                 </div>
               ) : !mirrorRoster.length ? (
-                <p className="p-8 text-center text-sm text-slate-500">No test accounts in this department.</p>
+                <p className="p-8 text-center text-sm text-helper">No test accounts in this department.</p>
               ) : (
                 <div className="space-y-4 p-4">
                   {/* Credentials card */}
-                  <div className="rounded-lg border border-teal-200 bg-teal-50 p-4">
-                    <p className="text-xs font-bold uppercase tracking-wider text-teal-700 mb-3">Test Login Credentials</p>
-                    <p className="text-xs text-teal-600 mb-3">
-                      Password for all accounts: <span className="font-mono font-bold text-teal-900 bg-white px-2 py-0.5 rounded border border-teal-200">{department.mirrorCode}</span>
+                  <div className="rounded-lg border border-line-soft bg-mist p-4">
+                    <p className="text-xs font-bold uppercase tracking-wider text-forest mb-3">Test Login Credentials</p>
+                    <p className="text-xs text-forest mb-3">
+                      Password for all accounts: <span className="font-mono font-bold text-forest bg-white px-2 py-0.5 rounded border border-line-soft">{department.mirrorCode}</span>
                     </p>
                     <div className="grid gap-2">
                       {mirrorRoster.map(u => (
-                        <div key={u.id} className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 bg-white rounded border border-teal-100 px-3 py-2 text-sm">
+                        <div key={u.id} className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 bg-white rounded border border-line-soft px-3 py-2 text-sm">
                           <Badge variant="outline" className="capitalize w-fit shrink-0">{u.role}</Badge>
-                          <span className="font-mono text-slate-700 text-xs break-all">{u.email}</span>
-                          <span className="text-slate-400 text-xs shrink-0 sm:ml-auto">password: <span className="font-mono font-medium text-slate-700">{department.mirrorCode}</span></span>
+                          <span className="font-mono text-ink text-xs break-all">{u.email}</span>
+                          <span className="text-helper text-xs shrink-0 sm:ml-auto">password: <span className="font-mono font-medium text-ink">{department.mirrorCode}</span></span>
                         </div>
                       ))}
                     </div>
@@ -1473,15 +1473,15 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
                       {mirrorRoster.map(u => (
                         <TableRow key={u.id}>
                           <TableCell>
-                            <div className="font-semibold text-slate-900">{u.fullName}</div>
-                            {u.status === "pending" && <div className="text-xs text-amber-600 mt-0.5">Awaiting the {department.mirrorDepartmentName || "test department"} HOD's approval</div>}
+                            <div className="font-semibold text-ink">{u.fullName}</div>
+                            {u.status === "pending" && <div className="text-xs text-status-foreground mt-0.5">Awaiting the {department.mirrorDepartmentName || "test department"} HOD's approval</div>}
                           </TableCell>
-                          <TableCell className="text-slate-500 text-sm font-mono">{u.email}</TableCell>
+                          <TableCell className="text-helper text-sm font-mono">{u.email}</TableCell>
                           <TableCell>
                             <Badge variant="outline" className="capitalize">{u.role}</Badge>
                           </TableCell>
                           <TableCell>
-                            <Badge variant={u.status === "approved" ? "default" : "secondary"} className={`rounded-full ${u.status === 'approved' ? 'bg-slate-900' : u.status === 'pending' ? 'bg-amber-100 text-amber-800 border-none' : ''}`}>
+                            <Badge variant={u.status === "approved" ? "default" : "secondary"} className={`rounded-full ${u.status === 'approved' ? 'bg-deep' : u.status === 'pending' ? 'bg-status text-status-foreground border-none' : ''}`}>
                               {u.status === "rejected" ? "Deactivated" : u.status}
                             </Badge>
                           </TableCell>
@@ -1497,12 +1497,12 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
                                   {u.status === "rejected" ? (
                                     <Button size="sm" variant="outline" onClick={() => handleReactivate(u.id, u.fullName, true)} disabled={changingUserId === u.id} className="h-8 px-3">Reactivate</Button>
                                   ) : (
-                                    <Button size="sm" variant="outline" onClick={() => handleDeactivate(u.id, u.role, true)} disabled={changingUserId === u.id} className="text-rose-700 border-rose-200 hover:bg-rose-50 h-8 px-3">Deactivate</Button>
+                                    <Button size="sm" variant="outline" onClick={() => handleDeactivate(u.id, u.role, true)} disabled={changingUserId === u.id} className="text-status-foreground border-status-border hover:bg-status h-8 px-3">Deactivate</Button>
                                   )}
                                   <Button size="sm" variant="outline" onClick={() => { setUserToDelete({
                                     id: u.id, name: u.fullName, role: u.role, isTest: true,
                                     departmentName: department.mirrorDepartmentName || "test department",
-                                  }); setDeleteUserError(null); }} className="text-rose-700 border-rose-200 hover:bg-rose-50 h-8 px-3">
+                                  }); setDeleteUserError(null); }} className="text-status-foreground border-status-border hover:bg-status h-8 px-3">
                                     <Trash2 className="h-4 w-4 mr-1" /> Delete
                                   </Button>
                                 </>

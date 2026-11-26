@@ -11,13 +11,13 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "border border-teal-500/40 bg-gradient-to-r from-teal-600 via-teal-500 to-cyan-500 text-primary-foreground shadow-[0_14px_30px_rgba(13,148,136,0.18)]",
+          "border border-forest bg-primary text-primary-foreground hover:bg-deep shadow-[0_14px_30px_color-mix(in_srgb,var(--gothos-forest)_18%,transparent)]",
         destructive:
-          "border border-destructive/30 bg-destructive text-destructive-foreground shadow-[0_14px_30px_rgba(239,68,68,0.18)]",
+          "border border-destructive bg-destructive text-destructive-foreground hover:bg-deep shadow-[0_14px_30px_color-mix(in_srgb,var(--gothos-forest)_18%,transparent)]",
         outline:
-          "border-[0.5px] bg-white/75 [border-color:var(--button-outline)] shadow-[0_12px_24px_rgba(15,23,42,0.04)] active:shadow-none",
+          "border-[0.5px] bg-card text-forest border-forest hover:bg-sage shadow-[0_12px_24px_color-mix(in_srgb,var(--gothos-forest)_4%,transparent)] active:shadow-none",
         secondary:
-          "border border-teal-100 bg-teal-50 text-teal-900 shadow-none",
+          "border border-forest bg-mist text-forest shadow-none hover:bg-sage",
         ghost: "border border-transparent bg-transparent shadow-none",
         link: "text-primary underline-offset-4 hover:underline",
       },

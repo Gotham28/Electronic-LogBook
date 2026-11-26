@@ -224,13 +224,13 @@ export function QuarterlyAppraisalSection() {
 
   return (
     <section data-tour="quarterly-appraisal" className="space-y-5" aria-labelledby="quarterly-appraisal-heading">
-      <Card className="border-slate-200 bg-white">
-        <CardHeader className="border-b border-slate-100 pb-4">
+      <Card className="border-line-soft bg-white">
+        <CardHeader className="border-b border-line-soft pb-4">
           <div className="flex items-start gap-3">
-            <div className="mt-0.5 rounded-lg bg-teal-50 p-2 text-teal-800"><ClipboardCheck className="h-5 w-5" aria-hidden="true" /></div>
+            <div className="mt-0.5 rounded-lg bg-mist p-2 text-forest"><ClipboardCheck className="h-5 w-5" aria-hidden="true" /></div>
             <div>
-              <CardTitle id="quarterly-appraisal-heading" className="text-base font-bold text-slate-900">Postgraduate students quarterly appraisal</CardTitle>
-              <CardDescription className="mt-1 text-sm text-slate-600">
+              <CardTitle id="quarterly-appraisal-heading" className="text-base font-bold text-ink">Postgraduate students quarterly appraisal</CardTitle>
+              <CardDescription className="mt-1 text-sm text-soft-ink">
                 "Record and review appraisals for approved students in your department."
                 {" "}Scores use the form guide: 1–3 Not Satisfactory, 4–6 Satisfactory, 7–9 More Than Satisfactory.
               </CardDescription>
@@ -239,17 +239,17 @@ export function QuarterlyAppraisalSection() {
         </CardHeader>
         <CardContent className="p-5 sm:p-6">
           {studentsLoading ? (
-            <div className="flex min-h-24 items-center justify-center text-sm text-slate-600" role="status">Loading available students…</div>
+            <div className="flex min-h-24 items-center justify-center text-sm text-soft-ink" role="status">Loading available students…</div>
           ) : studentsError ? (
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 p-4" role="alert">
-              <p className="text-sm text-rose-800">{studentsError}</p>
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-status-border bg-status p-4" role="alert">
+              <p className="text-sm text-status-foreground">{studentsError}</p>
               <div className="flex flex-wrap items-center gap-2">
                 <Button type="button" variant="outline" size="sm" onClick={loadStudents}>Try again</Button>
                 <Button type="button" variant="outline" size="sm" onClick={openArogya}>Ask Mochi about this</Button>
               </div>
             </div>
           ) : students.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600">
+            <div className="rounded-lg border border-dashed border-input bg-mist p-5 text-sm text-soft-ink">
               There are no approved students in your department to appraise.
             </div>
           ) : (
@@ -299,19 +299,19 @@ export function QuarterlyAppraisalSection() {
 
               <div className="space-y-3">
                 <div>
-                  <h4 className="text-sm font-semibold text-slate-900">Appraisal scores</h4>
-                  <p className="mt-1 text-xs text-slate-600">Choose one score from 1 to 9 for every category.</p>
+                  <h4 className="text-sm font-semibold text-ink">Appraisal scores</h4>
+                  <p className="mt-1 text-xs text-soft-ink">Choose one score from 1 to 9 for every category.</p>
                 </div>
-                <div className="overflow-x-auto rounded-lg border border-slate-200">
+                <div className="overflow-x-auto rounded-lg border border-line-soft">
                   <table className="w-full min-w-[36rem] border-collapse text-left text-sm">
                     <caption className="sr-only">Quarterly appraisal score entry</caption>
-                    <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
+                    <thead className="bg-mist text-xs uppercase tracking-wide text-soft-ink">
                       <tr><th scope="col" className="px-4 py-3">Particulars</th><th scope="col" className="w-60 px-4 py-3">Score (1–9)</th></tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
+                    <tbody className="divide-y divide-line-soft">
                       {quarterlyAppraisalCategories.map(({ key, label }) => (
                         <tr key={key}>
-                          <th scope="row" className="px-4 py-3 font-medium text-slate-800">{label}</th>
+                          <th scope="row" className="px-4 py-3 font-medium text-ink">{label}</th>
                           <td className="px-4 py-2.5">
                             <Select value={scores[key]} onValueChange={(value) => setScores((current) => ({ ...current, [key]: value }))}>
                               <SelectTrigger id={`appraisal-${key}`} aria-label={`Score for ${label}`} aria-invalid={Boolean(formError && !scores[key])} className="h-10">
@@ -336,7 +336,7 @@ export function QuarterlyAppraisalSection() {
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                     <div className="min-w-0">
                       <Label htmlFor="appraisal-faculty-remarks">Faculty remarks</Label>
-                      <p id="appraisal-draft-help" className="mt-1 text-xs leading-relaxed text-slate-500">
+                      <p id="appraisal-draft-help" className="mt-1 text-xs leading-relaxed text-helper">
                         Mochi drafts from training progress and posting data; it does not use the selected quarter or entered scores.
                       </p>
                     </div>
@@ -348,7 +348,7 @@ export function QuarterlyAppraisalSection() {
                       disabled={!requiredFieldsReady || draftLoading || saving}
                       onClick={handleDraftWithArogya}
                       aria-describedby="appraisal-draft-help"
-                      className="min-h-11 shrink-0 gap-1.5 border-teal-200 bg-white px-3 text-teal-800 shadow-sm hover:bg-teal-50 focus-visible:ring-teal-600"
+                      className="min-h-11 shrink-0 gap-1.5 border-line-soft bg-white px-3 text-forest shadow-sm hover:bg-mist focus-visible:ring-ring"
                       id="appraisal-draft-arogya"
                     >
                       <Wand2 className="h-3.5 w-3.5" aria-hidden="true" />
@@ -356,7 +356,7 @@ export function QuarterlyAppraisalSection() {
                     </Button>
                   </div>
                   {draftError && <div className="flex flex-wrap items-center justify-between gap-2" role="alert">
-                    <p className="text-xs text-rose-700">{draftError}</p>
+                    <p className="text-xs text-status-foreground">{draftError}</p>
                     <Button type="button" variant="outline" size="sm" className="min-h-10" onClick={openArogya}>Ask Mochi about this</Button>
                   </div>}
                   <Textarea
@@ -370,11 +370,11 @@ export function QuarterlyAppraisalSection() {
                     }}
                     placeholder="Faculty remarks on this student's progress"
                   />
-                  {isDemoMode() && hasDrafted && <p className="text-[10px] text-slate-400 font-medium text-right">Sample AI output</p>}
+                  {isDemoMode() && hasDrafted && <p className="text-[10px] text-helper font-medium text-right">Sample AI output</p>}
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="appraisal-remediation">Remediation suggestions</Label>
-                  <p id="appraisal-remediation-help" className="text-xs text-slate-600">Required if any category score is below 4.</p>
+                  <p id="appraisal-remediation-help" className="text-xs text-soft-ink">Required if any category score is below 4.</p>
                   <Textarea
                     id="appraisal-remediation"
                     aria-invalid={Boolean(formError && quarterlyAppraisalCategories.some(({ key }) => Number(scores[key]) < 4) && !remediationSuggestions.trim())}
@@ -391,12 +391,12 @@ export function QuarterlyAppraisalSection() {
                 </div>
               </div>
 
-              {formError && <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2" role="alert">
-                <p className="text-sm text-rose-800">{formError}</p>
+              {formError && <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-status-border bg-status px-3 py-2" role="alert">
+                <p className="text-sm text-status-foreground">{formError}</p>
                 <Button type="button" variant="outline" size="sm" className="min-h-10" onClick={openArogya}>Ask Mochi about this</Button>
               </div>}
-              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
-                <p className="text-xs text-slate-500">The saved form will be visible to the student and can be printed.</p>
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line-soft pt-4">
+                <p className="text-xs text-helper">The saved form will be visible to the student and can be printed.</p>
                 <Button type="submit" disabled={saving} className="min-w-44 gap-2">
                   <Save className="h-4 w-4" aria-hidden="true" />
                   {saving ? "Saving appraisal…" : "Save quarterly appraisal"}
@@ -408,25 +408,25 @@ export function QuarterlyAppraisalSection() {
       </Card>
 
       {studentId && (
-        <Card className="border-slate-200 bg-white">
-          <CardHeader className="border-b border-slate-100 pb-4">
+        <Card className="border-line-soft bg-white">
+          <CardHeader className="border-b border-line-soft pb-4">
             <div className="flex items-center justify-between gap-3">
               <div><CardTitle className="text-base">Saved quarterly appraisals</CardTitle><CardDescription className="mt-1">Review or print the records available to your role.</CardDescription></div>
-              <Printer className="h-5 w-5 shrink-0 text-slate-500" aria-hidden="true" />
+              <Printer className="h-5 w-5 shrink-0 text-helper" aria-hidden="true" />
             </div>
           </CardHeader>
           <CardContent className="space-y-4 p-5 sm:p-6">
-            {appraisalsLoading ? <p className="py-5 text-center text-sm text-slate-600" role="status">Loading saved appraisals…</p>
+            {appraisalsLoading ? <p className="py-5 text-center text-sm text-soft-ink" role="status">Loading saved appraisals…</p>
               : appraisalsError ? (
                 <div className="flex flex-wrap items-center justify-between gap-3" role="alert">
-                  <p className="text-sm text-rose-700">{appraisalsError}</p>
+                  <p className="text-sm text-status-foreground">{appraisalsError}</p>
                   <div className="flex flex-wrap items-center gap-2">
                     <Button type="button" size="sm" variant="outline" onClick={() => loadAppraisals(studentId)}>Try again</Button>
                     <Button type="button" variant="outline" size="sm" onClick={openArogya}>Ask Mochi about this</Button>
                   </div>
                 </div>
               )
-                : appraisals.length === 0 ? <p className="py-5 text-center text-sm text-slate-600">No quarterly appraisal has been saved for this student yet.</p>
+                : appraisals.length === 0 ? <p className="py-5 text-center text-sm text-soft-ink">No quarterly appraisal has been saved for this student yet.</p>
                   : appraisals.map((appraisal) => <QuarterlyAppraisalRecord key={appraisal.id} appraisal={appraisal} />)}
           </CardContent>
         </Card>

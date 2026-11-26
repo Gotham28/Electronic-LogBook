@@ -472,10 +472,10 @@ export function ProcedureLogsPage() {
   return (
     <div className="space-y-6 pb-12">
       {error && (
-        <div className="flex flex-col items-center justify-center p-8 text-center border rounded-2xl bg-rose-50 border-rose-100">
-          <p className="text-rose-700 mb-4">{error}</p>
+        <div className="flex flex-col items-center justify-center p-8 text-center border rounded-2xl bg-status border-status-border">
+          <p className="text-status-foreground mb-4">{error}</p>
           <div className="flex flex-wrap items-center justify-center gap-2">
-            <Button onClick={fetchLogs} variant="outline" className="border-rose-200 text-rose-700">Try Again</Button>
+            <Button onClick={fetchLogs} variant="outline" className="border-status-border text-status-foreground">Try Again</Button>
             <Button type="button" variant="outline" size="sm" onClick={openArogya}>Ask Mochi about this</Button>
           </div>
         </div>
@@ -484,7 +484,7 @@ export function ProcedureLogsPage() {
         <div>
           <p className="page-eyebrow">Procedures seen and performed</p>
           <h2 className="page-title mt-1">Procedure log</h2>
-          <p className="mt-2 text-sm text-slate-500">Procedure exposure, with competency verified only by the reviewing faculty member.</p>
+          <p className="mt-2 text-sm text-helper">Procedure exposure, with competency verified only by the reviewing faculty member.</p>
         </div>
         <Dialog open={open} onOpenChange={(val) => { 
           setOpen(val); 
@@ -516,12 +516,12 @@ export function ProcedureLogsPage() {
                 resetKey={voiceResetKey}
               />
               {editLogStatus === "rejected" && (
-                <div className="rounded-xl border border-rose-200 bg-rose-50/90 p-3.5 text-xs text-rose-900">
-                  <div className="flex items-center gap-1.5 font-semibold text-rose-800">
-                    <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
+                <div className="rounded-xl border border-status-border bg-status p-3.5 text-xs text-status-foreground">
+                  <div className="flex items-center gap-1.5 font-semibold text-status-foreground">
+                    <AlertCircle className="h-4 w-4 shrink-0 text-status-foreground" />
                     <span>Faculty Feedback / Revision Reason:</span>
                   </div>
-                  <p className="mt-1.5 whitespace-pre-wrap rounded-lg bg-white/80 p-2.5 text-slate-800 border border-rose-100 font-medium leading-relaxed">
+                  <p className="mt-1.5 whitespace-pre-wrap rounded-lg bg-card p-2.5 text-ink border border-status-border font-medium leading-relaxed">
                     {editLogRemarks || "No specific feedback was provided. Please verify the entry details and resubmit."}
                   </p>
                 </div>
@@ -619,8 +619,8 @@ export function ProcedureLogsPage() {
                                       key={opt}
                                       className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${
                                         checked
-                                          ? "border-teal-600 bg-teal-50 text-teal-900"
-                                          : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                                          ? "border-forest bg-mist text-forest"
+                                          : "border-line-soft bg-white text-ink hover:bg-mist"
                                       }`}
                                     >
                                       <input
@@ -628,7 +628,7 @@ export function ProcedureLogsPage() {
                                         name={`proc-field-${field.id}`}
                                         checked={checked}
                                         onChange={() => setDynamicFieldValue(field.id, opt)}
-                                        className="h-3.5 w-3.5 accent-teal-700"
+                                        className="h-3.5 w-3.5 accent-forest"
                                       />
                                       <span>{opt === origVal && !baseOptions.includes(opt) ? `${opt} (previous)` : opt}</span>
                                     </label>
@@ -638,7 +638,7 @@ export function ProcedureLogsPage() {
                                   <button
                                     type="button"
                                     onClick={() => setDynamicFieldValue(field.id, "")}
-                                    className="ml-1 text-xs font-medium text-slate-500 underline hover:text-slate-800"
+                                    className="ml-1 text-xs font-medium text-helper underline hover:text-ink"
                                   >
                                     Clear
                                   </button>
@@ -701,7 +701,7 @@ export function ProcedureLogsPage() {
                         </SelectContent>
                       </Select>
                       {competencyLevels.length === 0 && (
-                        <p className="text-sm text-slate-600">No competency levels are set up for your department. Ask your HOD to add them in Department Settings.</p>
+                        <p className="text-sm text-soft-ink">No competency levels are set up for your department. Ask your HOD to add them in Department Settings.</p>
                       )}
                     </Field>
                   )}
@@ -744,33 +744,33 @@ export function ProcedureLogsPage() {
 
       {!hideProcedureProgress && (
         <>
-          {!PROCEDURE_REQUIREMENTS.length && <p className="rounded-xl bg-teal-50 p-4 text-sm text-teal-800">{hideUhid && isFreeTextProcedures ? "Procedure names can be entered directly. This demo department has no configured procedure list or target." : "Your HOD has not configured procedure types for this department yet."}</p>}
+          {!PROCEDURE_REQUIREMENTS.length && <p className="rounded-xl bg-mist p-4 text-sm text-forest">{hideUhid && isFreeTextProcedures ? "Procedure names can be entered directly. This demo department has no configured procedure list or target." : "Your HOD has not configured procedure types for this department yet."}</p>}
           {(PROCEDURE_REQUIREMENTS.length > 0 || !hideUhid) && <div className="grid gap-4 md:grid-cols-2">
             {(Object.keys(PROCEDURE_GROUPS) as ProcedureGroup[]).map((group) => {
               const completed = logs.filter((log) => log.procedureGroup === group && log.status !== "rejected").length;
               return (
-                <Card key={group} className={group === "emergency" ? "border-cyan-100" : "border-teal-100"}>
+                <Card key={group} className={group === "emergency" ? "border-line-soft" : "border-line-soft"}>
                   <CardContent className="flex items-center justify-between p-5">
                     <div>
-                      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{groupNames[group]}</p>
-                      <p className="mt-1 text-2xl font-bold text-slate-900">{completed} logged</p>
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-helper">{groupNames[group]}</p>
+                      <p className="mt-1 text-2xl font-bold text-ink">{completed} logged</p>
                     </div>
-                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-teal-50 text-teal-700"><Stethoscope className="h-5 w-5" /></div>
+                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-mist text-forest"><Stethoscope className="h-5 w-5" /></div>
                   </CardContent>
                 </Card>
               );
             })}
           </div>}
 
-          {(!hideUhid || hasProcedureTarget) && <div className="flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50/80 p-4">
-            <AlertCircle className="h-5 w-5 text-amber-700" />
-            <p className="text-xs text-amber-900"><strong>{logs.length}/{REQUIRED_PROCEDURE_COUNT}</strong> required procedures logged. Continue adding procedures from the departmental list.</p>
+          {(!hideUhid || hasProcedureTarget) && <div className="flex items-center gap-3 rounded-2xl border border-status-border bg-status p-4">
+            <AlertCircle className="h-5 w-5 text-status-foreground" />
+            <p className="text-xs text-status-foreground"><strong>{logs.length}/{REQUIRED_PROCEDURE_COUNT}</strong> required procedures logged. Continue adding procedures from the departmental list.</p>
           </div>}
 
           {(!hideUhid || hasProcedureTarget) && <Card>
-            <CardHeader className="border-b border-teal-100">
+            <CardHeader className="border-b border-line-soft">
               <CardTitle className="text-lg">Number of procedures required</CardTitle>
-              <p className="text-xs text-slate-500">The total is calculated from the procedure targets configured by your HOD.</p>
+              <p className="text-xs text-helper">The total is calculated from the procedure targets configured by your HOD.</p>
             </CardHeader>
             <CardContent className="p-0">
               <Table>
@@ -783,16 +783,16 @@ export function ProcedureLogsPage() {
                     return (
                       <TableRow key={requirement.name}>
                         <TableCell className="font-semibold">{requirement.name}</TableCell>
-                        {!isFreeTextProcedures && <TableCell><Badge variant="outline" className="border-teal-100 bg-teal-50 text-teal-800">{groupNames[requirement.group]}</Badge></TableCell>}
+                        {!isFreeTextProcedures && <TableCell><Badge variant="outline" className="border-line-soft bg-mist text-forest">{groupNames[requirement.group]}</Badge></TableCell>}
                         <TableCell>{logged}</TableCell>
-                        <TableCell className="font-bold text-teal-800">{requirement.required}</TableCell>
+                        <TableCell className="font-bold text-forest">{requirement.required}</TableCell>
                         <TableCell>{Math.max(requirement.required - logged, 0)}</TableCell>
                       </TableRow>
                     );
                   })}
-                  <TableRow className="bg-teal-50/60">
+                  <TableRow className="bg-mist">
                     <TableCell className="font-bold" colSpan={3}>Combined target</TableCell>
-                    <TableCell className="font-bold text-teal-800">{REQUIRED_PROCEDURE_COUNT}</TableCell>
+                    <TableCell className="font-bold text-forest">{REQUIRED_PROCEDURE_COUNT}</TableCell>
                     <TableCell className="font-bold">{Math.max(REQUIRED_PROCEDURE_COUNT - logs.length, 0)}</TableCell>
                   </TableRow>
                 </TableBody>
@@ -803,12 +803,12 @@ export function ProcedureLogsPage() {
       )}
 
       <Card>
-        <CardHeader className="border-b border-teal-100"><CardTitle className="text-lg">Procedure entries sent</CardTitle></CardHeader>
+        <CardHeader className="border-b border-line-soft"><CardTitle className="text-lg">Procedure entries sent</CardTitle></CardHeader>
         <CardContent className="p-0">
           {loading ? (
             <div className="flex h-48 flex-col items-center justify-center space-y-4">
-              <Loader2 className="h-8 w-8 animate-spin text-teal-600" />
-              <p className="text-sm font-medium text-slate-500">Loading procedures...</p>
+              <Loader2 className="h-8 w-8 animate-spin text-forest" />
+              <p className="text-sm font-medium text-helper">Loading procedures...</p>
             </div>
           ) : logs.length === 0 ? (
             <Empty className="py-14">
@@ -829,11 +829,11 @@ export function ProcedureLogsPage() {
                   <TableRow key={log.id}>
                     <TableCell className="font-bold">{log.number}</TableCell>
                     <TableCell>{formatLogbookDate(log.date)}</TableCell>
-                    {!isFreeTextProcedures && <TableCell><Badge variant="outline" className="border-teal-100 bg-teal-50 text-teal-800">{groupNames[log.procedureGroup as ProcedureGroup] || log.procedureGroup}</Badge></TableCell>}
+                    {!isFreeTextProcedures && <TableCell><Badge variant="outline" className="border-line-soft bg-mist text-forest">{groupNames[log.procedureGroup as ProcedureGroup] || log.procedureGroup}</Badge></TableCell>}
                     <TableCell className="font-semibold">{log.procedureName}
                       {recordDetailsEnabled && (!dynamicProcedureFields || activeProcedureFields.length > 0) && (
                         <details className="mt-2">
-                          <summary className="cursor-pointer text-xs font-medium text-teal-700">Entry details</summary>
+                          <summary className="cursor-pointer text-xs font-medium text-forest">Entry details</summary>
                           <ProcedureClinicalDetails entry={log} fields={dynamicProcedureFields ? activeProcedureFields : undefined} />
                         </details>
                       )}
@@ -844,14 +844,14 @@ export function ProcedureLogsPage() {
                     {showProcedureExperience && <TableCell className="text-xs">{log.facultyVerifiedLevel ? (competencyLevels.find(c => c.value === log.facultyVerifiedLevel)?.name || log.facultyVerifiedLevel) : 'Pending verification'}</TableCell>}
                     <TableCell className="text-xs max-w-[160px]">
                       {log.status === "pending"
-                        ? <span className="text-slate-400">—</span>
+                        ? <span className="text-helper">—</span>
                         : log.status === "rejected"
-                          ? <span title={log.facultyRemarks || "No remark"} className={`block truncate cursor-help font-medium ${log.facultyRemarks ? "text-rose-700" : "text-slate-400"}`}>
+                          ? <span title={log.facultyRemarks || "No remark"} className={`block truncate cursor-help font-medium ${log.facultyRemarks ? "text-status-foreground" : "text-helper"}`}>
                               {log.facultyRemarks || "No remark"}
                             </span>
                           : log.facultyRemarks
-                            ? <span title={log.facultyRemarks} className="block truncate cursor-help text-slate-600">{log.facultyRemarks}</span>
-                            : <span className="text-slate-500">No remark</span>}
+                            ? <span title={log.facultyRemarks} className="block truncate cursor-help text-soft-ink">{log.facultyRemarks}</span>
+                            : <span className="text-helper">No remark</span>}
                     </TableCell>
                     <TableCell>{statusBadge(log.status)}</TableCell>
                     <TableCell className="text-right">
@@ -859,17 +859,17 @@ export function ProcedureLogsPage() {
                         <Button
                           size="sm"
                           variant="outline"
-                          className="border-rose-300 text-rose-700 bg-rose-50 hover:bg-rose-100 hover:text-rose-800 font-semibold text-xs gap-1.5 h-8 px-2.5"
+                          className="border-status-border text-status-foreground bg-status hover:bg-status hover:text-status-foreground font-semibold text-xs gap-1.5 h-8 px-2.5"
                           onClick={() => openLogEditor(log, true)}
                         >
                           <RotateCcw className="h-3.5 w-3.5" /> Resubmit
                         </Button>
                       ) : log.status === "pending" ? (
                         <div className="flex items-center justify-end gap-1">
-                          <Button variant="ghost" size="sm" className="text-teal-600 hover:text-teal-800 hover:bg-teal-50" onClick={() => openLogEditor(log, false)}>
+                          <Button variant="ghost" size="sm" className="text-forest hover:text-forest hover:bg-mist" onClick={() => openLogEditor(log, false)}>
                             <Edit3 className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="sm" className="text-rose-500 hover:text-rose-700 hover:bg-rose-50" onClick={() => handleDeleteProcedureLog(log.id)}>
+                          <Button variant="ghost" size="sm" className="text-status-foreground hover:text-status-foreground hover:bg-status" onClick={() => handleDeleteProcedureLog(log.id)}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
@@ -892,7 +892,7 @@ function Field({ label, children, isAiFilled }: { label: string; children: React
       <div className="flex items-center gap-1.5">
         <Label>{label}</Label>
         {isAiFilled && (
-          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-mist text-forest border border-line-soft">
             <Sparkles className="h-2.5 w-2.5" />
             <span>AI filled</span>
           </span>
@@ -904,7 +904,7 @@ function Field({ label, children, isAiFilled }: { label: string; children: React
 }
 
 function statusBadge(status: ProcedureLog["status"]) {
-  if (status === "verified") return <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700"><CheckCircle2 className="mr-1 h-3 w-3" /> Verified</Badge>;
-  if (status === "rejected") return <Badge className="border-rose-200 bg-rose-50 text-rose-700"><AlertCircle className="mr-1 h-3 w-3" /> Rejected</Badge>;
-  return <Badge className="border-amber-200 bg-amber-50 text-amber-700"><Clock className="mr-1 h-3 w-3" /> Pending</Badge>;
+  if (status === "verified") return <Badge className="border-status-border bg-status text-status-foreground"><CheckCircle2 className="mr-1 h-3 w-3" /> Verified</Badge>;
+  if (status === "rejected") return <Badge className="border-status-border bg-status text-status-foreground"><AlertCircle className="mr-1 h-3 w-3" /> Rejected</Badge>;
+  return <Badge className="border-status-border bg-status text-status-foreground"><Clock className="mr-1 h-3 w-3" /> Pending</Badge>;
 }

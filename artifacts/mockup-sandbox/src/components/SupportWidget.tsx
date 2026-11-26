@@ -188,14 +188,14 @@ export function SupportWidget() {
       <button
         type="button"
         onClick={() => handleOpenChange(true)}
-        className={`print:hidden fixed z-40 flex items-center gap-2 rounded-full border border-teal-200 bg-white/95 px-3.5 py-2 text-xs font-semibold text-teal-800 shadow-md backdrop-blur-sm transition-all hover:bg-teal-50 hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2 sm:px-4 sm:py-2.5 sm:text-sm ${
+        className={`print:hidden fixed z-40 flex items-center gap-2 rounded-full border border-line-soft bg-card px-3.5 py-2 text-xs font-semibold text-forest shadow-md backdrop-blur-sm transition-all hover:bg-mist hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:px-4 sm:py-2.5 sm:text-sm ${
           hasArogyaLauncher
             ? "bottom-[calc(86px+env(safe-area-inset-bottom))] right-20 sm:bottom-[31px] sm:right-24"
             : "bottom-4 right-4 sm:bottom-6 sm:right-6"
         }`}
         aria-label="Need help? Report a problem or contact support"
       >
-        <HelpCircle className="h-4 w-4 text-teal-600 sm:h-4 sm:w-4" />
+        <HelpCircle className="h-4 w-4 text-forest sm:h-4 sm:w-4" />
         <span>Need help?</span>
       </button>
 
@@ -203,11 +203,11 @@ export function SupportWidget() {
       <Dialog open={isOpen} onOpenChange={handleOpenChange}>
         <DialogContent className="max-w-md sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-lg text-slate-900">
-              <HelpCircle className="h-5 w-5 text-teal-600" />
+            <DialogTitle className="flex items-center gap-2 text-lg text-ink">
+              <HelpCircle className="h-5 w-5 text-forest" />
               {referenceCode ? "Ticket Submitted" : "Report a Problem / Support"}
             </DialogTitle>
-            <DialogDescription className="text-xs text-slate-500">
+            <DialogDescription className="text-xs text-helper">
               {referenceCode
                 ? "Your ticket has been received and logged."
                 : "Need help or found an issue? Tell us what went wrong and our team will investigate."}
@@ -216,10 +216,10 @@ export function SupportWidget() {
 
           {referenceCode ? (
             <div className="space-y-4 py-3">
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 text-center">
-                <p className="text-xs font-medium text-emerald-800">Your Ticket Reference Code</p>
+              <div className="rounded-xl border border-status-border bg-status p-4 text-center">
+                <p className="text-xs font-medium text-status-foreground">Your Ticket Reference Code</p>
                 <div className="mt-2 flex items-center justify-center gap-2">
-                  <span className="font-mono text-xl font-bold tracking-wider text-emerald-900">
+                  <span className="font-mono text-xl font-bold tracking-wider text-status-foreground">
                     {referenceCode}
                   </span>
                   <Button
@@ -227,13 +227,13 @@ export function SupportWidget() {
                     variant="outline"
                     size="sm"
                     onClick={handleCopyCode}
-                    className="h-8 border-emerald-300 bg-white px-2.5 text-xs text-emerald-800 hover:bg-emerald-50"
+                    className="h-8 border-status-border bg-white px-2.5 text-xs text-status-foreground hover:bg-status"
                   >
-                    {copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+                    {copied ? <Check className="h-3.5 w-3.5 text-status-foreground" /> : <Copy className="h-3.5 w-3.5" />}
                     <span className="ml-1">{copied ? "Copied" : "Copy"}</span>
                   </Button>
                 </div>
-                <p className="mt-3 text-xs text-slate-600">
+                <p className="mt-3 text-xs text-soft-ink">
                   Please keep this reference code handy. Our administrator has been notified.
                 </p>
               </div>
@@ -242,7 +242,7 @@ export function SupportWidget() {
                 <Button
                   type="button"
                   onClick={() => handleOpenChange(false)}
-                  className="bg-teal-600 text-white hover:bg-teal-700"
+                  className="bg-forest text-white hover:bg-deep"
                 >
                   Close
                 </Button>
@@ -251,23 +251,23 @@ export function SupportWidget() {
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4 py-2">
               {/* Privacy Warning */}
-              <div className="flex items-start gap-2.5 rounded-lg border border-amber-200 bg-amber-50/70 p-3 text-xs text-amber-900">
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+              <div className="flex items-start gap-2.5 rounded-lg border border-status-border bg-status p-3 text-xs text-status-foreground">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-status-foreground" />
                 <span>
                   <strong>Important:</strong> Do not include patient details, medical records, or passwords.
                 </span>
               </div>
 
               {isDemo && (
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs text-slate-600">
+                <div className="rounded-lg border border-line-soft bg-mist p-2.5 text-xs text-soft-ink">
                   <strong>Notice:</strong> Support tickets cannot be submitted in demo mode. Please sign in with a real account to report issues.
                 </div>
               )}
 
               {/* Category */}
               <div className="space-y-1.5">
-                <Label htmlFor="support-category" className="text-xs font-semibold text-slate-700">
-                  Category <span className="text-rose-500">*</span>
+                <Label htmlFor="support-category" className="text-xs font-semibold text-ink">
+                  Category <span className="text-status-foreground">*</span>
                 </Label>
                 {currentUser ? (
                   <Select
@@ -286,13 +286,13 @@ export function SupportWidget() {
                   </Select>
                 ) : (
                   <div className="space-y-1.5">
-                    <div className="flex h-10 w-full items-center justify-between rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800">
+                    <div className="flex h-10 w-full items-center justify-between rounded-md border border-line-soft bg-mist px-3 py-2 text-sm text-ink">
                       <span>Cannot log in / Account access</span>
-                      <span className="rounded bg-teal-50 px-2 py-0.5 text-[11px] font-medium text-teal-700 border border-teal-100">
+                      <span className="rounded bg-mist px-2 py-0.5 text-[11px] font-medium text-forest border border-line-soft">
                         Login Issue
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-500">
+                    <p className="text-[11px] text-helper">
                       Public reports are restricted to login issues. Please log in to report bugs or request features.
                     </p>
                   </div>
@@ -302,10 +302,10 @@ export function SupportWidget() {
               {/* Message */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="support-message" className="text-xs font-semibold text-slate-700">
-                    Message <span className="text-rose-500">*</span>
+                  <Label htmlFor="support-message" className="text-xs font-semibold text-ink">
+                    Message <span className="text-status-foreground">*</span>
                   </Label>
-                  <span className="text-[11px] text-slate-400">
+                  <span className="text-[11px] text-helper">
                     {message.length}/2000
                   </span>
                 </div>
@@ -325,8 +325,8 @@ export function SupportWidget() {
               {/* Name & Email (optional but encouraged) */}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label htmlFor="support-name" className="text-xs font-semibold text-slate-700">
-                    Your Name <span className="text-slate-400 font-normal">(optional)</span>
+                  <Label htmlFor="support-name" className="text-xs font-semibold text-ink">
+                    Your Name <span className="text-helper font-normal">(optional)</span>
                   </Label>
                   <Input
                     id="support-name"
@@ -339,8 +339,8 @@ export function SupportWidget() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="support-email" className="text-xs font-semibold text-slate-700">
-                    Email for Reply <span className="text-slate-400 font-normal">(optional)</span>
+                  <Label htmlFor="support-email" className="text-xs font-semibold text-ink">
+                    Email for Reply <span className="text-helper font-normal">(optional)</span>
                   </Label>
                   <Input
                     id="support-email"
@@ -380,7 +380,7 @@ export function SupportWidget() {
                 <Button
                   type="submit"
                   disabled={isSubmitting || isDemo || message.trim().length < 10}
-                  className="bg-teal-600 text-white hover:bg-teal-700"
+                  className="bg-forest text-white hover:bg-deep"
                 >
                   {isSubmitting ? (
                     <>

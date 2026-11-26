@@ -12,17 +12,37 @@ const Progress = React.forwardRef<
   <ProgressPrimitive.Root
     ref={ref}
     className={cn(
-      "relative h-2 w-full overflow-hidden rounded-full bg-teal-100/80",
+      "relative h-2 w-full overflow-hidden rounded-full bg-sage",
       className
     )}
     {...props}
   >
     <ProgressPrimitive.Indicator
-      className="h-full w-full flex-1 bg-gradient-to-r from-teal-600 via-teal-500 to-cyan-500 transition-transform duration-700 ease-out"
+      className="h-full w-full flex-1 bg-forest transition-transform duration-700 ease-out"
       style={{ transform: `translateX(-${100 - (value || 0)}%)` }}
     />
   </ProgressPrimitive.Root>
 ))
 Progress.displayName = ProgressPrimitive.Root.displayName
 
-export { Progress }
+function ProgressRing({ value, strokeWidth }: { value: number; strokeWidth: number }) {
+  const radius = (100 - strokeWidth) / 2
+  return (
+    <svg aria-hidden="true" viewBox="0 0 100 100" className="pointer-events-none absolute inset-0 size-full -rotate-90" fill="none">
+      <circle cx="50" cy="50" r={radius} strokeWidth={strokeWidth} className="stroke-line-soft" />
+      {value > 0 && (
+        <circle
+          cx="50"
+          cy="50"
+          r={radius}
+          strokeWidth={strokeWidth}
+          className="stroke-forest"
+          pathLength="100"
+          strokeDasharray={value === 100 ? undefined : value + " 100"}
+        />
+      )}
+    </svg>
+  )
+}
+
+export { Progress, ProgressRing }

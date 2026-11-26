@@ -692,41 +692,41 @@ export function DemoMovie({ activeRole, navigationItems, navigate, blocked, arog
   return createPortal((
     <>
       <div aria-hidden="true" ref={cursorRef} className="pointer-events-none fixed left-0 top-0 z-[2001] opacity-0 will-change-transform" data-demo-cursor>
-        <MousePointer2 className="h-8 w-8 -translate-x-[2px] -translate-y-[2px] fill-white text-slate-950 drop-shadow-[0_2px_3px_rgba(0,0,0,0.55)]" strokeWidth={1.8} />
+        <MousePointer2 className="h-8 w-8 -translate-x-[2px] -translate-y-[2px] fill-white text-ink drop-shadow-[0_2px_3px_color-mix(in_srgb,var(--gothos-forest)_55%,transparent)]" strokeWidth={1.8} />
       </div>
-      {point && <div key={clickCount} aria-hidden="true" className="pointer-events-none fixed z-[1998] h-7 w-7 -translate-x-1/2 -translate-y-1/2 animate-ping rounded-full border-2 border-teal-600/70 motion-reduce:animate-none" style={{ left: point.x, top: point.y }} />}
+      {point && <div key={clickCount} aria-hidden="true" className="pointer-events-none fixed z-[1998] h-7 w-7 -translate-x-1/2 -translate-y-1/2 animate-ping rounded-full border-2 border-forest/70 motion-reduce:animate-none" style={{ left: point.x, top: point.y }} />}
       <div className="pointer-events-none fixed inset-0 z-[2000]" data-demo-player>
-        <section ref={playerRef} aria-label={`Guided demonstration controls; ${completedCount} actions visited`} title={`${completedCount} actions visited`} className="pointer-events-auto fixed left-1/2 top-[max(8px,env(safe-area-inset-top))] flex w-fit max-w-[calc(100vw-1rem)] items-center gap-1 overflow-hidden rounded-full border border-white/15 bg-[#102B2D]/95 px-2 py-1.5 text-white shadow-[0_12px_36px_rgba(6,25,27,0.3)] backdrop-blur-xl transition-[left,top,transform] duration-150 ease-out motion-reduce:transition-none">
-          <span className="hidden whitespace-nowrap px-1 text-[10px] font-semibold text-white/65 md:inline">Guided demo</span>
+        <section ref={playerRef} aria-label={`Guided demonstration controls; ${completedCount} actions visited`} title={`${completedCount} actions visited`} className="pointer-events-auto fixed left-1/2 top-[max(8px,env(safe-area-inset-top))] flex w-fit max-w-[calc(100vw-1rem)] items-center gap-1 overflow-hidden rounded-full border border-white/15 bg-deep px-2 py-1.5 text-white shadow-[0_12px_36px_color-mix(in_srgb,var(--gothos-forest)_30%,transparent)] backdrop-blur-xl transition-[left,top,transform] duration-150 ease-out motion-reduce:transition-none">
+          <span className="hidden whitespace-nowrap px-1 text-[10px] font-semibold text-white md:inline">Guided demo</span>
           <div className="hidden items-center gap-0.5 rounded-full bg-white/5 p-0.5 sm:flex" role="group" aria-label="Walkthrough sections">
-            {ROLES.map((role, index) => <button key={role} type="button" onClick={() => goSection(index)} aria-current={sectionIndex === index ? "step" : undefined} className={`min-h-7 rounded-full px-2.5 text-[11px] font-medium ${sectionIndex === index ? "bg-teal-200 text-slate-900" : "text-white/75 hover:bg-white/10"}`}>{roleName(role)}</button>)}
+            {ROLES.map((role, index) => <button key={role} type="button" onClick={() => goSection(index)} aria-current={sectionIndex === index ? "step" : undefined} className={`min-h-7 rounded-full px-2.5 text-[11px] font-medium ${sectionIndex === index ? "bg-sage text-ink" : "text-white hover:bg-white/10"}`}>{roleName(role)}</button>)}
           </div>
-          <select aria-label="Walkthrough role" value={sectionIndex} onChange={(event) => goSection(Number(event.target.value))} className="h-7 max-w-[6.5rem] rounded-full border border-white/15 bg-[#19383A] px-2 text-[11px] text-white sm:hidden">
+          <select aria-label="Walkthrough role" value={sectionIndex} onChange={(event) => goSection(Number(event.target.value))} className="h-7 max-w-[6.5rem] rounded-full border border-mint bg-forest px-2 text-[11px] text-white sm:hidden">
             {ROLES.map((role, index) => <option key={role} value={index}>{roleName(role)}</option>)}
           </select>
           <span className="mx-0.5 h-5 w-px shrink-0 bg-white/15" aria-hidden="true" />
           <button type="button" onClick={goBack} disabled={completedCount === 0} aria-label="Previous walkthrough step" className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-white/15 disabled:opacity-40"><ArrowLeft className="h-4 w-4" /></button>
           {stage === "playing"
-            ? <button type="button" onClick={pause} aria-label="Pause walkthrough" className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white text-[#102B2D]"><Pause className="h-4 w-4" /></button>
-            : <button type="button" onClick={resume} aria-label="Resume walkthrough" className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-teal-200 text-[#102B2D]"><Play className="h-4 w-4" /></button>}
+            ? <button type="button" onClick={pause} aria-label="Pause walkthrough" className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white text-ink"><Pause className="h-4 w-4" /></button>
+            : <button type="button" onClick={resume} aria-label="Resume walkthrough" className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-sage text-ink"><Play className="h-4 w-4" /></button>}
           <button type="button" onClick={goNext} aria-label="Next walkthrough step" className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-white/15"><ArrowRight className="h-4 w-4" /></button>
-          <label className="hidden items-center text-[10px] sm:flex"><span className="sr-only">Walkthrough speed</span><select aria-label="Walkthrough speed" value={speed} onChange={(event) => changeSpeed(event.target.value)} className="h-8 rounded-full border border-white/15 bg-[#19383A] px-2 text-xs text-white"><option value={0.5}>0.5×</option><option value={0.75}>0.75×</option><option value={1}>1×</option><option value={1.5}>1.5×</option><option value={2}>2×</option></select></label>
-          <button type="button" onClick={exit} aria-label="Exit walkthrough" className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-white/75 hover:bg-white/10"><X className="h-4 w-4" /></button>
+          <label className="hidden items-center text-[10px] sm:flex"><span className="sr-only">Walkthrough speed</span><select aria-label="Walkthrough speed" value={speed} onChange={(event) => changeSpeed(event.target.value)} className="h-8 rounded-full border border-mint bg-forest px-2 text-xs text-white"><option value={0.5}>0.5×</option><option value={0.75}>0.75×</option><option value={1}>1×</option><option value={1.5}>1.5×</option><option value={2}>2×</option></select></label>
+          <button type="button" onClick={exit} aria-label="Exit walkthrough" className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-white hover:bg-white/10"><X className="h-4 w-4" /></button>
           <div className="absolute inset-x-2 bottom-0 flex gap-0.5" role="progressbar" aria-label="Role walkthrough progress" aria-valuemin={0} aria-valuemax={ROLES.length} aria-valuenow={sectionIndex + 1}>
-            {ROLES.map((role, index) => <span key={role} className={`h-0.5 flex-1 rounded-full ${index <= sectionIndex ? "bg-teal-300" : "bg-white/20"}`} />)}
+            {ROLES.map((role, index) => <span key={role} className={`h-0.5 flex-1 rounded-full ${index <= sectionIndex ? "bg-line" : "bg-white/20"}`} />)}
           </div>
         </section>
       </div>
       <aside aria-live="polite" className="pointer-events-none fixed bottom-[calc(84px+env(safe-area-inset-bottom))] left-1/2 z-[1900] w-[min(32rem,calc(100vw-1rem))] -translate-x-1/2 sm:bottom-6" data-demo-caption>
-        <div className="pointer-events-auto rounded-2xl border border-white/90 border-l-4 border-l-teal-600 bg-white/98 p-4 text-slate-900 shadow-[0_18px_52px_rgba(15,23,42,0.24)] backdrop-blur-xl sm:p-5">
+        <div className="pointer-events-auto rounded-2xl border border-card-edge border-l-4 border-l-forest bg-card p-4 text-ink shadow-[0_18px_52px_color-mix(in_srgb,var(--gothos-forest)_24%,transparent)] backdrop-blur-xl sm:p-5">
           <div className="flex items-center justify-between gap-3">
-            <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-teal-900 sm:text-xs">{caption.title}</p>
-            {stage === "complete" && <Check className="h-4 w-4 text-emerald-700" aria-hidden="true" />}
+            <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-forest sm:text-xs">{caption.title}</p>
+            {stage === "complete" && <Check className="h-4 w-4 text-status-foreground" aria-hidden="true" />}
           </div>
-          <p className="mt-1.5 text-sm font-medium leading-6 text-slate-800 sm:text-base">{caption.body}</p>
+          <p className="mt-1.5 text-sm font-medium leading-6 text-ink sm:text-base">{caption.body}</p>
           <div className="mt-2 flex items-center justify-between">
-            <label className="flex items-center gap-1 text-[10px] text-slate-600 sm:hidden"><span>Speed</span><select aria-label="Walkthrough speed" value={speed} onChange={(event) => changeSpeed(event.target.value)} className="rounded border border-slate-300 bg-white px-1 py-0.5 text-slate-800"><option value={0.5}>0.5×</option><option value={0.75}>0.75×</option><option value={1}>1×</option><option value={1.5}>1.5×</option><option value={2}>2×</option></select></label>
-            {stage === "complete" && <button type="button" onClick={replay} className="inline-flex items-center gap-1 rounded-full bg-teal-700 px-3 py-1.5 text-[11px] font-semibold text-white"><RotateCcw className="h-3 w-3" />Replay</button>}
+            <label className="flex items-center gap-1 text-[10px] text-soft-ink sm:hidden"><span>Speed</span><select aria-label="Walkthrough speed" value={speed} onChange={(event) => changeSpeed(event.target.value)} className="rounded border border-input bg-white px-1 py-0.5 text-ink"><option value={0.5}>0.5×</option><option value={0.75}>0.75×</option><option value={1}>1×</option><option value={1.5}>1.5×</option><option value={2}>2×</option></select></label>
+            {stage === "complete" && <button type="button" onClick={replay} className="inline-flex items-center gap-1 rounded-full bg-deep px-3 py-1.5 text-[11px] font-semibold text-white"><RotateCcw className="h-3 w-3" />Replay</button>}
           </div>
         </div>
       </aside>

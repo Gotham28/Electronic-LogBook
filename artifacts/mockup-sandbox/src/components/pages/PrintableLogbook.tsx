@@ -22,7 +22,7 @@ class PrintErrorBoundary extends React.Component<{children: React.ReactNode}, {e
   render() {
     if (this.state.error) {
       return (
-        <div className="p-8 text-red-600 bg-red-50 border border-red-200 rounded m-8">
+        <div className="p-8 text-status-foreground bg-status border border-status-border rounded m-8">
           <h1 className="text-2xl font-bold mb-4">Print Render Crash</h1>
           <p className="mb-4">The PDF generation crashed during rendering:</p>
           <pre className="p-4 bg-white text-xs overflow-auto rounded border">{this.state.error.message}\n{this.state.error.stack}</pre>
@@ -42,14 +42,14 @@ const STATUS_LABELS: Record<string, string> = {
 
 function StatusPill({ status }: { status: string }) {
   const colours: Record<string, string> = {
-    verified: "bg-emerald-100 text-emerald-800",
-    approved: "bg-emerald-100 text-emerald-800",
-    rejected: "bg-rose-100 text-rose-800",
-    pending: "bg-amber-100 text-amber-800",
-    submitted: "bg-blue-100 text-blue-800",
+    verified: "bg-status text-status-foreground",
+    approved: "bg-status text-status-foreground",
+    rejected: "bg-status text-status-foreground",
+    pending: "bg-status text-status-foreground",
+    submitted: "bg-sage text-forest",
   };
   return (
-    <span className={`inline-block rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide ${colours[status] ?? "bg-slate-100 text-slate-600"}`}>
+    <span className={`inline-block rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide ${colours[status] ?? "bg-sage text-soft-ink"}`}>
       {STATUS_LABELS[status] ?? status}
     </span>
   );
@@ -70,55 +70,55 @@ function CoverPage({ profile, name }: { profile: any; name: string }) {
   }, [course]);
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[98vh] break-after-page px-6 py-12 sm:px-12 sm:py-20 text-slate-800" style={{ fontFamily: "system-ui, sans-serif", background: "linear-gradient(160deg, #f0fdf9 0%, #ffffff 60%)" }}>
+    <div className="flex flex-col items-center justify-center min-h-[98vh] break-after-page px-6 py-12 sm:px-12 sm:py-20 text-ink" style={{ fontFamily: "system-ui, sans-serif", background: "var(--gothos-bg)" }}>
       {/* Header band */}
       <div className="flex flex-col items-center gap-4 mb-20 text-center w-full">
-        <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-teal-700 text-white shadow-lg mb-2">
+        <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-deep text-white shadow-lg mb-2">
           <BookOpen size={32} />
         </div>
-        <p className="text-3xl font-extrabold text-slate-900 text-center w-full">{profile.collegeName}</p>
-        <p className="text-sm font-bold uppercase tracking-[0.25em] text-teal-700">Electronic Logbook</p>
+        <p className="text-3xl font-extrabold text-ink text-center w-full">{profile.collegeName}</p>
+        <p className="text-sm font-bold uppercase tracking-[0.25em] text-forest">Electronic Logbook</p>
       </div>
 
       {/* Main title */}
       <div className="text-center mb-16 w-full max-w-2xl flex flex-col items-center">
-        <h1 className="text-6xl font-extrabold text-slate-900 leading-tight">Resident<br/>Training Record</h1>
+        <h1 className="text-6xl font-extrabold text-ink leading-tight">Resident<br/>Training Record</h1>
         <div className="mt-8 mb-2 flex items-center justify-center w-full">
           <input 
             type="text" 
             value={course} 
             onChange={(e) => setCourse(e.target.value)}
-            className="text-2xl font-bold text-teal-800 bg-transparent text-center border-b border-transparent hover:border-slate-300 focus:border-teal-500 focus:outline-none w-3/4 placeholder:text-teal-200 transition-colors"
+            className="text-2xl font-bold text-forest bg-transparent text-center border-b border-transparent hover:border-input focus:border-forest focus:outline-none w-3/4 placeholder:text-helper transition-colors"
             placeholder="Enter Course (e.g. MD Pediatrics)"
           />
         </div>
-        <p className="text-xl font-medium text-teal-700">Department of {profile.department ?? "—"}</p>
+        <p className="text-xl font-medium text-forest">Department of {profile.department ?? "—"}</p>
       </div>
 
       {/* Resident card */}
-      <div className="w-full max-w-sm rounded-2xl border border-teal-100 bg-white shadow-md px-8 py-8 text-center mb-16">
-        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-3">Resident</p>
-        <h2 className="text-3xl font-bold text-slate-900 mb-1">{name}</h2>
+      <div className="w-full max-w-sm rounded-2xl border border-line-soft bg-white shadow-md px-8 py-8 text-center mb-16">
+        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-helper mb-3">Resident</p>
+        <h2 className="text-3xl font-bold text-ink mb-1">{name}</h2>
         {profile.registrationNumber && (
-          <p className="text-sm text-slate-500 font-mono mt-1">{profile.registrationNumber}</p>
+          <p className="text-sm text-helper font-mono mt-1">{profile.registrationNumber}</p>
         )}
-        <div className="mt-4 border-t border-slate-100 pt-4">
-          <p className="text-sm text-slate-600">{dateRange}</p>
-          {profile.batch && <p className="text-xs text-slate-400 mt-0.5">Batch of {profile.batch}</p>}
+        <div className="mt-4 border-t border-line-soft pt-4">
+          <p className="text-sm text-soft-ink">{dateRange}</p>
+          {profile.batch && <p className="text-xs text-helper mt-0.5">Batch of {profile.batch}</p>}
         </div>
       </div>
 
       {/* Guide */}
       {profile.mentorName && (
         <div className="text-center mb-16">
-          <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 mb-2">Under the Guidance of</p>
-          <p className="text-xl font-bold text-slate-800">{profile.mentorName}</p>
-          <p className="text-sm text-slate-500">{mentorRole}</p>
+          <p className="text-[10px] uppercase tracking-[0.2em] text-helper mb-2">Under the Guidance of</p>
+          <p className="text-xl font-bold text-ink">{profile.mentorName}</p>
+          <p className="text-sm text-helper">{mentorRole}</p>
         </div>
       )}
 
       {/* Footer */}
-      <div className="mt-auto pt-16 text-center text-xs text-slate-400">
+      <div className="mt-auto pt-16 text-center text-xs text-helper">
         <p>Generated on {printedDate}</p>
         <p className="mt-1">This document is system-generated and confidential.</p>
       </div>
@@ -128,20 +128,20 @@ function CoverPage({ profile, name }: { profile: any; name: string }) {
 
 function SectionHeader({ number, title }: { number: string; title: string }) {
   return (
-    <div className="flex items-baseline gap-3 mb-5 pb-3 border-b-2 border-teal-600 break-after-avoid">
-      <span className="text-[11px] font-black uppercase tracking-[0.2em] text-teal-600">{number}</span>
-      <h3 className="text-lg font-bold text-slate-900">{title}</h3>
+    <div className="flex items-baseline gap-3 mb-5 pb-3 border-b-2 border-forest break-after-avoid">
+      <span className="text-[11px] font-black uppercase tracking-[0.2em] text-forest">{number}</span>
+      <h3 className="text-lg font-bold text-ink">{title}</h3>
     </div>
   );
 }
 
 function EmptySection() {
-  return <p className="text-sm text-slate-400 italic">No records found.</p>;
+  return <p className="text-sm text-helper italic">No records found.</p>;
 }
 
 function Th({ children, right }: { children: React.ReactNode; right?: boolean }) {
   return (
-    <th className={`py-2 px-3 text-[10px] font-bold uppercase tracking-wider text-slate-500 bg-slate-50 border-b border-t border-slate-200 whitespace-nowrap ${right ? "text-right" : "text-left"}`}>
+    <th className={`py-2 px-3 text-[10px] font-bold uppercase tracking-wider text-helper bg-mist border-b border-t border-line-soft whitespace-nowrap ${right ? "text-right" : "text-left"}`}>
       {children}
     </th>
   );
@@ -149,7 +149,7 @@ function Th({ children, right }: { children: React.ReactNode; right?: boolean })
 
 function Td({ children, right, muted }: { children: React.ReactNode; right?: boolean; muted?: boolean }) {
   return (
-    <td className={`py-2 px-3 text-[11px] border-b border-slate-100 align-top ${right ? "text-right" : "text-left"} ${muted ? "text-slate-400" : "text-slate-800"}`}>
+    <td className={`py-2 px-3 text-[11px] border-b border-line-soft align-top ${right ? "text-right" : "text-left"} ${muted ? "text-helper" : "text-ink"}`}>
       {children}
     </td>
   );
@@ -161,11 +161,11 @@ function AggregateSummary({ rows, label }: { rows: any[]; label: string }) {
   const pending = rows.filter(r => r.status === "pending" || r.status === "submitted").length;
   const rejected = rows.filter(r => r.status === "rejected").length;
   return (
-    <div className="mt-4 flex gap-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider justify-end">
-      <div className="bg-slate-100 px-4 py-2 rounded-lg border border-slate-200 shadow-sm">Total {label}: <span className="text-slate-900 ml-1">{rows.length}</span></div>
-      <div className="bg-emerald-50 text-emerald-700 px-4 py-2 rounded-lg border border-emerald-100 shadow-sm">Verified: <span className="ml-1">{verified}</span></div>
-      <div className="bg-amber-50 text-amber-700 px-4 py-2 rounded-lg border border-amber-100 shadow-sm">Pending: <span className="ml-1">{pending}</span></div>
-      {rejected > 0 && <div className="bg-rose-50 text-rose-700 px-4 py-2 rounded-lg border border-rose-100 shadow-sm">Rejected: <span className="ml-1">{rejected}</span></div>}
+    <div className="mt-4 flex gap-4 text-[10px] font-bold text-helper uppercase tracking-wider justify-end">
+      <div className="bg-sage px-4 py-2 rounded-lg border border-line-soft shadow-sm">Total {label}: <span className="text-ink ml-1">{rows.length}</span></div>
+      <div className="bg-status text-status-foreground px-4 py-2 rounded-lg border border-status-border shadow-sm">Verified: <span className="ml-1">{verified}</span></div>
+      <div className="bg-status text-status-foreground px-4 py-2 rounded-lg border border-status-border shadow-sm">Pending: <span className="ml-1">{pending}</span></div>
+      {rejected > 0 && <div className="bg-status text-status-foreground px-4 py-2 rounded-lg border border-status-border shadow-sm">Rejected: <span className="ml-1">{rejected}</span></div>}
     </div>
   );
 }
@@ -261,8 +261,8 @@ export function PrintableLogbook() {
   }, [closePrintView, data, error, flipPreviewDone, loading]);
 
   if (loading) return (
-    <div className="flex flex-col items-center justify-center min-h-screen gap-4 text-slate-500">
-      <div className="w-10 h-10 rounded-full border-4 border-teal-200 border-t-teal-600 animate-spin" />
+    <div className="flex flex-col items-center justify-center min-h-screen gap-4 text-helper">
+      <div className="w-10 h-10 rounded-full border-4 border-line-soft border-t-forest animate-spin" />
       <p className="text-sm font-medium">Preparing your logbook PDF…</p>
     </div>
   );
@@ -270,12 +270,12 @@ export function PrintableLogbook() {
   if (error) {
     return (
       <div className="p-12 text-center print:hidden" role="alert">
-        <p className="text-lg font-semibold text-rose-700">Your logbook could not be printed</p>
-        <p className="mt-2 text-sm text-slate-600">{error}</p>
-        <p className="mt-1 text-xs text-slate-500">Nothing was printed. Some sections could not be loaded.</p>
+        <p className="text-lg font-semibold text-status-foreground">Your logbook could not be printed</p>
+        <p className="mt-2 text-sm text-soft-ink">{error}</p>
+        <p className="mt-1 text-xs text-helper">Nothing was printed. Some sections could not be loaded.</p>
         <div className="mt-6 flex justify-center gap-3">
-          <button onClick={fetchAll} className="rounded-xl bg-teal-600 px-5 py-2 text-sm text-white font-semibold">Try again</button>
-          <button onClick={closePrintView} className="rounded-xl border border-slate-300 bg-white px-5 py-2 text-sm text-slate-700">Cancel</button>
+          <button onClick={fetchAll} className="rounded-xl bg-forest px-5 py-2 text-sm text-white font-semibold">Try again</button>
+          <button onClick={closePrintView} className="rounded-xl border border-input bg-white px-5 py-2 text-sm text-ink">Cancel</button>
         </div>
       </div>
     );
@@ -294,8 +294,8 @@ export function PrintableLogbook() {
   return (
     <PrintErrorBoundary>
       {isDemoMode() && shouldReduceMotion === false && !flipPreviewDone && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden bg-slate-950/55 p-5 print:hidden" role="status" aria-live="polite">
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(255,255,255,0.12),transparent_65%)]" />
+        <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden bg-deep/55 p-5 print:hidden" role="status" aria-live="polite">
+          <div className="absolute inset-0 bg-transparent" />
           <AnimatePresence mode="wait">
             <motion.div
               key={flipPage}
@@ -303,34 +303,34 @@ export function PrintableLogbook() {
               animate={{ opacity: 1, rotateY: 0, x: 0 }}
               exit={{ opacity: 0, rotateY: 70, x: -24 }}
               transition={{ duration: 0.38, ease: "easeOut" }}
-              className="relative flex min-h-[min(68vh,34rem)] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-white/70 bg-white px-6 py-7 shadow-[0_30px_100px_rgba(15,23,42,0.38)] sm:px-9 sm:py-9"
+              className="relative flex min-h-[min(68vh,34rem)] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-card-edge bg-white px-6 py-7 shadow-[0_30px_100px_color-mix(in_srgb,var(--gothos-forest)_38%,transparent)] sm:px-9 sm:py-9"
               style={{ transformOrigin: "left center", perspective: 1200 }}
             >
-              <div className="flex items-center justify-between border-b border-slate-200 pb-4">
-                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-teal-700">Electronic Logbook</span>
-                <span className="text-xs font-medium tabular-nums text-slate-400">{String(flipPage + 1).padStart(2, "0")} / 04</span>
+              <div className="flex items-center justify-between border-b border-line-soft pb-4">
+                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-forest">Electronic Logbook</span>
+                <span className="text-xs font-medium tabular-nums text-helper">{String(flipPage + 1).padStart(2, "0")} / 04</span>
               </div>
               <div className="flex flex-1 flex-col justify-center py-9">
-                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">{user?.name ?? "Resident"}</p>
-                <h1 className="mt-3 text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-helper">{user?.name ?? "Resident"}</p>
+                <h1 className="mt-3 text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
                   {["Training record", "Clinical activity", "Academic activity", "Progress summary"][flipPage]}
                 </h1>
                 <div className="mt-8 space-y-4" aria-hidden="true">
-                  <div className="h-2 w-4/5 rounded-full bg-slate-100" />
-                  <div className="h-2 w-full rounded-full bg-slate-100" />
-                  <div className="h-2 w-3/5 rounded-full bg-slate-100" />
+                  <div className="h-2 w-4/5 rounded-full bg-sage" />
+                  <div className="h-2 w-full rounded-full bg-sage" />
+                  <div className="h-2 w-3/5 rounded-full bg-sage" />
                   <div className="mt-7 grid grid-cols-2 gap-3">
-                    <div className="h-16 rounded-xl border border-teal-100 bg-teal-50/70" />
-                    <div className="h-16 rounded-xl border border-slate-100 bg-slate-50" />
+                    <div className="h-16 rounded-xl border border-line-soft bg-mist" />
+                    <div className="h-16 rounded-xl border border-line-soft bg-mist" />
                   </div>
                 </div>
               </div>
-              <div className="flex items-center justify-between border-t border-slate-200 pt-4">
-                <span className="text-xs text-slate-400">Preparing print view</span>
+              <div className="flex items-center justify-between border-t border-line-soft pt-4">
+                <span className="text-xs text-helper">Preparing print view</span>
                 <button
                   type="button"
                   onClick={() => setFlipPreviewDone(true)}
-                  className="min-h-11 rounded-lg px-3 text-sm font-semibold text-teal-800 transition-colors hover:bg-teal-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600"
+                  className="min-h-11 rounded-lg px-3 text-sm font-semibold text-forest transition-colors hover:bg-mist focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   Skip preview
                 </button>
@@ -357,25 +357,25 @@ export function PrintableLogbook() {
       <CoverPage profile={data.profile} name={user?.name ?? "—"} />
 
       {/* Main document */}
-      <div ref={documentRef} className="bg-white px-4 py-8 sm:px-10 sm:py-10 max-w-[900px] mx-auto text-slate-800" style={{ fontFamily: "system-ui, sans-serif" }}>
+      <div ref={documentRef} className="bg-white px-4 py-8 sm:px-10 sm:py-10 max-w-[900px] mx-auto text-ink" style={{ fontFamily: "system-ui, sans-serif" }}>
         <table className="w-full border-collapse m-0 p-0 border-0">
           <thead className="print-header-group">
             <tr>
               <td className="p-0 border-0">
                 {/* Running header on every printed page — native repeating header at top of each page */}
-                <div className="hidden print:flex items-center justify-between border-b-2 border-teal-600 pb-2 mb-6 bg-white">
+                <div className="hidden print:flex items-center justify-between border-b-2 border-forest pb-2 mb-6 bg-white">
                   <div className="flex items-center gap-3">
-                    <div style={{ width: 4, height: 26, background: "#0d9488", borderRadius: 3, flexShrink: 0 }} />
+                    <div style={{ width: 4, height: 26, background: "var(--gothos-forest)", borderRadius: 3, flexShrink: 0 }} />
                     <div>
-                      <p style={{ fontSize: 11, fontWeight: 800, color: "#0f172a", margin: 0, lineHeight: 1.2 }}>{user?.name ?? "—"}</p>
-                      <p style={{ fontSize: 9, color: "#64748b", margin: 0, marginTop: 1 }}>
-                        {data.profile?.collegeName} &nbsp;·&nbsp; Dept. of {department}&nbsp;&nbsp;|&nbsp;&nbsp;Reg. No:&nbsp;<span style={{ fontWeight: 700, color: "#0f172a" }}>{regNumber}</span>
+                      <p style={{ fontSize: 11, fontWeight: 800, color: "var(--gothos-ink)", margin: 0, lineHeight: 1.2 }}>{user?.name ?? "—"}</p>
+                      <p style={{ fontSize: 9, color: "var(--gothos-muted)", margin: 0, marginTop: 1 }}>
+                        {data.profile?.collegeName} &nbsp;·&nbsp; Dept. of {department}&nbsp;&nbsp;|&nbsp;&nbsp;Reg. No:&nbsp;<span style={{ fontWeight: 700, color: "var(--gothos-ink)" }}>{regNumber}</span>
                       </p>
                     </div>
                   </div>
                   <div style={{ textAlign: "right" }}>
-                    <p style={{ fontSize: 9, fontWeight: 700, color: "#0d9488", textTransform: "uppercase", letterSpacing: "0.1em", margin: 0 }}>Electronic Logbook</p>
-                    <p style={{ fontSize: 8, color: "#94a3b8", margin: 0, marginTop: 1 }}>Resident Training Record · {new Date().getFullYear()}</p>
+                    <p style={{ fontSize: 9, fontWeight: 700, color: "var(--gothos-forest)", textTransform: "uppercase", letterSpacing: "0.1em", margin: 0 }}>Electronic Logbook</p>
+                    <p style={{ fontSize: 8, color: "var(--gothos-muted)", margin: 0, marginTop: 1 }}>Resident Training Record · {new Date().getFullYear()}</p>
                   </div>
                 </div>
               </td>
@@ -385,16 +385,16 @@ export function PrintableLogbook() {
             <tr>
               <td className="p-0 border-0 align-top">
                 {/* Document identity bar */}
-        <div className="flex flex-wrap items-start justify-between gap-4 mb-10 pb-6 border-b border-slate-200">
+        <div className="flex flex-wrap items-start justify-between gap-4 mb-10 pb-6 border-b border-line-soft">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-teal-600 mb-1">{data.profile?.collegeName}</p>
-            <h1 className="text-2xl font-extrabold text-slate-900">{user?.name ?? "—"}</h1>
-            <p className="text-sm text-slate-500 mt-0.5">Department of {department}</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-forest mb-1">{data.profile?.collegeName}</p>
+            <h1 className="text-2xl font-extrabold text-ink">{user?.name ?? "—"}</h1>
+            <p className="text-sm text-helper mt-0.5">Department of {department}</p>
           </div>
-          <div className="text-right text-xs text-slate-500 space-y-0.5">
-            <p><span className="font-semibold text-slate-700">Reg. No:</span> {regNumber}</p>
-            <p><span className="font-semibold text-slate-700">Batch:</span> {joiningYear}</p>
-            <p><span className="font-semibold text-slate-700">Printed:</span> {new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" })}</p>
+          <div className="text-right text-xs text-helper space-y-0.5">
+            <p><span className="font-semibold text-ink">Reg. No:</span> {regNumber}</p>
+            <p><span className="font-semibold text-ink">Batch:</span> {joiningYear}</p>
+            <p><span className="font-semibold text-ink">Printed:</span> {new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" })}</p>
           </div>
         </div>
 
@@ -409,7 +409,7 @@ export function PrintableLogbook() {
                 </tr></thead>
                 <tbody>
                   {rows.map((p: any, i: number) => (
-                    <tr key={p.id} className={i % 2 === 0 ? "bg-white" : "bg-slate-50"}>
+                    <tr key={p.id} className={i % 2 === 0 ? "bg-white" : "bg-mist"}>
                       <Td><span className="font-semibold">{p.ward}</span></Td>
                       <Td>{formatLogbookDate(p.startDate)}</Td>
                       <Td>{formatLogbookDate(p.endDate)}</Td>
@@ -437,7 +437,7 @@ export function PrintableLogbook() {
                 </tr></thead>
                 <tbody>
                   {rows.map((c: any, i: number) => (
-                    <tr key={c.id} className={i % 2 === 0 ? "" : "bg-slate-50/50"}>
+                    <tr key={c.id} className={i % 2 === 0 ? "" : "bg-mist"}>
                       <Td muted>{rows.length - i}</Td>
                       <Td>{formatLogbookDate(c.date)}</Td>
                       {!hideUhid && <Td muted={!c.patientUhid}>{c.patientUhid || "—"}</Td>}
@@ -467,7 +467,7 @@ export function PrintableLogbook() {
                 </tr></thead>
                 <tbody>
                   {rows.map((p: any, i: number) => (
-                    <tr key={p.id} className={i % 2 === 0 ? "" : "bg-slate-50/50"}>
+                    <tr key={p.id} className={i % 2 === 0 ? "" : "bg-mist"}>
                       <Td muted>{rows.length - i}</Td>
                       <Td>{formatLogbookDate(p.date)}</Td>
                       <Td><span className="font-medium">{p.procedureName}</span>
@@ -506,7 +506,7 @@ export function PrintableLogbook() {
                 </tr></thead>
                 <tbody>
                   {rows.map((c: any, i: number) => (
-                    <tr key={c.id} className={i % 2 === 0 ? "" : "bg-slate-50/50"}>
+                    <tr key={c.id} className={i % 2 === 0 ? "" : "bg-mist"}>
                       <Td muted>{rows.length - i}</Td>
                       <Td>{formatLogbookDate(c.date)}</Td>
                       <Td><span className="font-medium">{clinicalNames.get(c.category) ?? c.category}</span></Td>
@@ -537,7 +537,7 @@ export function PrintableLogbook() {
                 </tr></thead>
                 <tbody>
                   {rows.map((a: any, i: number) => (
-                    <tr key={a.id} className={i % 2 === 0 ? "" : "bg-slate-50/50"}>
+                    <tr key={a.id} className={i % 2 === 0 ? "" : "bg-mist"}>
                       <Td muted>{rows.length - i}</Td>
                       <Td>{formatLogbookDate(a.date)}</Td>
                       <Td>{academicSectionName(academicLogbook, a.activityType ?? a.type ?? "—").replace(/_/g, " ")}</Td>
@@ -554,7 +554,7 @@ export function PrintableLogbook() {
                   readAcademicRecord(a.description)!.trainingYear - readAcademicRecord(b.description)!.trainingYear
                   || a.activityType.localeCompare(b.activityType) || a.date.localeCompare(b.date)).map((row: any) => (
                   <article key={row.id}>
-                    <h4 className="font-semibold text-slate-900">{academicSectionName(academicLogbook, row.activityType)} · {formatLogbookDate(row.date)}</h4>
+                    <h4 className="font-semibold text-ink">{academicSectionName(academicLogbook, row.activityType)} · {formatLogbookDate(row.date)}</h4>
                     <p className="mt-1 whitespace-pre-wrap text-sm">{row.topic}</p>
                     <AcademicRecordDetails activityType={row.activityType} description={row.description} presentationType={row.presentationType} />
                     <p className="mt-2 text-xs">Reviewing faculty: {row.supervisorName || "—"} · Status: {row.status}</p>
@@ -577,11 +577,11 @@ export function PrintableLogbook() {
               </tr></thead>
               <tbody>
                 {data.assessments.map((a: any, i: number) => (
-                  <tr key={a.id} className={i % 2 === 0 ? "" : "bg-slate-50/50"}>
+                  <tr key={a.id} className={i % 2 === 0 ? "" : "bg-mist"}>
                     <Td>{formatLogbookDate(a.date)}</Td>
                     <Td><span className="font-medium">{a.examName}</span></Td>
                     <Td>{a.type}</Td>
-                    <Td right><span className="font-bold">{a.marks}</span>{a.maximum ? <span className="text-slate-400"> / {a.maximum}</span> : ""}</Td>
+                    <Td right><span className="font-bold">{a.marks}</span>{a.maximum ? <span className="text-helper"> / {a.maximum}</span> : ""}</Td>
                     <Td muted={!a.assessorName}>{a.assessorName || "—"}</Td>
                   </tr>
                 ))}
@@ -600,7 +600,7 @@ export function PrintableLogbook() {
               </tr></thead>
               <tbody>
                 {rows.map((c: any, i: number) => (
-                  <tr key={c.id} className={i % 2 === 0 ? "" : "bg-slate-50/50"}>
+                  <tr key={c.id} className={i % 2 === 0 ? "" : "bg-mist"}>
                     <Td><span className="font-medium">{c.title}</span></Td>
                     <Td muted={!c.provider}>{c.provider || "—"}</Td>
                     <Td>{formatLogbookDate(c.issueDate)}</Td>
@@ -627,7 +627,7 @@ export function PrintableLogbook() {
                     ? Math.ceil((new Date(l.endDate).getTime() - new Date(l.startDate).getTime()) / 86400000) + 1
                     : "—";
                   return (
-                    <tr key={l.id} className={i % 2 === 0 ? "" : "bg-slate-50/50"}>
+                    <tr key={l.id} className={i % 2 === 0 ? "" : "bg-mist"}>
                       <Td>{l.leaveType}</Td>
                       <Td>{formatLogbookDate(l.startDate)}</Td>
                       <Td>{formatLogbookDate(l.endDate)}</Td>
@@ -645,7 +645,7 @@ export function PrintableLogbook() {
         <div className="mb-16 no-break">
           <SectionHeader number={nextSection()} title="Thesis" />
           {!data.thesis ? <EmptySection /> : (
-            <div className="rounded-xl border border-slate-200 overflow-hidden">
+            <div className="rounded-xl border border-line-soft overflow-hidden">
               {[
                 ["Thesis Title", data.thesis.thesisTitle],
                 ["Protocol Submission", data.thesis.protocolSubmissionDate ? formatLogbookDate(data.thesis.protocolSubmissionDate) : "—"],
@@ -657,9 +657,9 @@ export function PrintableLogbook() {
                 ["Mid-Term Status", data.thesis.midTermStatus],
                 ["Final Submission Status", data.thesis.finalSubmissionStatus],
               ].map(([label, value], i) => (
-                <div key={label} className={`flex gap-4 px-4 py-2.5 text-xs ${i % 2 === 0 ? "bg-white" : "bg-slate-50"}`}>
-                  <span className="w-48 shrink-0 font-semibold text-slate-500">{label}</span>
-                  <span className="text-slate-800">{value || "—"}</span>
+                <div key={label} className={`flex gap-4 px-4 py-2.5 text-xs ${i % 2 === 0 ? "bg-white" : "bg-mist"}`}>
+                  <span className="w-48 shrink-0 font-semibold text-helper">{label}</span>
+                  <span className="text-ink">{value || "—"}</span>
                 </div>
               ))}
             </div>
@@ -672,18 +672,18 @@ export function PrintableLogbook() {
           {(() => { const rows = data.appraisals; return !rows || rows.length === 0 ? <EmptySection /> : (
             <div className="grid grid-cols-2 gap-4">
               {rows.map((appr: any, i: number) => (
-                <div key={appr.id || i} className="rounded-xl border border-slate-200 overflow-hidden bg-white shadow-sm p-4 text-xs">
-                  <div className="font-bold text-sm text-slate-800 mb-2 border-b border-slate-100 pb-2 flex justify-between items-center">
+                <div key={appr.id || i} className="rounded-xl border border-line-soft overflow-hidden bg-white shadow-sm p-4 text-xs">
+                  <div className="font-bold text-sm text-ink mb-2 border-b border-line-soft pb-2 flex justify-between items-center">
                     <span>Q{appr.quarter} {appr.year}</span>
-                    <span className="text-[10px] font-normal text-slate-500 uppercase">{formatLogbookDate(appr.appraisalDate)}</span>
+                    <span className="text-[10px] font-normal text-helper uppercase">{formatLogbookDate(appr.appraisalDate)}</span>
                   </div>
                   <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2">
-                    <span className="text-slate-500">Patient Care:</span><span className="font-semibold text-slate-800 text-right">{appr.patientCareGrade || "—"}</span>
-                    <span className="text-slate-500">Scholastic:</span><span className="font-semibold text-slate-800 text-right">{appr.scholasticGrade || "—"}</span>
-                    <span className="text-slate-500">Prof. Attributes:</span><span className="font-semibold text-slate-800 text-right">{appr.professionalAttributesGrade || "—"}</span>
+                    <span className="text-helper">Patient Care:</span><span className="font-semibold text-ink text-right">{appr.patientCareGrade || "—"}</span>
+                    <span className="text-helper">Scholastic:</span><span className="font-semibold text-ink text-right">{appr.scholasticGrade || "—"}</span>
+                    <span className="text-helper">Prof. Attributes:</span><span className="font-semibold text-ink text-right">{appr.professionalAttributesGrade || "—"}</span>
                   </div>
                   {appr.facultyRemarks && (
-                    <div className="mt-3 pt-2 border-t border-slate-100 italic text-slate-600 text-[10px]">
+                    <div className="mt-3 pt-2 border-t border-line-soft italic text-soft-ink text-[10px]">
                       "{appr.facultyRemarks}"
                     </div>
                   )}
@@ -696,12 +696,12 @@ export function PrintableLogbook() {
         {/* ── Final Declaration ────────────────────────── */}
         <div className="break-before-page pt-10">
           <div className="text-center mb-8">
-             <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-teal-50 text-teal-600 mb-4 shadow-sm border border-teal-100">
+             <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-mist text-forest mb-4 shadow-sm border border-line-soft">
                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
              </div>
-             <h2 className="text-3xl font-bold text-slate-900">Final Verification</h2>
+             <h2 className="text-3xl font-bold text-ink">Final Verification</h2>
           </div>
-          <div className="bg-slate-50 border border-slate-200 rounded-xl p-8 text-sm text-slate-700 leading-loose space-y-5">
+          <div className="bg-mist border border-line-soft rounded-xl p-8 text-sm text-ink leading-loose space-y-5">
              <p>This is to certify that <strong>{user?.name ?? "the resident"}</strong> (Registration No: <strong>{regNumber}</strong>) has satisfactorily fulfilled all the mandatory requirements for the <strong>{localStorage.getItem("logbook_course") || data.profile?.course || "MD/MS Program"}</strong> training program in the Department of <strong>{department}</strong> at <strong>{data.profile?.collegeName}</strong>.</p>
              <p>All clinical cases, procedures, and academic activities recorded in this logbook have been personally performed or attended by the resident. The entries have been periodically evaluated, verified, and authenticated by the respective unit supervisors and the Head of Department.</p>
              <p>The resident has demonstrated the necessary clinical competencies, professionalism, and ethical conduct required for the successful completion of the training period.</p>
@@ -711,8 +711,8 @@ export function PrintableLogbook() {
           <div className="mt-32 grid grid-cols-3 gap-8 no-break">
             {["Resident Signature", "Guide / Supervisor", "HOD Signature & Stamp"].map((label) => (
               <div key={label} className="text-center">
-                <div className="h-14 border-b border-slate-300 mb-2" />
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">{label}</p>
+                <div className="h-14 border-b border-input mb-2" />
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-helper">{label}</p>
               </div>
             ))}
           </div>
@@ -725,10 +725,10 @@ export function PrintableLogbook() {
 
         {/* Print controls */}
         <div className="mt-10 flex justify-center gap-3 print:hidden">
-          <button onClick={() => window.print()} className="flex items-center gap-2 rounded-xl bg-teal-600 px-5 py-2 text-sm font-semibold text-white">
+          <button onClick={() => window.print()} className="flex items-center gap-2 rounded-xl bg-forest px-5 py-2 text-sm font-semibold text-white">
             <Printer className="h-4 w-4" /> Print / Save as PDF
           </button>
-          <button onClick={closePrintView} className="flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-5 py-2 text-sm text-slate-700">
+          <button onClick={closePrintView} className="flex items-center gap-2 rounded-xl border border-input bg-white px-5 py-2 text-sm text-ink">
             <X className="h-4 w-4" /> Close
           </button>
         </div>

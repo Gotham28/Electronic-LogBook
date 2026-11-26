@@ -148,21 +148,21 @@ export function RegistrationPage({
   return (
     <div className="medical-grid min-h-screen p-4 md:p-8">
       <div className="glass-panel mx-auto max-w-5xl overflow-hidden rounded-[30px] motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-4 motion-safe:duration-500 motion-reduce:animate-none">
-        <header className="flex items-center justify-between border-b border-white/80 bg-white/65 px-5 py-4 md:px-8">
-          <button onClick={onBack} className="flex items-center gap-2 text-xs font-bold text-teal-800">
+        <header className="flex items-center justify-between border-b border-card-edge bg-card px-5 py-4 md:px-8">
+          <button onClick={onBack} className="flex items-center gap-2 text-xs font-bold text-forest">
             <ArrowLeft className="h-4 w-4" /> Back to sign in
           </button>
-          <div className="flex items-center gap-2 text-teal-800">
+          <div className="flex items-center gap-2 text-forest">
             <BookOpenCheck className="h-5 w-5" />
             <span className="text-sm font-bold">Student self-registration</span>
           </div>
         </header>
 
         <div className="grid lg:grid-cols-[.72fr_1.28fr]">
-          <aside className="bg-gradient-to-br from-teal-700 to-cyan-600 p-7 text-white md:p-9 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-left-4 motion-safe:duration-500 motion-reduce:animate-none">
-            <p className="text-[10px] font-bold uppercase tracking-[.2em] text-teal-100">Registration progress</p>
+          <aside className="bg-deep p-7 text-white md:p-9 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-left-4 motion-safe:duration-500 motion-reduce:animate-none">
+            <p className="text-[10px] font-bold uppercase tracking-[.2em] text-white">Registration progress</p>
             <h1 className="mt-3 text-3xl font-bold">Create your E-Logbook account</h1>
-            <p className="mt-3 text-xs leading-5 text-teal-50/85">
+            <p className="mt-3 text-xs leading-5 text-white">
               Register using the official university registration number, exact joining date and department.
             </p>
             <div className="mt-8 space-y-3">
@@ -170,17 +170,17 @@ export function RegistrationPage({
             </div>
             <div className="mt-8 rounded-2xl border border-white/15 bg-white/10 p-4">
               <p className="flex items-center gap-2 text-xs font-bold"><CalendarDays className="h-4 w-4" /> Course duration check</p>
-              <p className="mt-2 text-[11px] leading-5 text-teal-50">
+              <p className="mt-2 text-[11px] leading-5 text-white">
                 The system calculates the expected completion date from the exact day, month and year of joining.
               </p>
             </div>
           </aside>
 
-          <main className="bg-white/82 p-6 md:p-9">
+          <main className="bg-card p-6 md:p-9">
               <form onSubmit={completeRegistration} className="space-y-5 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-3 motion-safe:duration-500 motion-reduce:animate-none">
                 <div>
                   <h2 className="mt-1 text-3xl font-bold">Student details</h2>
-                  <p className="mt-2 text-sm text-slate-500">All fields must match the official admission record.</p>
+                  <p className="mt-2 text-sm text-helper">All fields must match the official admission record.</p>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Field label="Full name" htmlFor="registration-full-name"><Input id="registration-full-name" value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} required /></Field>
@@ -203,7 +203,7 @@ export function RegistrationPage({
                           required 
                           disabled={emailVerified}
                         />
-                        {emailVerified && <CheckCircle className="absolute right-3 top-2.5 h-4 w-4 text-emerald-500" />}
+                        {emailVerified && <CheckCircle className="absolute right-3 top-2.5 h-4 w-4 text-status-foreground" />}
                       </div>
                       {!emailVerified && (
                         <Button type="button" variant="outline" onClick={sendOtp} disabled={!form.email || sendingOtp || countdown > 0}>
@@ -212,8 +212,8 @@ export function RegistrationPage({
                       )}
                     </div>
                     {otpSent && !emailVerified && (
-                      <div className="mt-3 flex flex-col gap-3 rounded-lg border bg-slate-50 p-3">
-                        <Label className="text-xs text-slate-600">Enter 6-digit code</Label>
+                      <div className="mt-3 flex flex-col gap-3 rounded-lg border bg-mist p-3">
+                        <Label className="text-xs text-soft-ink">Enter 6-digit code</Label>
                         <div className="flex items-center gap-3">
                           <InputOTP maxLength={6} value={otp} onChange={setOtp} disabled={verifyingOtp}>
                             <InputOTPGroup>
@@ -246,14 +246,14 @@ export function RegistrationPage({
                       <SelectContent>{departments.filter((department) => department.collegeId === selectedCollegeId).map((department) => <SelectItem key={department.id} value={String(department.id)}>{department.name}</SelectItem>)}</SelectContent>
                     </Select>
                   </Field>
-                  {departmentsLoading && <p role="status" className="text-sm text-slate-500">Loading departments…</p>}
-                  {departmentError && <p role="alert" className="text-sm text-rose-700">We could not load the department directory. Check that the API is running with the current branch, then <button type="button" className="font-semibold underline underline-offset-2" onClick={loadDepartments}>try again</button>.</p>}
-                  {!departmentsLoading && !departmentError && !departments.length && <p className="text-sm text-slate-500">No departments are accepting registrations yet. Contact your institution.</p>}
+                  {departmentsLoading && <p role="status" className="text-sm text-helper">Loading departments…</p>}
+                  {departmentError && <p role="alert" className="text-sm text-status-foreground">We could not load the department directory. Check that the API is running with the current branch, then <button type="button" className="font-semibold underline underline-offset-2" onClick={loadDepartments}>try again</button>.</p>}
+                  {!departmentsLoading && !departmentError && !departments.length && <p className="text-sm text-helper">No departments are accepting registrations yet. Contact your institution.</p>}
                   <Field label="University ID" htmlFor="registration-university-id"><Input id="registration-university-id" value={form.kuhsId} onChange={(e) => setForm({ ...form, kuhsId: e.target.value })} required /></Field>
                   <Field label="University registration number (Optional)" htmlFor="registration-number"><Input id="registration-number" value={form.registrationNumber} onChange={(e) => setForm({ ...form, registrationNumber: e.target.value })} /></Field>
                   <Field label="Exact joining date" htmlFor="registration-joining-date">
                     <Input id="registration-joining-date" type="date" value={form.joiningDate} onChange={(e) => setForm({ ...form, joiningDate: e.target.value })} required />
-                    <p className="text-[10px] text-slate-500">Day, month and year are required.</p>
+                    <p className="text-[10px] text-helper">Day, month and year are required.</p>
                   </Field>
                   <div className="grid grid-cols-2 gap-3">
                     <Summary label="Joining year" value={String(joiningYear)} />
@@ -261,14 +261,14 @@ export function RegistrationPage({
                   <Field label="Create password" htmlFor="registration-password"><Input id="registration-password" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} minLength={8} required /></Field>
                   <Field label="Confirm password" htmlFor="registration-confirm-password">
                     <Input id="registration-confirm-password" type="password" value={form.confirmPassword} onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })} minLength={8} required />
-                    {form.confirmPassword && !passwordsMatch && <p className="text-[10px] text-rose-600">Passwords do not match.</p>}
+                    {form.confirmPassword && !passwordsMatch && <p className="text-[10px] text-status-foreground">Passwords do not match.</p>}
                   </Field>
                 </div>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center mt-6">
                   <Button type="submit" disabled={!passwordsMatch || submitting || !emailVerified || !form.department || departmentsLoading} className="w-full sm:w-auto">
                     {submitting ? "Submitting Registration..." : "Complete Registration"} <ArrowRight className="h-4 w-4 ml-2" />
                   </Button>
-                  {!emailVerified && <p className="text-xs font-medium text-slate-500">Please verify your email to continue</p>}
+                  {!emailVerified && <p className="text-xs font-medium text-helper">Please verify your email to continue</p>}
                 </div>
               </form>
           </main>
@@ -283,13 +283,13 @@ function Field({ label, htmlFor, children }: { label: string; htmlFor: string; c
 }
 
 function Summary({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-xl border border-teal-100 bg-white/80 p-3"><p className="text-[9px] font-bold uppercase tracking-wider text-teal-700">{label}</p><p className="mt-1 truncate text-xs font-bold text-slate-900">{value || "—"}</p></div>;
+  return <div className="rounded-xl border border-line-soft bg-card p-3"><p className="text-[9px] font-bold uppercase tracking-wider text-forest">{label}</p><p className="mt-1 truncate text-xs font-bold text-ink">{value || "—"}</p></div>;
 }
 
 function Step({ number, title, active, complete }: { number: string; title: string; active: boolean; complete: boolean }) {
   return (
     <div className={`flex items-center gap-3 rounded-2xl border p-3 ${active ? "border-white/35 bg-white/15 motion-safe:animate-pulse-soft motion-reduce:animate-none" : "border-white/10 bg-white/5"}`}>
-      <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white text-xs font-bold text-teal-700">
+      <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white text-xs font-bold text-forest">
         {complete ? <BadgeCheck className="h-4 w-4" /> : number}
       </span>
       <p className="text-xs font-bold">{title}</p>

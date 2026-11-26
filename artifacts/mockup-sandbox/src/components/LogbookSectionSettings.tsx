@@ -12,7 +12,7 @@ import { logbookSectionSettingsSchema, type LogbookSectionSettings, type Managed
 import type { AcademicLogbookField } from "@/lib/academic-logbook";
 
 const endpoint = "/api/admin/department/logbook-sections";
-const selectClass = "h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm disabled:opacity-60";
+const selectClass = "h-10 w-full rounded-md border border-line-soft bg-white px-3 text-sm disabled:opacity-60";
 const emptySection = (categoryId: string, sortOrder: number): LogbookSectionSettings => ({
   name: "", categoryId, sortOrder, years: [1, 2, 3], topicLabel: "Topic / title", multilineTopic: false,
   fields: [], archived: false, required: 0, period: "total",
@@ -23,7 +23,7 @@ function Control({ label, children }: { label: string; children: React.ReactNode
   return <div className="space-y-1.5"><Label htmlFor={id}>{label}</Label>{React.isValidElement<{ id?: string }>(children) ? React.cloneElement(children, { id }) : children}</div>;
 }
 function Check({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) {
-  return <label className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" className="h-4 w-4 accent-teal-700" checked={checked} onChange={(event) => onChange(event.target.checked)} />{label}</label>;
+  return <label className="flex items-center gap-2 text-sm text-ink"><input type="checkbox" className="h-4 w-4 accent-forest" checked={checked} onChange={(event) => onChange(event.target.checked)} />{label}</label>;
 }
 const cleanChoices = (values?: string[]) => values?.map((value) => value.trim()).filter(Boolean);
 
@@ -96,29 +96,29 @@ export function LogbookSectionSettings() {
     update({ fields });
   };
 
-  if (loading && !data) return <p role="status" className="py-6 text-sm text-slate-500">Loading logbook sections…</p>;
-  if (error) return <div role="alert" className="space-y-3 rounded-xl border border-rose-200 bg-rose-50 p-4"><p>{error}</p><Button variant="outline" onClick={load} disabled={loading}>Reload sections</Button></div>;
+  if (loading && !data) return <p role="status" className="py-6 text-sm text-helper">Loading logbook sections…</p>;
+  if (error) return <div role="alert" className="space-y-3 rounded-xl border border-status-border bg-status p-4"><p>{error}</p><Button variant="outline" onClick={load} disabled={loading}>Reload sections</Button></div>;
   if (!data) return null;
   const filtered = data.sections.filter((section) => section.name.toLowerCase().includes(query.toLowerCase()));
 
   return <section className="space-y-5" aria-label="Logbook section settings">
-    <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 pb-4">
-      <div><h3 className="text-lg font-semibold text-slate-900">Logbook sections</h3><p className="mt-1 text-sm text-slate-500">Configure the sections, fields and requirements residents use in their logbook.</p></div>
+    <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line-soft pb-4">
+      <div><h3 className="text-lg font-semibold text-ink">Logbook sections</h3><p className="mt-1 text-sm text-helper">Configure the sections, fields and requirements residents use in their logbook.</p></div>
       {!draft && <Button onClick={() => edit()} disabled={data.readOnly || loading}>Add logbook section</Button>}
     </div>
-    {data.readOnly && <p role="status" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">These settings are inherited from the source department. Edit them using that department’s HOD account.</p>}
+    {data.readOnly && <p role="status" className="rounded-lg bg-status p-3 text-sm text-status-foreground">These settings are inherited from the source department. Edit them using that department’s HOD account.</p>}
     {!draft ? <>
       <Control label="Search logbook sections"><Input value={query} onChange={(event) => setQuery(event.target.value)} /></Control>
-      {!filtered.length && <p className="py-6 text-sm text-slate-500">{query ? "No matching sections." : "No logbook sections configured. Add your first section to get started."}</p>}
-      <div className="divide-y divide-slate-200">{filtered.map((section) => <div key={section.value} className="flex items-center justify-between gap-3 py-4">
-        <div><p className="font-medium text-slate-900">{section.name}{section.archived && <span className="ml-2 rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-600">Archived</span>}</p>
-          <p className="mt-1 text-xs text-slate-500">{data.categories.find((category) => category.id === section.categoryId)?.title} · Years {section.years.join(", ")} · {section.fields.length} additional fields · {section.required ? `${section.required} ${section.period === "month" ? "per month" : "overall"}` : "No minimum set"}</p></div>
+      {!filtered.length && <p className="py-6 text-sm text-helper">{query ? "No matching sections." : "No logbook sections configured. Add your first section to get started."}</p>}
+      <div className="divide-y divide-line-soft">{filtered.map((section) => <div key={section.value} className="flex items-center justify-between gap-3 py-4">
+        <div><p className="font-medium text-ink">{section.name}{section.archived && <span className="ml-2 rounded bg-sage px-2 py-0.5 text-xs text-soft-ink">Archived</span>}</p>
+          <p className="mt-1 text-xs text-helper">{data.categories.find((category) => category.id === section.categoryId)?.title} · Years {section.years.join(", ")} · {section.fields.length} additional fields · {section.required ? `${section.required} ${section.period === "month" ? "per month" : "overall"}` : "No minimum set"}</p></div>
         <Button variant="outline" size="sm" onClick={() => edit(section)} disabled={loading}>{data.readOnly ? "View" : "Edit"}</Button>
       </div>)}</div>
     </> : <div className="grid items-start gap-6 2xl:grid-cols-[minmax(0,1fr)_22rem]">
       <form onSubmit={save} className="min-w-0 space-y-5">
-        <h4 className="font-semibold text-slate-900">{editing ? "Edit logbook section" : "New logbook section"}</h4>
-        {formError && <p role="alert" ref={errorRef} tabIndex={-1} className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{formError}</p>}
+        <h4 className="font-semibold text-ink">{editing ? "Edit logbook section" : "New logbook section"}</h4>
+        {formError && <p role="alert" ref={errorRef} tabIndex={-1} className="rounded-lg border border-status-border bg-status p-3 text-sm text-status-foreground">{formError}</p>}
         <fieldset disabled={busy || data.readOnly} className="space-y-5">
           <div className="grid gap-4 sm:grid-cols-2">
             <Control label="Section name"><Input required maxLength={160} value={draft.name} onChange={(event) => update({ name: event.target.value })} /></Control>
@@ -133,17 +133,17 @@ export function LogbookSectionSettings() {
             <Control label="Required activity count"><Input type="number" required min={0} max={100000} value={draft.required} onChange={(event) => update({ required: Number(event.target.value) })} /></Control>
             <Control label="Requirement period"><select className={selectClass} value={draft.period} onChange={(event) => update({ period: event.target.value as "total" | "month" })}><option value="total">Overall</option><option value="month">Per month</option></select></Control>
           </div>
-          <p className="text-xs text-slate-500">A required count of 0 means optional. Monthly requirements are tracked separately from the overall academic target.</p>
+          <p className="text-xs text-helper">A required count of 0 means optional. Monthly requirements are tracked separately from the overall academic target.</p>
           <Check label="Archive this section" checked={draft.archived} onChange={(archived) => update({ archived })} />
-          <p className="text-xs text-slate-500">Archiving stops new entries. Existing entries and their review history remain available.</p>
-          <div className="space-y-4 border-t border-slate-200 pt-4">
+          <p className="text-xs text-helper">Archiving stops new entries. Existing entries and their review history remain available.</p>
+          <div className="space-y-4 border-t border-line-soft pt-4">
             <div className="flex items-center justify-between gap-3"><h4 className="font-semibold">Additional fields</h4><Button type="button" variant="outline" size="sm" disabled={draft.fields.length >= 40} onClick={() => update({ fields: [...draft.fields, { key: `f_${crypto.randomUUID().replaceAll("-", "")}`, label: "", type: "text" }] })}>Add field</Button></div>
-            {!draft.fields.length && <p className="text-sm text-slate-500">Add fields when this section needs details beyond the date, topic, notes and reviewing faculty.</p>}
-            {draft.fields.map((field, index) => <div key={field.key} className="space-y-4 rounded-xl border border-slate-200 p-4">
+            {!draft.fields.length && <p className="text-sm text-helper">Add fields when this section needs details beyond the date, topic, notes and reviewing faculty.</p>}
+            {draft.fields.map((field, index) => <div key={field.key} className="space-y-4 rounded-xl border border-line-soft p-4">
               <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold">Field {index + 1}</p><div className="flex gap-1">
                 <Button type="button" size="sm" variant="ghost" aria-label={`Move field ${index + 1} up`} disabled={index === 0} onClick={() => moveField(index, -1)}>↑</Button>
                 <Button type="button" size="sm" variant="ghost" aria-label={`Move field ${index + 1} down`} disabled={index === draft.fields.length - 1} onClick={() => moveField(index, 1)}>↓</Button>
-                <Button type="button" size="sm" variant="ghost" className="text-rose-700" onClick={() => update({ fields: draft.fields.filter((_, item) => item !== index) })}>Remove field {index + 1}</Button>
+                <Button type="button" size="sm" variant="ghost" className="text-status-foreground" onClick={() => update({ fields: draft.fields.filter((_, item) => item !== index) })}>Remove field {index + 1}</Button>
               </div></div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Control label={`Field ${index + 1} label`}><Input required maxLength={160} value={field.label} onChange={(event) => fieldChange(index, { label: event.target.value })} /></Control>
@@ -161,25 +161,25 @@ export function LogbookSectionSettings() {
                 <Control label={`Field ${index + 1} must not exceed another field`}><select className={selectClass} value={field.maximumField ?? ""} onChange={(event) => fieldChange(index, { maximumField: event.target.value || undefined })}><option value="">No comparison</option>{draft.fields.filter((other) => other.key !== field.key && other.type === "number").map((other) => <option key={other.key} value={other.key}>{other.label || "Unnamed field"}</option>)}</select></Control>
               </div>}
               {field.type === "date" && <Check label={`Field ${index + 1} must be on or after the entry date`} checked={!!field.notBeforeLogDate} onChange={(notBeforeLogDate) => fieldChange(index, { notBeforeLogDate })} />}
-              <details className="rounded-lg bg-slate-50 p-3"><summary className="cursor-pointer text-sm font-medium">Conditional display and requirement</summary><div className="mt-3 grid gap-4 sm:grid-cols-2">
+              <details className="rounded-lg bg-mist p-3"><summary className="cursor-pointer text-sm font-medium">Conditional display and requirement</summary><div className="mt-3 grid gap-4 sm:grid-cols-2">
                 <Control label={`Show field ${index + 1} when`}><select className={selectClass} value={field.requiredWhen?.field ?? ""} onChange={(event) => fieldChange(index, { requiredWhen: event.target.value ? { field: event.target.value, value: "" } : undefined })}><option value="">Always show</option>{draft.fields.filter((other) => other.key !== field.key && !other.requiredWhen).map((other) => <option key={other.key} value={other.key}>{other.label || "Unnamed field"}</option>)}</select></Control>
                 {field.requiredWhen && <Control label={`Field ${index + 1} source must equal`}>
                   {draft.fields.find((other) => other.key === field.requiredWhen!.field)?.type === "select"
                     ? <select required className={selectClass} value={field.requiredWhen.value} onChange={(event) => fieldChange(index, { requiredWhen: { ...field.requiredWhen!, value: event.target.value } })}><option value="">Choose a value</option>{draft.fields.find((other) => other.key === field.requiredWhen!.field)?.options?.filter(Boolean).map((option, item) => <option key={item} value={option}>{option}</option>)}</select>
                     : <Input required maxLength={160} value={field.requiredWhen.value} onChange={(event) => fieldChange(index, { requiredWhen: { ...field.requiredWhen!, value: event.target.value } })} />}
                 </Control>}
-              </div><p className="mt-2 text-xs text-slate-500">A conditional field is required whenever its source matches.</p></details>
+              </div><p className="mt-2 text-xs text-helper">A conditional field is required whenever its source matches.</p></details>
             </div>)}
           </div>
         </fieldset>
-        <div className="flex flex-wrap justify-end gap-2 border-t border-slate-200 pt-4">
+        <div className="flex flex-wrap justify-end gap-2 border-t border-line-soft pt-4">
           <Button type="button" variant="outline" disabled={busy} onClick={() => { setDraft(null); setEditing(null); }}>Cancel editing</Button>
           <Button type="submit" disabled={busy || data.readOnly}>{busy ? "Saving…" : "Save logbook section"}</Button>
         </div>
         {formError.includes("another session") && <Button type="button" variant="outline" onClick={() => { setDraft(null); setEditing(null); void load(); }}>Reload sections</Button>}
       </form>
-      <aside className="space-y-4 rounded-xl border border-teal-200 bg-teal-50/30 p-4" aria-label="Resident form preview">
-        <div><h4 className="font-semibold text-teal-950">Resident form preview</h4><p className="mt-1 text-xs text-slate-500">Try the fields to check conditional choices. Preview values are never saved.</p></div>
+      <aside className="space-y-4 rounded-xl border border-line-soft bg-mist p-4" aria-label="Resident form preview">
+        <div><h4 className="font-semibold text-forest">Resident form preview</h4><p className="mt-1 text-xs text-helper">Try the fields to check conditional choices. Preview values are never saved.</p></div>
         <p className="font-medium">{draft.name || "Section name"}</p>
         <Control label="Logbook year"><select className={selectClass}>{draft.years.map((year) => <option key={year}>Year {year}</option>)}</select></Control>
         <Control label="Date"><Input type="date" /></Control>
@@ -187,7 +187,7 @@ export function LogbookSectionSettings() {
         {!!draft.participation?.filter(Boolean).length && <Control label="Participation"><select className={selectClass}><option value="">Select participation</option>{draft.participation.filter(Boolean).map((choice, index) => <option key={index}>{choice}</option>)}</select></Control>}
         <AcademicRecordFields section={{ ...draft, value: editing?.value ?? "preview" }} values={preview} onChange={setPreview} />
         <Control label="Notes (optional)"><Textarea /></Control>
-        <p className="text-xs text-slate-500">Residents select an approved reviewing faculty member when submitting.</p>
+        <p className="text-xs text-helper">Residents select an approved reviewing faculty member when submitting.</p>
       </aside>
     </div>}
   </section>;
