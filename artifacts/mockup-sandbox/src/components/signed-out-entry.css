@@ -9,20 +9,21 @@
 @font-face {
   font-family: "Literata Display";
   src: url("/fonts/literata-display.woff2") format("woff2");
-  font-weight: 600 700;
+  font-weight: 400 700;
   font-style: normal;
   font-display: swap;
 }
 
 .signed-out-entry {
   --font-sans: "Source Sans 3", system-ui, sans-serif;
-  --font-serif: var(--font-sans);
+  --font-serif: "Literata Display", Georgia, serif;
   font-family: var(--font-sans);
+  background-color: #F6F4EF;
 }
 
 .signed-out-entry .signed-out-hero-title {
   font-family: "Literata Display", Georgia, serif;
-  font-weight: 700;
+  font-weight: 500;
   font-optical-sizing: auto;
   letter-spacing: -0.02em;
 }
@@ -33,28 +34,73 @@
 
 .signed-out-entry [data-slot="button"] {
   font-weight: 600;
-  border-radius: 999px;
+  border-radius: 0.5rem;
   transition-property: background-color, border-color, color, box-shadow, opacity;
 }
 
-.signed-out-preview[data-playing="false"] * {
-  animation: none;
-  transition: none;
+.signed-out-entry [data-slot="input"] {
+  border-radius: 0.5rem;
 }
 
-@media (max-height: 480px) and (max-width: 960px) {
-  .signed-out-entry .signed-out-shell {
-    padding-top: 0.75rem;
-    padding-bottom: 0.75rem;
+@keyframes botanical-sway {
+  0%, 100% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
   }
+  50% {
+    transform: translate3d(6px, -8px, 0) rotate(1.4deg);
+  }
+}
 
-  .signed-out-entry .signed-out-main {
-    padding-top: 1.25rem;
-    padding-bottom: 1.25rem;
+@keyframes botanical-drift {
+  0%, 100% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+  50% {
+    transform: translate3d(-7px, 7px, 0) rotate(-1.2deg);
+  }
+}
+
+@keyframes mochi-idle {
+  0%, 100% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+  50% {
+    transform: translate3d(0, -3px, 0) rotate(1.5deg);
+  }
+}
+
+.botanical-sway-slow {
+  animation: botanical-sway 18s ease-in-out infinite;
+  will-change: transform;
+}
+
+.botanical-sway-medium {
+  animation: botanical-sway 14s ease-in-out infinite reverse;
+  will-change: transform;
+}
+
+.botanical-drift-slow {
+  animation: botanical-drift 20s ease-in-out infinite;
+  will-change: transform;
+}
+
+.mochi-idle {
+  animation: mochi-idle 4.5s ease-in-out infinite;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .botanical-sway-slow,
+  .botanical-sway-medium,
+  .botanical-drift-slow,
+  .mochi-idle {
+    animation: none;
+    will-change: auto;
   }
 }
 
 #root:has(.signed-out-entry) > .support-widget-floating,
-#root:has(.signed-out-support-button) > .support-widget-floating {
+#root:has(.signed-out-support-button) > .support-widget-floating,
+#root:has(.signed-out-entry) > [data-testid="cookie-consent-banner"] {
   display: none;
 }
