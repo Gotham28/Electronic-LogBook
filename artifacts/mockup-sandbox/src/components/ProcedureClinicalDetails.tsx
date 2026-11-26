@@ -41,8 +41,8 @@ export function ProcedureClinicalDetails({
 
   return <dl className="mt-3 grid min-w-0 gap-3 text-xs sm:grid-cols-2">
     {items.map(([id, label, value]) => <div key={id} className="min-w-0">
-      <dt className="font-medium text-slate-500">{label}</dt>
-      <dd className="mt-1 whitespace-pre-wrap break-words font-normal text-slate-800">{value && value !== "N/A" ? value : "Not recorded"}</dd>
+      <dt className="font-medium text-helper">{label}</dt>
+      <dd className="mt-1 whitespace-pre-wrap break-words font-normal text-ink">{value && value !== "N/A" ? value : "Not recorded"}</dd>
     </div>)}
   </dl>;
 }

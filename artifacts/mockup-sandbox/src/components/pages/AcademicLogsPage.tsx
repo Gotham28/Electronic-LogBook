@@ -220,10 +220,10 @@ export function AcademicLogsPage({ categoryId }: { categoryId?: string } = {}) {
   return (
     <div className="space-y-6 pb-12">
       {error && (
-        <div className="flex flex-col items-center justify-center p-8 text-center border rounded-2xl bg-rose-50 border-rose-100">
-          <p className="text-rose-700 mb-4">{error}</p>
+        <div className="flex flex-col items-center justify-center p-8 text-center border rounded-2xl bg-status border-status-border">
+          <p className="text-status-foreground mb-4">{error}</p>
           <div className="flex flex-wrap items-center justify-center gap-2">
-            <Button onClick={fetchLogs} variant="outline" className="border-rose-200 text-rose-700">Try Again</Button>
+            <Button onClick={fetchLogs} variant="outline" className="border-status-border text-status-foreground">Try Again</Button>
             <Button type="button" variant="outline" size="sm" onClick={openArogya}>Ask Mochi about this</Button>
           </div>
         </div>
@@ -232,7 +232,7 @@ export function AcademicLogsPage({ categoryId }: { categoryId?: string } = {}) {
         <div>
           <p className="page-eyebrow">Academic record</p>
           <h2 className="page-title mt-1">{category?.title || academicLogbook?.title || "Academic activities"}</h2>
-          <p className="mt-2 text-sm text-slate-500">{category ? "Record entries in this category and select a training year to see the available logbook sections." : academicLogbook
+          <p className="mt-2 text-sm text-helper">{category ? "Record entries in this category and select a training year to see the available logbook sections." : academicLogbook
             ? "Record lectures, practicals, daily activities, teaching, postings, research, assessment marks, attendance and appraisal."
             : "Presentations, journal clubs, seminars, symposia, mortality meetings and conferences."}</p>
         </div>
@@ -257,19 +257,19 @@ export function AcademicLogsPage({ categoryId }: { categoryId?: string } = {}) {
             </DialogHeader>
             <form onSubmit={submit} className="space-y-4">
               {editLogStatus === "rejected" && (
-                <div className="rounded-xl border border-rose-200 bg-rose-50/90 p-3.5 text-xs text-rose-900">
-                  <div className="flex items-center gap-1.5 font-semibold text-rose-800">
-                    <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
+                <div className="rounded-xl border border-status-border bg-status p-3.5 text-xs text-status-foreground">
+                  <div className="flex items-center gap-1.5 font-semibold text-status-foreground">
+                    <AlertCircle className="h-4 w-4 shrink-0 text-status-foreground" />
                     <span>Faculty Feedback / Revision Reason:</span>
                   </div>
-                  <p className="mt-1.5 whitespace-pre-wrap rounded-lg bg-white/80 p-2.5 text-slate-800 border border-rose-100 font-medium leading-relaxed">
+                  <p className="mt-1.5 whitespace-pre-wrap rounded-lg bg-card p-2.5 text-ink border border-status-border font-medium leading-relaxed">
                     {editLogRemarks || "No specific feedback was provided. Please verify the activity details and resubmit."}
                   </p>
                 </div>
               )}
               {formError && (
-                <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-rose-200 bg-rose-50 p-3">
-                  <p ref={formErrorRef} role="alert" tabIndex={-1} className="text-sm text-rose-700">{formError}</p>
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-status-border bg-status p-3">
+                  <p ref={formErrorRef} role="alert" tabIndex={-1} className="text-sm text-status-foreground">{formError}</p>
                   <Button type="button" variant="outline" size="sm" onClick={openArogya}>Ask Mochi about this</Button>
                 </div>
               )}
@@ -290,7 +290,7 @@ export function AcademicLogsPage({ categoryId }: { categoryId?: string } = {}) {
                   <Select value={form.type} onValueChange={(value) => { setForm({ ...form, type: value, presentationType: "" }); setRecordValues({}); setFormError(""); }} disabled={isSubmitting}>
                     <SelectTrigger aria-label="Activity category"><SelectValue placeholder="Select a section" /></SelectTrigger>
                     <SelectContent>
-                      {!academicOptions.length && <p className="text-sm text-slate-500">Your HOD has not configured academic activities yet.</p>}
+                      {!academicOptions.length && <p className="text-sm text-helper">Your HOD has not configured academic activities yet.</p>}
                       {availableOptions.map((item) => <SelectItem key={item.value} value={item.value}>{item.name}</SelectItem>)}
                       {editLogId && !availableOptions.some((item) => item.value === form.type) && <SelectItem value={form.type}>{section?.name || form.type} (existing entry)</SelectItem>}
                     </SelectContent>
@@ -339,7 +339,7 @@ export function AcademicLogsPage({ categoryId }: { categoryId?: string } = {}) {
                 <Button type="button" variant="outline" onClick={() => { setOpen(false); publishArogyaContext(null); }} disabled={isSubmitting}>Cancel</Button>
                 <Button 
                   type="submit" 
-                  className={editLogStatus === "rejected" ? "bg-rose-600 hover:bg-rose-700 text-white" : ""}
+                  className={editLogStatus === "rejected" ? "bg-destructive hover:bg-deep text-white" : ""}
                   disabled={isSubmitting}
                 >
                   {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -370,7 +370,7 @@ export function AcademicLogsPage({ categoryId }: { categoryId?: string } = {}) {
       </div>
 
       {academicLogbook && <Card>
-        <CardHeader className="gap-3 border-b border-teal-100 sm:flex-row sm:items-center sm:justify-between">
+        <CardHeader className="gap-3 border-b border-line-soft sm:flex-row sm:items-center sm:justify-between">
           <CardTitle className="text-lg">Logbook sections</CardTitle>
           <div className="space-y-1 sm:w-40"><Label htmlFor="logbook-year-filter">Show year</Label>
             <Select value={selectedYear} onValueChange={setSelectedYear}>
@@ -382,28 +382,28 @@ export function AcademicLogsPage({ categoryId }: { categoryId?: string } = {}) {
         <CardContent className="grid gap-2 p-4 sm:grid-cols-2">
           {categorySections(academicLogbook, categoryId, selectedYear).map((item) => (
             <button key={item.value} type="button" onClick={() => openNewLog(item.value)}
-              className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-3 text-left hover:border-teal-300 hover:bg-teal-50 focus-visible:outline-2 focus-visible:outline-teal-600">
-              <span><span className="block text-sm font-medium text-slate-900">{item.name || item.value}</span>
-                <span className="mt-1 block text-xs text-slate-500">{loading || error ? "" : `${visibleLogs.filter((log) => log.activityType === item.value && log.status !== "rejected").length} recorded · `}Years {item.years.join(", ")}</span>
-              </span><PlusCircle aria-hidden="true" className="h-4 w-4 shrink-0 text-teal-700" />
+              className="flex items-center justify-between gap-3 rounded-xl border border-line-soft p-3 text-left hover:border-line hover:bg-mist focus-visible:outline-2 focus-visible:outline-ring">
+              <span><span className="block text-sm font-medium text-ink">{item.name || item.value}</span>
+                <span className="mt-1 block text-xs text-helper">{loading || error ? "" : `${visibleLogs.filter((log) => log.activityType === item.value && log.status !== "rejected").length} recorded · `}Years {item.years.join(", ")}</span>
+              </span><PlusCircle aria-hidden="true" className="h-4 w-4 shrink-0 text-forest" />
             </button>
           ))}
         </CardContent>
       </Card>}
 
       {configuredOptions.some((item) => item.required > 0) && <Card>
-        <CardHeader className="border-b border-teal-100">
+        <CardHeader className="border-b border-line-soft">
           <CardTitle className="text-lg">Mandatory academic requirements</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-4">
           {configuredOptions.filter((item) => item.required > 0).map((requirement) => {
             const logged = logs.filter((log) => log.activityType === requirement.value && log.status !== "rejected" && (requirement.period !== "month" || log.date.startsWith(todayForInput().slice(0, 7)))).length;
             return (
-              <div key={requirement.name} className="rounded-2xl border border-teal-100 bg-teal-50/50 p-4">
-                <p className="text-sm font-bold text-slate-900">{requirement.name}</p>
-                <p className="mt-3 text-2xl font-bold text-teal-700">{requirement.required}</p>
-                <p className="text-xs text-slate-500">{requirement.period === "month" ? "per month" : "overall"}</p>
-                <p className="mt-3 text-xs font-semibold text-slate-700">{logged} logged {requirement.period === "month" ? "this month" : "overall"}</p>
+              <div key={requirement.name} className="rounded-2xl border border-line-soft bg-mist p-4">
+                <p className="text-sm font-bold text-ink">{requirement.name}</p>
+                <p className="mt-3 text-2xl font-bold text-forest">{requirement.required}</p>
+                <p className="text-xs text-helper">{requirement.period === "month" ? "per month" : "overall"}</p>
+                <p className="mt-3 text-xs font-semibold text-ink">{logged} logged {requirement.period === "month" ? "this month" : "overall"}</p>
               </div>
             );
           })}
@@ -411,12 +411,12 @@ export function AcademicLogsPage({ categoryId }: { categoryId?: string } = {}) {
       </Card>}
 
       <Card>
-        <CardHeader className="border-b border-teal-100"><CardTitle className="flex items-center gap-2 text-lg"><GraduationCap className="h-5 w-5 text-teal-600" /> Academic activity record</CardTitle></CardHeader>
+        <CardHeader className="border-b border-line-soft"><CardTitle className="flex items-center gap-2 text-lg"><GraduationCap className="h-5 w-5 text-forest" /> Academic activity record</CardTitle></CardHeader>
         <CardContent className="p-0">
           {loading ? (
             <div className="flex h-48 flex-col items-center justify-center space-y-4">
-              <Loader2 className="h-8 w-8 animate-spin text-teal-600" />
-              <p className="text-sm font-medium text-slate-500">Loading academic activities...</p>
+              <Loader2 className="h-8 w-8 animate-spin text-forest" />
+              <p className="text-sm font-medium text-helper">Loading academic activities...</p>
             </div>
           ) : visibleLogs.length === 0 ? (
             <Empty className="py-14">
@@ -437,39 +437,39 @@ export function AcademicLogsPage({ categoryId }: { categoryId?: string } = {}) {
                   <TableRow key={log.id}>
                     <TableCell className="font-bold">{log.number}</TableCell>
                     <TableCell>{formatLogbookDate(log.date)}</TableCell>
-                    <TableCell><Badge variant="outline" className="border-teal-100 bg-teal-50 text-teal-800">{log.type}</Badge></TableCell>
+                    <TableCell><Badge variant="outline" className="border-line-soft bg-mist text-forest">{log.type}</Badge></TableCell>
                     <TableCell>{log.presentationType}</TableCell>
                     <TableCell className="max-w-sm whitespace-pre-wrap font-semibold">{log.topic}
-                      {log.description && <details className="mt-2"><summary className="cursor-pointer text-xs font-medium text-teal-700">View details</summary>
+                      {log.description && <details className="mt-2"><summary className="cursor-pointer text-xs font-medium text-forest">View details</summary>
                         <AcademicRecordDetails activityType={log.activityType} description={log.description} />
                       </details>}
                     </TableCell>
                     <TableCell>{log.faculty}</TableCell>
                     <TableCell className="font-medium">
                       {log.status === "pending"
-                        ? <span className="text-slate-400">—</span>
+                        ? <span className="text-helper">—</span>
                         : log.facultyGrade
-                          ? <span className="font-bold text-teal-800">{log.facultyGrade}</span>
-                          : <span className="text-slate-500">No grade</span>}
+                          ? <span className="font-bold text-forest">{log.facultyGrade}</span>
+                          : <span className="text-helper">No grade</span>}
                     </TableCell>
                     <TableCell className="text-xs max-w-[160px]">
                       {log.status === "pending"
-                        ? <span className="text-slate-400">—</span>
+                        ? <span className="text-helper">—</span>
                         : log.status === "rejected"
-                          ? <span title={log.facultyRemarks || "No remark"} className={`block truncate cursor-help font-medium ${log.facultyRemarks ? "text-rose-700" : "text-slate-400"}`}>
+                          ? <span title={log.facultyRemarks || "No remark"} className={`block truncate cursor-help font-medium ${log.facultyRemarks ? "text-status-foreground" : "text-helper"}`}>
                               {log.facultyRemarks || "No remark"}
                             </span>
                           : log.facultyRemarks
-                            ? <span title={log.facultyRemarks} className="block truncate cursor-help text-slate-600">{log.facultyRemarks}</span>
-                            : <span className="text-slate-500">No remark</span>}
+                            ? <span title={log.facultyRemarks} className="block truncate cursor-help text-soft-ink">{log.facultyRemarks}</span>
+                            : <span className="text-helper">No remark</span>}
                     </TableCell>
-                    <TableCell>{log.status === "verified" ? <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700"><CheckCircle2 className="mr-1 h-3 w-3" /> Verified</Badge> : log.status === "rejected" ? <Badge className="border-rose-200 bg-rose-50 text-rose-700"><AlertCircle className="mr-1 h-3 w-3" /> Rejected</Badge> : <Badge className="border-amber-200 bg-amber-50 text-amber-700"><Clock className="mr-1 h-3 w-3" /> Pending</Badge>}</TableCell>
+                    <TableCell>{log.status === "verified" ? <Badge className="border-status-border bg-status text-status-foreground"><CheckCircle2 className="mr-1 h-3 w-3" /> Verified</Badge> : log.status === "rejected" ? <Badge className="border-status-border bg-status text-status-foreground"><AlertCircle className="mr-1 h-3 w-3" /> Rejected</Badge> : <Badge className="border-status-border bg-status text-status-foreground"><Clock className="mr-1 h-3 w-3" /> Pending</Badge>}</TableCell>
                     <TableCell className="text-right">
                       {log.status === "rejected" ? (
                         <Button
                           size="sm"
                           variant="outline"
-                          className="border-rose-300 text-rose-700 bg-rose-50 hover:bg-rose-100 hover:text-rose-800 font-semibold text-xs gap-1.5 h-8 px-2.5"
+                          className="border-status-border text-status-foreground bg-status hover:bg-status hover:text-status-foreground font-semibold text-xs gap-1.5 h-8 px-2.5"
                           onClick={() => startEditAcademic(log)}
                         >
                           <RotateCcw className="h-3.5 w-3.5" /> Resubmit
@@ -479,7 +479,7 @@ export function AcademicLogsPage({ categoryId }: { categoryId?: string } = {}) {
                           aria-label={`Edit ${log.topic}`}
                           variant="ghost"
                           size="sm"
-                          className="text-teal-600 hover:text-teal-800 hover:bg-teal-50"
+                          className="text-forest hover:text-forest hover:bg-mist"
                           onClick={() => startEditAcademic(log)}
                         >
                           <Edit3 className="h-4 w-4" />
@@ -502,5 +502,5 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 function Summary({ label, value }: { label: string; value: number | string }) {
-  return <Card><CardContent className="p-3 sm:p-5"><p className="text-2xl font-bold text-teal-700 sm:text-3xl">{value}</p><p className="mt-1 text-[11px] font-bold uppercase leading-tight tracking-wide text-slate-500 sm:leading-[inherit] sm:tracking-wider">{label}</p></CardContent></Card>;
+  return <Card><CardContent className="p-3 sm:p-5"><p className="text-2xl font-bold text-forest sm:text-3xl">{value}</p><p className="mt-1 text-[11px] font-bold uppercase leading-tight tracking-wide text-helper sm:leading-[inherit] sm:tracking-wider">{label}</p></CardContent></Card>;
 }

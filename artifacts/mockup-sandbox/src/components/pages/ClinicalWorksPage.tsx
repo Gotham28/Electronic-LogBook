@@ -188,7 +188,7 @@ export function ClinicalWorksPage() {
         <div>
           <p className="page-eyebrow">Imaging and procedures</p>
           <h2 className="page-title mt-1">Clinical work</h2>
-          <p className="mt-2 max-w-2xl text-sm text-slate-500">Log each study or procedure you performed and send it to a faculty member for verification.</p>
+          <p className="mt-2 max-w-2xl text-sm text-helper">Log each study or procedure you performed and send it to a faculty member for verification.</p>
         </div>
         <Dialog open={open} onOpenChange={closeDialog}>
           <DialogTrigger asChild>
@@ -196,17 +196,17 @@ export function ClinicalWorksPage() {
           </DialogTrigger>
           <DialogContent className="max-h-[90vh] overflow-y-auto rounded-2xl bg-white sm:max-w-2xl">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-xl"><Stethoscope className="h-5 w-5 text-teal-600" /> {editStatus === "rejected" ? "Resubmit clinical work" : editId ? "Edit clinical work" : "New clinical work"}</DialogTitle>
+              <DialogTitle className="flex items-center gap-2 text-xl"><Stethoscope className="h-5 w-5 text-forest" /> {editStatus === "rejected" ? "Resubmit clinical work" : editId ? "Edit clinical work" : "New clinical work"}</DialogTitle>
               <DialogDescription>{editStatus === "rejected" ? "Review the faculty feedback below, edit the details, and resubmit for verification." : "All fields are required."}</DialogDescription>
             </DialogHeader>
             <form onSubmit={submit} className="space-y-5">
               {editStatus === "rejected" && (
-                <div className="rounded-xl border border-rose-200 bg-rose-50/90 p-3.5 text-xs text-rose-900">
-                  <div className="flex items-center gap-1.5 font-semibold text-rose-800">
-                    <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
+                <div className="rounded-xl border border-status-border bg-status p-3.5 text-xs text-status-foreground">
+                  <div className="flex items-center gap-1.5 font-semibold text-status-foreground">
+                    <AlertCircle className="h-4 w-4 shrink-0 text-status-foreground" />
                     <span>Faculty Feedback / Revision Reason:</span>
                   </div>
-                  <p className="mt-1.5 whitespace-pre-wrap rounded-lg bg-white/80 p-2.5 text-slate-800 border border-rose-100 font-medium leading-relaxed">
+                  <p className="mt-1.5 whitespace-pre-wrap rounded-lg bg-card p-2.5 text-ink border border-status-border font-medium leading-relaxed">
                     {editRemarks || "No specific feedback was provided. Please verify the entry details and resubmit."}
                   </p>
                 </div>
@@ -249,7 +249,7 @@ export function ClinicalWorksPage() {
               <Field label="Reviewing faculty member" htmlFor="cw-supervisor">
                 {professorsError ? (
                   <div className="flex flex-wrap items-center gap-2">
-                    <p role="alert" className="text-sm text-rose-700">{professorsError}</p>
+                    <p role="alert" className="text-sm text-status-foreground">{professorsError}</p>
                     <Button type="button" variant="outline" size="sm" onClick={openArogya}>Ask Mochi about this</Button>
                   </div>
                 ) : (
@@ -289,7 +289,7 @@ export function ClinicalWorksPage() {
                 <Button type="button" variant="outline" onClick={() => closeDialog(false)} disabled={submitting}>Cancel</Button>
                 <Button 
                   type="submit" 
-                  className={editStatus === "rejected" ? "bg-rose-600 hover:bg-rose-700 text-white" : ""}
+                  className={editStatus === "rejected" ? "bg-destructive hover:bg-deep text-white" : ""}
                   disabled={submitting}
                 >
                   {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -310,7 +310,7 @@ export function ClinicalWorksPage() {
       </div>
 
       {clinicalWorkCategories.length === 0 && (
-        <p className="rounded-xl bg-teal-50 p-4 text-sm text-teal-800">Your HOD has not set up clinical work categories yet.</p>
+        <p className="rounded-xl bg-mist p-4 text-sm text-forest">Your HOD has not set up clinical work categories yet.</p>
       )}
 
       {!loading && !error && clinicalWorkCategories.length > 0 && (
@@ -324,21 +324,21 @@ export function ClinicalWorksPage() {
             const done = hasMinimum && verified >= item.required;
             const pct = hasMinimum ? Math.min(Math.round((verified / item.required) * 100), 100) : 0;
             return (
-              <div key={item.value} className={`rounded-xl border p-4 ${done ? "border-emerald-200 bg-emerald-50/60" : "border-teal-100 bg-white"}`}>
+              <div key={item.value} className={`rounded-xl border p-4 ${done ? "border-status-border bg-status" : "border-line-soft bg-white"}`}>
                 <div className="flex items-start justify-between gap-2">
-                  <p className="min-w-0 break-words text-xs font-semibold leading-snug text-slate-700">{item.name}</p>
-                  {done && <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />}
+                  <p className="min-w-0 break-words text-xs font-semibold leading-snug text-ink">{item.name}</p>
+                  {done && <CheckCircle2 className="h-4 w-4 shrink-0 text-status-foreground" />}
                 </div>
-                <p className="mt-2 text-xl font-bold text-slate-900">{logged}</p>
+                <p className="mt-2 text-xl font-bold text-ink">{logged}</p>
                 {hasMinimum ? (
                   <>
-                    <p className="text-[11px] text-slate-500">{verified} of {item.required} verified{monthly ? " this month" : ""}</p>
-                    <div className="mt-2 h-1.5 w-full rounded-full bg-slate-100">
-                      <div className={`h-1.5 rounded-full transition-all ${done ? "bg-emerald-500" : "bg-teal-500"}`} style={{ width: `${pct}%` }} />
+                    <p className="text-[11px] text-helper">{verified} of {item.required} verified{monthly ? " this month" : ""}</p>
+                    <div className="mt-2 h-1.5 w-full rounded-full bg-sage">
+                      <div className={`h-1.5 rounded-full transition-all ${done ? "bg-forest" : "bg-forest"}`} style={{ width: `${pct}%` }} />
                     </div>
                   </>
                 ) : (
-                  <p className="text-[11px] text-slate-500">No minimum set</p>
+                  <p className="text-[11px] text-helper">No minimum set</p>
                 )}
               </div>
             );
@@ -347,32 +347,32 @@ export function ClinicalWorksPage() {
       )}
 
       <Card>
-        <CardHeader className="flex flex-col justify-between gap-4 border-b border-teal-100 md:flex-row md:items-center">
+        <CardHeader className="flex flex-col justify-between gap-4 border-b border-line-soft md:flex-row md:items-center">
           <div className="relative w-full max-w-md">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-teal-600" aria-hidden />
+            <Search className="absolute left-3 top-3 h-4 w-4 text-forest" aria-hidden />
             <Input value={search} onChange={(e) => setSearch(e.target.value)} className="h-11 pl-9" aria-label="Search clinical work"
               placeholder={hideCaseNumber ? "Search category or sub-type..." : "Search category, sub-type or case number..."} />
           </div>
-          {!loading && !error && <Badge variant="outline" className="w-fit border-teal-100 bg-teal-50 px-3 py-1 text-teal-800">{logs.length} logged</Badge>}
+          {!loading && !error && <Badge variant="outline" className="w-fit border-line-soft bg-mist px-3 py-1 text-forest">{logs.length} logged</Badge>}
         </CardHeader>
         <CardContent className="p-0">
           {loading ? (
             <div className="flex h-48 flex-col items-center justify-center gap-3" role="status">
-              <Loader2 className="h-8 w-8 animate-spin text-teal-600" />
-              <p className="text-sm text-slate-500">Loading clinical work...</p>
+              <Loader2 className="h-8 w-8 animate-spin text-forest" />
+              <p className="text-sm text-helper">Loading clinical work...</p>
             </div>
           ) : error ? (
             <div className="flex flex-col items-center justify-center gap-4 p-8 text-center" role="alert">
-              <p className="text-sm font-medium text-rose-700">{error}</p>
+              <p className="text-sm font-medium text-status-foreground">{error}</p>
               <div className="flex flex-wrap items-center justify-center gap-2">
-                <Button size="sm" variant="outline" onClick={() => void fetchLogs()} className="border-rose-200 text-rose-700">Try again</Button>
+                <Button size="sm" variant="outline" onClick={() => void fetchLogs()} className="border-status-border text-status-foreground">Try again</Button>
                 <Button type="button" variant="outline" size="sm" onClick={openArogya}>Ask Mochi about this</Button>
               </div>
             </div>
           ) : filtered.length === 0 ? (
             <div className="flex h-48 flex-col items-center justify-center gap-2 text-center">
-              <p className="text-base font-semibold text-slate-950">{logs.length === 0 ? "No clinical work logged yet" : "No entries match your search"}</p>
-              <p className="max-w-sm text-sm text-slate-500">{logs.length === 0 ? "Use “Log clinical work” to add your first entry." : "Clear the search to see every entry."}</p>
+              <p className="text-base font-semibold text-ink">{logs.length === 0 ? "No clinical work logged yet" : "No entries match your search"}</p>
+              <p className="max-w-sm text-sm text-helper">{logs.length === 0 ? "Use “Log clinical work” to add your first entry." : "Clear the search to see every entry."}</p>
             </div>
           ) : (
               <Table>
@@ -399,17 +399,17 @@ export function ClinicalWorksPage() {
                       <TableCell className="font-bold">{log.number}</TableCell>
                       <TableCell>{formatLogbookDate(log.date)}</TableCell>
                       <TableCell>
-                        <p className="font-semibold text-slate-900">{category}</p>
-                        {subType && <p className="text-xs text-slate-500">{subType}</p>}
+                        <p className="font-semibold text-ink">{category}</p>
+                        {subType && <p className="text-xs text-helper">{subType}</p>}
                       </TableCell>
-                      {!hideCaseNumber && <TableCell className="font-semibold text-teal-800">{log.caseNumber}</TableCell>}
+                      {!hideCaseNumber && <TableCell className="font-semibold text-forest">{log.caseNumber}</TableCell>}
                       <TableCell className="capitalize">{log.patientAge} / {log.patientSex}</TableCell>
                       
-                      {competencyLevels.length > 0 && <TableCell className="text-xs text-slate-600">{log.competency ?? <span className="text-slate-300">—</span>}</TableCell>}
+                      {competencyLevels.length > 0 && <TableCell className="text-xs text-soft-ink">{log.competency ?? <span className="text-helper">—</span>}</TableCell>}
                       <TableCell>{log.supervisorName ?? "—"}</TableCell>
                       <TableCell className="max-w-[180px] text-xs">
-                        {log.status === "pending" ? <span className="text-slate-400">—</span>
-                          : <span title={log.facultyRemarks || "No remark"} className={`block truncate ${log.status === "rejected" && log.facultyRemarks ? "font-medium text-rose-700" : "text-slate-600"}`}>{log.facultyRemarks || "No remark"}</span>}
+                        {log.status === "pending" ? <span className="text-helper">—</span>
+                          : <span title={log.facultyRemarks || "No remark"} className={`block truncate ${log.status === "rejected" && log.facultyRemarks ? "font-medium text-status-foreground" : "text-soft-ink"}`}>{log.facultyRemarks || "No remark"}</span>}
                       </TableCell>
                       <TableCell>{statusBadge(log.status)}</TableCell>
                       <TableCell className="text-right">
@@ -417,15 +417,15 @@ export function ClinicalWorksPage() {
                           <Button
                             size="sm"
                             variant="outline"
-                            className="border-rose-300 text-rose-700 bg-rose-50 hover:bg-rose-100 hover:text-rose-800 font-semibold text-xs gap-1.5 h-8 px-2.5"
+                            className="border-status-border text-status-foreground bg-status hover:bg-status hover:text-status-foreground font-semibold text-xs gap-1.5 h-8 px-2.5"
                             onClick={() => startEdit(log)}
                           >
                             <RotateCcw className="h-3.5 w-3.5" /> Resubmit
                           </Button>
                         ) : log.status === "pending" ? (
                           <div className="flex items-center justify-end gap-1">
-                            <Button variant="ghost" size="sm" aria-label={`Edit entry ${log.number}`} className="text-teal-600 hover:bg-teal-50 hover:text-teal-800" onClick={() => startEdit(log)}><Edit3 className="h-4 w-4" /></Button>
-                            <Button variant="ghost" size="sm" aria-label={`Delete entry ${log.number}`} className="text-rose-500 hover:bg-rose-50 hover:text-rose-700" onClick={() => void remove(log.id)}><Trash2 className="h-4 w-4" /></Button>
+                            <Button variant="ghost" size="sm" aria-label={`Edit entry ${log.number}`} className="text-forest hover:bg-mist hover:text-forest" onClick={() => startEdit(log)}><Edit3 className="h-4 w-4" /></Button>
+                            <Button variant="ghost" size="sm" aria-label={`Delete entry ${log.number}`} className="text-status-foreground hover:bg-status hover:text-status-foreground" onClick={() => void remove(log.id)}><Trash2 className="h-4 w-4" /></Button>
                           </div>
                         ) : null}
                       </TableCell>
@@ -446,7 +446,7 @@ function Field({ label, htmlFor, children }: { label: string; htmlFor: string; c
 }
 
 function statusBadge(status: ClinicalWorkLog["status"]) {
-  if (status === "verified") return <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700"><CheckCircle2 className="mr-1 h-3 w-3" /> Verified</Badge>;
-  if (status === "rejected") return <Badge className="border-rose-200 bg-rose-50 text-rose-700"><AlertCircle className="mr-1 h-3 w-3" /> Rejected</Badge>;
-  return <Badge className="border-amber-200 bg-amber-50 text-amber-700"><Clock className="mr-1 h-3 w-3" /> Pending</Badge>;
+  if (status === "verified") return <Badge className="border-status-border bg-status text-status-foreground"><CheckCircle2 className="mr-1 h-3 w-3" /> Verified</Badge>;
+  if (status === "rejected") return <Badge className="border-status-border bg-status text-status-foreground"><AlertCircle className="mr-1 h-3 w-3" /> Rejected</Badge>;
+  return <Badge className="border-status-border bg-status text-status-foreground"><Clock className="mr-1 h-3 w-3" /> Pending</Badge>;
 }

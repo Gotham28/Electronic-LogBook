@@ -50,25 +50,25 @@ function renderAttendanceStatusBadge(status: string) {
   switch (status) {
     case "present":
       return (
-        <Badge className="border-emerald-200 bg-emerald-50 text-[11px] font-semibold text-emerald-700">
+        <Badge className="border-status-border bg-status text-[11px] font-semibold text-status-foreground">
           <CheckCircle2 className="mr-1 h-3 w-3" /> Present
         </Badge>
       );
     case "absent":
       return (
-        <Badge className="border-rose-200 bg-rose-50 text-[11px] font-semibold text-rose-700">
+        <Badge className="border-status-border bg-status text-[11px] font-semibold text-status-foreground">
           <XCircle className="mr-1 h-3 w-3" /> Absent
         </Badge>
       );
     case "half_day":
       return (
-        <Badge className="border-amber-200 bg-amber-50 text-[11px] font-semibold text-amber-700">
+        <Badge className="border-status-border bg-status text-[11px] font-semibold text-status-foreground">
           <Clock className="mr-1 h-3 w-3" /> Half Day
         </Badge>
       );
     case "leave":
       return (
-        <Badge className="border-slate-200 bg-slate-100 text-[11px] font-semibold text-slate-700">
+        <Badge className="border-line-soft bg-sage text-[11px] font-semibold text-ink">
           <CalendarDays className="mr-1 h-3 w-3" /> Leave
         </Badge>
       );
@@ -118,33 +118,33 @@ function StudentDailyAttendanceView() {
       <div>
         <p className="page-eyebrow">Attendance administration</p>
         <h2 className="page-title mt-1">Daily Attendance</h2>
-        <p className="mt-2 text-sm text-slate-500">
+        <p className="mt-2 text-sm text-helper">
           Review your verified daily attendance records marked by department faculty.
         </p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-[18px] border border-white/70 bg-white/76 p-4 shadow-[0_18px_48px_rgba(15,23,42,0.05)]">
-          <p className="text-3xl font-bold text-slate-900">{totalDays}</p>
-          <p className="mt-1 text-[11px] font-bold uppercase tracking-wider text-slate-500">Days Logged</p>
+        <div className="rounded-[18px] border border-card-edge bg-card p-4 shadow-[0_18px_48px_color-mix(in_srgb,var(--gothos-forest)_5%,transparent)]">
+          <p className="text-3xl font-bold text-ink">{totalDays}</p>
+          <p className="mt-1 text-[11px] font-bold uppercase tracking-wider text-helper">Days Logged</p>
         </div>
-        <div className="rounded-[18px] border border-white/70 bg-white/76 p-4 shadow-[0_18px_48px_rgba(15,23,42,0.05)]">
-          <p className="text-3xl font-bold text-emerald-600">{presentDays}</p>
-          <p className="mt-1 text-[11px] font-bold uppercase tracking-wider text-slate-500">Days Present</p>
+        <div className="rounded-[18px] border border-card-edge bg-card p-4 shadow-[0_18px_48px_color-mix(in_srgb,var(--gothos-forest)_5%,transparent)]">
+          <p className="text-3xl font-bold text-status-foreground">{presentDays}</p>
+          <p className="mt-1 text-[11px] font-bold uppercase tracking-wider text-helper">Days Present</p>
         </div>
-        <div className="rounded-[18px] border border-white/70 bg-white/76 p-4 shadow-[0_18px_48px_rgba(15,23,42,0.05)]">
-          <p className="text-3xl font-bold text-rose-600">{absentDays + leaveDays}</p>
-          <p className="mt-1 text-[11px] font-bold uppercase tracking-wider text-slate-500">Absent / Leave</p>
+        <div className="rounded-[18px] border border-card-edge bg-card p-4 shadow-[0_18px_48px_color-mix(in_srgb,var(--gothos-forest)_5%,transparent)]">
+          <p className="text-3xl font-bold text-status-foreground">{absentDays + leaveDays}</p>
+          <p className="mt-1 text-[11px] font-bold uppercase tracking-wider text-helper">Absent / Leave</p>
         </div>
-        <div className="rounded-[18px] border border-white/70 bg-white/76 p-4 shadow-[0_18px_48px_rgba(15,23,42,0.05)]">
-          <p className="text-3xl font-bold text-teal-600">{percentage}{percentage !== "—" ? "%" : ""}</p>
-          <p className="mt-1 text-[11px] font-bold uppercase tracking-wider text-slate-500">Attendance Rate</p>
+        <div className="rounded-[18px] border border-card-edge bg-card p-4 shadow-[0_18px_48px_color-mix(in_srgb,var(--gothos-forest)_5%,transparent)]">
+          <p className="text-3xl font-bold text-forest">{percentage}{percentage !== "—" ? "%" : ""}</p>
+          <p className="mt-1 text-[11px] font-bold uppercase tracking-wider text-helper">Attendance Rate</p>
         </div>
       </div>
 
-      <Card className="border-white/70 bg-white/76">
-        <CardHeader className="border-b border-white/70 pb-3 flex flex-row items-center justify-between">
-          <CardTitle className="text-base font-bold text-slate-950">Attendance History</CardTitle>
+      <Card className="border-card-edge bg-card">
+        <CardHeader className="border-b border-card-edge pb-3 flex flex-row items-center justify-between">
+          <CardTitle className="text-base font-bold text-ink">Attendance History</CardTitle>
           <Button size="sm" variant="outline" onClick={fetchAttendance} disabled={loading} className="text-xs">
             Refresh
           </Button>
@@ -152,10 +152,10 @@ function StudentDailyAttendanceView() {
         <CardContent className="p-0">
           {loading ? (
             <div className="py-12 flex justify-center items-center">
-              <div className="animate-spin rounded-full border-4 border-slate-300 border-t-teal-600 h-8 w-8" />
+              <div className="animate-spin rounded-full border-4 border-line-soft border-t-forest h-8 w-8" />
             </div>
           ) : error ? (
-            <div className="p-6 text-center text-rose-600 text-sm font-medium">
+            <div className="p-6 text-center text-status-foreground text-sm font-medium">
               <p>{error}</p>
               <Button size="sm" variant="outline" onClick={fetchAttendance} className="mt-3">
                 Try again
@@ -182,16 +182,16 @@ function StudentDailyAttendanceView() {
               <TableBody>
                 {records.map((r) => (
                   <TableRow key={r.id}>
-                    <TableCell className="text-xs font-medium text-slate-900 py-3">
+                    <TableCell className="text-xs font-medium text-ink py-3">
                       {formatLogbookDate(r.date)}
                     </TableCell>
                     <TableCell className="py-3">
                       {renderAttendanceStatusBadge(r.status)}
                     </TableCell>
-                    <TableCell className="text-xs text-slate-600 py-3">
+                    <TableCell className="text-xs text-soft-ink py-3">
                       {r.clockIn || r.clockOut ? `${r.clockIn || "—"} to ${r.clockOut || "—"}` : "Full Day"}
                     </TableCell>
-                    <TableCell className="text-xs text-slate-600 py-3">
+                    <TableCell className="text-xs text-soft-ink py-3">
                       {r.verifierName || "Department Faculty"}
                     </TableCell>
                   </TableRow>
@@ -259,49 +259,49 @@ function StudentYearlyAttendanceView() {
       <div>
         <p className="page-eyebrow">Attendance administration</p>
         <h2 className="page-title mt-1">Yearly Attendance</h2>
-        <p className="mt-2 text-sm text-slate-500">
+        <p className="mt-2 text-sm text-helper">
           Review your annual attendance percentages logged and verified by department faculty.
         </p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {yearRows.map(({ year, label, pct, record }) => (
-          <div key={year} className="rounded-[18px] border border-white/70 bg-white/76 p-4 shadow-[0_18px_48px_rgba(15,23,42,0.05)]">
+          <div key={year} className="rounded-[18px] border border-card-edge bg-card p-4 shadow-[0_18px_48px_color-mix(in_srgb,var(--gothos-forest)_5%,transparent)]">
             <div className="flex items-center justify-between">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{label}</p>
+              <p className="text-[11px] font-bold uppercase tracking-wider text-helper">{label}</p>
               {pct !== null ? (
-                <Badge className="border-emerald-200 bg-emerald-50 text-[10px] font-semibold text-emerald-700">
+                <Badge className="border-status-border bg-status text-[10px] font-semibold text-status-foreground">
                   <CheckCircle2 className="mr-1 h-3 w-3" /> Recorded
                 </Badge>
               ) : (
-                <Badge variant="outline" className="text-[10px] text-slate-400">
+                <Badge variant="outline" className="text-[10px] text-helper">
                   Pending
                 </Badge>
               )}
             </div>
-            <p className="mt-2 text-3xl font-bold text-slate-900">
+            <p className="mt-2 text-3xl font-bold text-ink">
               {pct !== null ? `${pct}%` : "—"}
             </p>
-            <p className="mt-1 text-xs text-slate-500 truncate">
+            <p className="mt-1 text-xs text-helper truncate">
               {record?.verifierName ? `Marked by ${record.verifierName}` : "Not yet entered"}
             </p>
           </div>
         ))}
 
-        <div className="rounded-[18px] border border-white/70 bg-white/76 p-4 shadow-[0_18px_48px_rgba(15,23,42,0.05)]">
-          <p className="text-[11px] font-bold uppercase tracking-wider text-teal-600">Overall Average</p>
-          <p className="mt-2 text-3xl font-bold text-teal-700">
+        <div className="rounded-[18px] border border-card-edge bg-card p-4 shadow-[0_18px_48px_color-mix(in_srgb,var(--gothos-forest)_5%,transparent)]">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-forest">Overall Average</p>
+          <p className="mt-2 text-3xl font-bold text-forest">
             {avg}{avg !== "—" ? "%" : ""}
           </p>
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs text-helper">
             {validPercentages.length} of 3 years recorded
           </p>
         </div>
       </div>
 
-      <Card className="border-white/70 bg-white/76">
-        <CardHeader className="border-b border-white/70 pb-3 flex flex-row items-center justify-between">
-          <CardTitle className="text-base font-bold text-slate-950">Yearly Attendance Breakdown</CardTitle>
+      <Card className="border-card-edge bg-card">
+        <CardHeader className="border-b border-card-edge pb-3 flex flex-row items-center justify-between">
+          <CardTitle className="text-base font-bold text-ink">Yearly Attendance Breakdown</CardTitle>
           <Button size="sm" variant="outline" onClick={fetchAttendance} disabled={loading} className="text-xs">
             Refresh
           </Button>
@@ -309,10 +309,10 @@ function StudentYearlyAttendanceView() {
         <CardContent className="p-0">
           {loading ? (
             <div className="py-12 flex justify-center items-center">
-              <div className="animate-spin rounded-full border-4 border-slate-300 border-t-teal-600 h-8 w-8" />
+              <div className="animate-spin rounded-full border-4 border-line-soft border-t-forest h-8 w-8" />
             </div>
           ) : error ? (
-            <div className="p-6 text-center text-rose-600 text-sm font-medium">
+            <div className="p-6 text-center text-status-foreground text-sm font-medium">
               <p>{error}</p>
               <Button size="sm" variant="outline" onClick={fetchAttendance} className="mt-3">
                 Try again
@@ -340,31 +340,31 @@ function StudentYearlyAttendanceView() {
               <TableBody>
                 {yearRows.map(({ year, label, pct, record }) => (
                   <TableRow key={year}>
-                    <TableCell className="text-xs font-bold text-slate-900 py-3">
+                    <TableCell className="text-xs font-bold text-ink py-3">
                       {label}
                     </TableCell>
                     <TableCell className="py-3">
                       {pct !== null ? (
-                        <span className="text-sm font-bold text-teal-800">{pct}%</span>
+                        <span className="text-sm font-bold text-forest">{pct}%</span>
                       ) : (
-                        <span className="text-xs text-slate-400">Not recorded</span>
+                        <span className="text-xs text-helper">Not recorded</span>
                       )}
                     </TableCell>
                     <TableCell className="py-3">
                       {pct !== null ? (
-                        <Badge className="border-emerald-200 bg-emerald-50 text-[11px] font-semibold text-emerald-700">
+                        <Badge className="border-status-border bg-status text-[11px] font-semibold text-status-foreground">
                           <CheckCircle2 className="mr-1 h-3 w-3" /> Verified
                         </Badge>
                       ) : (
-                        <Badge variant="outline" className="text-[11px] text-slate-400">
+                        <Badge variant="outline" className="text-[11px] text-helper">
                           Pending
                         </Badge>
                       )}
                     </TableCell>
-                    <TableCell className="text-xs text-slate-600 py-3">
+                    <TableCell className="text-xs text-soft-ink py-3">
                       {record?.verifierName || "—"}
                     </TableCell>
-                    <TableCell className="text-xs text-slate-600 py-3">
+                    <TableCell className="text-xs text-soft-ink py-3">
                       {record?.createdAt ? formatLogbookDate(record.createdAt.slice(0, 10)) : "—"}
                     </TableCell>
                   </TableRow>
@@ -477,14 +477,14 @@ export function AttendancePage() {
       <div>
         <p className="page-eyebrow">Attendance administration</p>
         <h2 className="page-title mt-1">Leave records</h2>
-        <p className="mt-2 text-sm text-slate-500">Apply for leave and maintain the complete HOD decision record.</p>
+        <p className="mt-2 text-sm text-helper">Apply for leave and maintain the complete HOD decision record.</p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
         {balanceError ? (
-          <div className="md:col-span-2 flex flex-col items-center justify-center gap-3 rounded-2xl border border-rose-100 bg-rose-50 p-4 text-center" role="alert">
-            <p className="text-sm font-medium text-rose-700">{balanceError}</p>
-            <Button size="sm" variant="outline" onClick={fetchLeaves} className="border-rose-200 text-rose-700">Try again</Button>
+          <div className="md:col-span-2 flex flex-col items-center justify-center gap-3 rounded-2xl border border-status-border bg-status p-4 text-center" role="alert">
+            <p className="text-sm font-medium text-status-foreground">{balanceError}</p>
+            <Button size="sm" variant="outline" onClick={fetchLeaves} className="border-status-border text-status-foreground">Try again</Button>
           </div>
         ) : (
           <>
@@ -500,9 +500,9 @@ export function AttendancePage() {
         <SummaryCard label="Pending Approval" value={pendingCount} tone="amber" />
       </div>
 
-      <Card className="border-white/70 bg-white/76">
-        <CardHeader className="border-b border-white/70 pb-3">
-          <CardTitle className="text-sm font-bold text-slate-950">New Leave Application</CardTitle>
+      <Card className="border-card-edge bg-card">
+        <CardHeader className="border-b border-card-edge pb-3">
+          <CardTitle className="text-sm font-bold text-ink">New Leave Application</CardTitle>
         </CardHeader>
         <CardContent className="p-4">
           <form onSubmit={handleApplyLeave} className="space-y-4">
@@ -537,16 +537,16 @@ export function AttendancePage() {
                 required
               />
             </div>
-            <Button type="submit" className="bg-gradient-to-r from-teal-600 via-teal-500 to-cyan-500 text-xs font-semibold text-white shadow-[0_14px_30px_rgba(13,148,136,0.18)] hover:shadow-[0_18px_38px_rgba(13,148,136,0.24)]">
+            <Button type="submit" className="bg-forest text-xs font-semibold text-white shadow-[0_14px_30px_color-mix(in_srgb,var(--gothos-forest)_18%,transparent)] hover:shadow-[0_18px_38px_color-mix(in_srgb,var(--gothos-forest)_24%,transparent)]">
               Submit Leave Application
             </Button>
           </form>
         </CardContent>
       </Card>
 
-      <Card data-tour="student-leave-records" className="border-white/70 bg-white/76">
-        <CardHeader className="border-b border-white/70 pb-3">
-          <CardTitle className="text-base font-bold text-slate-950">Leave Records</CardTitle>
+      <Card data-tour="student-leave-records" className="border-card-edge bg-card">
+        <CardHeader className="border-b border-card-edge pb-3">
+          <CardTitle className="text-base font-bold text-ink">Leave Records</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           {leaves.length === 0 ? (
@@ -572,17 +572,17 @@ export function AttendancePage() {
               <TableBody>
                 {leaves.map((leave, idx) => (
                   <TableRow key={leave.number}>
-                    <TableCell className="py-3 text-xs font-bold text-slate-950">
+                    <TableCell className="py-3 text-xs font-bold text-ink">
                       {idx + 1}
-                      <p className="text-[10px] font-normal text-slate-400">Applied {formatLogbookDate(leave.appliedOn)}</p>
+                      <p className="text-[10px] font-normal text-helper">Applied {formatLogbookDate(leave.appliedOn)}</p>
                     </TableCell>
-                    <TableCell className="py-3 text-xs font-medium text-slate-700">{leave.leaveType}</TableCell>
-                    <TableCell className="py-3 text-xs text-slate-700">
+                    <TableCell className="py-3 text-xs font-medium text-ink">{leave.leaveType}</TableCell>
+                    <TableCell className="py-3 text-xs text-ink">
                       {formatLogbookDate(leave.fromDate)} to {formatLogbookDate(leave.toDate)}
-                      <p className="text-[10px] text-slate-400">{leave.totalDays} day(s)</p>
+                      <p className="text-[10px] text-helper">{leave.totalDays} day(s)</p>
                     </TableCell>
-                    <TableCell className="max-w-[260px] py-3 text-xs text-slate-600">{leave.reason}</TableCell>
-                    <TableCell className="py-3 text-xs text-slate-600">{leave.approvedBy}</TableCell>
+                    <TableCell className="max-w-[260px] py-3 text-xs text-soft-ink">{leave.reason}</TableCell>
+                    <TableCell className="py-3 text-xs text-soft-ink">{leave.approvedBy}</TableCell>
                     <TableCell className="py-3">{renderLeaveStatus(leave.status)}</TableCell>
                   </TableRow>
                 ))}
@@ -604,14 +604,14 @@ function getInclusiveDays(fromDate: string, toDate: string) {
 
 function SummaryCard({ label, value, tone, total }: { label: string; value: number; tone: "teal" | "amber" | "slate", total?: number | null }) {
   const toneClass = {
-    teal: "border-white/70 bg-white/76 text-teal-900",
-    amber: "border-white/70 bg-white/76 text-amber-900",
-    slate: "border-white/70 bg-white/76 text-slate-900",
+    teal: "border-card-edge bg-card text-forest",
+    amber: "border-card-edge bg-card text-status-foreground",
+    slate: "border-card-edge bg-card text-ink",
   }[tone];
 
   return (
-    <div className={`rounded-[18px] border p-4 shadow-[0_18px_48px_rgba(15,23,42,0.05)] ${toneClass}`}>
-      <p className="text-4xl font-semibold leading-none text-slate-950">
+    <div className={`rounded-[18px] border p-4 shadow-[0_18px_48px_color-mix(in_srgb,var(--gothos-forest)_5%,transparent)] ${toneClass}`}>
+      <p className="text-4xl font-semibold leading-none text-ink">
         {value} <span className="text-sm font-semibold opacity-60">{total ? `/ ${total} used` : ""}</span>
       </p>
       <p className="mt-2 text-[11px] font-bold uppercase tracking-[0.18em] opacity-70">{label}</p>
@@ -622,7 +622,7 @@ function SummaryCard({ label, value, tone, total }: { label: string; value: numb
 function renderLeaveStatus(status: LeaveStatus) {
   if (status === "approved") {
     return (
-      <Badge className="border-emerald-200 bg-emerald-50 text-[10px] text-emerald-700">
+      <Badge className="border-status-border bg-status text-[10px] text-status-foreground">
         <CheckCircle2 className="mr-1 h-3 w-3" /> Approved
       </Badge>
     );
@@ -630,14 +630,14 @@ function renderLeaveStatus(status: LeaveStatus) {
 
   if (status === "rejected") {
     return (
-      <Badge className="border-rose-200 bg-rose-50 text-[10px] text-rose-700">
+      <Badge className="border-status-border bg-status text-[10px] text-status-foreground">
         <XCircle className="mr-1 h-3 w-3" /> Rejected
       </Badge>
     );
   }
 
   return (
-    <Badge className="border-amber-200 bg-amber-50 text-[10px] text-amber-700">
+    <Badge className="border-status-border bg-status text-[10px] text-status-foreground">
       <Clock className="mr-1 h-3 w-3" /> Pending HOD
     </Badge>
   );

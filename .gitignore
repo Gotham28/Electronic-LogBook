@@ -82,3 +82,6 @@ IMPLEMENTATION_PLAN_*.md
 
 # Local multi-college plan for discussion and approval
 /IMPLEMENTATION_PLAN_MULTI_COLLEGE.md
+
+# Keep local AI execution state out of version control
+/.ai-state/

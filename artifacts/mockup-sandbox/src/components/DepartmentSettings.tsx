@@ -75,22 +75,22 @@ function WordingSettings() {
     await load();
   }, [load]);
 
-  if (loadError) return <div role="alert" className="space-y-3 rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
+  if (loadError) return <div role="alert" className="space-y-3 rounded-lg border border-status-border bg-status p-4 text-sm text-status-foreground">
     <p>{loadError}</p><Button variant="outline" onClick={() => void load()}>Try again</Button>
   </div>;
-  if (!wording) return <p role="status" className="text-sm text-slate-500">Loading wording…</p>;
+  if (!wording) return <p role="status" className="text-sm text-helper">Loading wording…</p>;
   const groups = DEPARTMENT_LABEL_GROUPS.filter((group) => wording.labels.some((item) => item.group === group));
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-2 border-b border-slate-200 pb-4">
-        <h3 className="text-lg font-semibold text-slate-900">Wording</h3>
-        <p className="text-sm text-slate-500">The names residents and faculty see for a few pages and columns. Each one saves on its own, and pages update straight away.</p>
-        {wording.readOnly && <p className="text-sm text-amber-700">This department mirrors another department's settings, so its wording can't be changed here.</p>}
+      <div className="flex flex-col gap-2 border-b border-line-soft pb-4">
+        <h3 className="text-lg font-semibold text-ink">Wording</h3>
+        <p className="text-sm text-helper">The names residents and faculty see for a few pages and columns. Each one saves on its own, and pages update straight away.</p>
+        {wording.readOnly && <p className="text-sm text-status-foreground">This department mirrors another department's settings, so its wording can't be changed here.</p>}
       </div>
-      {refreshNotice && <p role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">{refreshNotice}</p>}
+      {refreshNotice && <p role="alert" className="rounded-lg border border-status-border bg-status p-3 text-sm text-status-foreground">{refreshNotice}</p>}
       {groups.map((group) => (
         <section key={group} aria-label={`${group} wording`} className="space-y-3">
-          <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-500">{group}</h4>
+          <h4 className="text-sm font-semibold uppercase tracking-wide text-helper">{group}</h4>
           {wording.labels.filter((item) => item.group === group).map((item) => (
             <WordingRow key={`${item.key}:${item.revision}`} item={item} readOnly={wording.readOnly} onChanged={onRowChanged} />
           ))}
@@ -132,7 +132,7 @@ function WordingRow({ item, readOnly, onChanged }: { item: WordingItem; readOnly
   const reset = () => run(() => apiDelete(`${WORDING_ENDPOINT}/${item.key}`, { body: JSON.stringify({ revision: item.revision }) }), "Wording reset to default");
 
   return (
-    <div className="space-y-2 rounded-lg border border-slate-200 bg-white p-4">
+    <div className="space-y-2 rounded-lg border border-line-soft bg-white p-4">
       <Label htmlFor={inputId}>{item.description}</Label>
       <div className="flex flex-col gap-2 sm:flex-row">
         <Input id={inputId} value={draft} maxLength={item.maxLength} disabled={readOnly || busy}
@@ -141,10 +141,10 @@ function WordingRow({ item, readOnly, onChanged }: { item: WordingItem; readOnly
         <Button type="button" disabled={readOnly || busy || invalid || trimmed === current} onClick={() => void save()}>Save</Button>
         <Button type="button" variant="outline" disabled={readOnly || busy || item.override === null} onClick={() => void reset()}>Reset to default</Button>
       </div>
-      <p id={`${inputId}-hint`} className="text-xs text-slate-500">
+      <p id={`${inputId}-hint`} className="text-xs text-helper">
         Default: {defaultValue} · {item.override === null ? "using the default" : "customised"}
       </p>
-      {error && <p role="alert" className="text-sm text-rose-700">{error}</p>}
+      {error && <p role="alert" className="text-sm text-status-foreground">{error}</p>}
     </div>
   );
 }
@@ -442,24 +442,24 @@ export function DepartmentSettings() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-1 border-b border-slate-200 pb-4">
-        <h2 data-tour="hod-requirements" className="text-2xl font-semibold tracking-tight text-slate-900">Training requirements</h2>
-        <p className="text-sm text-slate-500">Department of {data.department.name}</p>
+      <div className="flex flex-col gap-1 border-b border-line-soft pb-4">
+        <h2 data-tour="hod-requirements" className="text-2xl font-semibold tracking-tight text-ink">Training requirements</h2>
+        <p className="text-sm text-helper">Department of {data.department.name}</p>
       </div>
 
       <div className="flex flex-wrap gap-3">
         {totals.map(({ key, label, value }) => (
-          <div key={key} className="flex flex-col justify-between rounded-xl border border-slate-200 bg-white p-4 shadow-sm min-w-[12rem] flex-1">
-            <p className="text-xs font-semibold text-slate-600">{label}</p>
+          <div key={key} className="flex flex-col justify-between rounded-xl border border-line-soft bg-white p-4 shadow-sm min-w-[12rem] flex-1">
+            <p className="text-xs font-semibold text-soft-ink">{label}</p>
             {value ? (
               <div className="mt-2 flex items-baseline gap-2">
-                <span className="text-2xl font-semibold tracking-tight text-slate-950">{value}</span>
-                <span className="text-[11px] text-slate-500">Target total</span>
+                <span className="text-2xl font-semibold tracking-tight text-ink">{value}</span>
+                <span className="text-[11px] text-helper">Target total</span>
               </div>
             ) : (
               <div className="mt-2 flex flex-col gap-0.5">
-                <span className="text-sm font-semibold text-slate-700">No minimum set yet</span>
-                <span className="text-[11px] leading-4 text-slate-500">Residents can still log these. Set a required count on any item below and this total will add them up.</span>
+                <span className="text-sm font-semibold text-ink">No minimum set yet</span>
+                <span className="text-[11px] leading-4 text-helper">Residents can still log these. Set a required count on any item below and this total will add them up.</span>
               </div>
             )}
           </div>
@@ -472,7 +472,7 @@ export function DepartmentSettings() {
             <Label htmlFor="section-select" className="sr-only">Section</Label>
             <select 
               id="section-select" 
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+              className="w-full rounded-xl border border-input bg-white px-3 py-2 text-sm"
               value={activeSectionId}
               onChange={(e) => setActiveSectionId(e.target.value)}
             >
@@ -491,13 +491,13 @@ export function DepartmentSettings() {
                   onClick={() => setActiveSectionId(s.id)}
                   className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                     activeSectionId === s.id 
-                      ? "bg-teal-50 text-teal-900" 
-                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                      ? "bg-mist text-forest"
+                      : "text-soft-ink hover:bg-mist hover:text-ink"
                   }`}
                 >
                   <span>{s.label}</span>
                   <span className={`rounded-full px-2 py-0.5 text-xs ${
-                    activeSectionId === s.id ? "bg-teal-100 text-teal-800" : "bg-slate-100 text-slate-600"
+                    activeSectionId === s.id ? "bg-sage text-forest" : "bg-sage text-soft-ink"
                   }`}>
                     {s.items.length}
                   </span>
@@ -511,18 +511,18 @@ export function DepartmentSettings() {
           {activeSection.kind === "logbook" ? <LogbookSectionSettings /> : activeSection.kind === "wording" ? <WordingSettings /> : activeSection.kind === "menu_order" ? <NavOrderSettings /> : activeSection.kind === "psychiatry" ? <PsychiatrySettings /> : <>
           <div className="flex flex-col gap-2 border-b border-slate-200 pb-4">
             <div className="flex items-center justify-between gap-4">
-              <h3 className="text-lg font-semibold text-slate-900">{activeSection.label}</h3>
+              <h3 className="text-lg font-semibold text-ink">{activeSection.label}</h3>
               <Button data-tour="hod-requirements-add" size="sm" onClick={() => setIsAdding(!isAdding)}>
                 {activeSection.addLabel}
               </Button>
             </div>
-            {activeSection.desc && <p className="text-sm text-slate-500">{activeSection.desc}</p>}
+            {activeSection.desc && <p className="text-sm text-helper">{activeSection.desc}</p>}
           </div>
 
           {activeSection.kind === "posting" && !isDemoMode() && <PostingAttachmentSetting />}
 
           {isAdding && (
-            <div data-tour="hod-requirements-add-form" className="rounded-xl border border-slate-200 bg-slate-50 p-4 mb-2">
+            <div data-tour="hod-requirements-add-form" className="rounded-xl border border-line-soft bg-mist p-4 mb-2">
               <form onSubmit={handleAddSubmit} className="flex flex-wrap items-end gap-4">
                 <div className="space-y-2 flex-1 min-w-[200px]">
                   <Label htmlFor="add-name">Name</Label>
@@ -540,12 +540,12 @@ export function DepartmentSettings() {
                           <SelectTrigger id="add-group"><SelectValue placeholder="Select a group" /></SelectTrigger>
                           <SelectContent>
                             {procedureGroups.map(g => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}
-                            <SelectItem value="NEW_GROUP" className="font-semibold text-teal-700">+ Add new group</SelectItem>
+                            <SelectItem value="NEW_GROUP" className="font-semibold text-forest">+ Add new group</SelectItem>
                           </SelectContent>
                         </Select>
                         {groupsError && (
                           <div className="flex items-center gap-3 mt-1">
-                            <p className="text-sm text-rose-600">Could not load procedure groups.</p>
+                            <p className="text-sm text-status-foreground">Could not load procedure groups.</p>
                             <Button type="button" variant="outline" size="sm" onClick={fetchGroups} disabled={busy}>Retry</Button>
                           </div>
                         )}
@@ -603,7 +603,7 @@ export function DepartmentSettings() {
 
           {activeSection.items.length > COLLAPSE_THRESHOLD && (
             <div className="relative mb-2">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-helper" />
               <Input
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -640,13 +640,13 @@ export function DepartmentSettings() {
           {activeSection.kind === "clinical_work_category" && (
             <div className="flex flex-col space-y-3">
               {activeSection.items.length === 0 && !searchQuery.trim() ? (
-                <p className="py-2 text-sm text-slate-500">No clinical work categories configured.</p>
+                <p className="py-2 text-sm text-helper">No clinical work categories configured.</p>
               ) : visibleItems.length === 0 ? (
-                <p className="py-2 text-sm text-slate-500">No matches for &ldquo;{searchQuery.trim()}&rdquo;.</p>
+                <p className="py-2 text-sm text-helper">No matches for &ldquo;{searchQuery.trim()}&rdquo;.</p>
               ) : (
                 <>
                   {searchQuery.trim() && (
-                    <p className="text-xs text-slate-500">Showing {visibleItems.length} of {activeSection.items.length}</p>
+                    <p className="text-xs text-helper">Showing {visibleItems.length} of {activeSection.items.length}</p>
                   )}
                   {visibleItems.map(category => (
                     <ClinicalWorkRow
@@ -671,7 +671,7 @@ export function DepartmentSettings() {
           {!["procedure", "clinical_work_category"].includes(activeSection.kind) && (
             <div className="flex flex-col">
               {visibleItems.length === 0 ? (
-                <p className="py-2 text-sm text-slate-500">
+                <p className="py-2 text-sm text-helper">
                   {searchQuery.trim() ? `No matches for \u201c${searchQuery.trim()}\u201d.` : 
                     activeSection.kind === "posting" ? "No postings configured." :
                     activeSection.kind === "academic" ? "No academic activities configured." :
@@ -684,20 +684,20 @@ export function DepartmentSettings() {
               ) : (
                 <>
                   {searchQuery.trim() && (
-                    <p className="mb-2 text-xs text-slate-500">
+                    <p className="mb-2 text-xs text-helper">
                       Showing {visibleItems.length} of {activeSection.items.length}
                     </p>
                   )}
-                  <div className="flex flex-col divide-y divide-slate-100 border-t border-slate-100">
+                  <div className="flex flex-col divide-y divide-line-soft border-t border-line-soft">
                     {visibleItems.map(item => {
                       const hasCount = ["academic", "case_category", "conference_level", "leave_type"].includes(activeSection.kind);
                       const isLeave = activeSection.kind === "leave_type";
                       return (
                         <div key={item.id} className="flex items-center justify-between py-3">
                           <div className="flex flex-col">
-                            <span className="text-sm font-medium text-slate-900">{item.name}</span>
+                            <span className="text-sm font-medium text-ink">{item.name}</span>
                             {TARGET_KINDS.includes(activeSection.kind) && (item as any).period && (
-                              <span className="text-xs text-slate-500">{(item as any).period === "month" ? "per month" : "overall"}</span>
+                              <span className="text-xs text-helper">{(item as any).period === "month" ? "per month" : "overall"}</span>
                             )}
                           </div>
                           <div className="flex items-center gap-3">
@@ -715,7 +715,7 @@ export function DepartmentSettings() {
                                   "Leave allowance updated"
                                 );
                               }} className="flex items-center gap-2">
-                                <Label htmlFor={`target-${item.id}`} className="text-xs text-slate-500">
+                                <Label htmlFor={`target-${item.id}`} className="text-xs text-helper">
                                   {isLeave ? "Days" : "Minimum"}
                                 </Label>
                                 <Input 
@@ -745,7 +745,7 @@ export function DepartmentSettings() {
                             <Button 
                               variant="ghost" 
                               size="icon"
-                              className="h-8 w-8 text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+                              className="h-8 w-8 text-status-foreground hover:bg-status hover:text-status-foreground"
                               aria-label={`Delete ${item.name}`}
                               disabled={busy || deleting}
                               onClick={() => confirmDelete(item.id, activeSection.kind as any, item.name)}
@@ -773,30 +773,30 @@ export function DepartmentSettings() {
               <>
                 <AlertDialogHeader>
                   <div className="flex items-start gap-3">
-                    <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-rose-100">
-                      <AlertTriangle className="h-4 w-4 text-rose-700" />
+                    <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-status">
+                      <AlertTriangle className="h-4 w-4 text-status-foreground" />
                     </div>
                     <div className="flex-1 space-y-3">
-                      <AlertDialogTitle className="text-rose-900">Delete {shownTarget?.name}?</AlertDialogTitle>
+                      <AlertDialogTitle className="text-status-foreground">Delete {shownTarget?.name}?</AlertDialogTitle>
                       <AlertDialogDescription asChild>
                         <div>
                           {shownTarget?.count === null ? (
                             deleteError ? (
-                              <p className="text-sm text-rose-800 mt-1 leading-relaxed">Checking usage failed.</p>
+                              <p className="text-sm text-status-foreground mt-1 leading-relaxed">Checking usage failed.</p>
                             ) : (
-                              <p className="text-sm text-rose-800 mt-1 leading-relaxed animate-pulse">Checking usage...</p>
+                              <p className="text-sm text-status-foreground mt-1 leading-relaxed animate-pulse">Checking usage...</p>
                             )
                           ) : shownTarget && shownTarget.count !== null && shownTarget.count > 0 ? (
-                            <p className="text-sm text-rose-800 mt-1 leading-relaxed">
+                            <p className="text-sm text-status-foreground mt-1 leading-relaxed">
                               {shownTarget.count} student {shownTarget.count === 1 ? 'record currently uses' : 'records currently use'} &apos;{shownTarget.name}&apos;. Deleting it will not affect those existing records, but it will be removed from the dropdown for future entries. Delete anyway?
                             </p>
                           ) : (
-                            <p className="text-sm text-rose-800 mt-1 leading-relaxed">
+                            <p className="text-sm text-status-foreground mt-1 leading-relaxed">
                               No student records currently use this option. Delete?
                             </p>
                           )}
                           {deleteError && shownTarget && shownTarget.count !== null && (
-                            <div className="mt-3 p-3 bg-rose-100 border border-rose-300 rounded-md text-sm text-rose-900 font-medium">
+                            <div className="mt-3 p-3 bg-status border border-status-border rounded-md text-sm text-status-foreground font-medium">
                               {deleteError}
                             </div>
                           )}
@@ -810,14 +810,14 @@ export function DepartmentSettings() {
                     Cancel
                   </Button>
                   {shownTarget && shownTarget.count === null && deleteError ? (
-                    <Button type="button" onClick={() => { if (deleteTarget) confirmDelete(deleteTarget.id, deleteTarget.type, deleteTarget.name); }} className="bg-rose-600 hover:bg-rose-700 text-white">
+                    <Button type="button" onClick={() => { if (deleteTarget) confirmDelete(deleteTarget.id, deleteTarget.type, deleteTarget.name); }} className="bg-destructive hover:bg-deep text-white">
                       Try again
                     </Button>
                   ) : (
                     <Button
                       onClick={handleDelete}
                       disabled={deleting || !deleteTarget || deleteTarget.count === null}
-                      className="bg-rose-600 hover:bg-rose-700 text-white"
+                      className="bg-destructive hover:bg-deep text-white"
                     >
                       {deleting ? "Deleting..." : "Delete"}
                     </Button>
@@ -879,18 +879,18 @@ function ProceduresList({
     <div className="flex flex-col space-y-3">
       {groupsError && (
         <div className="py-4 flex items-center gap-3">
-          <p className="text-sm text-rose-600">Could not load procedure groups.</p>
+          <p className="text-sm text-status-foreground">Could not load procedure groups.</p>
           <Button type="button" variant="outline" size="sm" onClick={fetchGroups} disabled={busy}>Retry</Button>
         </div>
       )}
       {allGroups.length === 0 && !query.trim() ? (
-        <p className="py-4 text-sm text-slate-500">No procedure types configured.</p>
+        <p className="py-4 text-sm text-helper">No procedure types configured.</p>
       ) : renderedBlocks.length === 0 ? (
-        <p className="py-2 text-sm text-slate-500">No matches for &ldquo;{query.trim()}&rdquo;.</p>
+        <p className="py-2 text-sm text-helper">No matches for &ldquo;{query.trim()}&rdquo;.</p>
       ) : (
         <>
           {query.trim() && (
-            <p className="text-xs text-slate-500">Showing {shown} of {procedures.length}</p>
+            <p className="text-xs text-helper">Showing {shown} of {procedures.length}</p>
           )}
           {renderedBlocks}
         </>
@@ -904,23 +904,23 @@ function ProcedureGroupBlock({ group, types, forceExpand, getDraft, setDraft, is
   const isExpanded = forceExpand || expanded;
 
   return (
-    <div className="flex flex-col border border-slate-200 rounded-xl bg-white overflow-hidden">
-      <div className="flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100/50 transition-colors">
+    <div className="flex flex-col border border-line-soft rounded-xl bg-white overflow-hidden">
+      <div className="flex items-center justify-between p-3 bg-mist hover:bg-sage transition-colors">
         <button 
           type="button" 
           aria-expanded={isExpanded}
           onClick={() => setExpanded(!expanded)}
-          className="flex flex-1 items-center gap-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 rounded"
+          className="flex flex-1 items-center gap-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
         >
-          <ChevronDown className={`h-4 w-4 shrink-0 text-slate-500 transition-transform ${isExpanded ? "" : "-rotate-90"}`} />
+          <ChevronDown className={`h-4 w-4 shrink-0 text-helper transition-transform ${isExpanded ? "" : "-rotate-90"}`} />
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-slate-900">{group.name}</span>
-            <span className="text-xs text-slate-500">({group.isOfficial ? group.count : types.length} procedure types)</span>
+            <span className="text-sm font-medium text-ink">{group.name}</span>
+            <span className="text-xs text-helper">({group.isOfficial ? group.count : types.length} procedure types)</span>
           </div>
         </button>
         {group.isOfficial && (
           <Button 
-            variant="ghost" size="icon" className="h-8 w-8 text-rose-600 hover:bg-rose-100"
+            variant="ghost" size="icon" className="h-8 w-8 text-status-foreground hover:bg-status"
             aria-label={`Delete ${group.name}`}
             disabled={busy || deleting}
             onClick={() => confirmDelete(group.id, "procedure_group", group.name)}
@@ -930,12 +930,12 @@ function ProcedureGroupBlock({ group, types, forceExpand, getDraft, setDraft, is
         )}
       </div>
       {isExpanded && types.length > 0 && (
-        <div className="flex flex-col divide-y divide-slate-100 border-t border-slate-200">
+        <div className="flex flex-col divide-y divide-line-soft border-t border-line-soft">
           {types.map((p: any) => (
             <div key={p.id} className="flex flex-wrap items-center justify-between p-3 gap-2">
               <div className="flex min-w-0 flex-1 flex-col">
-                <span className="text-sm text-slate-900 font-medium">{p.name}</span>
-                <span className="text-xs text-slate-500">{p.group}</span>
+                <span className="text-sm text-ink font-medium">{p.name}</span>
+                <span className="text-xs text-helper">{p.group}</span>
                 <ProcedureFieldRequirementsEditor procedure={p} />
               </div>
               <div className="flex items-center gap-3">
@@ -943,7 +943,7 @@ function ProcedureGroupBlock({ group, types, forceExpand, getDraft, setDraft, is
                   e.preventDefault();
                   patchItem(p.id, "procedure", p.required, undefined, "Procedure target updated");
                 }} className="flex items-center gap-2">
-                  <Label htmlFor={`target-proc-${p.id}`} className="text-xs text-slate-500">Minimum</Label>
+                  <Label htmlFor={`target-proc-${p.id}`} className="text-xs text-helper">Minimum</Label>
                   <Input 
                     id={`target-proc-${p.id}`}
                     type="number" min={0} max={100000} required className="w-20"
@@ -960,7 +960,7 @@ function ProcedureGroupBlock({ group, types, forceExpand, getDraft, setDraft, is
                   </Button>
                 </form>
                 <Button 
-                  variant="ghost" size="icon" className="h-8 w-8 text-rose-600 hover:bg-rose-50"
+                  variant="ghost" size="icon" className="h-8 w-8 text-status-foreground hover:bg-status"
                   aria-label={`Delete ${p.name}`}
                   disabled={busy || deleting}
                   onClick={() => confirmDelete(p.id, "procedure", p.name)}
@@ -998,26 +998,26 @@ function ClinicalWorkRow({
   };
 
   return (
-    <div className="flex flex-col border border-slate-200 rounded-xl bg-white overflow-hidden">
-      <div className="flex flex-wrap items-center justify-between p-3 bg-slate-50 gap-2">
+    <div className="flex flex-col border border-line-soft rounded-xl bg-white overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between p-3 bg-mist gap-2">
         <button 
           type="button" 
           aria-expanded={expanded}
           onClick={() => setExpanded(!expanded)}
-          className="flex flex-1 items-center gap-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 rounded min-w-[200px]"
+          className="flex flex-1 items-center gap-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded min-w-[200px]"
         >
-          <ChevronDown className={`h-4 w-4 shrink-0 text-slate-500 transition-transform ${expanded ? "" : "-rotate-90"}`} />
+          <ChevronDown className={`h-4 w-4 shrink-0 text-helper transition-transform ${expanded ? "" : "-rotate-90"}`} />
           <div className="flex flex-col">
-            <span className="text-sm font-medium text-slate-900">{category.name}</span>
-            {category.period === "month" && <span className="text-xs text-slate-500">per month</span>}
+            <span className="text-sm font-medium text-ink">{category.name}</span>
+            {category.period === "month" && <span className="text-xs text-helper">per month</span>}
           </div>
         </button>
-        <div className="flex items-center gap-3 md:pl-4 md:border-l border-slate-200">
+        <div className="flex items-center gap-3 md:pl-4 md:border-l border-line-soft">
           <form onSubmit={(e) => {
             e.preventDefault();
             patchItem(category.id, "clinical_work_category", category.required, category.period, "Clinical work minimum updated");
           }} className="flex items-center gap-2">
-            <Label htmlFor={`target-${category.id}`} className="text-xs text-slate-500">Minimum</Label>
+            <Label htmlFor={`target-${category.id}`} className="text-xs text-helper">Minimum</Label>
             <Input 
               id={`target-${category.id}`}
               type="number" min={0} max={100000} required className="w-20"
@@ -1034,7 +1034,7 @@ function ClinicalWorkRow({
             </Button>
           </form>
           <Button 
-            variant="ghost" size="icon" className="h-8 w-8 text-rose-600 hover:bg-rose-50"
+            variant="ghost" size="icon" className="h-8 w-8 text-status-foreground hover:bg-status"
             aria-label={`Delete ${category.name}`}
             disabled={busy || deleting}
             onClick={() => confirmDelete(category.id, "clinical_work_category", category.name)}
@@ -1044,16 +1044,16 @@ function ClinicalWorkRow({
         </div>
       </div>
       {expanded && (
-        <div className="bg-white p-4 border-t border-slate-200 space-y-4">
+        <div className="bg-white p-4 border-t border-line-soft space-y-4">
           {subTypes.length === 0 ? (
-            <p className="text-sm text-slate-500">No sub-types yet</p>
+            <p className="text-sm text-helper">No sub-types yet</p>
           ) : (
-            <ul className="flex flex-col divide-y divide-slate-100 border border-slate-200 rounded-lg">
+            <ul className="flex flex-col divide-y divide-line-soft border border-line-soft rounded-lg">
               {subTypes.map((item: any) => (
                 <li key={item.id} className="flex items-center justify-between p-2">
                   <span className="text-sm pl-2">{item.name}</span>
                   <Button 
-                    variant="ghost" size="icon" className="h-8 w-8 text-rose-600 hover:bg-rose-50"
+                    variant="ghost" size="icon" className="h-8 w-8 text-status-foreground hover:bg-status"
                     aria-label={`Delete ${item.name}`}
                     disabled={busy || deleting}
                     onClick={() => confirmDelete(item.id, "clinical_work_subtype", item.name)}

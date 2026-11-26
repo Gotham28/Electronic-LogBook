@@ -22,7 +22,7 @@ function validateName(value: string): string | null {
 }
 
 function Field({ label, value }: { label: string; value: string | null | undefined }) {
-  return <div className="space-y-1"><dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</dt><dd className="text-sm text-slate-900">{value || "Not available"}</dd></div>;
+  return <div className="space-y-1"><dt className="text-xs font-semibold uppercase tracking-wide text-helper">{label}</dt><dd className="text-sm text-ink">{value || "Not available"}</dd></div>;
 }
 
 export function ProfilePage({ adminShell = false }: { adminShell?: boolean }) {
@@ -159,8 +159,8 @@ export function ProfilePage({ adminShell = false }: { adminShell?: boolean }) {
     }
   };
 
-  if (loading && !profile) return <div role="status" className="mx-auto max-w-4xl p-6 text-sm text-slate-500">Loading your profile…</div>;
-  if (!profile) return <main className="mx-auto max-w-4xl p-6"><Card><CardContent className="space-y-3 p-6"><h1 className="text-xl font-bold">Your profile could not be loaded</h1><p role="alert" className="text-sm text-rose-700">{loadError || "Please try again."}</p><Button onClick={() => void loadProfile(true)}>Retry</Button></CardContent></Card></main>;
+  if (loading && !profile) return <div role="status" className="mx-auto max-w-4xl p-6 text-sm text-helper">Loading your profile…</div>;
+  if (!profile) return <main className="mx-auto max-w-4xl p-6"><Card><CardContent className="space-y-3 p-6"><h1 className="text-xl font-bold">Your profile could not be loaded</h1><p role="alert" className="text-sm text-status-foreground">{loadError || "Please try again."}</p><Button onClick={() => void loadProfile(true)}>Retry</Button></CardContent></Card></main>;
 
   const readOnlyText = profile.capabilities.readOnlyReason === "impersonation"
     ? "Name changes are unavailable while viewing an account through impersonation."
@@ -168,29 +168,29 @@ export function ProfilePage({ adminShell = false }: { adminShell?: boolean }) {
   const initials = profile.user.fullName.split(/\s+/).map((part) => part[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
 
   return <main className="mx-auto w-full max-w-4xl space-y-6 p-1 sm:p-2">
-    {adminShell ? <Link href="/" className="inline-flex items-center gap-2 text-sm font-semibold text-teal-800 hover:underline"><ArrowLeft className="h-4 w-4" />Back to portal</Link> : null}
-    <header><p className="text-xs font-bold uppercase tracking-[0.18em] text-teal-700">Account</p><h1 className="mt-1 text-3xl font-bold text-slate-950">My Profile</h1><p className="mt-2 text-sm text-slate-600">View your account details and manage the name shown in your logbook.</p></header>
-    {loadError ? <div role="alert" className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">Profile refresh failed: {loadError}<Button variant="link" className="h-auto p-0" onClick={() => void loadProfile(false)}>Retry</Button></div> : null}
-    {message ? <p role="status" aria-live="polite" className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">{message}</p> : null}
-    {emailStatus ? <p role="status" className="rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-700">{emailStatus}</p> : null}
-    {errorMessage ? <p role="alert" aria-live="assertive" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{errorMessage}</p> : null}
-    <Card className="rounded-2xl border-slate-200/80 shadow-sm">
+    {adminShell ? <Link href="/" className="inline-flex items-center gap-2 text-sm font-semibold text-forest hover:underline"><ArrowLeft className="h-4 w-4" />Back to portal</Link> : null}
+    <header><p className="text-xs font-bold uppercase tracking-[0.18em] text-forest">Account</p><h1 className="mt-1 text-3xl font-bold text-ink">My Profile</h1><p className="mt-2 text-sm text-soft-ink">View your account details and manage the name shown in your logbook.</p></header>
+    {loadError ? <div role="alert" className="flex flex-wrap items-center gap-2 rounded-xl border border-status-border bg-status p-3 text-sm text-status-foreground">Profile refresh failed: {loadError}<Button variant="link" className="h-auto p-0" onClick={() => void loadProfile(false)}>Retry</Button></div> : null}
+    {message ? <p role="status" aria-live="polite" className="rounded-xl border border-status-border bg-status p-3 text-sm text-status-foreground">{message}</p> : null}
+    {emailStatus ? <p role="status" className="rounded-xl border border-line-soft bg-white p-3 text-sm text-ink">{emailStatus}</p> : null}
+    {errorMessage ? <p role="alert" aria-live="assertive" className="rounded-xl border border-status-border bg-status p-3 text-sm text-status-foreground">{errorMessage}</p> : null}
+    <Card className="rounded-2xl border-line-soft shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0"><CardTitle className="text-lg">Account details</CardTitle>
         {!editing && profile.capabilities.canEditName ? <Button ref={editButtonRef} variant="outline" onClick={beginEdit}><Pencil className="mr-2 h-4 w-4" />Edit name</Button> : null}
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="flex items-center gap-4 rounded-xl bg-slate-50 p-4"><div aria-label={`Initials ${initials}`} className="grid h-12 w-12 place-items-center rounded-full bg-teal-100 text-sm font-bold text-teal-900">{initials}</div><div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Name</p><p className="text-lg font-semibold text-slate-950">{profile.user.fullName}</p></div></div>
+        <div className="flex items-center gap-4 rounded-xl bg-mist p-4"><div aria-label={`Initials ${initials}`} className="grid h-12 w-12 place-items-center rounded-full bg-sage text-sm font-bold text-forest">{initials}</div><div><p className="text-xs font-semibold uppercase tracking-wide text-helper">Name</p><p className="text-lg font-semibold text-ink">{profile.user.fullName}</p></div></div>
         {editing ? <form onSubmit={handleSave} className="space-y-3" noValidate>
           <div className="space-y-2"><Label htmlFor="profile-full-name">Full name</Label><Input ref={nameInputRef} id="profile-full-name" name="fullName" autoComplete="name" maxLength={200} value={draft} aria-invalid={!!nameError} aria-describedby={nameError ? "profile-name-error" : "profile-name-help"} onChange={(event) => { setDraft(event.target.value); setNameError(null); }} />
-            {nameError ? <p id="profile-name-error" role="alert" className="text-sm text-rose-700">{nameError}</p> : null}
-            <p id="profile-name-help" className="text-xs text-slate-600">{profile.user.role === "student" ? "Your updated name will appear in your logbook. Your department HOD will be notified." : "Your updated name will appear throughout your account."}</p>
+            {nameError ? <p id="profile-name-error" role="alert" className="text-sm text-status-foreground">{nameError}</p> : null}
+            <p id="profile-name-help" className="text-xs text-soft-ink">{profile.user.role === "student" ? "Your updated name will appear in your logbook. Your department HOD will be notified." : "Your updated name will appear throughout your account."}</p>
           </div>
           <div className="flex flex-wrap gap-2"><Button type="submit" disabled={saving || !!validateName(draft) || canonicalName(draft) === profile.user.fullName}>{saving ? "Saving…" : "Save changes"}</Button><Button type="button" variant="outline" disabled={saving} onClick={cancelEdit}>Cancel</Button></div>
-        </form> : readOnlyText ? <p className="text-sm text-slate-600">{readOnlyText}</p> : null}
+        </form> : readOnlyText ? <p className="text-sm text-soft-ink">{readOnlyText}</p> : null}
         <dl className="grid gap-x-8 gap-y-5 sm:grid-cols-2"><Field label="Email" value={profile.user.email} /><Field label="Role" value={profile.user.role[0]?.toUpperCase() + profile.user.role.slice(1)} /><Field label="Department" value={profile.user.departmentName} /></dl>
       </CardContent>
     </Card>
-    {profile.student ? <Card className="rounded-2xl border-slate-200/80 shadow-sm"><CardHeader><CardTitle className="text-lg">Academic details</CardTitle></CardHeader><CardContent><dl className="grid gap-x-8 gap-y-5 sm:grid-cols-2"><Field label="Registration number" value={profile.student.registrationNumber} /><Field label="KUHS ID" value={profile.student.kuhsId} /><Field label="Batch" value={profile.student.batch} /><Field label="Date of joining" value={profile.student.dateOfJoining} /></dl></CardContent></Card> : null}
+    {profile.student ? <Card className="rounded-2xl border-line-soft shadow-sm"><CardHeader><CardTitle className="text-lg">Academic details</CardTitle></CardHeader><CardContent><dl className="grid gap-x-8 gap-y-5 sm:grid-cols-2"><Field label="Registration number" value={profile.student.registrationNumber} /><Field label="KUHS ID" value={profile.student.kuhsId} /><Field label="Batch" value={profile.student.batch} /><Field label="Date of joining" value={profile.student.dateOfJoining} /></dl></CardContent></Card> : null}
     <ProfileNameHistory refreshKey={historyRefresh} />
   </main>;
 }

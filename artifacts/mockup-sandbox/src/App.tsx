@@ -8,6 +8,7 @@ import { HODPortal } from "@/components/HODPortal";
 import { AdminPortal } from "@/components/AdminPortal";
 import { LoginPage } from "@/components/LoginPage";
 import { RegistrationPage } from "@/components/RegistrationPage";
+import { SignedOutSupportButton } from "@/components/SupportWidget";
 import { CaseLogsPage } from "@/components/pages/CaseLogsPage";
 import { ProcedureLogsPage } from "@/components/pages/ProcedureLogsPage";
 import { AcademicLogsPage } from "@/components/pages/AcademicLogsPage";
@@ -43,54 +44,6 @@ const PsychiatryWorkspace = lazy(() => import("@/components/pages/PsychiatryWork
 const PsychiatryReviewPage = lazy(() => import("@/components/pages/PsychiatryWorkspace").then((module) => ({ default: module.PsychiatryReviewPage })));
 
 type ModuleMap = Record<string, () => Promise<Record<string, unknown>>>;
-
-function relativeLuminance(hex: string): number | null {
-  const match = hex.match(/^#?([\da-f]{6})$/i);
-  if (!match) return null;
-
-  const channels = [0, 2, 4].map((offset) => parseInt(match[1].slice(offset, offset + 2), 16) / 255);
-  const linear = channels.map((channel) => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4);
-  return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
-}
-
-function contrastRatio(first: number, second: number): number {
-  const lighter = Math.max(first, second);
-  const darker = Math.min(first, second);
-  return (lighter + 0.05) / (darker + 0.05);
-}
-
-function mixHexWithBlack(hex: string, amount: number): string {
-  const match = hex.match(/^#?([\da-f]{6})$/i);
-  if (!match) return hex;
-  const channels = [0, 2, 4].map((offset) => Math.round(parseInt(match[1].slice(offset, offset + 2), 16) * (1 - amount)));
-  return `#${channels.map((channel) => channel.toString(16).padStart(2, "0")).join("")}`;
-}
-
-function getDemoAccentTextColors(accent: string) {
-  const accentLuminance = relativeLuminance(accent);
-  if (accentLuminance === null) return { readable: "#0f766e", foreground: "#ffffff" };
-
-  const whiteLuminance = 1;
-  const inkLuminance = relativeLuminance("#0f172a")!;
-  let readable = accent;
-  if (contrastRatio(accentLuminance, whiteLuminance) < 4.5) {
-    for (let amount = 0.02; amount <= 0.9; amount += 0.02) {
-      const candidate = mixHexWithBlack(accent, amount);
-      const candidateLuminance = relativeLuminance(candidate);
-      if (candidateLuminance !== null && contrastRatio(candidateLuminance, whiteLuminance) >= 4.5) {
-        readable = candidate;
-        break;
-      }
-    }
-  }
-
-  return {
-    readable,
-    foreground: contrastRatio(accentLuminance, whiteLuminance) >= contrastRatio(accentLuminance, inkLuminance)
-      ? "#ffffff"
-      : "#0f172a",
-  };
-}
 
 function _resolveComponent(
   mod: Record<string, unknown>,
@@ -164,7 +117,7 @@ function PreviewRenderer({
 
   if (error) {
     return (
-      <pre style={{ color: "red", padding: "2rem", fontFamily: "system-ui" }}>
+      <pre style={{ color: "var(--gothos-ink)", padding: "2rem", fontFamily: "system-ui" }}>
         {error}
       </pre>
     );
@@ -231,15 +184,10 @@ function App() {
     const root = document.documentElement;
     if (currentUser?.isDemoMode) {
       const accent = getDemoDepartmentProfile(currentUser.departmentId).accent;
-      const { readable, foreground } = getDemoAccentTextColors(accent);
       root.style.setProperty("--demo-accent", accent);
-      root.style.setProperty("--demo-accent-readable", readable);
-      root.style.setProperty("--demo-accent-foreground", foreground);
       root.setAttribute("data-demo-mode", "true");
     } else {
       root.style.removeProperty("--demo-accent");
-      root.style.removeProperty("--demo-accent-readable");
-      root.style.removeProperty("--demo-accent-foreground");
       root.removeAttribute("data-demo-mode");
     }
   }, [currentUser?.departmentId, currentUser?.isDemoMode]);
@@ -346,7 +294,10 @@ function App() {
               setAuthScreen("login");
             }}
           />
-          <Toaster position="top-right" richColors />
+          <div className="bg-background pb-4 text-center print:hidden">
+            <SignedOutSupportButton />
+          </div>
+          <Toaster position="top-right" />
         </>
       );
     }
@@ -360,7 +311,7 @@ function App() {
             setIsAuthenticated(true);
           }}
         />
-        <Toaster position="top-right" richColors />
+        <Toaster position="top-right" />
       </>
     );
   }
@@ -379,7 +330,7 @@ function App() {
             setLocation("/");
           }}
         />
-        <Toaster position="top-right" richColors />
+        <Toaster position="top-right" />
       </>
     );
   }
@@ -388,7 +339,7 @@ function App() {
     return (
       <DepartmentProvider departmentId={currentUser?.departmentId ?? null}>
         {currentUser?.isDemoMode && (
-          <div className="print:hidden sticky top-0 z-50 bg-white/90 px-3 py-2 shadow-sm">
+          <div className="print:hidden sticky top-0 z-50 bg-card px-3 py-2 shadow-sm">
             <DemoBanner />
           </div>
         )}
@@ -460,7 +411,7 @@ function DepartmentWorkspace({ activeRole, demo, onSignOut, children }: { active
 }
 
 function AccessDeniedPage() {
-  return <main className="mx-auto max-w-3xl p-6"><div role="alert" className="rounded-2xl border border-rose-200 bg-white p-6"><h1 className="text-xl font-bold text-slate-900">Access unavailable</h1><p className="mt-2 text-sm text-slate-600">These saved name-change notices are available to the current department HOD.</p></div></main>;
+  return <main className="mx-auto max-w-3xl p-6"><div role="alert" className="rounded-2xl border border-status-border bg-white p-6"><h1 className="text-xl font-bold text-ink">Access unavailable</h1><p className="mt-2 text-sm text-soft-ink">These saved name-change notices are available to the current department HOD.</p></div></main>;
 }
 
 function FeatureGate({ hiddenBy, requires, children }: { hiddenBy?: string; requires?: string; children: ReactNode }) {

@@ -138,8 +138,8 @@ export function MaintenanceAnnouncements() {
     <div className="mt-12 space-y-6 border-t pt-8">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight text-slate-900">Maintenance Notices</h2>
-          <p className="text-slate-500">Schedule a platform-wide ELogbook service notice across all colleges for selected roles.</p>
+          <h2 className="text-2xl font-bold tracking-tight text-ink">Maintenance Notices</h2>
+          <p className="text-helper">Schedule a platform-wide ELogbook service notice across all colleges for selected roles.</p>
         </div>
         <Button onClick={openNew}><Plus className="mr-2 h-4 w-4" /> Schedule</Button>
       </div>
@@ -151,19 +151,19 @@ export function MaintenanceAnnouncements() {
             <TableHead>Audience</TableHead><TableHead className="text-right">Actions</TableHead>
           </TableRow></TableHeader>
           <TableBody>
-            {loading ? <TableRow><TableCell colSpan={5} className="text-center text-slate-500">Loading…</TableCell></TableRow>
-              : loadError ? <TableRow><TableCell colSpan={5} role="alert" className="py-6 text-center text-rose-700">{loadError}</TableCell></TableRow>
-              : announcements.length === 0 ? <TableRow><TableCell colSpan={5} className="text-center text-slate-500">No maintenance notices scheduled.</TableCell></TableRow>
+            {loading ? <TableRow><TableCell colSpan={5} className="text-center text-helper">Loading…</TableCell></TableRow>
+              : loadError ? <TableRow><TableCell colSpan={5} role="alert" className="py-6 text-center text-status-foreground">{loadError}</TableCell></TableRow>
+              : announcements.length === 0 ? <TableRow><TableCell colSpan={5} className="text-center text-helper">No maintenance notices scheduled.</TableCell></TableRow>
               : announcements.map((announcement) => {
                 const isScheduledOrActive = announcement.status === "scheduled" || announcement.status === "active";
                 return <TableRow key={announcement.id}>
-                  <TableCell><span className={`inline-flex rounded-md px-2 py-1 text-xs font-medium ${announcement.status === "scheduled" ? "bg-amber-100 text-amber-700" : announcement.status === "active" ? "bg-emerald-100 text-emerald-700" : announcement.status === "cancelled" ? "bg-slate-100 text-slate-700" : "bg-blue-100 text-blue-700"}`}>{announcement.status}</span></TableCell>
+                  <TableCell><span className={`inline-flex rounded-md px-2 py-1 text-xs font-medium ${announcement.status === "scheduled" ? "bg-status text-status-foreground" : announcement.status === "active" ? "bg-status text-status-foreground" : announcement.status === "cancelled" ? "bg-sage text-ink" : "bg-sage text-forest"}`}>{announcement.status}</span></TableCell>
                   <TableCell className="font-medium">ELogbook maintenance</TableCell>
                   <TableCell className="text-xs">{formatIst(announcement.startAt)}<br />to {formatIst(announcement.endAt)}</TableCell>
-                  <TableCell className="text-xs text-slate-500">{announcement.audienceRoles.map(audienceLabel).join(", ")}</TableCell>
+                  <TableCell className="text-xs text-helper">{announcement.audienceRoles.map(audienceLabel).join(", ")}</TableCell>
                   <TableCell className="text-right">{isScheduledOrActive && <div className="flex justify-end gap-2">
                     <Button variant="outline" size="sm" onClick={() => openEdit(announcement)}>Edit</Button>
-                    <Button variant="outline" size="sm" className="text-rose-600 hover:text-rose-700" onClick={() => void handleCancel(announcement)}>Cancel</Button>
+                    <Button variant="outline" size="sm" className="text-status-foreground hover:text-status-foreground" onClick={() => void handleCancel(announcement)}>Cancel</Button>
                   </div>}</TableCell>
                 </TableRow>;
               })}
@@ -175,7 +175,7 @@ export function MaintenanceAnnouncements() {
         <DialogContent className="max-w-xl">
           <DialogHeader><DialogTitle>{form.id ? "Edit" : "Schedule"} ELogbook Maintenance</DialogTitle></DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <p className="rounded-lg border border-teal-100 bg-teal-50 p-3 text-sm leading-relaxed text-teal-950">
+            <p className="rounded-lg border border-line-soft bg-mist p-3 text-sm leading-relaxed text-forest">
               {maintenancePreview(form.startAt, form.endAt)}
             </p>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -201,8 +201,8 @@ export function MaintenanceAnnouncements() {
                 </label>)}
               </div>
             </div>
-            {form.id && <p className="text-xs text-slate-500">Changing the schedule or audience updates the in-app notice for those roles. Active maintenance keeps its original start time.</p>}
-            {!isFormValid && (form.startAt || form.endAt) && <p role="alert" className="text-sm text-rose-700">Choose valid future IST times with the end after the start, and select at least one audience.</p>}
+            {form.id && <p className="text-xs text-helper">Changing the schedule or audience updates the in-app notice for those roles. Active maintenance keeps its original start time.</p>}
+            {!isFormValid && (form.startAt || form.endAt) && <p role="alert" className="text-sm text-status-foreground">Choose valid future IST times with the end after the start, and select at least one audience.</p>}
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>Close</Button>
               <Button type="submit" disabled={submitting || !isFormValid}>{submitting ? "Saving…" : "Save schedule"}</Button>

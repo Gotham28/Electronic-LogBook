@@ -119,7 +119,7 @@ export function PostingsPage() {
         <div>
           <p className="page-eyebrow flex items-center gap-2">Student-managed clinical training</p>
           <h2 className="page-title mt-1">Postings &amp; rotations</h2>
-          <p className="mt-2 text-sm text-slate-500">Track your individual {postingLabelLower}s.</p>
+          <p className="mt-2 text-sm text-helper">Track your individual {postingLabelLower}s.</p>
         </div>
         <Dialog open={open} onOpenChange={(val) => {
           setOpen(val);
@@ -144,7 +144,7 @@ export function PostingsPage() {
                   <Input value={ward} onChange={e => setWard(e.target.value)} required placeholder={`Enter ${postingLabelLower}`} />
                 ) : (
                   <>
-                    {!postingOptions.length && <p className="text-xs text-slate-500">Your HOD has not configured postings yet.</p>}
+                    {!postingOptions.length && <p className="text-xs text-helper">Your HOD has not configured postings yet.</p>}
                     <Select value={ward} onValueChange={(val: any) => setWard(val)}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
@@ -168,7 +168,7 @@ export function PostingsPage() {
               </div>
               {(!isFreeTextWard || (freeTextPostingSupervisor && professors.length > 0)) && (
                 <div className="space-y-2">
-                  <Label>Supervisor (Unit Chief) {isFreeTextWard && <span className="text-slate-400 font-normal text-xs">(optional)</span>}</Label>
+                  <Label>Supervisor (Unit Chief) {isFreeTextWard && <span className="text-helper font-normal text-xs">(optional)</span>}</Label>
                   <Select value={supervisorId} onValueChange={setSupervisorId}>
                     <SelectTrigger><SelectValue placeholder={isFreeTextWard ? "Select faculty member (optional)" : "Select faculty member"} /></SelectTrigger>
                     <SelectContent>
@@ -189,17 +189,17 @@ export function PostingsPage() {
 
       {postingSchedule.length > 0 && <PostingScheduleCard schedule={postingSchedule} postingOptions={postingOptions} />}
 
-      <Card className="border-white/70 bg-white/76">
-        <CardHeader className="border-b border-white/70">
+      <Card className="border-card-edge bg-card">
+        <CardHeader className="border-b border-card-edge">
           <CardTitle className="text-lg">Posting Records</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           {loading ? (
-             <div className="p-8 text-center text-slate-500">Loading...</div>
+             <div className="p-8 text-center text-helper">Loading...</div>
           ) : error ? (
             <div className="flex flex-col items-center justify-center gap-4 p-8 text-center" role="alert">
-              <p className="text-sm font-medium text-rose-700">{error}</p>
-              <Button size="sm" variant="outline" onClick={fetchPostings} className="border-rose-200 text-rose-700">Try again</Button>
+              <p className="text-sm font-medium text-status-foreground">{error}</p>
+              <Button size="sm" variant="outline" onClick={fetchPostings} className="border-status-border text-status-foreground">Try again</Button>
             </div>
           ) : postings.length === 0 ? (
             <Empty className="py-14">
@@ -214,7 +214,7 @@ export function PostingsPage() {
             </Empty>
           ) : (
             <Table>
-              <TableHeader className="bg-slate-50">
+              <TableHeader className="bg-mist">
                 <TableRow>
                   <TableHead>{postingLabelTitle}</TableHead>
                   <TableHead>Start Date</TableHead>
@@ -228,16 +228,16 @@ export function PostingsPage() {
               <TableBody>
                 {postings.map((item, index) => (
                   <TableRow key={item.id || index}>
-                    <TableCell className="font-medium text-slate-900">{item.ward}</TableCell>
+                    <TableCell className="font-medium text-ink">{item.ward}</TableCell>
                     <TableCell>{formatLogbookDate(item.startDate)}</TableCell>
                     <TableCell>{formatLogbookDate(item.endDate)}</TableCell>
                     {(!isFreeTextWard || freeTextPostingSupervisor) && <TableCell>{item.supervisorName || "—"}</TableCell>}
                     {(!isFreeTextWard || freeTextPostingSupervisor) && (
                       <TableCell>
                         <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                          item.status === "verified" ? "bg-emerald-100 text-emerald-700" :
-                          item.status === "rejected" ? "bg-rose-100 text-rose-700" :
-                          "bg-amber-100 text-amber-700"
+                          item.status === "verified" ? "bg-status text-status-foreground" :
+                          item.status === "rejected" ? "bg-status text-status-foreground" :
+                          "bg-status text-status-foreground"
                         }`}>
                           {item.status === "verified" ? "Verified" : item.status === "rejected" ? "Rejected" : "Pending"}
                         </span>
@@ -252,7 +252,7 @@ export function PostingsPage() {
                     <TableCell className="text-right max-w-[220px]">
                       {/* Auto-verified postings (no supervisor) stay editable; faculty-verified ones are locked. */}
                       {(item.status === "pending" || (!item.supervisorId || item.status === "verified")) ? (
-                        <Button variant="ghost" size="sm" className="text-teal-600 hover:text-teal-800 hover:bg-teal-50" onClick={() => {
+                        <Button variant="ghost" size="sm" className="text-forest hover:text-forest hover:bg-mist" onClick={() => {
                           setEditId(item.id);
                           setWard(item.ward);
                           setStartDate(item.startDate);
@@ -267,13 +267,13 @@ export function PostingsPage() {
                           <span
                             title={(item as any).facultyRemarks}
                             className={`block truncate cursor-help text-sm font-medium ${
-                              item.status === "rejected" ? "text-rose-700" : "text-slate-600"
+                              item.status === "rejected" ? "text-status-foreground" : "text-soft-ink"
                             }`}
                           >
                             {(item as any).facultyRemarks}
                           </span>
                         ) : (
-                          <span className="text-xs text-slate-400">No remark</span>
+                          <span className="text-xs text-helper">No remark</span>
                         )
                       ) : null}
                     </TableCell>
@@ -294,25 +294,25 @@ function PostingScheduleCard({ schedule, postingOptions }: { schedule: PostingSc
   const names = new Map(postingOptions.map((option) => [option.value, option.name]));
   const years = Array.from(new Set(schedule.map((row) => row.trainingYear))).sort((a, b) => a - b);
   return (
-    <Card className="border-white/70 bg-white/76">
-      <CardHeader className="border-b border-white/70">
+    <Card className="border-card-edge bg-card">
+      <CardHeader className="border-b border-card-edge">
         <CardTitle className="text-lg">Posting schedule</CardTitle>
-        <p className="text-sm text-slate-500">The planned rotation for each year of training, set by your department.</p>
+        <p className="text-sm text-helper">The planned rotation for each year of training, set by your department.</p>
       </CardHeader>
       <CardContent className="grid gap-4 p-4 md:grid-cols-3">
         {years.map((year) => {
           const rows = schedule.filter((row) => row.trainingYear === year);
           const total = rows.reduce((sum, row) => sum + row.months, 0);
           return (
-            <section key={year} className="rounded-xl border border-slate-200 bg-white" aria-label={`Year ${year} postings`}>
-              <header className="flex items-baseline justify-between border-b border-slate-100 px-4 py-3">
-                <h3 className="text-sm font-semibold text-slate-900">Year {ROMAN[year - 1] ?? year}</h3>
-                <span className="text-xs text-slate-500">{total} {total === 1 ? "month" : "months"}</span>
+            <section key={year} className="rounded-xl border border-line-soft bg-white" aria-label={`Year ${year} postings`}>
+              <header className="flex items-baseline justify-between border-b border-line-soft px-4 py-3">
+                <h3 className="text-sm font-semibold text-ink">Year {ROMAN[year - 1] ?? year}</h3>
+                <span className="text-xs text-helper">{total} {total === 1 ? "month" : "months"}</span>
               </header>
-              <ul className="divide-y divide-slate-100">
+              <ul className="divide-y divide-line-soft">
                 {rows.map((row) => (
                   <li key={row.postingValue} className="flex items-start justify-between gap-3 px-4 py-2.5 text-sm">
-                    <span className="text-slate-700">{names.get(row.postingValue) ?? row.postingValue}</span>
+                    <span className="text-ink">{names.get(row.postingValue) ?? row.postingValue}</span>
                     <Badge variant="secondary" className="shrink-0">{row.months} {row.months === 1 ? "month" : "months"}</Badge>
                   </li>
                 ))}

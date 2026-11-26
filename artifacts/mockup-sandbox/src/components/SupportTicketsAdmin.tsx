@@ -86,19 +86,19 @@ function statusBadge(status: SupportTicketStatus) {
   switch (status) {
     case "open":
       return (
-        <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800 border border-amber-200">
+        <span className="inline-flex items-center gap-1 rounded-full bg-status px-2.5 py-0.5 text-xs font-semibold text-status-foreground border border-status-border">
           <Clock className="h-3 w-3" /> Open
         </span>
       );
     case "in_progress":
       return (
-        <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-blue-800 border border-blue-200">
+        <span className="inline-flex items-center gap-1 rounded-full bg-sage px-2.5 py-0.5 text-xs font-semibold text-forest border border-line-soft">
           <RefreshCw className="h-3 w-3 animate-spin" /> In Progress
         </span>
       );
     case "resolved":
       return (
-        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800 border border-emerald-200">
+        <span className="inline-flex items-center gap-1 rounded-full bg-status px-2.5 py-0.5 text-xs font-semibold text-status-foreground border border-status-border">
           <CheckCircle2 className="h-3 w-3" /> Resolved
         </span>
       );
@@ -111,19 +111,19 @@ function emailStatusBadge(status: string) {
   switch (status) {
     case "sent":
       return (
-        <span className="inline-flex items-center rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
+        <span className="inline-flex items-center rounded-md bg-status px-2 py-0.5 text-[11px] font-medium text-status-foreground ring-1 ring-inset ring-ring">
           Sent
         </span>
       );
     case "failed":
       return (
-        <span className="inline-flex items-center rounded-md bg-rose-50 px-2 py-0.5 text-[11px] font-medium text-rose-700 ring-1 ring-inset ring-rose-600/20">
+        <span className="inline-flex items-center rounded-md bg-status px-2 py-0.5 text-[11px] font-medium text-status-foreground ring-1 ring-inset ring-ring">
           Failed
         </span>
       );
     default:
       return (
-        <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+        <span className="inline-flex items-center rounded-md bg-sage px-2 py-0.5 text-[11px] font-medium text-soft-ink">
           Pending
         </span>
       );
@@ -204,15 +204,15 @@ export function SupportTicketsAdmin({
   return (
     <div className="space-y-4">
       {/* Header and Filter Card */}
-      <Card className="border-slate-200 shadow-sm">
+      <Card className="border-line-soft shadow-sm">
         <CardHeader className="pb-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <CardTitle className="flex items-center gap-2 text-lg text-slate-900">
-                <LifeBuoy className="h-5 w-5 text-teal-600" />
+              <CardTitle className="flex items-center gap-2 text-lg text-ink">
+                <LifeBuoy className="h-5 w-5 text-forest" />
                 Support Tickets
               </CardTitle>
-              <CardDescription className="text-xs text-slate-500">
+              <CardDescription className="text-xs text-helper">
                 Review and resolve user-reported problems, bugs, and login inquiries across the platform.
               </CardDescription>
             </div>
@@ -222,7 +222,7 @@ export function SupportTicketsAdmin({
                 size="sm"
                 onClick={() => void fetchTickets()}
                 disabled={loading}
-                className="border-slate-200 text-slate-700"
+                className="border-line-soft text-ink"
               >
                 <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
                 Refresh
@@ -232,7 +232,7 @@ export function SupportTicketsAdmin({
         </CardHeader>
 
         <CardContent className="pt-0">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line-soft pt-3">
             {/* Filter buttons */}
             <div className="flex flex-wrap gap-1.5">
               {(
@@ -252,8 +252,8 @@ export function SupportTicketsAdmin({
                   }}
                   className={`rounded-lg px-3 py-1 text-xs font-medium transition-all ${
                     statusFilter === tab.value
-                      ? "bg-teal-600 text-white shadow-sm"
-                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      ? "bg-forest text-white shadow-sm"
+                      : "bg-sage text-soft-ink hover:bg-sage"
                   }`}
                 >
                   {tab.label}
@@ -261,7 +261,7 @@ export function SupportTicketsAdmin({
               ))}
             </div>
 
-            <div className="text-xs text-slate-500 font-medium">
+            <div className="text-xs text-helper font-medium">
               Showing {tickets.length} of {total} ticket{total === 1 ? "" : "s"}
             </div>
           </div>
@@ -269,26 +269,26 @@ export function SupportTicketsAdmin({
       </Card>
 
       {/* Tickets Table */}
-      <Card className="border-slate-200 shadow-sm overflow-hidden">
+      <Card className="border-line-soft shadow-sm overflow-hidden">
         {error ? (
           <div className="p-8 text-center" role="alert">
-            <AlertCircle className="mx-auto h-8 w-8 text-rose-500 mb-2" />
-            <p className="text-sm font-semibold text-slate-800">Error loading support tickets</p>
-            <p className="text-xs text-slate-500 mt-1 mb-4">{error}</p>
+            <AlertCircle className="mx-auto h-8 w-8 text-status-foreground mb-2" />
+            <p className="text-sm font-semibold text-ink">Error loading support tickets</p>
+            <p className="text-xs text-helper mt-1 mb-4">{error}</p>
             <Button variant="outline" size="sm" onClick={() => void fetchTickets()}>
               Retry
             </Button>
           </div>
         ) : loading && tickets.length === 0 ? (
-          <div className="p-12 text-center text-slate-400">
-            <Loader2 className="mx-auto h-6 w-6 animate-spin mb-2 text-teal-600" />
+          <div className="p-12 text-center text-helper">
+            <Loader2 className="mx-auto h-6 w-6 animate-spin mb-2 text-forest" />
             <p className="text-xs">Loading support tickets...</p>
           </div>
         ) : tickets.length === 0 ? (
-          <div className="p-12 text-center text-slate-500">
-            <LifeBuoy className="mx-auto h-8 w-8 text-slate-300 mb-2" />
-            <p className="text-sm font-semibold text-slate-700">No tickets found</p>
-            <p className="text-xs text-slate-400 mt-1">
+          <div className="p-12 text-center text-helper">
+            <LifeBuoy className="mx-auto h-8 w-8 text-helper mb-2" />
+            <p className="text-sm font-semibold text-ink">No tickets found</p>
+            <p className="text-xs text-helper mt-1">
               {statusFilter === "all"
                 ? "No support tickets have been submitted yet."
                 : `No tickets with status "${statusFilter}".`}
@@ -297,15 +297,15 @@ export function SupportTicketsAdmin({
         ) : (
           <div className="overflow-x-auto">
             <Table>
-              <TableHeader className="bg-slate-50/70">
+              <TableHeader className="bg-mist">
                 <TableRow>
-                  <TableHead className="w-[120px] text-xs font-semibold text-slate-700">Reference</TableHead>
-                  <TableHead className="w-[120px] text-xs font-semibold text-slate-700">Category</TableHead>
-                  <TableHead className="min-w-[160px] text-xs font-semibold text-slate-700">Reporter</TableHead>
-                  <TableHead className="min-w-[240px] text-xs font-semibold text-slate-700">Message Preview</TableHead>
-                  <TableHead className="w-[110px] text-xs font-semibold text-slate-700">Status</TableHead>
-                  <TableHead className="w-[160px] text-xs font-semibold text-slate-700">Created</TableHead>
-                  <TableHead className="w-[90px] text-xs font-semibold text-slate-700">Email</TableHead>
+                  <TableHead className="w-[120px] text-xs font-semibold text-ink">Reference</TableHead>
+                  <TableHead className="w-[120px] text-xs font-semibold text-ink">Category</TableHead>
+                  <TableHead className="min-w-[160px] text-xs font-semibold text-ink">Reporter</TableHead>
+                  <TableHead className="min-w-[240px] text-xs font-semibold text-ink">Message Preview</TableHead>
+                  <TableHead className="w-[110px] text-xs font-semibold text-ink">Status</TableHead>
+                  <TableHead className="w-[160px] text-xs font-semibold text-ink">Created</TableHead>
+                  <TableHead className="w-[90px] text-xs font-semibold text-ink">Email</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -318,27 +318,27 @@ export function SupportTicketsAdmin({
                     <TableRow
                       key={t.id}
                       onClick={() => handleRowClick(t)}
-                      className="cursor-pointer transition-colors hover:bg-teal-50/40"
+                      className="cursor-pointer transition-colors hover:bg-mist"
                     >
-                      <TableCell className="font-mono text-xs font-bold text-teal-900">
+                      <TableCell className="font-mono text-xs font-bold text-forest">
                         {t.referenceCode}
                       </TableCell>
-                      <TableCell className="text-xs font-medium text-slate-700">
+                      <TableCell className="text-xs font-medium text-ink">
                         <Badge variant="outline" className="text-[11px] font-normal">
                           {categoryLabel(t.category)}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-xs text-slate-800">
+                      <TableCell className="text-xs text-ink">
                         <div className="font-medium truncate max-w-[180px]">{reporterDisplay}</div>
                         {t.email && (
-                          <div className="text-[11px] text-slate-400 truncate max-w-[180px]">{t.email}</div>
+                          <div className="text-[11px] text-helper truncate max-w-[180px]">{t.email}</div>
                         )}
                       </TableCell>
-                      <TableCell className="text-xs text-slate-600">
+                      <TableCell className="text-xs text-soft-ink">
                         <p className="line-clamp-2 max-w-[320px]">{t.message}</p>
                       </TableCell>
                       <TableCell>{statusBadge(t.status)}</TableCell>
-                      <TableCell className="text-xs text-slate-500 whitespace-nowrap">
+                      <TableCell className="text-xs text-helper whitespace-nowrap">
                         {formatIst(t.createdAt)}
                       </TableCell>
                       <TableCell>{emailStatusBadge(t.emailStatus)}</TableCell>
@@ -352,8 +352,8 @@ export function SupportTicketsAdmin({
 
         {/* Pagination Controls */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between border-t border-slate-100 px-4 py-3 bg-slate-50/50">
-            <span className="text-xs text-slate-500">
+          <div className="flex items-center justify-between border-t border-line-soft px-4 py-3 bg-mist">
+            <span className="text-xs text-helper">
               Page {page} of {totalPages}
             </span>
             <div className="flex gap-1.5">
@@ -392,12 +392,12 @@ export function SupportTicketsAdmin({
             <>
               <DialogHeader>
                 <div className="flex flex-wrap items-center justify-between gap-2 pr-6">
-                  <DialogTitle className="flex items-center gap-2 text-lg text-slate-900 font-mono">
+                  <DialogTitle className="flex items-center gap-2 text-lg text-ink font-mono">
                     {selectedTicket.referenceCode}
                   </DialogTitle>
                   <div>{statusBadge(editStatus)}</div>
                 </div>
-                <DialogDescription className="text-xs text-slate-500">
+                <DialogDescription className="text-xs text-helper">
                   Submitted on {formatIst(selectedTicket.createdAt)} · Category:{" "}
                   <strong>{categoryLabel(selectedTicket.category)}</strong>
                 </DialogDescription>
@@ -405,30 +405,30 @@ export function SupportTicketsAdmin({
 
               <div className="space-y-4 py-2">
                 {/* Reporter & Context Info */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-lg border border-slate-200 bg-slate-50/60 p-3 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-lg border border-line-soft bg-mist p-3 text-xs">
                   <div>
-                    <span className="text-slate-400 block mb-0.5 font-medium">Reporter</span>
-                    <span className="font-semibold text-slate-800 flex items-center gap-1.5">
-                      <User className="h-3.5 w-3.5 text-slate-400" />
+                    <span className="text-helper block mb-0.5 font-medium">Reporter</span>
+                    <span className="font-semibold text-ink flex items-center gap-1.5">
+                      <User className="h-3.5 w-3.5 text-helper" />
                       {selectedTicket.userFullName
                         ? `${selectedTicket.userFullName} (${selectedTicket.userRole || "User"})`
                         : selectedTicket.name || "Not provided"}
                     </span>
                     {selectedTicket.departmentName && (
-                      <span className="text-slate-500 block text-[11px] ml-5">
+                      <span className="text-helper block text-[11px] ml-5">
                         Department: {selectedTicket.departmentName}
                       </span>
                     )}
                   </div>
 
                   <div>
-                    <span className="text-slate-400 block mb-0.5 font-medium">Contact Email</span>
-                    <span className="text-slate-800 flex items-center gap-1.5">
-                      <Mail className="h-3.5 w-3.5 text-slate-400" />
+                    <span className="text-helper block mb-0.5 font-medium">Contact Email</span>
+                    <span className="text-ink flex items-center gap-1.5">
+                      <Mail className="h-3.5 w-3.5 text-helper" />
                       {selectedTicket.email ? (
                         <a
                           href={`mailto:${selectedTicket.email}`}
-                          className="text-teal-700 hover:underline"
+                          className="text-forest hover:underline"
                         >
                           {selectedTicket.email}
                         </a>
@@ -440,9 +440,9 @@ export function SupportTicketsAdmin({
 
                   {selectedTicket.pageUrl && (
                     <div className="sm:col-span-2">
-                      <span className="text-slate-400 block mb-0.5 font-medium">Page Location</span>
-                      <span className="text-slate-700 font-mono text-[11px] flex items-center gap-1.5">
-                        <Globe className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                      <span className="text-helper block mb-0.5 font-medium">Page Location</span>
+                      <span className="text-ink font-mono text-[11px] flex items-center gap-1.5">
+                        <Globe className="h-3.5 w-3.5 text-helper shrink-0" />
                         {selectedTicket.pageUrl}
                       </span>
                     </div>
@@ -450,9 +450,9 @@ export function SupportTicketsAdmin({
 
                   {selectedTicket.userAgent && (
                     <div className="sm:col-span-2">
-                      <span className="text-slate-400 block mb-0.5 font-medium">Browser / Device</span>
-                      <span className="text-slate-500 text-[11px] truncate block flex items-center gap-1.5">
-                        <Monitor className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                      <span className="text-helper block mb-0.5 font-medium">Browser / Device</span>
+                      <span className="text-helper text-[11px] truncate block flex items-center gap-1.5">
+                        <Monitor className="h-3.5 w-3.5 text-helper shrink-0" />
                         {selectedTicket.userAgent}
                       </span>
                     </div>
@@ -461,17 +461,17 @@ export function SupportTicketsAdmin({
 
                 {/* Message Body */}
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold text-slate-700">Problem Description</Label>
-                  <div className="rounded-lg border border-slate-200 bg-white p-3.5 text-sm text-slate-800 whitespace-pre-wrap leading-relaxed shadow-inner max-h-56 overflow-y-auto">
+                  <Label className="text-xs font-semibold text-ink">Problem Description</Label>
+                  <div className="rounded-lg border border-line-soft bg-white p-3.5 text-sm text-ink whitespace-pre-wrap leading-relaxed shadow-inner max-h-56 overflow-y-auto">
                     {selectedTicket.message}
                   </div>
                 </div>
 
                 {/* Status & Admin Notes form */}
-                <div className="space-y-3 pt-2 border-t border-slate-100">
+                <div className="space-y-3 pt-2 border-t border-line-soft">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="space-y-1.5">
-                      <Label htmlFor="edit-status" className="text-xs font-semibold text-slate-700">
+                      <Label htmlFor="edit-status" className="text-xs font-semibold text-ink">
                         Update Status
                       </Label>
                       <Select
@@ -490,10 +490,10 @@ export function SupportTicketsAdmin({
                     </div>
 
                     <div className="space-y-1.5">
-                      <Label className="text-xs font-semibold text-slate-700">Email Notification</Label>
+                      <Label className="text-xs font-semibold text-ink">Email Notification</Label>
                       <div className="pt-2">
                         {emailStatusBadge(selectedTicket.emailStatus)}
-                        <span className="ml-2 text-xs text-slate-500">
+                        <span className="ml-2 text-xs text-helper">
                           {selectedTicket.emailStatus === "sent"
                             ? "Admin notified via email"
                             : selectedTicket.emailStatus === "failed"
@@ -505,8 +505,8 @@ export function SupportTicketsAdmin({
                   </div>
 
                   <div className="space-y-1.5">
-                    <Label htmlFor="edit-notes" className="text-xs font-semibold text-slate-700">
-                      Admin Notes <span className="text-slate-400 font-normal">(Internal notes on resolution)</span>
+                    <Label htmlFor="edit-notes" className="text-xs font-semibold text-ink">
+                      Admin Notes <span className="text-helper font-normal">(Internal notes on resolution)</span>
                     </Label>
                     <Textarea
                       id="edit-notes"
@@ -521,8 +521,8 @@ export function SupportTicketsAdmin({
                 </div>
 
                 {/* Footer Buttons */}
-                <div className="flex items-center justify-between pt-3 border-t border-slate-100">
-                  <span className="text-[11px] text-slate-400">
+                <div className="flex items-center justify-between pt-3 border-t border-line-soft">
+                  <span className="text-[11px] text-helper">
                     {selectedTicket.resolvedAt && `Resolved at ${formatIst(selectedTicket.resolvedAt)}`}
                   </span>
                   <div className="flex gap-2">
@@ -538,7 +538,7 @@ export function SupportTicketsAdmin({
                       type="button"
                       onClick={handleSaveChanges}
                       disabled={isSaving}
-                      className="bg-teal-600 text-white hover:bg-teal-700"
+                      className="bg-forest text-white hover:bg-deep"
                     >
                       {isSaving ? (
                         <>

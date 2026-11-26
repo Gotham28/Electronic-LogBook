@@ -67,17 +67,17 @@ export function LegalDisclaimerModal({ activeRole, onBlockingChange }: Props) {
 
   // Note: No onClose handlers, no keyboard listeners, no click-outside. Strictly blocking.
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4 sm:p-6">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-deep/80 backdrop-blur-sm p-4 sm:p-6">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
         
         {/* Header */}
-        <div className="flex items-center gap-4 border-b border-slate-100 bg-slate-50 p-6 shrink-0">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-red-100">
-            <ShieldAlert className="h-6 w-6 text-red-700" />
+        <div className="flex items-center gap-4 border-b border-line-soft bg-mist p-6 shrink-0">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-status">
+            <ShieldAlert className="h-6 w-6 text-status-foreground" />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-slate-900">Important Legal Disclaimer</h2>
-            <p className="text-sm text-slate-500 mt-1">Please read and accept the terms below to continue using the eLogbook.</p>
+            <h2 className="text-xl font-bold text-ink">Important Legal Disclaimer</h2>
+            <p className="text-sm text-helper mt-1">Please read and accept the terms below to continue using the eLogbook.</p>
           </div>
         </div>
         
@@ -85,9 +85,9 @@ export function LegalDisclaimerModal({ activeRole, onBlockingChange }: Props) {
         <div 
           ref={contentRef}
           onScroll={handleScroll}
-          className="p-6 md:p-8 overflow-y-auto flex-1 text-sm text-slate-700 space-y-5"
+          className="p-6 md:p-8 overflow-y-auto flex-1 text-sm text-ink space-y-5"
         >
-          <p className="font-bold text-slate-900 uppercase text-center border-b border-slate-200 pb-4 mb-6">
+          <p className="font-bold text-ink uppercase text-center border-b border-line-soft pb-4 mb-6">
             Data Responsibility and Liability Disclaimer
           </p>
           
@@ -111,20 +111,20 @@ export function LegalDisclaimerModal({ activeRole, onBlockingChange }: Props) {
             </li>
           </ol>
           
-          <p className="font-medium pt-4 text-slate-900">
+          <p className="font-medium pt-4 text-ink">
             By clicking "I Accept and Agree" below, you confirm that you have read, understood, and agree to be bound by the above terms.
           </p>
         </div>
 
         {/* Footer / Actions */}
-        <div className="border-t border-slate-100 p-6 bg-slate-50 flex flex-col sm:flex-row items-center justify-between gap-4 shrink-0">
-          <p className="text-xs text-slate-500 font-medium">
+        <div className="border-t border-line-soft p-6 bg-mist flex flex-col sm:flex-row items-center justify-between gap-4 shrink-0">
+          <p className="text-xs text-helper font-medium">
             {!canAccept ? "↓ Please scroll to the bottom to accept" : "✓ Thank you for reading the disclaimer"}
           </p>
           <Button 
             onClick={handleAccept} 
             disabled={!canAccept}
-            className="w-full sm:w-auto h-11 px-8 bg-slate-900 hover:bg-slate-800 transition-all"
+            className="w-full sm:w-auto h-11 px-8 bg-deep hover:bg-deep transition-all"
           >
             I Accept and Agree
           </Button>

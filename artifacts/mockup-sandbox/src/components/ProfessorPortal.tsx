@@ -406,8 +406,8 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
     return (
       <div className="flex h-64 items-center justify-center">
         <div className="flex flex-col items-center space-y-4">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-300 border-t-teal-600"></div>
-          <p className="text-sm font-medium text-slate-500">Loading Faculty Review Queue...</p>
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-line-soft border-t-forest"></div>
+          <p className="text-sm font-medium text-helper">Loading Faculty Review Queue...</p>
         </div>
       </div>
     );
@@ -416,7 +416,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
   if (error) {
     return (
       <div className="flex h-64 flex-col items-center justify-center space-y-4">
-        <p className="text-red-500">{error}</p>
+        <p className="text-status-foreground">{error}</p>
         <div className="flex items-center gap-2">
           <Button onClick={fetchProfessorData} variant="outline">Try Again</Button>
           {askMochiButton}
@@ -477,21 +477,21 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
     <div className="space-y-6 pb-12">
       {/* Top Banner: Professor Profile — hidden when embedded in HOD portal */}
       {!embedded && (
-        <div className="rounded-2xl bg-gradient-to-r from-teal-900 via-slate-900 to-teal-950 p-6 text-white shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="rounded-2xl bg-deep p-6 text-white shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <Badge className="bg-teal-500/20 text-teal-300 border-teal-500/30 text-xs font-semibold mb-2">
+            <Badge className="bg-white/20 text-white border-forest/30 text-xs font-semibold mb-2">
               Faculty &amp; Evaluator Portal
             </Badge>
             <h2 className="text-2xl font-black">Welcome, {currentUser?.name || data?.faculty?.name}</h2>
-            <p className="text-xs text-slate-300">
+            <p className="text-xs text-white">
               Department faculty • <strong><DemoCount value={allStudents.length} /> approved students</strong>
             </p>
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="bg-teal-500/10 border border-teal-500/30 px-4 py-2 rounded-xl text-right">
-              <p className="text-xl font-extrabold text-teal-300"><DemoCount value={Math.max(0, reviews.length - Object.keys(evaluatedLogs).length)} /></p>
-              <p className="text-[11px] text-slate-300 font-medium">Pending Review Items</p>
+            <div className="bg-forest/10 border border-forest/30 px-4 py-2 rounded-xl text-right">
+              <p className="text-xl font-extrabold text-mint"><DemoCount value={Math.max(0, reviews.length - Object.keys(evaluatedLogs).length)} /></p>
+              <p className="text-[11px] text-white font-medium">Pending Review Items</p>
             </div>
           </div>
         </div>
@@ -502,7 +502,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
       <Tabs value={currentTab} onValueChange={handleTabChange} className="w-full">
         {/* Inner tab bar — hidden when embedded in HOD portal (HOD sidebar handles navigation) */}
         {!embedded && (
-          <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-white p-1 shadow-sm sm:w-auto">
+          <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-xl border border-line-soft bg-white p-1 shadow-sm sm:w-auto">
             <TabsTrigger value="review-queue" className="gap-2 text-xs font-semibold">
               <FileCheck className="h-4 w-4" /> Sequential Review Queue (<DemoCount value={Math.max(0, reviews.length - Object.keys(evaluatedLogs).length)} />)
             </TabsTrigger>
@@ -523,23 +523,23 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
         {/* Tab 1: Sequential Fast Review Queue */}
         <TabsContent value="review-queue" className="pt-4 space-y-6" data-tour="review-queue">
           {reviews.length === 0 || currentIndex >= reviews.length ? (
-            <Card className="p-8 text-center bg-white border border-slate-200">
-              <CheckCircle2 className="h-12 w-12 text-emerald-500 mx-auto mb-3" />
-              <h3 className="text-base font-bold text-slate-900">Review Queue Clear!</h3>
-              <p className="text-xs text-slate-500">All submitted student logs have been reviewed and verified.</p>
+            <Card className="p-8 text-center bg-white border border-line-soft">
+              <CheckCircle2 className="h-12 w-12 text-status-foreground mx-auto mb-3" />
+              <h3 className="text-base font-bold text-ink">Review Queue Clear!</h3>
+              <p className="text-xs text-helper">All submitted student logs have been reviewed and verified.</p>
             </Card>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Submission Detail View */}
               <div className="lg:col-span-2 space-y-4">
-                <Card className="border border-slate-200 shadow-xs bg-white" data-tour="review-first-item">
-                  <CardHeader className="border-b border-slate-100 pb-3">
+                <Card className="border border-line-soft shadow-xs bg-white" data-tour="review-first-item">
+                  <CardHeader className="border-b border-line-soft pb-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="bg-teal-50 text-teal-800 border-teal-300 text-xs">
+                        <Badge variant="outline" className="bg-mist text-forest border-line text-xs">
                           Item {currentIndex + 1} of {reviews.length}
                         </Badge>
-                        <Badge className="bg-slate-100 text-slate-700 text-xs">
+                        <Badge className="bg-sage text-ink text-xs">
                           {currentItem.type}
                         </Badge>
                       </div>
@@ -568,19 +568,19 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                   </CardHeader>
 
                   <CardContent className="p-6 space-y-4">
-                    <div className="flex items-start justify-between border-b border-slate-100 pb-4">
+                    <div className="flex items-start justify-between border-b border-line-soft pb-4">
                       <div>
-                        <h3 className="text-lg font-bold text-slate-900">{currentItem.title}</h3>
-                        <p className="text-xs text-slate-500 mt-0.5">
-                          Submitted by <strong className="text-slate-800">{currentItem.studentName}</strong>
+                        <h3 className="text-lg font-bold text-ink">{currentItem.title}</h3>
+                        <p className="text-xs text-helper mt-0.5">
+                          Submitted by <strong className="text-ink">{currentItem.studentName}</strong>
                         </p>
                       </div>
-                      <span className="text-xs text-slate-400 font-mono">{formatLogbookDate(currentItem.date)}</span>
+                      <span className="text-xs text-helper font-mono">{formatLogbookDate(currentItem.date)}</span>
                     </div>
 
                     {recognizedReviewFlags.length > 0 && (
-                      <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-2">
-                        <ul className="list-disc pl-4 space-y-1 text-xs text-amber-900">
+                      <div className="rounded-lg border border-status-border bg-status p-3 space-y-2">
+                        <ul className="list-disc pl-4 space-y-1 text-xs text-status-foreground">
                           {recognizedReviewFlags.map((flag) => (
                             <li key={flag}>{PROFESSOR_REVIEW_FLAG_LABELS[flag]}</li>
                           ))}
@@ -602,16 +602,16 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                     {currentItem.type === "Case Log" ? (
                       <CaseLogDetails caseLog={currentItem as CaseLogDetailRecord} hideUhid={hideUhid} medicalSummaryCaseFields={Boolean(config?.enabledFeatures?.medicalSummaryCaseFields)} microbiologyCaseFields={microbiologyCaseFields} customFieldDefinitions={caseLogFields} />
                     ) : (
-                      <div className="bg-slate-50 p-4 rounded-xl space-y-2 border border-slate-200/60">
-                        <h4 className="text-xs font-semibold uppercase text-slate-500">Submission Details</h4>
-                        <p className="text-sm text-slate-800 leading-relaxed whitespace-pre-wrap">{currentItem.detail}</p>
-                        {currentItem.patientInfo && <p className="text-xs text-slate-600 font-medium">Patient Info: {currentItem.patientInfo}</p>}
-                        {!hideUhid && currentItem.patientUhid && <p className="text-xs font-semibold text-teal-800">{label("caseLog.caseId")}: {currentItem.patientUhid}</p>}
-                        {!hideUhid && currentItem.caseNumber && <p className="text-xs font-semibold text-teal-800">Case number: {currentItem.caseNumber}</p>}
-                        {currentItem.type === "Conference" && currentItem.location && <p className="text-xs text-slate-600 font-medium">Location: {currentItem.location}</p>}
-                        {currentItem.type === "Conference" && currentItem.conferenceType && <p className="text-xs text-slate-600 font-medium">Type: {currentItem.conferenceType === 'cme' ? 'CME' : 'Conference'}</p>}
-                        {currentItem.type === "Conference" && currentItem.level && <p className="text-xs text-slate-600 font-medium">Level: {currentItem.level}</p>}
-                        {currentItem.type === "Conference" && currentItem.category && <p className="text-xs text-slate-600 font-medium">Category: {currentItem.category}</p>}
+                      <div className="bg-mist p-4 rounded-xl space-y-2 border border-line-soft">
+                        <h4 className="text-xs font-semibold uppercase text-helper">Submission Details</h4>
+                        <p className="text-sm text-ink leading-relaxed whitespace-pre-wrap">{currentItem.detail}</p>
+                        {currentItem.patientInfo && <p className="text-xs text-soft-ink font-medium">Patient Info: {currentItem.patientInfo}</p>}
+                        {!hideUhid && currentItem.patientUhid && <p className="text-xs font-semibold text-forest">{label("caseLog.caseId")}: {currentItem.patientUhid}</p>}
+                        {!hideUhid && currentItem.caseNumber && <p className="text-xs font-semibold text-forest">Case number: {currentItem.caseNumber}</p>}
+                        {currentItem.type === "Conference" && currentItem.location && <p className="text-xs text-soft-ink font-medium">Location: {currentItem.location}</p>}
+                        {currentItem.type === "Conference" && currentItem.conferenceType && <p className="text-xs text-soft-ink font-medium">Type: {currentItem.conferenceType === 'cme' ? 'CME' : 'Conference'}</p>}
+                        {currentItem.type === "Conference" && currentItem.level && <p className="text-xs text-soft-ink font-medium">Level: {currentItem.level}</p>}
+                        {currentItem.type === "Conference" && currentItem.category && <p className="text-xs text-soft-ink font-medium">Category: {currentItem.category}</p>}
                         {currentItem.type === "Academic" && (
                           <AcademicRecordDetails activityType={currentItem.activityType || ""}
                             description={currentItem.description} presentationType={currentItem.presentationType} />
@@ -632,20 +632,20 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                         )}
                         {currentItem.type === "Procedure" && !showProcedureDetails && (config?.enabledFeatures?.freeTextProcedures || procedureDetailsField) && (
                           <>
-                            {currentItem.diagnosis && <p className="text-xs text-slate-600 font-medium">{procedureDetailsField ? "Details" : "Diagnosis"}: {currentItem.diagnosis}</p>}
-                            {!procedureDetailsField && currentItem.sex && <p className="text-xs text-slate-600 font-medium">Sex: {currentItem.sex}</p>}
+                            {currentItem.diagnosis && <p className="text-xs text-soft-ink font-medium">{procedureDetailsField ? "Details" : "Diagnosis"}: {currentItem.diagnosis}</p>}
+                            {!procedureDetailsField && currentItem.sex && <p className="text-xs text-soft-ink font-medium">Sex: {currentItem.sex}</p>}
                           </>
                         )}
                         {currentItem.type === "Conference" && currentItem.certificateUrl && (
-                          <p className="text-xs text-slate-600 font-medium overflow-hidden text-ellipsis whitespace-nowrap">Certificate: <a href={currentItem.certificateUrl} target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline">{currentItem.certificateUrl}</a></p>
+                          <p className="text-xs text-soft-ink font-medium overflow-hidden text-ellipsis whitespace-nowrap">Certificate: <a href={currentItem.certificateUrl} target="_blank" rel="noopener noreferrer" className="text-forest hover:underline">{currentItem.certificateUrl}</a></p>
                         )}
                       </div>
                     )}
 
                     {evaluatedLogs[currentItem.id] && (
-                      <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center justify-between">
+                      <div className="p-3 rounded-lg bg-status border border-status-border text-xs text-status-foreground flex items-center justify-between">
                         <span>Evaluated Status: <strong>{evaluatedLogs[currentItem.id].status.toUpperCase()}</strong> {evaluatedLogs[currentItem.id].remarks ? `(${evaluatedLogs[currentItem.id].remarks})` : "(No remark)"}</span>
-                        <Badge className="bg-emerald-600">Saved</Badge>
+                        <Badge className="bg-forest">Saved</Badge>
                       </div>
                     )}
                   </CardContent>
@@ -654,16 +654,16 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
 
               {/* Fast Evaluation Panel */}
               <div className="space-y-4">
-                <Card data-tour="review-fast-evaluation" className="border border-teal-200 shadow-sm bg-white">
-                  <CardHeader className="bg-teal-50/70 border-b border-teal-100 pb-3">
-                    <CardTitle className="text-sm font-bold text-teal-900 flex items-center gap-2">
-                      <FileCheck className="h-4 w-4 text-teal-700" /> Fast Faculty Evaluation
+                <Card data-tour="review-fast-evaluation" className="border border-line-soft shadow-sm bg-white">
+                  <CardHeader className="bg-mist border-b border-line-soft pb-3">
+                    <CardTitle className="text-sm font-bold text-forest flex items-center gap-2">
+                      <FileCheck className="h-4 w-4 text-forest" /> Fast Faculty Evaluation
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-4 space-y-4">
                     {currentItem.type === "Procedure" && canVerifyCompetency && (
                       <div className="space-y-2">
-                        <label className="text-xs font-semibold text-slate-700">Verified Competency Level</label>
+                        <label className="text-xs font-semibold text-ink">Verified Competency Level</label>
                         <Select value={competencyOverride} onValueChange={setCompetencyOverride}>
                           <SelectTrigger className="text-xs">
                             <SelectValue />
@@ -672,20 +672,20 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                             {competencyLevels.map((c) => <SelectItem key={c.id} value={c.value}>{c.name}</SelectItem>)}
                           </SelectContent>
                         </Select>
-                        <p className="text-[10px] text-slate-500">Available only while reviewing procedure logs.</p>
+                        <p className="text-[10px] text-helper">Available only while reviewing procedure logs.</p>
                       </div>
                     )}
 
                     {currentItem.type === "Academic" && (
                       <div className="space-y-2">
-                        <label className="text-xs font-semibold text-slate-700">Scholastic Grade</label>
+                        <label className="text-xs font-semibold text-ink">Scholastic Grade</label>
                         <div className="flex gap-2">
                           {["A+", "A", "B+", "B", "C"].map((g) => (
                             <button
                               key={g}
                               type="button"
                               onClick={() => setGrade(g)}
-                              className={`flex-1 py-1.5 rounded text-xs font-bold transition-all border ${grade === g ? "bg-teal-600 text-white border-teal-600" : "bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200"
+                              className={`flex-1 py-1.5 rounded text-xs font-bold transition-all border ${grade === g ? "bg-forest text-white border-forest" : "bg-sage text-ink border-line-soft hover:bg-sage"
                                 }`}
                             >
                               {g}
@@ -696,7 +696,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                     )}
 
                     <div className="space-y-2">
-                      <label className="text-xs font-semibold text-slate-700">Faculty Remarks</label>
+                      <label className="text-xs font-semibold text-ink">Faculty Remarks</label>
                       <Textarea
                         rows={3}
                         placeholder="Add constructive feedback or verification notes..."
@@ -711,7 +711,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                         onClick={handleReject}
                         disabled={isSubmitting}
                         variant="outline"
-                        className="border-rose-300 text-rose-700 hover:bg-rose-50 text-xs font-semibold gap-1"
+                        className="border-status-border text-status-foreground hover:bg-status text-xs font-semibold gap-1"
                       >
                         <XCircle className="h-4 w-4" /> Request Revision
                       </Button>
@@ -719,7 +719,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                         onClick={handleApprove}
                         disabled={isSubmitting}
                         data-tour="review-approve"
-                        className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold gap-1"
+                        className="bg-forest hover:bg-forest text-white text-xs font-semibold gap-1"
                       >
                         <CheckCircle2 className="h-4 w-4" /> Verify &amp; Next
                       </Button>
@@ -733,11 +733,11 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
 
         {/* Tab 2: All Students List with Full Logbook Inspector */}
         <TabsContent value="mentees" className="pt-4 space-y-4">
-          <Card className="border-cyan-100 bg-cyan-50/60">
+          <Card className="border-line-soft bg-mist">
             <CardContent className="flex flex-col justify-between gap-4 p-5 sm:flex-row sm:items-center">
               <div>
-                <p className="font-bold text-slate-900">Privacy-protected student access</p>
-                <p className="mt-1 text-xs text-slate-600">
+                <p className="font-bold text-ink">Privacy-protected student access</p>
+                <p className="mt-1 text-xs text-soft-ink">
                   {data?.faculty?.role === "hod"
                     ? "As HOD, you can inspect progress and complete logbooks for every approved student in your department."
                     : "Progress is visible department-wide; detailed entries are limited to logs explicitly sent to you."}
@@ -745,13 +745,13 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
               </div>
             </CardContent>
           </Card>
-          <Card data-tour="faculty-progress-list" className="border border-slate-200 shadow-xs bg-white">
-            <CardHeader className="pb-3 border-b border-slate-100">
-              <CardTitle className="text-base font-bold text-slate-900">All PG Students Progress</CardTitle>
+          <Card data-tour="faculty-progress-list" className="border border-line-soft shadow-xs bg-white">
+            <CardHeader className="pb-3 border-b border-line-soft">
+              <CardTitle className="text-base font-bold text-ink">All PG Students Progress</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               <Table>
-                <TableHeader className="bg-slate-50">
+                <TableHeader className="bg-mist">
                   <TableRow>
                     <TableHead className="text-xs font-semibold">Resident Name</TableHead>
                     <TableHead className="text-xs font-semibold">Requirement Progress</TableHead>
@@ -762,20 +762,20 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                 <TableBody>
                   {mentees.map((m: any, index: number) => (
                     <TableRow key={m.id} className={isDemoMode() ? "demo-stagger-item" : undefined} style={isDemoMode() ? { "--demo-stagger-index": index } as React.CSSProperties : undefined}>
-                      <TableCell className="font-bold text-xs text-slate-900">
+                      <TableCell className="font-bold text-xs text-ink">
                         {m.name}
-                        <p className="text-[11px] text-slate-500 font-normal">{m.registrationNumber}</p>
+                        <p className="text-[11px] text-helper font-normal">{m.registrationNumber}</p>
                       </TableCell>
                       <TableCell className="text-xs w-48">
                         {m.overallCompletion !== null && m.overallCompletion !== undefined ? (
                           <>
                             <div className="flex items-center justify-between text-[11px] mb-1">
-                              <span className="font-semibold text-slate-700"><DemoCount value={m.overallCompletion} suffix="%" /></span>
+                              <span className="font-semibold text-ink"><DemoCount value={m.overallCompletion} suffix="%" /></span>
                             </div>
                             <DemoProgress value={m.overallCompletion} className="h-2" />
                           </>
                         ) : (
-                          <span className="text-slate-400">Not configured</span>
+                          <span className="text-helper">Not configured</span>
                         )}
                       </TableCell>
                       <TableCell>{renderShortfallBadge(m.shortfallStatus)}</TableCell>
@@ -788,7 +788,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                           }}
                           size="sm"
                           variant="outline"
-                          className="text-xs text-teal-700 border-teal-300 font-semibold gap-1.5"
+                          className="text-xs text-forest border-line font-semibold gap-1.5"
                         >
                           <BookOpen className="h-3.5 w-3.5" /> View Logbook
                         </Button>
@@ -803,10 +803,10 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
 
         {/* Tab 3: Add Assessment */}
         <TabsContent value="assessments" className="pt-4 space-y-4">
-          <Card data-tour="faculty-add-assessment" className="border border-slate-200 bg-white">
-            <CardHeader className="pb-3 border-b border-slate-100">
-              <CardTitle className="text-base font-bold text-slate-900">Add Assessment Score</CardTitle>
-              <CardDescription className="text-xs text-slate-500">
+          <Card data-tour="faculty-add-assessment" className="border border-line-soft bg-white">
+            <CardHeader className="pb-3 border-b border-line-soft">
+              <CardTitle className="text-base font-bold text-ink">Add Assessment Score</CardTitle>
+              <CardDescription className="text-xs text-helper">
                 Enter exam results for a student in your department. The assessment will be attributed to your account automatically.
               </CardDescription>
             </CardHeader>
@@ -842,7 +842,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
               >
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-700">Student <span className="text-rose-500">*</span></label>
+                    <label className="text-xs font-semibold text-ink">Student <span className="text-status-foreground">*</span></label>
                     <Select value={assessStudentId} onValueChange={setAssessStudentId}>
                       <SelectTrigger className="text-xs">
                         <SelectValue placeholder="Select student" />
@@ -858,7 +858,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                     </Select>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-700">Exam Name <span className="text-rose-500">*</span></label>
+                    <label className="text-xs font-semibold text-ink">Exam Name <span className="text-status-foreground">*</span></label>
                     <Input
                       value={assessExamName}
                       onChange={(e) => setAssessExamName(e.target.value)}
@@ -867,7 +867,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-700">Marks (out of 100) <span className="text-rose-500">*</span></label>
+                    <label className="text-xs font-semibold text-ink">Marks (out of 100) <span className="text-status-foreground">*</span></label>
                     <Input
                       type="number"
                       min="0"
@@ -879,7 +879,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-700">Type</label>
+                    <label className="text-xs font-semibold text-ink">Type</label>
                     <Select value={assessType} onValueChange={(val: any) => setAssessType(val)}>
                       <SelectTrigger className="text-xs">
                         <SelectValue />
@@ -902,7 +902,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                     </Select>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-700">Date</label>
+                    <label className="text-xs font-semibold text-ink">Date</label>
                     <Input
                       type="date"
                       value={assessDate}
@@ -914,7 +914,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                 <Button
                   type="submit"
                   disabled={assessSubmitting}
-                  className="bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs gap-2"
+                  className="bg-forest hover:bg-deep text-white font-semibold text-xs gap-2"
                 >
                   <PlusCircle className="h-4 w-4" />
                   {assessSubmitting ? "Saving..." : "Record Assessment"}
@@ -946,29 +946,29 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
         <DialogContent className="sm:max-w-[900px] max-h-[85vh] overflow-y-auto bg-white">
           {selectedMentee && (
             <div className="space-y-4">
-              <DialogHeader className="border-b border-slate-100 pb-3">
-                <DialogTitle className="text-slate-900 flex items-center justify-between">
+              <DialogHeader className="border-b border-line-soft pb-3">
+                <DialogTitle className="text-ink flex items-center justify-between">
                   <span className="flex items-center gap-2">
-                    <BookOpen className="h-5 w-5 text-teal-600" /> Logbook Record: {selectedMentee.name}
+                    <BookOpen className="h-5 w-5 text-forest" /> Logbook Record: {selectedMentee.name}
                   </span>
                 </DialogTitle>
-                <DialogDescription className="text-slate-500">
+                <DialogDescription className="text-helper">
                   Registration: {selectedMentee.registrationNumber}
                 </DialogDescription>
               </DialogHeader>
 
               {selectedMentee.overallCompletion !== null && selectedMentee.overallCompletion !== undefined && (
-                <div className="bg-slate-50 p-4 rounded-xl space-y-2 border border-slate-200">
+                <div className="bg-mist p-4 rounded-xl space-y-2 border border-line-soft">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="font-semibold text-slate-700">Overall MCI Requirement Completion</span>
-                    <span className="font-bold text-teal-800"><DemoCount value={selectedMentee.overallCompletion} suffix="%" /></span>
+                    <span className="font-semibold text-ink">Overall MCI Requirement Completion</span>
+                    <span className="font-bold text-forest"><DemoCount value={selectedMentee.overallCompletion} suffix="%" /></span>
                   </div>
                   <DemoProgress value={selectedMentee.overallCompletion} className="h-2" />
                 </div>
               )}
 
               <Tabs value={dialogTab} onValueChange={(v) => { setDialogTab(v); setLogFilter(null); }} className="w-full">
-                <TabsList className="bg-slate-100 p-1 rounded-lg w-full h-auto flex flex-nowrap sm:flex-wrap justify-start overflow-x-auto gap-1">
+                <TabsList className="bg-sage p-1 rounded-lg w-full h-auto flex flex-nowrap sm:flex-wrap justify-start overflow-x-auto gap-1">
                   <TabsTrigger value="progress" className="text-xs whitespace-nowrap">Training Progress</TabsTrigger>
                   {!config?.enabledFeatures?.hideCaseLogs && <TabsTrigger value="case-logs" className="text-xs whitespace-nowrap">Clinical Case Logs</TabsTrigger>}
                   {!config?.enabledFeatures?.hideProcedureLogs && <TabsTrigger value="proc-logs" className="text-xs whitespace-nowrap">Procedure Logs</TabsTrigger>}
@@ -992,20 +992,20 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                 <TabsContent value="progress" data-tour="faculty-student-progress" className="pt-3">
                   {menteeLogsLoading ? (
                     <div className="flex h-32 items-center justify-center">
-                      <div className="animate-spin rounded-full border-4 border-slate-300 border-t-teal-600 h-8 w-8" />
+                      <div className="animate-spin rounded-full border-4 border-line-soft border-t-forest h-8 w-8" />
                     </div>
                   ) : menteeProgressError ? (
                     /* ── Error state — never show zeros on fetch failure ── */
-                    <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-rose-100 bg-rose-50/60 p-8 text-center">
-                      <AlertTriangle className="h-8 w-8 text-rose-500" />
+                    <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-status-border bg-status p-8 text-center">
+                      <AlertTriangle className="h-8 w-8 text-status-foreground" />
                       <div>
-                        <p className="font-semibold text-rose-800">Failed to load progress data</p>
-                        <p className="mt-1 text-xs text-rose-600">{menteeProgressError}</p>
+                        <p className="font-semibold text-status-foreground">Failed to load progress data</p>
+                        <p className="mt-1 text-xs text-status-foreground">{menteeProgressError}</p>
                       </div>
                       <Button
                         size="sm"
                         variant="outline"
-                        className="border-rose-200 text-rose-700 gap-2"
+                        className="border-status-border text-status-foreground gap-2"
                         onClick={() => {
                           if (!selectedMentee) return;
                           // Capture the mentee at click time so a navigation
@@ -1065,7 +1065,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                   ) : (
                     /* ── Empty state before load completes ── */
                     <div className="flex h-32 items-center justify-center">
-                      <div className="animate-spin rounded-full border-4 border-slate-300 border-t-teal-600 h-8 w-8" />
+                      <div className="animate-spin rounded-full border-4 border-line-soft border-t-forest h-8 w-8" />
                     </div>
                   )}
                 </TabsContent>
@@ -1090,10 +1090,10 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                     />
                   )}
                   {menteeLogsLoading ? (
-                    <div className="flex h-32 items-center justify-center"><div className="animate-spin rounded-full border-4 border-slate-300 border-t-teal-600 h-8 w-8" /></div>
+                    <div className="flex h-32 items-center justify-center"><div className="animate-spin rounded-full border-4 border-line-soft border-t-forest h-8 w-8" /></div>
                   ) : (
                     <Table>
-                      <TableHeader className="bg-slate-50">
+                      <TableHeader className="bg-mist">
                         <TableRow>
                           <TableHead className="text-xs font-semibold">Date</TableHead>
                           <TableHead className="text-xs font-semibold">Diagnosis</TableHead>
@@ -1109,7 +1109,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                           if (menteeLoadErrors.logs) {
                             return (
                               <TableRow>
-                                <TableCell colSpan={4} role="alert" className="text-center text-sm font-medium text-rose-700 py-6">
+                                <TableCell colSpan={4} role="alert" className="text-center text-sm font-medium text-status-foreground py-6">
                                   <div className="flex flex-wrap items-center justify-center gap-2">
                                     <span>{menteeLoadErrors.logs}</span>
                                     {askMochiButton}
@@ -1119,7 +1119,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                             );
                           }
                           if (!rows.length) {
-                            return <TableRow><TableCell colSpan={4} className="text-center text-sm text-slate-500 py-6">No case logs found.</TableCell></TableRow>;
+                            return <TableRow><TableCell colSpan={4} className="text-center text-sm text-helper py-6">No case logs found.</TableCell></TableRow>;
                           }
                           return rows.map((log: CaseLogDetailRecord & { id: number }) => {
                             const expanded = expandedCaseIds.has(log.id);
@@ -1127,9 +1127,9 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                               <React.Fragment key={log.id}>
                                 <TableRow>
                                   <TableCell className="text-xs font-medium">{formatLogbookDate(log.date)}</TableCell>
-                                  <TableCell className="text-xs font-bold text-slate-900">{log.diagnosisFinal}</TableCell>
-                                  <TableCell className="text-xs text-slate-600">
-                                    {!hideUhid && <p className="font-semibold text-teal-800">{log.patientUhid || "—"}</p>}
+                                  <TableCell className="text-xs font-bold text-ink">{log.diagnosisFinal}</TableCell>
+                                  <TableCell className="text-xs text-soft-ink">
+                                    {!hideUhid && <p className="font-semibold text-forest">{log.patientUhid || "—"}</p>}
                                     <p>{log.patientAge} / {log.patientGender}</p>
                                   </TableCell>
                                   <TableCell className="text-right">
@@ -1172,10 +1172,10 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                     />
                   )}
                   {menteeLogsLoading ? (
-                    <div className="flex h-32 items-center justify-center"><div className="animate-spin rounded-full border-4 border-slate-300 border-t-teal-600 h-8 w-8" /></div>
+                    <div className="flex h-32 items-center justify-center"><div className="animate-spin rounded-full border-4 border-line-soft border-t-forest h-8 w-8" /></div>
                   ) : (
                     <Table>
-                      <TableHeader className="bg-slate-50">
+                      <TableHeader className="bg-mist">
                         <TableRow>
                           <TableHead className="text-xs font-semibold">Date</TableHead>
                           <TableHead className="text-xs font-semibold">Category</TableHead>
@@ -1191,7 +1191,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                           if (menteeLoadErrors.logs) {
                             return (
                               <TableRow>
-                                <TableCell colSpan={4} role="alert" className="text-center text-sm font-medium text-rose-700 py-6">
+                                <TableCell colSpan={4} role="alert" className="text-center text-sm font-medium text-status-foreground py-6">
                                   <div className="flex flex-wrap items-center justify-center gap-2">
                                     <span>{menteeLoadErrors.logs}</span>
                                     {askMochiButton}
@@ -1201,17 +1201,17 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                             );
                           }
                           if (!rows.length) {
-                            return <TableRow><TableCell colSpan={4} className="text-center text-sm text-slate-500 py-6">No clinical work found.</TableCell></TableRow>;
+                            return <TableRow><TableCell colSpan={4} className="text-center text-sm text-helper py-6">No clinical work found.</TableCell></TableRow>;
                           }
                           return rows.map((log: any) => (
                             <TableRow key={log.id}>
                               <TableCell className="text-xs font-medium">{formatLogbookDate(log.date)}</TableCell>
                               <TableCell className="text-xs">
-                                <p className="font-bold text-slate-900">{clinicalNames.get(log.category) ?? log.category}</p>
-                                {log.subType && <p className="text-slate-500">{clinicalNames.get(log.subType) ?? log.subType}</p>}
+                                <p className="font-bold text-ink">{clinicalNames.get(log.category) ?? log.category}</p>
+                                {log.subType && <p className="text-helper">{clinicalNames.get(log.subType) ?? log.subType}</p>}
                               </TableCell>
-                              <TableCell className="text-xs text-slate-600">
-                                {!hideUhid && <p className="font-semibold text-teal-800">{log.caseNumber}</p>}
+                              <TableCell className="text-xs text-soft-ink">
+                                {!hideUhid && <p className="font-semibold text-forest">{log.caseNumber}</p>}
                                 <p className="capitalize">{log.patientAge} / {log.patientSex}</p>
                               </TableCell>
                               <TableCell className="text-right">{renderLogStatusBadge(log.status)}</TableCell>
@@ -1244,10 +1244,10 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                     />
                   )}
                   {menteeLogsLoading ? (
-                    <div className="flex h-32 items-center justify-center"><div className="animate-spin rounded-full border-4 border-slate-300 border-t-teal-600 h-8 w-8" /></div>
+                    <div className="flex h-32 items-center justify-center"><div className="animate-spin rounded-full border-4 border-line-soft border-t-forest h-8 w-8" /></div>
                   ) : (
                     <Table>
-                      <TableHeader className="bg-slate-50">
+                      <TableHeader className="bg-mist">
                         <TableRow>
                           <TableHead className="text-xs font-semibold">Procedure Name</TableHead>
                           <TableHead className="text-xs font-semibold">{hideUhid ? "Age" : `${label("caseLog.caseId")} & Age`}</TableHead>
@@ -1266,7 +1266,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                           if (menteeLoadErrors.logs) {
                             return (
                               <TableRow>
-                                <TableCell colSpan={4} role="alert" className="text-center text-sm font-medium text-rose-700 py-6">
+                                <TableCell colSpan={4} role="alert" className="text-center text-sm font-medium text-status-foreground py-6">
                                   <div className="flex flex-wrap items-center justify-center gap-2">
                                     <span>{menteeLoadErrors.logs}</span>
                                     {askMochiButton}
@@ -1276,19 +1276,19 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                             );
                           }
                           if (!rows.length) {
-                            return <TableRow><TableCell colSpan={4} className="text-center text-sm text-slate-500 py-6">No procedure logs found.</TableCell></TableRow>;
+                            return <TableRow><TableCell colSpan={4} className="text-center text-sm text-helper py-6">No procedure logs found.</TableCell></TableRow>;
                           }
                           return rows.map((log: any) => {
                             const expanded = expandedProcIds.has(log.id);
                             return (
                               <React.Fragment key={log.id}>
                                 <TableRow>
-                                  <TableCell className="text-xs font-bold text-slate-900">{log.procedureName}</TableCell>
-                                  <TableCell className="text-xs text-slate-600">
-                                    {!hideUhid && <p className="font-semibold text-teal-800">{log.patientUhid || "—"}</p>}
+                                  <TableCell className="text-xs font-bold text-ink">{log.procedureName}</TableCell>
+                                  <TableCell className="text-xs text-soft-ink">
+                                    {!hideUhid && <p className="font-semibold text-forest">{log.patientUhid || "—"}</p>}
                                     <p>{log.patientAge}</p>
                                   </TableCell>
-                                  <TableCell className="text-xs text-teal-800 font-semibold">{log.competencyLevel ?? log.competencyDeclared}</TableCell>
+                                  <TableCell className="text-xs text-forest font-semibold">{log.competencyLevel ?? log.competencyDeclared}</TableCell>
                                   <TableCell className="text-right">
                                     <div className="flex items-center justify-end gap-2">
                                       {renderLogStatusBadge(log.status)}
@@ -1311,87 +1311,87 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                                 </TableRow>
                                 {expanded && (
                                   <TableRow>
-                                    <TableCell id={`proc-details-${log.id}`} colSpan={4} className="bg-slate-50 p-3">
-                                      <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
+                                    <TableCell id={`proc-details-${log.id}`} colSpan={4} className="bg-mist p-3">
+                                      <div className="space-y-4 rounded-xl border border-line-soft bg-white p-4 sm:p-5">
                                         <section aria-labelledby={`proc-ctx-${log.id}`}>
-                                          <h4 id={`proc-ctx-${log.id}`} className="mb-3 text-xs font-bold uppercase tracking-wide text-teal-800">Procedure &amp; patient context</h4>
+                                          <h4 id={`proc-ctx-${log.id}`} className="mb-3 text-xs font-bold uppercase tracking-wide text-forest">Procedure &amp; patient context</h4>
                                           {procedureDetailsField ? (
                                             <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                               <div className="min-w-0">
-                                                <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Date</dt>
-                                                <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">{formatLogbookDate(log.date)}</dd>
+                                                <dt className="text-[11px] font-semibold uppercase tracking-wide text-helper">Date</dt>
+                                                <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-ink">{formatLogbookDate(log.date)}</dd>
                                               </div>
                                               <div className="min-w-0">
-                                                <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Procedure name</dt>
-                                                <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">{log.procedureName || <span className="text-slate-400">Not recorded</span>}</dd>
+                                                <dt className="text-[11px] font-semibold uppercase tracking-wide text-helper">Procedure name</dt>
+                                                <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-ink">{log.procedureName || <span className="text-helper">Not recorded</span>}</dd>
                                               </div>
                                               <div className="min-w-0 sm:col-span-2">
-                                                <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Details</dt>
-                                                <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">{log.diagnosis || <span className="text-slate-400">Not recorded</span>}</dd>
+                                                <dt className="text-[11px] font-semibold uppercase tracking-wide text-helper">Details</dt>
+                                                <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-ink">{log.diagnosis || <span className="text-helper">Not recorded</span>}</dd>
                                               </div>
                                             </dl>
                                           ) : showProcedureDetails ? ((!dynamicProcedureFields || (activeProcedureFields?.length ?? 0) > 0) ? <ProcedureClinicalDetails entry={log} fields={activeProcedureFields} /> : null) : (
                                             <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                                               <div className="min-w-0">
-                                                <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Date</dt>
-                                                <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">{formatLogbookDate(log.date)}</dd>
+                                                <dt className="text-[11px] font-semibold uppercase tracking-wide text-helper">Date</dt>
+                                                <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-ink">{formatLogbookDate(log.date)}</dd>
                                               </div>
                                               <div className="min-w-0">
-                                                <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Procedure group</dt>
-                                                <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">{log.procedureGroup || <span className="text-slate-400">Not recorded</span>}</dd>
+                                                <dt className="text-[11px] font-semibold uppercase tracking-wide text-helper">Procedure group</dt>
+                                                <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-ink">{log.procedureGroup || <span className="text-helper">Not recorded</span>}</dd>
                                               </div>
                                               <div className="min-w-0">
-                                                <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Procedure name</dt>
-                                                <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">{log.procedureName || <span className="text-slate-400">Not recorded</span>}</dd>
+                                                <dt className="text-[11px] font-semibold uppercase tracking-wide text-helper">Procedure name</dt>
+                                                <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-ink">{log.procedureName || <span className="text-helper">Not recorded</span>}</dd>
                                               </div>
                                               <div className="min-w-0">
-                                                <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Patient age</dt>
-                                                <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">{log.patientAge || <span className="text-slate-400">Not recorded</span>}</dd>
+                                                <dt className="text-[11px] font-semibold uppercase tracking-wide text-helper">Patient age</dt>
+                                                <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-ink">{log.patientAge || <span className="text-helper">Not recorded</span>}</dd>
                                               </div>
                                               <div className="min-w-0">
-                                                <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Patient sex</dt>
-                                                <dd className="mt-1 capitalize whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">{log.sex || <span className="text-slate-400">Not recorded</span>}</dd>
+                                                <dt className="text-[11px] font-semibold uppercase tracking-wide text-helper">Patient sex</dt>
+                                                <dd className="mt-1 capitalize whitespace-pre-wrap break-words text-sm leading-relaxed text-ink">{log.sex || <span className="text-helper">Not recorded</span>}</dd>
                                               </div>
                                               {!hideUhid && (
                                                 <div className="min-w-0">
-                                                  <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">UHID</dt>
-                                                  <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">{log.patientUhid || <span className="text-slate-400">Not recorded</span>}</dd>
+                                                  <dt className="text-[11px] font-semibold uppercase tracking-wide text-helper">UHID</dt>
+                                                  <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-ink">{log.patientUhid || <span className="text-helper">Not recorded</span>}</dd>
                                                 </div>
                                               )}
                                               <div className="min-w-0">
-                                                <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Competency level</dt>
-                                                <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">{log.competencyLevel ?? log.competencyDeclared ?? <span className="text-slate-400">Not recorded</span>}</dd>
+                                                <dt className="text-[11px] font-semibold uppercase tracking-wide text-helper">Competency level</dt>
+                                                <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-ink">{log.competencyLevel ?? log.competencyDeclared ?? <span className="text-helper">Not recorded</span>}</dd>
                                               </div>
                                               <div className="min-w-0 sm:col-span-2">
-                                                <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Diagnosis</dt>
-                                                <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">{log.diagnosis || <span className="text-slate-400">Not recorded</span>}</dd>
+                                                <dt className="text-[11px] font-semibold uppercase tracking-wide text-helper">Diagnosis</dt>
+                                                <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-ink">{log.diagnosis || <span className="text-helper">Not recorded</span>}</dd>
                                               </div>
                                             </dl>
                                           )}
                                         </section>
                                         {/* Show review result when already reviewed */}
                                         {(log.status !== "pending" || log.facultyRemarks || log.facultyVerifiedLevel || log.reviewedAt) && (
-                                          <section aria-labelledby={`proc-review-${log.id}`} className="border-t border-slate-100 pt-4">
-                                            <h4 id={`proc-review-${log.id}`} className="mb-3 text-xs font-bold uppercase tracking-wide text-teal-800">Faculty review</h4>
+                                          <section aria-labelledby={`proc-review-${log.id}`} className="border-t border-line-soft pt-4">
+                                            <h4 id={`proc-review-${log.id}`} className="mb-3 text-xs font-bold uppercase tracking-wide text-forest">Faculty review</h4>
                                             <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                               <div className="min-w-0">
-                                                <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Status</dt>
-                                                <dd className="mt-1 capitalize whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">{log.status || <span className="text-slate-400">Not recorded</span>}</dd>
+                                                <dt className="text-[11px] font-semibold uppercase tracking-wide text-helper">Status</dt>
+                                                <dd className="mt-1 capitalize whitespace-pre-wrap break-words text-sm leading-relaxed text-ink">{log.status || <span className="text-helper">Not recorded</span>}</dd>
                                               </div>
                                               {log.facultyVerifiedLevel && (
                                                 <div className="min-w-0">
-                                                  <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Faculty verified level</dt>
-                                                  <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">{log.facultyVerifiedLevel}</dd>
+                                                  <dt className="text-[11px] font-semibold uppercase tracking-wide text-helper">Faculty verified level</dt>
+                                                  <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-ink">{log.facultyVerifiedLevel}</dd>
                                                 </div>
                                               )}
                                               <div className="min-w-0">
-                                                <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Faculty remarks</dt>
-                                                <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">{log.facultyRemarks || <span className="text-slate-400">None</span>}</dd>
+                                                <dt className="text-[11px] font-semibold uppercase tracking-wide text-helper">Faculty remarks</dt>
+                                                <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-ink">{log.facultyRemarks || <span className="text-helper">None</span>}</dd>
                                               </div>
                                               {log.reviewedAt && (
                                                 <div className="min-w-0">
-                                                  <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Reviewed at</dt>
-                                                  <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">{new Date(log.reviewedAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}</dd>
+                                                  <dt className="text-[11px] font-semibold uppercase tracking-wide text-helper">Reviewed at</dt>
+                                                  <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-ink">{new Date(log.reviewedAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}</dd>
                                                 </div>
                                               )}
                                             </dl>
@@ -1455,10 +1455,10 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                     />
                   )}
                   {menteeLogsLoading ? (
-                    <div className="flex h-32 items-center justify-center"><div className="animate-spin rounded-full border-4 border-slate-300 border-t-teal-600 h-8 w-8" /></div>
+                    <div className="flex h-32 items-center justify-center"><div className="animate-spin rounded-full border-4 border-line-soft border-t-forest h-8 w-8" /></div>
                   ) : (
                     <Table>
-                      <TableHeader className="bg-slate-50">
+                      <TableHeader className="bg-mist">
                         <TableRow>
                           <TableHead className="text-xs font-semibold">Type</TableHead>
                           <TableHead className="text-xs font-semibold">Topic</TableHead>
@@ -1473,7 +1473,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                           if (menteeLoadErrors.logs) {
                             return (
                               <TableRow>
-                                <TableCell colSpan={3} role="alert" className="text-center text-sm font-medium text-rose-700 py-6">
+                                <TableCell colSpan={3} role="alert" className="text-center text-sm font-medium text-status-foreground py-6">
                                   <div className="flex flex-wrap items-center justify-center gap-2">
                                     <span>{menteeLoadErrors.logs}</span>
                                     {askMochiButton}
@@ -1483,12 +1483,12 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                             );
                           }
                           if (!rows.length) {
-                            return <TableRow><TableCell colSpan={3} className="text-center text-sm text-slate-500 py-6">No academic logs found.</TableCell></TableRow>;
+                            return <TableRow><TableCell colSpan={3} className="text-center text-sm text-helper py-6">No academic logs found.</TableCell></TableRow>;
                           }
                           return rows.map((log: any) => (
                             <TableRow key={log.id}>
                               <TableCell className="text-xs font-semibold">{academicSectionName(academicLogbook, log.activityType)}</TableCell>
-                              <TableCell className="whitespace-pre-wrap text-xs text-slate-900">{log.topic}
+                              <TableCell className="whitespace-pre-wrap text-xs text-ink">{log.topic}
                                 <AcademicRecordDetails activityType={log.activityType} description={log.description} presentationType={log.presentationType} />
                               </TableCell>
                               <TableCell className="text-right">
@@ -1506,27 +1506,27 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                 <TabsContent value="postings" className="pt-3">
                   {menteeLoadErrors.postings ? (
                     <div className="flex flex-wrap items-center justify-center gap-2 py-6 text-center">
-                      <p role="alert" className="text-sm font-medium text-rose-700">{menteeLoadErrors.postings}</p>
+                      <p role="alert" className="text-sm font-medium text-status-foreground">{menteeLoadErrors.postings}</p>
                       {askMochiButton}
                     </div>
                   ) : menteePostings.length === 0 ? (
-                    <p className="text-sm text-slate-500 py-6 text-center">No postings visible to you (either none logged or none assigned to you as supervisor).</p>
+                    <p className="text-sm text-helper py-6 text-center">No postings visible to you (either none logged or none assigned to you as supervisor).</p>
                   ) : (
                     <div className="space-y-3">
                       {menteePostings.map((posting: any) => (
-                        <div key={posting.id} className="rounded-xl border border-slate-200 bg-white p-4">
+                        <div key={posting.id} className="rounded-xl border border-line-soft bg-white p-4">
                           <div className="flex items-start justify-between gap-3">
                             <div>
-                              <p className="font-semibold text-slate-900 text-sm">{posting.ward}</p>
-                              <p className="text-xs text-slate-500 mt-0.5">{formatLogbookDate(posting.startDate)} – {formatLogbookDate(posting.endDate)}</p>
+                              <p className="font-semibold text-ink text-sm">{posting.ward}</p>
+                              <p className="text-xs text-helper mt-0.5">{formatLogbookDate(posting.startDate)} – {formatLogbookDate(posting.endDate)}</p>
                               {posting.facultyRemarks && (
-                                <p className="mt-1 text-xs text-slate-600 italic">Remarks: {posting.facultyRemarks}</p>
+                                <p className="mt-1 text-xs text-soft-ink italic">Remarks: {posting.facultyRemarks}</p>
                               )}
                             </div>
                             <span className={`shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                              posting.status === "verified" ? "bg-emerald-100 text-emerald-700" :
-                              posting.status === "rejected" ? "bg-rose-100 text-rose-700" :
-                              "bg-amber-100 text-amber-700"
+                              posting.status === "verified" ? "bg-status text-status-foreground" :
+                              posting.status === "rejected" ? "bg-status text-status-foreground" :
+                              "bg-status text-status-foreground"
                             }`}>{posting.status === "verified" ? "Verified" : posting.status === "rejected" ? "Rejected" : "Pending"}</span>
                           </div>
                           {config?.enabledFeatures?.postingAttachments === true && !isDemoMode() && (
@@ -1559,27 +1559,27 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                   <TabsContent value="awards" className="pt-3">
                     {menteeLoadErrors.awards ? (
                       <div className="flex flex-wrap items-center justify-center gap-2 py-6 text-center">
-                        <p role="alert" className="text-sm font-medium text-rose-700">{menteeLoadErrors.awards}</p>
+                        <p role="alert" className="text-sm font-medium text-status-foreground">{menteeLoadErrors.awards}</p>
                         {askMochiButton}
                       </div>
                     ) : menteeAwards.length === 0 ? (
-                      <p className="text-sm text-slate-500 py-6 text-center">No awards visible to you (either none logged or none assigned to you as supervisor).</p>
+                      <p className="text-sm text-helper py-6 text-center">No awards visible to you (either none logged or none assigned to you as supervisor).</p>
                     ) : (
                       <div className="space-y-3">
                         {menteeAwards.map((award: any) => (
-                          <div key={award.id} className="rounded-xl border border-slate-200 bg-white p-4">
+                          <div key={award.id} className="rounded-xl border border-line-soft bg-white p-4">
                             <div className="flex items-start justify-between gap-3">
                               <div>
-                                <p className="font-semibold text-slate-900 text-sm">{award.description}</p>
-                                <p className="text-xs text-slate-500 mt-0.5">{formatLogbookDate(award.date)}</p>
+                                <p className="font-semibold text-ink text-sm">{award.description}</p>
+                                <p className="text-xs text-helper mt-0.5">{formatLogbookDate(award.date)}</p>
                                 {award.facultyRemarks && (
-                                  <p className="mt-1 text-xs text-slate-600 italic">Remarks: {award.facultyRemarks}</p>
+                                  <p className="mt-1 text-xs text-soft-ink italic">Remarks: {award.facultyRemarks}</p>
                                 )}
                               </div>
                               <span className={`shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                                award.status === "verified" ? "bg-emerald-100 text-emerald-700" :
-                                award.status === "rejected" ? "bg-rose-100 text-rose-700" :
-                                "bg-amber-100 text-amber-700"
+                                award.status === "verified" ? "bg-status text-status-foreground" :
+                                award.status === "rejected" ? "bg-status text-status-foreground" :
+                                "bg-status text-status-foreground"
                               }`}>{award.status === "verified" ? "Verified" : award.status === "rejected" ? "Rejected" : "Pending"}</span>
                             </div>
                             <AwardReviewForm
@@ -1605,17 +1605,17 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                 <TabsContent value="thesis" className="pt-3">
                   {menteeLoadErrors.thesis ? (
                     <div className="flex flex-wrap items-center justify-center gap-2 py-6 text-center">
-                      <p role="alert" className="text-sm font-medium text-rose-700">{menteeLoadErrors.thesis}</p>
+                      <p role="alert" className="text-sm font-medium text-status-foreground">{menteeLoadErrors.thesis}</p>
                       {askMochiButton}
                     </div>
                   ) : !menteeThesis ? (
-                    <p className="text-sm text-slate-500 py-6 text-center">No thesis recorded yet, or this student's thesis is not assigned to you as guide.</p>
+                    <p className="text-sm text-helper py-6 text-center">No thesis recorded yet, or this student's thesis is not assigned to you as guide.</p>
                   ) : (
                     <div className="space-y-4">
-                      <div className="rounded-xl border border-slate-200 bg-white p-4">
-                        <p className="font-semibold text-slate-900 text-sm">{menteeThesis.thesisTitle}</p>
+                      <div className="rounded-xl border border-line-soft bg-white p-4">
+                        <p className="font-semibold text-ink text-sm">{menteeThesis.thesisTitle}</p>
                         {menteeThesis.facultyRemarks && (
-                          <p className="mt-1 text-xs text-slate-600 italic">Remarks: {menteeThesis.facultyRemarks}</p>
+                          <p className="mt-1 text-xs text-soft-ink italic">Remarks: {menteeThesis.facultyRemarks}</p>
                         )}
                         <div className="mt-3 grid grid-cols-3 gap-3">
                           {[
@@ -1623,12 +1623,12 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                             ["Mid-Term", menteeThesis.midTermStatus, "midTermStatus"],
                             ["Final Submission", menteeThesis.finalSubmissionStatus, "finalSubmissionStatus"],
                           ].map(([label, status, field]) => (
-                            <div key={field} className="text-center rounded-lg border border-slate-100 p-2">
-                              <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">{label}</p>
+                            <div key={field} className="text-center rounded-lg border border-line-soft p-2">
+                              <p className="text-[10px] font-semibold text-helper uppercase tracking-wide">{label}</p>
                               <span className={`inline-block mt-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                                status === "approved" ? "bg-emerald-100 text-emerald-700" :
-                                status === "submitted" ? "bg-blue-100 text-blue-700" :
-                                "bg-amber-100 text-amber-700"
+                                status === "approved" ? "bg-status text-status-foreground" :
+                                status === "submitted" ? "bg-sage text-forest" :
+                                "bg-status text-status-foreground"
                               }`}>{String(status).charAt(0).toUpperCase() + String(status).slice(1)}</span>
                             </div>
                           ))}
@@ -1654,35 +1654,35 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                 <TabsContent value="certifications" className="pt-3">
                   {menteeLoadErrors.certifications ? (
                     <div className="flex flex-wrap items-center justify-center gap-2 py-6 text-center">
-                      <p role="alert" className="text-sm font-medium text-rose-700">{menteeLoadErrors.certifications}</p>
+                      <p role="alert" className="text-sm font-medium text-status-foreground">{menteeLoadErrors.certifications}</p>
                       {askMochiButton}
                     </div>
                   ) : menteeCerts.length === 0 ? (
-                    <p className="text-sm text-slate-500 py-6 text-center">No certifications visible to you (this student may not be your direct mentee).</p>
+                    <p className="text-sm text-helper py-6 text-center">No certifications visible to you (this student may not be your direct mentee).</p>
                   ) : (
                     <div className="space-y-3">
                       {menteeCerts.map((cert: any) => (
-                        <div key={cert.id} className="rounded-xl border border-slate-200 bg-white p-4">
+                        <div key={cert.id} className="rounded-xl border border-line-soft bg-white p-4">
                           <div className="flex items-start justify-between gap-3">
                             <div>
-                              <p className="font-semibold text-slate-900 text-sm">{cert.title}</p>
-                              <p className="text-xs text-slate-500 mt-0.5">{cert.provider} · Issued {formatLogbookDate(cert.issueDate)}</p>
+                              <p className="font-semibold text-ink text-sm">{cert.title}</p>
+                              <p className="text-xs text-helper mt-0.5">{cert.provider} · Issued {formatLogbookDate(cert.issueDate)}</p>
                               {cert.certificateFileType ? (
-                                <button type="button" className="text-xs text-teal-600 hover:underline mt-0.5 inline-block"
+                                <button type="button" className="text-xs text-forest hover:underline mt-0.5 inline-block"
                                   onClick={() => openCertificateFile(selectedMentee.id, cert.id).catch((err: any) => toast.error(err?.message || "Unable to open certificate"))}>View certificate ↗</button>
                               ) : cert.certificateUrl ? (
-                                <a href={cert.certificateUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-teal-600 hover:underline mt-0.5 inline-block">View certificate ↗</a>
+                                <a href={cert.certificateUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-forest hover:underline mt-0.5 inline-block">View certificate ↗</a>
                               ) : (
-                                <span className="text-xs text-slate-500 mt-0.5 inline-block">No file attached</span>
+                                <span className="text-xs text-helper mt-0.5 inline-block">No file attached</span>
                               )}
                               {cert.facultyRemarks && (
-                                <p className="mt-1 text-xs text-slate-600 italic">Remarks: {cert.facultyRemarks}</p>
+                                <p className="mt-1 text-xs text-soft-ink italic">Remarks: {cert.facultyRemarks}</p>
                               )}
                             </div>
                             <span className={`shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                              cert.status === "verified" ? "bg-emerald-100 text-emerald-700" :
-                              cert.status === "rejected" ? "bg-rose-100 text-rose-700" :
-                              "bg-amber-100 text-amber-700"
+                              cert.status === "verified" ? "bg-status text-status-foreground" :
+                              cert.status === "rejected" ? "bg-status text-status-foreground" :
+                              "bg-status text-status-foreground"
                             }`}>{cert.status === "verified" ? "Verified" : cert.status === "rejected" ? "Rejected" : "Pending"}</span>
                           </div>
                           <CertReviewForm
@@ -1707,22 +1707,22 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                 <TabsContent value="assessments" className="pt-3">
                   {menteeLoadErrors.assessments ? (
                     <div className="flex flex-wrap items-center justify-center gap-2 py-6 text-center">
-                      <p role="alert" className="text-sm font-medium text-rose-700">{menteeLoadErrors.assessments}</p>
+                      <p role="alert" className="text-sm font-medium text-status-foreground">{menteeLoadErrors.assessments}</p>
                       {askMochiButton}
                     </div>
                   ) : menteeAssessments.length === 0 ? (
-                    <p className="text-sm text-slate-500 py-6 text-center">No assessments found for this student.</p>
+                    <p className="text-sm text-helper py-6 text-center">No assessments found for this student.</p>
                   ) : (
                     <div className="space-y-4">
                       {menteeAssessments.map((assessment: any) => (
-                        <div key={assessment.id} className="rounded-xl border border-slate-200 bg-white p-4">
+                        <div key={assessment.id} className="rounded-xl border border-line-soft bg-white p-4">
                           <div className="flex items-start justify-between gap-3">
                             <div>
-                              <p className="font-semibold text-slate-900 text-sm">{assessment.examName}</p>
-                              <p className="text-xs text-slate-500 mt-0.5">{assessment.type === "annual" ? "Annual" : "Quarterly"} · {formatLogbookDate(assessment.date)}</p>
-                              <p className="mt-1 text-xs font-medium text-teal-800">Assessor ID: {assessment.assessorId}</p>
+                              <p className="font-semibold text-ink text-sm">{assessment.examName}</p>
+                              <p className="text-xs text-helper mt-0.5">{assessment.type === "annual" ? "Annual" : "Quarterly"} · {formatLogbookDate(assessment.date)}</p>
+                              <p className="mt-1 text-xs font-medium text-forest">Assessor ID: {assessment.assessorId}</p>
                             </div>
-                            <span className="shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold bg-slate-100 text-slate-900">
+                            <span className="shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold bg-sage text-ink">
                               {assessment.marks} / 100
                             </span>
                           </div>
@@ -1748,7 +1748,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                 <TabsContent value="attendance" className="pt-3">
                   {menteeLogsLoading ? (
                     <div className="flex h-32 items-center justify-center">
-                      <div className="animate-spin rounded-full border-4 border-slate-300 border-t-teal-600 h-8 w-8" />
+                      <div className="animate-spin rounded-full border-4 border-line-soft border-t-forest h-8 w-8" />
                     </div>
                   ) : yearlyAttendance ? (
                     <div className="space-y-4">
@@ -1770,14 +1770,14 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                           <>
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                               {rows.map(({ year, pct }) => (
-                                <div key={year} className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
-                                  <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">{year}</span>
-                                  <p className="text-xl font-bold text-slate-900 mt-1">{pct !== null ? `${pct}%` : "—"}</p>
+                                <div key={year} className="p-3.5 bg-mist border border-line-soft rounded-xl">
+                                  <span className="text-[11px] font-semibold text-helper uppercase tracking-wide">{year}</span>
+                                  <p className="text-xl font-bold text-ink mt-1">{pct !== null ? `${pct}%` : "—"}</p>
                                 </div>
                               ))}
-                              <div className="p-3.5 bg-teal-50 border border-teal-200 rounded-xl">
-                                <span className="text-[11px] font-semibold text-teal-700 uppercase tracking-wide">Average</span>
-                                <p className="text-xl font-bold text-teal-800 mt-1">{avg}{avg !== "—" ? "%" : ""}</p>
+                              <div className="p-3.5 bg-mist border border-line-soft rounded-xl">
+                                <span className="text-[11px] font-semibold text-forest uppercase tracking-wide">Average</span>
+                                <p className="text-xl font-bold text-forest mt-1">{avg}{avg !== "—" ? "%" : ""}</p>
                               </div>
                             </div>
                             <Table>
@@ -1793,17 +1793,17 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                               <TableBody>
                                 {rows.map(({ year, pct, rec }) => (
                                   <TableRow key={year}>
-                                    <TableCell className="text-xs font-bold text-slate-900">{year}</TableCell>
-                                    <TableCell className="text-xs font-bold text-teal-800">{pct !== null ? `${pct}%` : "Not recorded"}</TableCell>
+                                    <TableCell className="text-xs font-bold text-ink">{year}</TableCell>
+                                    <TableCell className="text-xs font-bold text-forest">{pct !== null ? `${pct}%` : "Not recorded"}</TableCell>
                                     <TableCell>
                                       {pct !== null ? (
-                                        <Badge className="border-emerald-200 bg-emerald-50 text-[10px] font-semibold text-emerald-700">Verified</Badge>
+                                        <Badge className="border-status-border bg-status text-[10px] font-semibold text-status-foreground">Verified</Badge>
                                       ) : (
-                                        <Badge variant="outline" className="text-[10px] text-slate-400">Pending</Badge>
+                                        <Badge variant="outline" className="text-[10px] text-helper">Pending</Badge>
                                       )}
                                     </TableCell>
-                                    <TableCell className="text-xs text-slate-600">{rec?.verifierName || "—"}</TableCell>
-                                    <TableCell className="text-xs text-slate-600">{rec?.createdAt ? formatLogbookDate(rec.createdAt.slice(0, 10)) : "—"}</TableCell>
+                                    <TableCell className="text-xs text-soft-ink">{rec?.verifierName || "—"}</TableCell>
+                                    <TableCell className="text-xs text-soft-ink">{rec?.createdAt ? formatLogbookDate(rec.createdAt.slice(0, 10)) : "—"}</TableCell>
                                   </TableRow>
                                 ))}
                               </TableBody>
@@ -1815,7 +1815,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                   ) : (
                     <div className="space-y-4">
                       {menteeAttendance.length === 0 ? (
-                        <div className="text-center text-sm text-slate-500 py-6">No daily attendance records found.</div>
+                        <div className="text-center text-sm text-helper py-6">No daily attendance records found.</div>
                       ) : (
                         <Table>
                           <TableHeader>
@@ -1829,10 +1829,10 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                           <TableBody>
                             {menteeAttendance.map((a: any) => (
                               <TableRow key={a.id}>
-                                <TableCell className="text-xs font-medium text-slate-900">{formatLogbookDate(a.date)}</TableCell>
+                                <TableCell className="text-xs font-medium text-ink">{formatLogbookDate(a.date)}</TableCell>
                                 <TableCell className="text-xs">{a.status}</TableCell>
-                                <TableCell className="text-xs text-slate-600">{a.clockIn || a.clockOut ? `${a.clockIn || "—"} to ${a.clockOut || "—"}` : "Full Day"}</TableCell>
-                                <TableCell className="text-xs text-slate-600">{a.verifierName || "—"}</TableCell>
+                                <TableCell className="text-xs text-soft-ink">{a.clockIn || a.clockOut ? `${a.clockIn || "—"} to ${a.clockOut || "—"}` : "Full Day"}</TableCell>
+                                <TableCell className="text-xs text-soft-ink">{a.verifierName || "—"}</TableCell>
                               </TableRow>
                             ))}
                           </TableBody>
@@ -1878,11 +1878,11 @@ function FilterBanner({
     filteredCount < totalInProgress;
 
   return (
-    <div className="mb-3 rounded-lg border border-teal-100 bg-teal-50/60 px-4 py-2.5 flex items-center justify-between gap-3">
+    <div className="mb-3 rounded-lg border border-line-soft bg-mist px-4 py-2.5 flex items-center justify-between gap-3">
       <div>
-        <span className="text-xs font-semibold text-teal-800">Filtered by: {label}</span>
+        <span className="text-xs font-semibold text-forest">Filtered by: {label}</span>
         {showMismatch && (
-          <p className="mt-0.5 text-[11px] text-slate-500">
+          <p className="mt-0.5 text-[11px] text-helper">
             Showing {filteredCount} {filteredCount === 1 ? "entry" : "entries"} you supervised, of {totalInProgress} logged.
           </p>
         )}
@@ -1891,7 +1891,7 @@ function FilterBanner({
         size="sm"
         variant="ghost"
         onClick={onClear}
-        className="h-7 px-2 text-xs text-slate-500 hover:text-slate-700 gap-1 shrink-0"
+        className="h-7 px-2 text-xs text-helper hover:text-ink gap-1 shrink-0"
       >
         <X className="h-3 w-3" /> Clear filter
       </Button>
@@ -2168,19 +2168,19 @@ function ProgressTabContent({
       {/* Summary tiles */}
       <div data-tour="faculty-progress-summary" className={`grid grid-cols-2 gap-2 sm:gap-4 ${tiles.length >= 3 ? "sm:grid-cols-3" : ""}`}>
         {tiles.map((tile) => (
-          <div key={tile.label} className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-center sm:p-4">
+          <div key={tile.label} className="rounded-xl border border-line-soft bg-mist p-3 text-center sm:p-4">
             <p className="metric-value">{tile.verified + tile.pending}</p>
             <p className="metric-label mt-1">{tile.label}</p>
-            <p className="mt-1 text-[11px] text-slate-500">{tile.verified} verified · {tile.pending} pending</p>
+            <p className="mt-1 text-[11px] text-helper">{tile.verified} verified · {tile.pending} pending</p>
           </div>
         ))}
       </div>
 
       {/* ── Section 1: Case Categories ── */}
       {showCases && <div data-tour="faculty-progress-cases" className="space-y-3">
-        <h3 className="text-sm font-semibold text-slate-700">Case Categories</h3>
+        <h3 className="text-sm font-semibold text-ink">Case Categories</h3>
         {caseBarItems.length === 0 ? (
-          <p className="text-xs text-slate-500 rounded-xl border border-dashed border-slate-200 p-4 text-center">
+          <p className="text-xs text-helper rounded-xl border border-dashed border-line-soft p-4 text-center">
             No case categories configured for this department.
           </p>
         ) : (
@@ -2201,7 +2201,7 @@ function ProgressTabContent({
                   variant="ghost"
                   size="sm"
                   onClick={() => setShowAllCaseBars(!showAllCaseBars)}
-                  className="text-slate-500 hover:text-slate-700"
+                  className="text-helper hover:text-ink"
                 >
                   {showAllCaseBars ? "Show less" : `Show all ${caseBarItems.length} categories`}
                 </Button>
@@ -2213,16 +2213,16 @@ function ProgressTabContent({
 
       {/* ── Section 2: Procedures (grouped) ── */}
       {showProcedures && <div data-tour="faculty-progress-procedures" className="space-y-3">
-        <h3 className="text-sm font-semibold text-slate-700">Procedures</h3>
+        <h3 className="text-sm font-semibold text-ink">Procedures</h3>
         {procBarItems.length === 0 ? (
-          <p className="text-xs text-slate-500 rounded-xl border border-dashed border-slate-200 p-4 text-center">
+          <p className="text-xs text-helper rounded-xl border border-dashed border-line-soft p-4 text-center">
             No procedures configured for this department.
           </p>
         ) : (
           <>
             {Array.from(procGroups.entries()).map(([group, items]) => (
               <div key={group} className="space-y-1.5">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-teal-700">{group}</p>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-forest">{group}</p>
                 <ProgressSection
                   items={items.slice(0, showAllProcBars ? undefined : 8)}
                   onItemClick={(item) =>
@@ -2242,7 +2242,7 @@ function ProgressTabContent({
                   variant="ghost"
                   size="sm"
                   onClick={() => setShowAllProcBars(!showAllProcBars)}
-                  className="text-slate-500 hover:text-slate-700"
+                  className="text-helper hover:text-ink"
                 >
                   {showAllProcBars ? "Show less" : `Show all ${procBarItems.length} procedures`}
                 </Button>
@@ -2254,9 +2254,9 @@ function ProgressTabContent({
 
       {/* ── Section 3: Clinical Work ── */}
       {showClinical && <div data-tour="faculty-progress-clinical" className="space-y-3">
-        <h3 className="text-sm font-semibold text-slate-700">Clinical Work</h3>
+        <h3 className="text-sm font-semibold text-ink">Clinical Work</h3>
         {clinicalBarItems.length === 0 ? (
-          <p className="text-xs text-slate-500 rounded-xl border border-dashed border-slate-200 p-4 text-center">
+          <p className="text-xs text-helper rounded-xl border border-dashed border-line-soft p-4 text-center">
             No clinical work minimums set and nothing logged yet.
           </p>
         ) : (
@@ -2271,7 +2271,7 @@ function ProgressTabContent({
                   variant="ghost"
                   size="sm"
                   onClick={() => setShowAllClinicalBars(!showAllClinicalBars)}
-                  className="text-slate-500 hover:text-slate-700"
+                  className="text-helper hover:text-ink"
                 >
                   {showAllClinicalBars ? "Show less" : `Show all ${clinicalBarItems.length} categories`}
                 </Button>
@@ -2283,9 +2283,9 @@ function ProgressTabContent({
 
       {/* ── Section 4: Academic Activities ── */}
       <div data-tour="faculty-progress-academics" className="space-y-3">
-        <h3 className="text-sm font-semibold text-slate-700">Academic Activities</h3>
+        <h3 className="text-sm font-semibold text-ink">Academic Activities</h3>
         {acadBarItems.length === 0 ? (
-          <p className="text-xs text-slate-500 rounded-xl border border-dashed border-slate-200 p-4 text-center">
+          <p className="text-xs text-helper rounded-xl border border-dashed border-line-soft p-4 text-center">
             No academic activities configured for this department.
           </p>
         ) : (
@@ -2306,7 +2306,7 @@ function ProgressTabContent({
                   variant="ghost"
                   size="sm"
                   onClick={() => setShowAllAcadBars(!showAllAcadBars)}
-                  className="text-slate-500 hover:text-slate-700"
+                  className="text-helper hover:text-ink"
                 >
                   {showAllAcadBars ? "Show less" : `Show all ${acadBarItems.length} activities`}
                 </Button>
@@ -2336,9 +2336,9 @@ type ProgressSectionItem = {
 };
 
 const progressChartConfig = {
-  verified: { label: "Verified", color: "#0d9488" },
-  pending: { label: "Pending", color: "#99f6e4" },
-  remaining: { label: "Remaining", color: "#f1f5f9" },
+  verified: { label: "Verified", color: "var(--chart-1)" },
+  pending: { label: "Pending", color: "var(--chart-2)" },
+  remaining: { label: "Remaining", color: "var(--chart-5)" },
 } satisfies ChartConfig;
 
 function ProgressSection({
@@ -2351,6 +2351,7 @@ function ProgressSection({
   // A 600px-wide chart cannot fit a phone; show the same numbers as a tappable list.
   const isMobile = useIsMobile();
   const animateDemo = useDemoMotionEnabled();
+  const pendingPatternId = React.useId();
   if (isMobile) return <ProgressList items={items} onItemClick={onItemClick} />;
   const chartData = items.map((item) => {
     const total = item.verified + item.pending;
@@ -2375,68 +2376,74 @@ function ProgressSection({
             layout="vertical"
             margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
           >
+            <defs>
+              <pattern id={pendingPatternId} width="6" height="6" patternUnits="userSpaceOnUse">
+                <rect width="6" height="6" fill="var(--gothos-mist)" />
+                <path d="M0 6L6 0" stroke="var(--chart-2)" strokeWidth="1.5" />
+              </pattern>
+            </defs>
             <XAxis type="number" hide />
             <YAxis
               dataKey="name"
               type="category"
               axisLine={false}
               tickLine={false}
-              tick={{ fontSize: 12, fill: "#334155" }}
+              tick={{ fontSize: 12, fill: "var(--gothos-muted)" }}
               width={160}
             />
             <ChartTooltip
-              cursor={{ fill: "rgba(241, 245, 249, 0.5)" }}
+              cursor={{ fill: "var(--gothos-mist)" }}
               content={({ active, payload }) => {
                 if (!active || !payload || !payload.length) return null;
                 const data = payload[0].payload;
                 const isDone = data.done && data.required !== null;
-                const vColor = isDone ? "bg-emerald-500" : "bg-teal-600";
-                const pColor = isDone ? "bg-emerald-300" : "bg-teal-200";
+                const vColor = isDone ? "bg-forest" : "bg-forest";
+                const pColor = "bg-pending-mark";
 
                 return (
-                  <div className="min-w-[200px] rounded-xl border border-slate-200 bg-white p-3 shadow-lg z-50">
-                    <p className="mb-2.5 text-sm font-bold text-slate-900">{data.name}</p>
-                    <div className="space-y-1.5 text-xs text-slate-600">
+                  <div className="min-w-[200px] rounded-xl border border-line-soft bg-white p-3 shadow-lg z-50">
+                    <p className="mb-2.5 text-sm font-bold text-ink">{data.name}</p>
+                    <div className="space-y-1.5 text-xs text-soft-ink">
                       <div className="flex items-center justify-between gap-4">
                         <span className="flex items-center gap-1.5">
                           <span className={`h-2.5 w-2.5 rounded-sm ${vColor}`}></span>Verified:
                         </span>
-                        <span className="font-semibold text-slate-900">{data.verifiedVal}</span>
+                        <span className="font-semibold text-ink">{data.verifiedVal}</span>
                       </div>
                       <div className="flex items-center justify-between gap-4">
                         <span className="flex items-center gap-1.5">
                           <span className={`h-2.5 w-2.5 rounded-sm ${pColor}`}></span>Pending:
                         </span>
-                        <span className="font-semibold text-slate-900">{data.pendingVal}</span>
+                        <span className="font-semibold text-ink">{data.pendingVal}</span>
                       </div>
                       {data.required !== null ? (
                         <>
                           <div className="flex items-center justify-between gap-4">
                             <span className="flex items-center gap-1.5">
-                              <span className="h-2.5 w-2.5 rounded-sm bg-slate-200"></span>Remaining:
+                              <span className="h-2.5 w-2.5 rounded-sm bg-sage"></span>Remaining:
                             </span>
-                            <span className="font-semibold text-slate-900">{data.remainingVal}</span>
+                            <span className="font-semibold text-ink">{data.remainingVal}</span>
                           </div>
-                          <div className="mt-2.5 flex items-center justify-between gap-4 border-t border-slate-100 pt-2.5 text-sm font-bold text-slate-900">
+                          <div className="mt-2.5 flex items-center justify-between gap-4 border-t border-line-soft pt-2.5 text-sm font-bold text-ink">
                             <span>Target:</span>
                             <span>{data.required}</span>
                           </div>
                         </>
                       ) : (
-                        <div className="mt-2 border-t border-slate-100 pt-2 text-[10px] italic text-slate-500">
+                        <div className="mt-2 border-t border-line-soft pt-2 text-[10px] italic text-helper">
                           {data.inCatalog ? "No minimum set" : "Not in current catalog"}
                         </div>
                       )}
                       {data.byCompetency && data.byCompetency.length > 0 && (
-                        <div className="mt-2.5 border-t border-slate-100 pt-2.5">
-                          <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                        <div className="mt-2.5 border-t border-line-soft pt-2.5">
+                          <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-helper">
                             By Competency
                           </p>
                           <div className="space-y-1.5">
                             {data.byCompetency.map((comp: any) => (
                               <div key={comp.level} className="flex items-center justify-between gap-4 text-[11px]">
-                                <span className="max-w-[140px] truncate text-slate-600">{comp.level}</span>
-                                <span className="whitespace-nowrap font-semibold text-slate-900">
+                                <span className="max-w-[140px] truncate text-soft-ink">{comp.level}</span>
+                                <span className="whitespace-nowrap font-semibold text-ink">
                                   {comp.verified}V · {comp.pending}P
                                 </span>
                               </div>
@@ -2461,7 +2468,7 @@ function ProgressSection({
                 return (
                   <Cell
                     key={`cell-ver-${index}`}
-                    fill={isDone ? "#10b981" : "#0d9488"}
+                    fill={isDone ? "var(--chart-3)" : "var(--chart-1)"}
                     className="cursor-pointer"
                   />
                 );
@@ -2474,21 +2481,16 @@ function ProgressSection({
               animationDuration={650}
               onClick={(_, index) => onItemClick(items[index])}
             >
-              {chartData.map((entry, index) => {
-                const isDone = entry.done && entry.required !== null;
-                return (
-                  <Cell
-                    key={`cell-pen-${index}`}
-                    fill={isDone ? "#6ee7b7" : "#99f6e4"}
-                    className="cursor-pointer"
-                  />
-                );
-              })}
+              {chartData.map((entry) => (
+                <Cell key={entry.key} fill={`url(#${pendingPatternId})`} className="cursor-pointer" />
+              ))}
             </Bar>
             <Bar
               dataKey="remainingVal"
               stackId="a"
-              fill="#f1f5f9"
+              fill="var(--chart-5)"
+              stroke="var(--gothos-muted)"
+              strokeWidth={1}
               radius={[0, 4, 4, 0]}
               isAnimationActive={animateDemo}
               animationDuration={650}
@@ -2516,21 +2518,20 @@ function ProgressList({
         const scale = item.required ?? Math.max(item.verified + item.pending, 1);
         const verifiedPct = Math.min((item.verified / scale) * 100, 100);
         const pendingPct = Math.min((item.pending / scale) * 100, 100 - verifiedPct);
-        const isDone = item.done && item.required !== null;
         return (
           <li key={item.key}>
-            <button type="button" onClick={() => onItemClick(item)} className="w-full rounded-xl border border-slate-100 bg-white p-3 text-left transition-colors active:bg-slate-50">
+            <button type="button" onClick={() => onItemClick(item)} className="w-full rounded-xl border border-line-soft bg-white p-3 text-left transition-colors active:bg-mist">
               <div className="flex items-start justify-between gap-3">
-                <span className="min-w-0 text-sm font-medium leading-snug text-slate-800">{item.label}</span>
-                <span className="shrink-0 text-xs font-semibold text-slate-700">
+                <span className="min-w-0 text-sm font-medium leading-snug text-ink">{item.label}</span>
+                <span className="shrink-0 text-xs font-semibold text-ink">
                   {item.required !== null ? `${item.verified} / ${item.required}` : `${item.verified} verified`}
                 </span>
               </div>
-              <div className="mt-2 flex h-2 overflow-hidden rounded-full bg-slate-100" aria-hidden>
-                <div className={`${isDone ? "bg-emerald-500" : "bg-teal-600"} ${animateDemo ? "demo-progress-fill" : ""}`} style={{ width: `${verifiedPct}%` }} />
-                <div className={`${isDone ? "bg-emerald-300" : "bg-teal-200"} ${animateDemo ? "demo-progress-fill" : ""}`} style={{ width: `${pendingPct}%` }} />
+              <div className="mt-2 flex h-2 overflow-hidden rounded-full bg-sage" aria-hidden>
+                <div className={`bg-forest ${animateDemo ? "demo-progress-fill" : ""}`} style={{ width: `${verifiedPct}%` }} />
+                <div className={`bg-mint inset-ring-1 inset-ring-helper ${animateDemo ? "demo-progress-fill" : ""}`} style={{ width: `${pendingPct}%` }} />
               </div>
-              <p className="mt-1.5 text-[11px] text-slate-500">
+              <p className="mt-1.5 text-[11px] text-helper">
                 {item.pending} pending
                 {item.required === null && ` · ${item.inCatalog ? "No minimum set" : "Not in current catalog"}`}
                 {item.byCompetency && item.byCompetency.length > 0 && ` · ${item.byCompetency.map((c) => `${c.level}: ${c.verified}V ${c.pending}P`).join(", ")}`}
@@ -2548,24 +2549,24 @@ function ProgressList({
 function renderShortfallBadge(status: string) {
   switch (status) {
     case "on_track":
-      return <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px]">On Track</Badge>;
+      return <Badge className="bg-status text-status-foreground border-status-border text-[10px]">On Track</Badge>;
     case "behind":
-      return <Badge className="bg-rose-50 text-rose-700 border-rose-200 text-[10px]">Behind</Badge>;
+      return <Badge className="bg-status text-status-foreground border-status-border text-[10px]">Behind</Badge>;
     case "not_tracked":
-      return <Badge variant="outline" className="text-slate-500 text-[10px]">No targets set</Badge>;
+      return <Badge variant="outline" className="text-helper text-[10px]">No targets set</Badge>;
     default:
-      return <Badge className="bg-amber-50 text-amber-700 border-amber-200 text-[10px]">At Risk</Badge>;
+      return <Badge className="bg-status text-status-foreground border-status-border text-[10px]">At Risk</Badge>;
   }
 }
 
 function renderLogStatusBadge(status: string) {
   switch (status) {
     case "verified":
-      return <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px]">Verified</Badge>;
+      return <Badge className="bg-status text-status-foreground border-status-border text-[10px]">Verified</Badge>;
     case "rejected":
-      return <Badge className="bg-rose-50 text-rose-700 border-rose-200 text-[10px]">Rejected</Badge>;
+      return <Badge className="bg-status text-status-foreground border-status-border text-[10px]">Rejected</Badge>;
     default:
-      return <Badge className="bg-amber-50 text-amber-700 border-amber-200 text-[10px]">Pending</Badge>;
+      return <Badge className="bg-status text-status-foreground border-status-border text-[10px]">Pending</Badge>;
   }
 }
 
@@ -2591,7 +2592,7 @@ function PostingReviewForm({ posting, studentId, busy, onDone }: {
   if (posting.status !== "pending") return null;
 
   return (
-    <div className="mt-3 border-t border-slate-100 pt-3 space-y-2">
+    <div className="mt-3 border-t border-line-soft pt-3 space-y-2">
       <Textarea
         placeholder="Optional remarks for the student…"
         className="text-xs min-h-[60px]"
@@ -2600,10 +2601,10 @@ function PostingReviewForm({ posting, studentId, busy, onDone }: {
         maxLength={4000}
       />
       <div className="flex gap-2">
-        <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs gap-1.5" disabled={submitting || busy} onClick={() => submit("verified")}>
+        <Button size="sm" className="bg-forest hover:bg-deep text-white text-xs gap-1.5" disabled={submitting || busy} onClick={() => submit("verified")}>
           <CheckCircle2 className="h-3.5 w-3.5" /> Verify
         </Button>
-        <Button size="sm" variant="outline" className="border-rose-200 text-rose-700 hover:bg-rose-50 text-xs gap-1.5" disabled={submitting || busy} onClick={() => submit("rejected")}>
+        <Button size="sm" variant="outline" className="border-status-border text-status-foreground hover:bg-status text-xs gap-1.5" disabled={submitting || busy} onClick={() => submit("rejected")}>
           <XCircle className="h-3.5 w-3.5" /> Reject
         </Button>
       </div>
@@ -2639,13 +2640,13 @@ function ThesisReviewForm({ thesis, studentId, busy, onDone }: {
   const statusOpts = ["pending", "submitted", "approved"] as const;
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
-      <p className="text-xs font-semibold text-slate-700">Update milestone statuses</p>
+    <div className="rounded-xl border border-line-soft bg-mist p-4 space-y-3">
+      <p className="text-xs font-semibold text-ink">Update milestone statuses</p>
       <div className="grid grid-cols-3 gap-3">
         {([["Protocol", protocolStatus, setProtocolStatus], ["Mid-Term", midTermStatus, setMidTermStatus], ["Final Submission", finalStatus, setFinalStatus]] as const).map(([label, val, setter]) => (
           <div key={label}>
-            <label className="text-[10px] font-semibold text-slate-500 uppercase">{label}</label>
-            <select className="mt-1 w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-xs" value={val} onChange={(e) => (setter as any)(e.target.value)}>
+            <label className="text-[10px] font-semibold text-helper uppercase">{label}</label>
+            <select className="mt-1 w-full rounded-md border border-input bg-white px-2 py-1 text-xs" value={val} onChange={(e) => (setter as any)(e.target.value)}>
               {statusOpts.map((o) => <option key={o} value={o}>{o.charAt(0).toUpperCase() + o.slice(1)}</option>)}
             </select>
           </div>
@@ -2658,7 +2659,7 @@ function ThesisReviewForm({ thesis, studentId, busy, onDone }: {
         onChange={(e) => setRemarks(e.target.value)}
         maxLength={4000}
       />
-      <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white text-xs gap-1.5" disabled={submitting || busy} onClick={submit}>
+      <Button size="sm" className="bg-forest hover:bg-deep text-white text-xs gap-1.5" disabled={submitting || busy} onClick={submit}>
         <CheckCircle2 className="h-3.5 w-3.5" /> Save milestone update
       </Button>
     </div>
@@ -2687,7 +2688,7 @@ function CertReviewForm({ cert, studentId, busy, onDone }: {
   if (cert.status !== "pending") return null;
 
   return (
-    <div className="mt-3 border-t border-slate-100 pt-3 space-y-2">
+    <div className="mt-3 border-t border-line-soft pt-3 space-y-2">
       <Textarea
         placeholder="Optional remarks for the student…"
         className="text-xs min-h-[60px]"
@@ -2696,10 +2697,10 @@ function CertReviewForm({ cert, studentId, busy, onDone }: {
         maxLength={4000}
       />
       <div className="flex gap-2">
-        <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs gap-1.5" disabled={submitting || busy} onClick={() => submit("verified")}>
+        <Button size="sm" className="bg-forest hover:bg-deep text-white text-xs gap-1.5" disabled={submitting || busy} onClick={() => submit("verified")}>
           <CheckCircle2 className="h-3.5 w-3.5" /> Verify
         </Button>
-        <Button size="sm" variant="outline" className="border-rose-200 text-rose-700 hover:bg-rose-50 text-xs gap-1.5" disabled={submitting || busy} onClick={() => submit("rejected")}>
+        <Button size="sm" variant="outline" className="border-status-border text-status-foreground hover:bg-status text-xs gap-1.5" disabled={submitting || busy} onClick={() => submit("rejected")}>
           <XCircle className="h-3.5 w-3.5" /> Reject
         </Button>
       </div>
@@ -2729,7 +2730,7 @@ function AwardReviewForm({ award, studentId, busy, onDone }: {
   if (award.status !== "pending") return null;
 
   return (
-    <div className="mt-3 border-t border-slate-100 pt-3 space-y-2">
+    <div className="mt-3 border-t border-line-soft pt-3 space-y-2">
       <Textarea
         placeholder="Optional remarks for the student…"
         className="text-xs min-h-[60px]"
@@ -2738,10 +2739,10 @@ function AwardReviewForm({ award, studentId, busy, onDone }: {
         maxLength={4000}
       />
       <div className="flex gap-2">
-        <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs gap-1.5" disabled={submitting || busy} onClick={() => submit("verified")}>
+        <Button size="sm" className="bg-forest hover:bg-deep text-white text-xs gap-1.5" disabled={submitting || busy} onClick={() => submit("verified")}>
           <CheckCircle2 className="h-3.5 w-3.5" /> Verify
         </Button>
-        <Button size="sm" variant="outline" className="border-rose-200 text-rose-700 hover:bg-rose-50 text-xs gap-1.5" disabled={submitting || busy} onClick={() => submit("rejected")}>
+        <Button size="sm" variant="outline" className="border-status-border text-status-foreground hover:bg-status text-xs gap-1.5" disabled={submitting || busy} onClick={() => submit("rejected")}>
           <XCircle className="h-3.5 w-3.5" /> Reject
         </Button>
       </div>
@@ -2790,11 +2791,11 @@ function AssessmentEditForm({ assessment, studentId, busy, onDone }: {
 
   if (!editing) {
     return (
-      <div className="flex items-center gap-1 mt-3 border-t border-slate-100 pt-3">
-        <Button variant="ghost" size="sm" className="h-7 text-xs text-teal-700 hover:text-teal-800 hover:bg-teal-50 gap-1.5 px-2" onClick={() => setEditing(true)}>
+      <div className="flex items-center gap-1 mt-3 border-t border-line-soft pt-3">
+        <Button variant="ghost" size="sm" className="h-7 text-xs text-forest hover:text-forest hover:bg-mist gap-1.5 px-2" onClick={() => setEditing(true)}>
           <Pencil className="h-3.5 w-3.5" /> Edit Score
         </Button>
-        <Button variant="ghost" size="sm" className="h-7 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 gap-1.5 px-2" disabled={submitting || busy} onClick={handleDelete}>
+        <Button variant="ghost" size="sm" className="h-7 text-xs text-status-foreground hover:text-status-foreground hover:bg-status gap-1.5 px-2" disabled={submitting || busy} onClick={handleDelete}>
           <Trash2 className="h-3.5 w-3.5" /> Remove
         </Button>
       </div>
@@ -2802,7 +2803,7 @@ function AssessmentEditForm({ assessment, studentId, busy, onDone }: {
   }
 
   return (
-    <div className="mt-3 border-t border-slate-100 pt-3 space-y-3 bg-slate-50/50 -mx-4 px-4 pb-1 rounded-b-xl">
+    <div className="mt-3 border-t border-line-soft pt-3 space-y-3 bg-mist -mx-4 px-4 pb-1 rounded-b-xl">
       <div className="grid grid-cols-[1fr_80px] gap-2">
         <Input 
           value={examName} 
@@ -2820,10 +2821,10 @@ function AssessmentEditForm({ assessment, studentId, busy, onDone }: {
         />
       </div>
       <div className="flex items-center gap-2 pb-2">
-        <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white text-xs gap-1.5 h-7 px-4" disabled={submitting || busy || !examName || marks === ""} onClick={submit}>
+        <Button size="sm" className="bg-forest hover:bg-deep text-white text-xs gap-1.5 h-7 px-4" disabled={submitting || busy || !examName || marks === ""} onClick={submit}>
           Save Changes
         </Button>
-        <Button size="sm" variant="ghost" className="text-slate-500 text-xs h-7" disabled={submitting || busy} onClick={() => {
+        <Button size="sm" variant="ghost" className="text-helper text-xs h-7" disabled={submitting || busy} onClick={() => {
           setEditing(false);
           setExamName(assessment.examName || "");
           setMarks(String(assessment.marks ?? ""));
@@ -2883,12 +2884,12 @@ function ProcedureLogReviewForm({
   }
 
   return (
-    <div className="mt-4 border-t border-slate-200 pt-4 space-y-3 bg-slate-50/70 p-4 rounded-xl border">
-      <h5 className="text-xs font-bold uppercase tracking-wide text-teal-800">Faculty Evaluation</h5>
+    <div className="mt-4 border-t border-line-soft pt-4 space-y-3 bg-mist p-4 rounded-xl border">
+      <h5 className="text-xs font-bold uppercase tracking-wide text-forest">Faculty Evaluation</h5>
 
       {procedureExperience && competencyLevels && competencyLevels.length > 0 && (
         <div className="space-y-1.5 max-w-sm">
-          <label className="text-xs font-semibold text-slate-700">Verified Competency Level</label>
+          <label className="text-xs font-semibold text-ink">Verified Competency Level</label>
           <Select value={competencyOverride} onValueChange={setCompetencyOverride}>
             <SelectTrigger className="text-xs h-8 bg-white">
               <SelectValue placeholder="Select competency level" />
@@ -2903,7 +2904,7 @@ function ProcedureLogReviewForm({
       )}
 
       <div className="space-y-1.5">
-        <label className="text-xs font-semibold text-slate-700">Faculty Remarks</label>
+        <label className="text-xs font-semibold text-ink">Faculty Remarks</label>
         <Textarea
           rows={2}
           placeholder="Add constructive feedback or remarks for the student..."
@@ -2917,7 +2918,7 @@ function ProcedureLogReviewForm({
       <div className="flex items-center gap-2 pt-1">
         <Button
           size="sm"
-          className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs gap-1.5 font-semibold"
+          className="bg-forest hover:bg-deep text-white text-xs gap-1.5 font-semibold"
           disabled={submitting}
           onClick={() => submit("verified")}
         >
@@ -2926,7 +2927,7 @@ function ProcedureLogReviewForm({
         <Button
           size="sm"
           variant="outline"
-          className="border-rose-300 text-rose-700 hover:bg-rose-50 text-xs gap-1.5 font-semibold"
+          className="border-status-border text-status-foreground hover:bg-status text-xs gap-1.5 font-semibold"
           disabled={submitting}
           onClick={() => submit("rejected")}
         >
@@ -3037,15 +3038,15 @@ function FacultyYearlyAttendanceSection({ allStudents }: { allStudents: any[] })
   };
 
   return (
-    <Card className="border-slate-200 shadow-sm bg-white">
-      <CardHeader className="border-b border-slate-100 pb-4">
+    <Card className="border-line-soft shadow-sm bg-white">
+      <CardHeader className="border-b border-line-soft pb-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <CardTitle className="text-lg font-bold text-slate-900 flex items-center gap-2">
-              <CalendarDays className="h-5 w-5 text-teal-600" />
+            <CardTitle className="text-lg font-bold text-ink flex items-center gap-2">
+              <CalendarDays className="h-5 w-5 text-forest" />
               Yearly Attendance Marking
             </CardTitle>
-            <p className="text-xs text-slate-500 mt-1">
+            <p className="text-xs text-helper mt-1">
               Log and update annual attendance percentages for all postgraduate trainees across training years.
             </p>
           </div>
@@ -3057,7 +3058,7 @@ function FacultyYearlyAttendanceSection({ allStudents }: { allStudents: any[] })
               size="sm"
               onClick={handleSaveAll}
               disabled={loading || saving || studentRows.length === 0}
-              className="bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs h-9 px-4 gap-1.5"
+              className="bg-forest hover:bg-deep text-white font-semibold text-xs h-9 px-4 gap-1.5"
             >
               <CheckCircle2 className="h-4 w-4" />
               {saving ? "Saving..." : "Save All Attendance"}
@@ -3068,10 +3069,10 @@ function FacultyYearlyAttendanceSection({ allStudents }: { allStudents: any[] })
       <CardContent className="p-0">
         {loading ? (
           <div className="py-12 flex justify-center items-center">
-            <div className="animate-spin rounded-full border-4 border-slate-300 border-t-teal-600 h-8 w-8" />
+            <div className="animate-spin rounded-full border-4 border-line-soft border-t-forest h-8 w-8" />
           </div>
         ) : studentRows.length === 0 ? (
-          <div className="py-12 text-center text-sm text-slate-500">
+          <div className="py-12 text-center text-sm text-helper">
             No students found in department.
           </div>
         ) : (
@@ -3091,11 +3092,11 @@ function FacultyYearlyAttendanceSection({ allStudents }: { allStudents: any[] })
                 {studentRows.map((r) => {
                   const recordedCount = [r.year1, r.year2, r.year3].filter((y) => y !== "").length;
                   return (
-                    <TableRow key={r.studentId} className="hover:bg-slate-50/60">
-                      <TableCell className="text-xs font-bold text-slate-900 py-3">
+                    <TableRow key={r.studentId} className="hover:bg-mist">
+                      <TableCell className="text-xs font-bold text-ink py-3">
                         {r.name}
                       </TableCell>
-                      <TableCell className="text-xs text-slate-600 py-3 font-mono">
+                      <TableCell className="text-xs text-soft-ink py-3 font-mono">
                         {r.rollNumber}
                       </TableCell>
                       <TableCell className="py-2.5">
@@ -3110,7 +3111,7 @@ function FacultyYearlyAttendanceSection({ allStudents }: { allStudents: any[] })
                             placeholder="e.g. 85"
                             className="text-xs h-8"
                           />
-                          <span className="text-xs font-semibold text-slate-500">%</span>
+                          <span className="text-xs font-semibold text-helper">%</span>
                         </div>
                       </TableCell>
                       <TableCell className="py-2.5">
@@ -3125,7 +3126,7 @@ function FacultyYearlyAttendanceSection({ allStudents }: { allStudents: any[] })
                             placeholder="e.g. 90"
                             className="text-xs h-8"
                           />
-                          <span className="text-xs font-semibold text-slate-500">%</span>
+                          <span className="text-xs font-semibold text-helper">%</span>
                         </div>
                       </TableCell>
                       <TableCell className="py-2.5">
@@ -3140,16 +3141,16 @@ function FacultyYearlyAttendanceSection({ allStudents }: { allStudents: any[] })
                             placeholder="e.g. 92"
                             className="text-xs h-8"
                           />
-                          <span className="text-xs font-semibold text-slate-500">%</span>
+                          <span className="text-xs font-semibold text-helper">%</span>
                         </div>
                       </TableCell>
                       <TableCell className="py-3">
                         {recordedCount > 0 ? (
-                          <Badge className="border-emerald-200 bg-emerald-50 text-[11px] font-semibold text-emerald-700">
+                          <Badge className="border-status-border bg-status text-[11px] font-semibold text-status-foreground">
                             <CheckCircle2 className="mr-1 h-3 w-3" /> {recordedCount}/3 Years Saved
                           </Badge>
                         ) : (
-                          <Badge variant="outline" className="text-[11px] text-slate-400">
+                          <Badge variant="outline" className="text-[11px] text-helper">
                             Not entered
                           </Badge>
                         )}
@@ -3264,15 +3265,15 @@ function FacultyDailyAttendanceSection({ allStudents }: { allStudents: any[] }) 
   const leaveCount = studentRows.filter((r) => r.status === "leave").length;
 
   return (
-    <Card className="border-slate-200 shadow-sm bg-white">
-      <CardHeader className="border-b border-slate-100 pb-4">
+    <Card className="border-line-soft shadow-sm bg-white">
+      <CardHeader className="border-b border-line-soft pb-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <CardTitle className="text-lg font-bold text-slate-900 flex items-center gap-2">
-              <CalendarDays className="h-5 w-5 text-teal-600" />
+            <CardTitle className="text-lg font-bold text-ink flex items-center gap-2">
+              <CalendarDays className="h-5 w-5 text-forest" />
               Daily Attendance Marking
             </CardTitle>
-            <p className="text-xs text-slate-500 mt-1">
+            <p className="text-xs text-helper mt-1">
               Mark and verify the daily attendance of postgraduate trainees in your department.
             </p>
           </div>
@@ -3295,33 +3296,33 @@ function FacultyDailyAttendanceSection({ allStudents }: { allStudents: any[] }) 
           </div>
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-line-soft">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline" className="text-xs bg-slate-50">
+            <Badge variant="outline" className="text-xs bg-mist">
               Total: {studentRows.length}
             </Badge>
-            <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs">
+            <Badge className="bg-status text-status-foreground border-status-border text-xs">
               Present: {presentCount}
             </Badge>
-            <Badge className="bg-rose-50 text-rose-700 border-rose-200 text-xs">
+            <Badge className="bg-status text-status-foreground border-status-border text-xs">
               Absent: {absentCount}
             </Badge>
-            <Badge className="bg-amber-50 text-amber-700 border-amber-200 text-xs">
+            <Badge className="bg-status text-status-foreground border-status-border text-xs">
               Half Day: {halfDayCount}
             </Badge>
-            <Badge className="bg-slate-100 text-slate-700 border-slate-200 text-xs">
+            <Badge className="bg-sage text-ink border-line-soft text-xs">
               Leave: {leaveCount}
             </Badge>
           </div>
           <div className="flex items-center gap-2">
-            <Button size="sm" variant="outline" onClick={() => markAll("present")} className="text-xs h-8 border-emerald-300 text-emerald-700 hover:bg-emerald-50">
+            <Button size="sm" variant="outline" onClick={() => markAll("present")} className="text-xs h-8 border-status-border text-status-foreground hover:bg-status">
               Mark All Present
             </Button>
             <Button
               size="sm"
               onClick={handleSave}
               disabled={saving || loading || studentRows.length === 0}
-              className="text-xs h-8 bg-teal-600 hover:bg-teal-700 text-white font-semibold"
+              className="text-xs h-8 bg-forest hover:bg-deep text-white font-semibold"
             >
               {saving ? "Saving..." : "Save Attendance"}
             </Button>
@@ -3331,10 +3332,10 @@ function FacultyDailyAttendanceSection({ allStudents }: { allStudents: any[] }) 
       <CardContent className="p-0">
         {loading ? (
           <div className="py-16 flex justify-center items-center">
-            <div className="animate-spin rounded-full border-4 border-slate-300 border-t-teal-600 h-8 w-8" />
+            <div className="animate-spin rounded-full border-4 border-line-soft border-t-forest h-8 w-8" />
           </div>
         ) : studentRows.length === 0 ? (
-          <div className="p-8 text-center text-slate-500 text-sm">
+          <div className="p-8 text-center text-helper text-sm">
             No students found in your department roster.
           </div>
         ) : (
@@ -3349,10 +3350,10 @@ function FacultyDailyAttendanceSection({ allStudents }: { allStudents: any[] }) 
             <TableBody>
               {studentRows.map((row) => (
                 <TableRow key={row.studentId}>
-                  <TableCell className="py-3 font-medium text-slate-900 text-xs">
+                  <TableCell className="py-3 font-medium text-ink text-xs">
                     {row.name}
                   </TableCell>
-                  <TableCell className="py-3 text-xs text-slate-600 font-mono">
+                  <TableCell className="py-3 text-xs text-soft-ink font-mono">
                     {row.rollNumber}
                   </TableCell>
                   <TableCell className="py-3">
@@ -3364,8 +3365,8 @@ function FacultyDailyAttendanceSection({ allStudents }: { allStudents: any[] }) 
                         onClick={() => updateStatus(row.studentId, "present")}
                         className={`h-7 px-2.5 text-xs font-semibold ${
                           row.status === "present"
-                            ? "bg-emerald-600 hover:bg-emerald-700 text-white"
-                            : "border-slate-200 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700"
+                            ? "bg-forest hover:bg-deep text-white"
+                            : "border-line-soft text-soft-ink hover:bg-status hover:text-status-foreground"
                         }`}
                       >
                         Present
@@ -3377,8 +3378,8 @@ function FacultyDailyAttendanceSection({ allStudents }: { allStudents: any[] }) 
                         onClick={() => updateStatus(row.studentId, "absent")}
                         className={`h-7 px-2.5 text-xs font-semibold ${
                           row.status === "absent"
-                            ? "bg-rose-600 hover:bg-rose-700 text-white"
-                            : "border-slate-200 text-slate-600 hover:bg-rose-50 hover:text-rose-700"
+                            ? "bg-destructive hover:bg-deep text-white"
+                            : "border-line-soft text-soft-ink hover:bg-status hover:text-status-foreground"
                         }`}
                       >
                         Absent
@@ -3390,8 +3391,8 @@ function FacultyDailyAttendanceSection({ allStudents }: { allStudents: any[] }) 
                         onClick={() => updateStatus(row.studentId, "half_day")}
                         className={`h-7 px-2.5 text-xs font-semibold ${
                           row.status === "half_day"
-                            ? "bg-amber-600 hover:bg-amber-700 text-white"
-                            : "border-slate-200 text-slate-600 hover:bg-amber-50 hover:text-amber-700"
+                            ? "bg-forest hover:bg-deep text-white"
+                            : "border-line-soft text-soft-ink hover:bg-status hover:text-status-foreground"
                         }`}
                       >
                         Half Day
@@ -3403,8 +3404,8 @@ function FacultyDailyAttendanceSection({ allStudents }: { allStudents: any[] }) 
                         onClick={() => updateStatus(row.studentId, "leave")}
                         className={`h-7 px-2.5 text-xs font-semibold ${
                           row.status === "leave"
-                            ? "bg-slate-700 hover:bg-slate-800 text-white"
-                            : "border-slate-200 text-slate-600 hover:bg-slate-100"
+                            ? "bg-deep hover:bg-deep text-white"
+                            : "border-line-soft text-soft-ink hover:bg-sage"
                         }`}
                       >
                         Leave
@@ -3443,14 +3444,14 @@ function StudentModalAttendanceTab({ mentee }: { mentee: any }) {
   if (loading) {
     return (
       <div className="py-8 flex justify-center items-center">
-        <div className="animate-spin rounded-full border-4 border-slate-300 border-t-teal-600 h-8 w-8" />
+        <div className="animate-spin rounded-full border-4 border-line-soft border-t-forest h-8 w-8" />
       </div>
     );
   }
 
   if (records.length === 0) {
     return (
-      <p className="text-sm text-slate-500 py-6 text-center">
+      <p className="text-sm text-helper py-6 text-center">
         No attendance records found for this student.
       </p>
     );
@@ -3463,12 +3464,12 @@ function StudentModalAttendanceTab({ mentee }: { mentee: any }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2 pb-2 border-b border-slate-100">
-        <Badge variant="outline" className="text-xs bg-slate-50">Total Logged: {records.length}</Badge>
-        <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs">Present: {presentCount}</Badge>
-        <Badge className="bg-rose-50 text-rose-700 border-rose-200 text-xs">Absent: {absentCount}</Badge>
-        <Badge className="bg-amber-50 text-amber-700 border-amber-200 text-xs">Half Day: {halfCount}</Badge>
-        <Badge className="bg-slate-100 text-slate-700 border-slate-200 text-xs">Leave: {leaveCount}</Badge>
+      <div className="flex flex-wrap items-center gap-2 pb-2 border-b border-line-soft">
+        <Badge variant="outline" className="text-xs bg-mist">Total Logged: {records.length}</Badge>
+        <Badge className="bg-status text-status-foreground border-status-border text-xs">Present: {presentCount}</Badge>
+        <Badge className="bg-status text-status-foreground border-status-border text-xs">Absent: {absentCount}</Badge>
+        <Badge className="bg-status text-status-foreground border-status-border text-xs">Half Day: {halfCount}</Badge>
+        <Badge className="bg-sage text-ink border-line-soft text-xs">Leave: {leaveCount}</Badge>
       </div>
 
       <Table>
@@ -3483,35 +3484,35 @@ function StudentModalAttendanceTab({ mentee }: { mentee: any }) {
         <TableBody>
           {records.map((r: any) => (
             <TableRow key={r.id}>
-              <TableCell className="py-2.5 text-xs font-medium text-slate-900">
+              <TableCell className="py-2.5 text-xs font-medium text-ink">
                 {formatLogbookDate(r.date)}
               </TableCell>
               <TableCell className="py-2.5">
                 {r.status === "present" && (
-                  <Badge className="border-emerald-200 bg-emerald-50 text-[10px] font-semibold text-emerald-700">
+                  <Badge className="border-status-border bg-status text-[10px] font-semibold text-status-foreground">
                     <CheckCircle2 className="mr-1 h-3 w-3" /> Present
                   </Badge>
                 )}
                 {r.status === "absent" && (
-                  <Badge className="border-rose-200 bg-rose-50 text-[10px] font-semibold text-rose-700">
+                  <Badge className="border-status-border bg-status text-[10px] font-semibold text-status-foreground">
                     <XCircle className="mr-1 h-3 w-3" /> Absent
                   </Badge>
                 )}
                 {r.status === "half_day" && (
-                  <Badge className="border-amber-200 bg-amber-50 text-[10px] font-semibold text-amber-700">
+                  <Badge className="border-status-border bg-status text-[10px] font-semibold text-status-foreground">
                     <Clock className="mr-1 h-3 w-3" /> Half Day
                   </Badge>
                 )}
                 {r.status === "leave" && (
-                  <Badge className="border-slate-200 bg-slate-100 text-[10px] font-semibold text-slate-700">
+                  <Badge className="border-line-soft bg-sage text-[10px] font-semibold text-ink">
                     <CalendarDays className="mr-1 h-3 w-3" /> Leave
                   </Badge>
                 )}
               </TableCell>
-              <TableCell className="py-2.5 text-xs text-slate-600">
+              <TableCell className="py-2.5 text-xs text-soft-ink">
                 {r.clockIn || r.clockOut ? `${r.clockIn || "—"} to ${r.clockOut || "—"}` : "Full Day"}
               </TableCell>
-              <TableCell className="py-2.5 text-xs text-slate-600">
+              <TableCell className="py-2.5 text-xs text-soft-ink">
                 {r.verifierName || "Faculty"}
               </TableCell>
             </TableRow>

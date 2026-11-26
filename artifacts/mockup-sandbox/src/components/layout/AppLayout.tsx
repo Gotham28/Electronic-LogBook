@@ -625,24 +625,24 @@ export function AppLayout({
 
   return (
     <SidebarProvider defaultOpen style={{ "--sidebar-width": "17rem", "--sidebar-width-icon": "5rem" } as React.CSSProperties}>
-      <div className="medical-grid h-screen w-full overflow-hidden p-0 text-slate-900 md:p-3 lg:p-4">
-        <div className="glass-panel mx-auto flex h-[100dvh] w-full max-w-[1600px] overflow-hidden rounded-none border-white/70 md:h-[calc(100vh-24px)] md:rounded-[30px] lg:h-[calc(100vh-32px)]">
-          <Sidebar collapsible="icon" className="print-hidden border-r border-slate-200/80 bg-white/95 shadow-[0_24px_80px_rgba(15,23,42,0.06)] backdrop-blur-xl">
-            <SidebarHeader className="h-[74px] overflow-hidden border-b border-slate-100 p-4 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-2">
+      <div className="h-screen w-full overflow-hidden p-0 text-ink md:p-3 lg:p-4">
+        <div className="glass-panel mx-auto flex h-[100dvh] w-full max-w-[1600px] overflow-hidden rounded-none border-card-edge md:h-[calc(100vh-24px)] md:rounded-[30px] lg:h-[calc(100vh-32px)]">
+          <Sidebar collapsible="icon" className="print-hidden border-r border-line-soft bg-card shadow-[0_24px_80px_color-mix(in_srgb,var(--gothos-forest)_6%,transparent)] backdrop-blur-xl">
+            <SidebarHeader className="h-[74px] overflow-hidden border-b border-line-soft p-4 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-2">
               <div className="relative flex h-full w-full items-center overflow-hidden group-data-[collapsible=icon]:justify-center">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-600 text-white shadow-[0_12px_28px_rgba(13,148,136,0.2)] transition-colors duration-200" style={demoMode ? { backgroundColor: "var(--demo-accent)", color: "var(--demo-accent-foreground)" } : undefined}>
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-forest text-white shadow-[0_12px_28px_color-mix(in_srgb,var(--gothos-forest)_20%,transparent)] transition-colors duration-200" style={demoMode ? { backgroundColor: "var(--demo-accent)", color: "var(--demo-accent-foreground)" } : undefined}>
                   <BookOpenCheck className="h-6 w-6" />
                 </div>
                 <div className="absolute left-[52px] top-1/2 w-[180px] -translate-y-1/2 whitespace-nowrap transition-opacity duration-150 group-data-[collapsible=icon]:pointer-events-none group-data-[collapsible=icon]:opacity-0">
-                  <p className="font-display text-lg font-bold leading-tight text-slate-900">E-Logbook</p>
-                  <p className="mt-0.5 text-[11px] font-medium text-slate-500">Clinical training records</p>
+                  <p className="font-display text-lg font-bold leading-tight text-ink">E-Logbook</p>
+                  <p className="mt-0.5 text-[11px] font-medium text-helper">Clinical training records</p>
                 </div>
               </div>
             </SidebarHeader>
 
             <SidebarContent className="p-2">
               <SidebarGroup>
-                <SidebarGroupLabel className="mb-2 h-8! px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-teal-900/45 group-data-[collapsible=icon]:mt-0! group-data-[collapsible=icon]:opacity-0" style={demoMode ? { color: "var(--demo-accent-readable)" } : undefined}>
+                <SidebarGroupLabel className="mb-2 h-8! px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-forest group-data-[collapsible=icon]:mt-0! group-data-[collapsible=icon]:opacity-0" style={demoMode ? { color: "var(--demo-accent)" } : undefined}>
                   {activeRole} workspace
                 </SidebarGroupLabel>
                 <SidebarGroupContent>
@@ -659,24 +659,24 @@ export function AppLayout({
                           tooltip={item.title}
                           className={`h-11 w-full rounded-xl px-3 transition-all duration-200 group-data-[collapsible=icon]:mx-auto! group-data-[collapsible=icon]:h-11! group-data-[collapsible=icon]:w-11! group-data-[collapsible=icon]:p-0! ${
                             isActive
-                              ? `border border-white/60 font-semibold text-white shadow-[0_16px_36px_rgba(13,148,136,0.22)] hover:text-white ${demoMode ? "" : "bg-gradient-to-r from-teal-600 to-cyan-500"}`
-                              : "text-slate-600 hover:border hover:border-white/70 hover:bg-white/80 hover:text-teal-900"
+                              ? "border border-card-edge font-semibold shadow-[0_16px_36px_color-mix(in_srgb,var(--gothos-forest)_22%,transparent)] data-[active=true]:bg-sidebar-primary data-[active=true]:text-sidebar-primary-foreground data-[active=true]:hover:bg-deep data-[active=true]:hover:text-sidebar-primary-foreground"
+                              : "text-soft-ink hover:border hover:border-card-edge hover:bg-card hover:text-forest"
                           }`}
                           style={demoMode && isActive ? { backgroundColor: "var(--demo-accent)", color: "var(--demo-accent-foreground)" } : undefined}
                         >
                           <Link href={item.href} aria-current={isActive ? "page" : undefined} data-demo-target={`nav:${item.href}`} data-demo-navigation-href={item.href} className="flex w-full items-center gap-3 group-data-[collapsible=icon]:justify-center">
-                            <Icon className={`h-4 w-4 ${isActive ? (demoMode ? "text-[var(--demo-accent-foreground)]" : "text-white") : demoMode ? "text-[var(--demo-accent-readable)]" : "text-teal-600"}`} />
+                            <Icon className={`h-4 w-4 ${isActive ? (demoMode ? "text-[var(--demo-accent-foreground)]" : "text-white") : demoMode ? "text-[var(--demo-accent)]" : "text-forest"}`} />
                             <span className="flex-1 truncate text-[13px] group-data-[collapsible=icon]:hidden">{item.title}</span>
 
                             {item.badgeLoading ? (
-                              <Skeleton className="h-4 w-12 rounded-full bg-teal-100/50 group-data-[collapsible=icon]:hidden" />
+                              <Skeleton className="h-4 w-12 rounded-full bg-sage group-data-[collapsible=icon]:hidden" />
                             ) : item.badge ? (
                               <Badge
                                 variant="outline"
                                 className={`rounded-full px-1.5 py-0 text-[9px] group-data-[collapsible=icon]:hidden ${
                                   isActive
                                     ? demoMode ? "border-white/25 bg-white/15 text-[var(--demo-accent-foreground)]" : "border-white/25 bg-white/15 text-white"
-                                    : item.badgeColor || "border-teal-100 bg-teal-50 text-teal-700"
+                                    : item.badgeColor || "border-line-soft bg-mist text-forest"
                                 }`}
                               >
                                 {item.badge}
@@ -708,30 +708,30 @@ export function AppLayout({
               </SidebarGroup>
             </SidebarContent>
 
-            <SidebarFooter className="sticky bottom-0 z-20 mt-auto border-t border-white/70 bg-white/92 p-3 backdrop-blur-md">
+            <SidebarFooter className="sticky bottom-0 z-20 mt-auto border-t border-card-edge bg-card p-3 backdrop-blur-md">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button data-tour-id="account-menu" className="flex w-full items-center gap-3 rounded-2xl border border-white/70 bg-white/75 p-2.5 text-left shadow-[0_14px_30px_rgba(15,23,42,0.05)] transition hover:-translate-y-0.5 hover:bg-white">
-                    <Avatar className="h-10 w-10 border border-teal-100">
-                      <AvatarFallback className="bg-gradient-to-br from-teal-100 to-cyan-100 text-xs font-bold text-teal-800">
+                  <button data-tour-id="account-menu" className="flex w-full items-center gap-3 rounded-2xl border border-card-edge bg-card p-2.5 text-left shadow-[0_14px_30px_color-mix(in_srgb,var(--gothos-forest)_5%,transparent)] transition hover:-translate-y-0.5 hover:bg-white">
+                    <Avatar className="h-10 w-10 border border-line-soft">
+                      <AvatarFallback className="bg-sage text-xs font-bold text-forest">
                         {initials}
                       </AvatarFallback>
                     </Avatar>
                     <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
-                      <p className="truncate text-xs font-bold text-slate-900">{displayName}</p>
-                      <p className="truncate text-[10px] font-semibold text-teal-700">{activeRole} portal</p>
+                      <p className="truncate text-xs font-bold text-ink">{displayName}</p>
+                      <p className="truncate text-[10px] font-semibold text-forest">{activeRole} portal</p>
                     </div>
-                    <ChevronDown className="h-4 w-4 text-teal-700/50 group-data-[collapsible=icon]:hidden" />
+                    <ChevronDown className="h-4 w-4 text-forest group-data-[collapsible=icon]:hidden" />
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-72 rounded-2xl border-white/70 bg-white/92 p-1 shadow-[0_24px_60px_rgba(15,23,42,0.12)] backdrop-blur-xl">
+                <DropdownMenuContent align="end" className="w-72 rounded-2xl border-card-edge bg-card p-1 shadow-[0_24px_60px_color-mix(in_srgb,var(--gothos-forest)_12%,transparent)] backdrop-blur-xl">
                   <DropdownMenuItem asChild className="cursor-pointer rounded-xl text-xs"><Link href="/profile"><UserRound className="mr-2 h-4 w-4" />My Profile</Link></DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setIsChangePasswordOpen(true)} className="cursor-pointer rounded-xl text-xs">
                     <KeyRound className="mr-2 h-4 w-4" /> Change Password
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   {onSignOut && (
-                    <DropdownMenuItem onClick={onSignOut} className="cursor-pointer rounded-xl text-xs text-rose-700">
+                    <DropdownMenuItem onClick={onSignOut} className="cursor-pointer rounded-xl text-xs text-status-foreground">
                       <LogOut className="mr-2 h-4 w-4" /> Sign out
                     </DropdownMenuItem>
                   )}
@@ -742,15 +742,15 @@ export function AppLayout({
           </Sidebar>
 
           <SidebarInset className="flex min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto bg-transparent">
-            <header className="print-hidden sticky top-0 z-20 flex h-[72px] items-center justify-between border-b border-white/70 bg-white/62 px-4 backdrop-blur-xl md:px-6">
+            <header className="print-hidden sticky top-0 z-20 flex h-[72px] items-center justify-between border-b border-card-edge bg-card px-4 backdrop-blur-xl md:px-6">
               <div className="flex min-w-0 items-center gap-3">
-                <SidebarTrigger data-demo-sidebar-trigger className="rounded-xl text-teal-800 hover:bg-white" />
-                <div className="hidden h-7 w-px bg-teal-100 sm:block" />
+                <SidebarTrigger data-demo-sidebar-trigger className="rounded-xl text-forest hover:bg-white" />
+                <div className="hidden h-7 w-px bg-sage sm:block" />
                 <div className="min-w-0">
-                  <p className="truncate font-display text-base font-bold text-slate-900">
+                  <p className="truncate font-display text-base font-bold text-ink">
                     Department of {department.name}
                   </p>
-                  <p className="truncate text-[11px] font-medium text-slate-500">
+                  <p className="truncate text-[11px] font-medium text-helper">
                     {activeRole} workspace
                   </p>
                 </div>
@@ -764,7 +764,7 @@ export function AppLayout({
                     size="sm"
                     onClick={() => window.open('/print', '_blank')}
                     title="Print the complete consolidated record."
-                    className="border-white/70 bg-white/75 text-teal-800 shadow-[0_12px_24px_rgba(15,23,42,0.05)] h-8 w-8 px-0 sm:w-auto sm:px-3"
+                    className="border-card-edge bg-card text-forest shadow-[0_12px_24px_color-mix(in_srgb,var(--gothos-forest)_5%,transparent)] h-8 w-8 px-0 sm:w-auto sm:px-3"
                   >
                     <Printer className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Print</span>
                   </Button>
@@ -778,7 +778,7 @@ export function AppLayout({
                     onClick={() => setIsTourOpen(true)}
                     aria-label="Take a guided tour"
                     title="Take a guided tour"
-                    className="h-8 w-8 border-white/70 bg-white/75 px-0 text-sm font-bold text-teal-800 shadow-[0_12px_24px_rgba(15,23,42,0.05)]"
+                    className="h-8 w-8 border-card-edge bg-card px-0 text-sm font-bold text-forest shadow-[0_12px_24px_color-mix(in_srgb,var(--gothos-forest)_5%,transparent)]"
                   >
                     ?
                   </Button>
@@ -788,28 +788,28 @@ export function AppLayout({
                   if (open && activeRole === "HOD") void savedNameNotices.refresh();
                 }}>
                   <DropdownMenuTrigger asChild>
-                    <button data-tour-id="notifications" aria-label="Open notifications" className="relative rounded-xl border border-white/70 bg-white/72 p-2 text-teal-800 shadow-[0_12px_24px_rgba(15,23,42,0.05)] transition hover:-translate-y-0.5 hover:bg-white">
+                    <button data-tour-id="notifications" aria-label="Open notifications" className="relative rounded-xl border border-card-edge bg-card p-2 text-forest shadow-[0_12px_24px_color-mix(in_srgb,var(--gothos-forest)_5%,transparent)] transition hover:-translate-y-0.5 hover:bg-white">
                       <Bell className="h-4 w-4" />
                       {(allNotifItems.length > 0 || (activeRole === "HOD" && savedNameNotices.unreadCount > 0)) && (
-                        <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-rose-500 ring-2 ring-white" />
+                        <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-destructive ring-2 ring-white" />
                       )}
                     </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-80 rounded-2xl border-white/70 bg-white/92 p-2 shadow-[0_24px_60px_rgba(15,23,42,0.12)] backdrop-blur-xl">
+                  <DropdownMenuContent align="end" className="w-80 rounded-2xl border-card-edge bg-card p-2 shadow-[0_24px_60px_color-mix(in_srgb,var(--gothos-forest)_12%,transparent)] backdrop-blur-xl">
                     <DropdownMenuLabel className="px-3 pt-2">Notifications</DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     {activeRole === "HOD" ? <>
-                      <DropdownMenuLabel className="px-3 py-1 text-[10px] uppercase tracking-wide text-slate-500">Saved name changes{savedNameNotices.unreadCount > 0 ? ` · ${savedNameNotices.unreadCount} unread` : ""}</DropdownMenuLabel>
-                      {savedNameNotices.error ? <div role="alert" className="mx-2 my-1 rounded-lg bg-amber-50 p-2 text-xs text-amber-900">Unable to refresh saved notices. <button type="button" className="ml-1 font-semibold underline" onClick={() => void savedNameNotices.refresh()}>Retry</button></div> : null}
-                      {savedNameNotices.loading && !savedNameNotices.hasLoaded ? <p role="status" className="px-3 py-2 text-xs text-slate-500">Loading saved notices…</p> : null}
-                      {savedNameNotices.hasLoaded && savedNameNotices.items.length === 0 && !savedNameNotices.error ? <p className="px-3 py-2 text-xs text-slate-500">No unread name-change notices.</p> : null}
-                      {savedNameNotices.items.map((item) => <DropdownMenuItem key={item.id} onClick={() => setLocation(item.detailHref)} className="cursor-pointer rounded-xl px-3 py-2 text-xs font-medium text-slate-700 hover:bg-teal-50 hover:text-teal-900">
-                        <span className="mr-2 h-2 w-2 shrink-0 rounded-full bg-teal-600" aria-hidden="true" />{item.previousName} → {item.newName}<span className="ml-auto text-[10px] text-slate-400">View</span>
+                      <DropdownMenuLabel className="px-3 py-1 text-[10px] uppercase tracking-wide text-helper">Saved name changes{savedNameNotices.unreadCount > 0 ? ` · ${savedNameNotices.unreadCount} unread` : ""}</DropdownMenuLabel>
+                      {savedNameNotices.error ? <div role="alert" className="mx-2 my-1 rounded-lg bg-status p-2 text-xs text-status-foreground">Unable to refresh saved notices. <button type="button" className="ml-1 font-semibold underline" onClick={() => void savedNameNotices.refresh()}>Retry</button></div> : null}
+                      {savedNameNotices.loading && !savedNameNotices.hasLoaded ? <p role="status" className="px-3 py-2 text-xs text-helper">Loading saved notices…</p> : null}
+                      {savedNameNotices.hasLoaded && savedNameNotices.items.length === 0 && !savedNameNotices.error ? <p className="px-3 py-2 text-xs text-helper">No unread name-change notices.</p> : null}
+                      {savedNameNotices.items.map((item) => <DropdownMenuItem key={item.id} onClick={() => setLocation(item.detailHref)} className="cursor-pointer rounded-xl px-3 py-2 text-xs font-medium text-ink hover:bg-mist hover:text-forest">
+                        <span className="mr-2 h-2 w-2 shrink-0 rounded-full bg-forest" aria-hidden="true" />{item.previousName} → {item.newName}<span className="ml-auto text-[10px] text-helper">View</span>
                       </DropdownMenuItem>)}
-                      <DropdownMenuItem onClick={() => setLocation("/notifications")} className="cursor-pointer rounded-xl px-3 py-2 text-xs font-semibold text-teal-800">View all updates</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setLocation("/notifications")} className="cursor-pointer rounded-xl px-3 py-2 text-xs font-semibold text-forest">View all updates</DropdownMenuItem>
                       <DropdownMenuSeparator />
                     </> : null}
-                    {maintenanceLoadError && <div role="alert" className="mx-2 my-1 rounded-lg bg-amber-50 p-2 text-xs text-amber-900">
+                    {maintenanceLoadError && <div role="alert" className="mx-2 my-1 rounded-lg bg-status p-2 text-xs text-status-foreground">
                       {maintenanceLoadError} <button type="button" className="ml-1 font-semibold underline" onClick={() => setMaintenanceRefreshToken((value) => value + 1)}>Retry</button>
                     </div>}
                     {allNotifItems.length > 0 ? (
@@ -825,13 +825,13 @@ export function AppLayout({
                             setNotifItems((prev) => prev.filter((i) => i.id !== item.id));
                             setLocation(item.href);
                           }}
-                          className="cursor-pointer rounded-xl px-3 py-2 text-xs font-medium text-slate-700 hover:bg-teal-50 hover:text-teal-900 transition-colors"
+                          className="cursor-pointer rounded-xl px-3 py-2 text-xs font-medium text-ink hover:bg-mist hover:text-forest transition-colors"
                         >
                           {item.text}
                         </DropdownMenuItem>
                       ))
                     ) : (
-                      <DropdownMenuItem className="rounded-xl px-3 py-2 text-slate-500 text-xs">{activeRole === "HOD" ? "No other notifications" : "No new notifications"}</DropdownMenuItem>
+                      <DropdownMenuItem className="rounded-xl px-3 py-2 text-helper text-xs">{activeRole === "HOD" ? "No other notifications" : "No new notifications"}</DropdownMenuItem>
                     )}
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -839,11 +839,11 @@ export function AppLayout({
             </header>
 
             <main data-demo-page={location} className="mx-auto w-full max-w-[1380px] flex-1 p-4 pb-28 sm:pb-4 md:p-6 lg:p-8">
-              {maintenanceLoadError && <div role="alert" className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+              {maintenanceLoadError && <div role="alert" className="mb-4 rounded-xl border border-status-border bg-status px-4 py-3 text-sm text-status-foreground">
                 {maintenanceLoadError} <button type="button" className="ml-2 font-semibold underline" onClick={() => setMaintenanceRefreshToken((value) => value + 1)}>Retry</button>
               </div>}
                 <DemoBanner />
-              <div className="print-only mb-6 border-b border-slate-300 pb-4">
+              <div className="print-only mb-6 border-b border-input pb-4">
                 <p className="page-eyebrow">Department of {department.name}</p>
                 <h1 className="mt-1 text-2xl font-bold">Resident Training Record</h1>
               </div>
@@ -896,7 +896,7 @@ export function AppLayout({
             onDismiss={() => setBubbleNotice(null)}
           />}
 
-          {maintenanceLoadError && !arogyaOpen && !bubbleNotice && <div role="alert" className="print:hidden fixed bottom-[calc(144px+env(safe-area-inset-bottom))] right-4 z-40 max-w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-amber-200 bg-white p-3 text-xs text-amber-950 shadow-lg sm:bottom-24 sm:right-6">
+          {maintenanceLoadError && !arogyaOpen && !bubbleNotice && <div role="alert" className="print:hidden fixed bottom-[calc(144px+env(safe-area-inset-bottom))] right-4 z-40 max-w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-status-border bg-white p-3 text-xs text-status-foreground shadow-lg sm:bottom-24 sm:right-6">
             {maintenanceLoadError} <button type="button" className="ml-1 font-semibold underline" onClick={() => setMaintenanceRefreshToken((value) => value + 1)}>Retry</button>
           </div>}
 

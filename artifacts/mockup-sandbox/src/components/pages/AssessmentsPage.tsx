@@ -80,21 +80,21 @@ export function AssessmentsPage() {
         <div>
           <p className="page-eyebrow flex items-center gap-2">Training progress</p>
           <h2 className="page-title mt-1">Assessments</h2>
-          <p className="mt-2 text-sm text-slate-500">Your {extendedAssessmentTypes ? "continuous, quarterly, half yearly, and annual" : "quarterly and annual"} assessment results, entered by your faculty assessor.</p>
+          <p className="mt-2 text-sm text-helper">Your {extendedAssessmentTypes ? "continuous, quarterly, half yearly, and annual" : "quarterly and annual"} assessment results, entered by your faculty assessor.</p>
         </div>
       </div>
 
-      <Card data-tour="student-assessments" className="border-white/70 bg-white/76">
-        <CardHeader className="border-b border-white/70">
+      <Card data-tour="student-assessments" className="border-card-edge bg-card">
+        <CardHeader className="border-b border-card-edge">
           <CardTitle className="text-lg">Assessment Records</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           {loading ? (
-             <div className="p-8 text-center text-slate-500">Loading...</div>
+             <div className="p-8 text-center text-helper">Loading...</div>
           ) : error ? (
             <div className="flex flex-col items-center justify-center gap-4 p-8 text-center" role="alert">
-              <p className="text-sm font-medium text-rose-700">{error}</p>
-              <Button size="sm" variant="outline" onClick={fetchAssessments} className="border-rose-200 text-rose-700">Try again</Button>
+              <p className="text-sm font-medium text-status-foreground">{error}</p>
+              <Button size="sm" variant="outline" onClick={fetchAssessments} className="border-status-border text-status-foreground">Try again</Button>
             </div>
           ) : assessments.length === 0 ? (
             <Empty className="py-14">
@@ -106,7 +106,7 @@ export function AssessmentsPage() {
             </Empty>
           ) : (
             <Table>
-              <TableHeader className="bg-slate-50">
+              <TableHeader className="bg-mist">
                 <TableRow>
                   <TableHead>Date</TableHead>
                   <TableHead>Exam Name</TableHead>
@@ -118,12 +118,12 @@ export function AssessmentsPage() {
               <TableBody>
                 {assessments.map((item) => (
                   <TableRow key={item.number}>
-                    <TableCell className="font-medium text-slate-900">{formatLogbookDate(item.date)}</TableCell>
+                    <TableCell className="font-medium text-ink">{formatLogbookDate(item.date)}</TableCell>
                     <TableCell>{item.examName}</TableCell>
                     <TableCell>
                       <Badge variant="outline" className="capitalize">{item.type?.replace(/_/g, " ")}</Badge>
                     </TableCell>
-                    <TableCell className="font-bold text-slate-900">{item.marks} / {item.maximum}</TableCell>
+                    <TableCell className="font-bold text-ink">{item.marks} / {item.maximum}</TableCell>
                     <TableCell>{item.assessorName}</TableCell>
                   </TableRow>
                 ))}
@@ -136,15 +136,15 @@ export function AssessmentsPage() {
       <section className="space-y-4" aria-labelledby="student-quarterly-appraisals-heading">
         <div>
           <p className="page-eyebrow">Faculty appraisal</p>
-          <h3 id="student-quarterly-appraisals-heading" className="mt-1 text-xl font-bold text-slate-900">Postgraduate Students Quarterly Appraisal Forms</h3>
-          <p className="mt-1 text-sm text-slate-500">Quarterly appraisals saved by your faculty and HOD appear here. You can print each form.</p>
+          <h3 id="student-quarterly-appraisals-heading" className="mt-1 text-xl font-bold text-ink">Postgraduate Students Quarterly Appraisal Forms</h3>
+          <p className="mt-1 text-sm text-helper">Quarterly appraisals saved by your faculty and HOD appear here. You can print each form.</p>
         </div>
         {appraisalsLoading ? (
-          <Card className="border-white/70 bg-white/76"><CardContent className="p-8 text-center text-slate-500" role="status">Loading quarterly appraisals…</CardContent></Card>
+          <Card className="border-card-edge bg-card"><CardContent className="p-8 text-center text-helper" role="status">Loading quarterly appraisals…</CardContent></Card>
         ) : appraisalsError ? (
-          <Card className="border-rose-200 bg-white"><CardContent className="flex flex-wrap items-center justify-between gap-3 p-5" role="alert"><p className="text-sm text-rose-700">{appraisalsError}</p><Button size="sm" variant="outline" onClick={fetchAppraisals}>Try again</Button></CardContent></Card>
+          <Card className="border-status-border bg-white"><CardContent className="flex flex-wrap items-center justify-between gap-3 p-5" role="alert"><p className="text-sm text-status-foreground">{appraisalsError}</p><Button size="sm" variant="outline" onClick={fetchAppraisals}>Try again</Button></CardContent></Card>
         ) : appraisals.length === 0 ? (
-          <Card className="border-white/70 bg-white/76"><CardContent className="p-8 text-center text-sm text-slate-500">No quarterly appraisal forms have been saved for you yet.</CardContent></Card>
+          <Card className="border-card-edge bg-card"><CardContent className="p-8 text-center text-sm text-helper">No quarterly appraisal forms have been saved for you yet.</CardContent></Card>
         ) : appraisals.map((appraisal) => <QuarterlyAppraisalRecord key={appraisal.id} appraisal={appraisal} />)}
       </section>
     </div>

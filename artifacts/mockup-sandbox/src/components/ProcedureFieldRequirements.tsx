@@ -288,8 +288,8 @@ export const DynamicProcedureFieldChecklist = React.forwardRef<DynamicFieldEdito
     <>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1 space-y-0.5">
-          <h4 className="text-sm font-semibold text-slate-900">{title}</h4>
-          <p className="text-xs text-slate-600">{description ?? defaultDesc}</p>
+          <h4 className="text-sm font-semibold text-ink">{title}</h4>
+          <p className="text-xs text-soft-ink">{description ?? defaultDesc}</p>
         </div>
         {editableSchema && (
           <Button
@@ -298,7 +298,7 @@ export const DynamicProcedureFieldChecklist = React.forwardRef<DynamicFieldEdito
             size="sm"
             disabled={interactionDisabled || isAdding}
             onClick={openAddPanel}
-            className="shrink-0 border-teal-200 text-teal-800 hover:bg-teal-50 hover:text-teal-900"
+            className="shrink-0 border-line-soft text-forest hover:bg-mist hover:text-forest"
           >
             <Plus className="mr-1.5 h-3.5 w-3.5" />
             Add Custom Field
@@ -307,28 +307,28 @@ export const DynamicProcedureFieldChecklist = React.forwardRef<DynamicFieldEdito
       </div>
 
       {readOnlyConfig && (
-        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+        <p className="rounded-lg border border-status-border bg-status px-3 py-2 text-xs text-status-foreground">
           This test department mirrors settings from its parent department and is read-only.
         </p>
       )}
 
       {fields.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/70 px-3 py-4 text-center text-xs text-slate-500">
+        <div className="rounded-lg border border-dashed border-line-soft bg-mist px-3 py-4 text-center text-xs text-helper">
           No detail fields configured. Use &ldquo;+ Add Custom Field&rdquo; above to add a field.
         </div>
       ) : (
-        <div className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
+        <div className="divide-y divide-line-soft rounded-lg border border-line-soft bg-white">
           {fields.map((field) => {
             const isChecked = mode === "procedure" ? requiredIds.includes(field.id) : field.isRequired;
             const isEditing = editingId === field.id;
 
             return (
-              <div key={field.id} className={`p-3 ${isEditing ? "bg-teal-50/30" : ""}`}>
+              <div key={field.id} className={`p-3 ${isEditing ? "bg-mist" : ""}`}>
                 {isEditing ? (
                   <div role="group" aria-label={`Edit ${field.label}`} className="space-y-3">
                     <div className="grid gap-3 sm:grid-cols-[1fr_11rem]">
                       <div className="space-y-1">
-                        <Label htmlFor={`${prefix}-edit-label-${field.id}`} className="text-xs text-slate-700">Field title</Label>
+                        <Label htmlFor={`${prefix}-edit-label-${field.id}`} className="text-xs text-ink">Field title</Label>
                         <Input
                           id={`${prefix}-edit-label-${field.id}`}
                           autoFocus
@@ -344,13 +344,13 @@ export const DynamicProcedureFieldChecklist = React.forwardRef<DynamicFieldEdito
                         />
                       </div>
                       <div className="space-y-1">
-                        <Label htmlFor={`${prefix}-edit-type-${field.id}`} className="text-xs text-slate-700">Input type</Label>
+                        <Label htmlFor={`${prefix}-edit-type-${field.id}`} className="text-xs text-ink">Input type</Label>
                         <select
                           id={`${prefix}-edit-type-${field.id}`}
                           disabled={interactionDisabled}
                           value={editDraft.type}
                           onChange={(e) => { setEditDraft((prev) => ({ ...prev, type: e.target.value as ProcedureFieldType })); setEditError(""); }}
-                          className="flex h-9 w-full rounded-md border border-slate-200 bg-white px-2.5 py-1 text-sm text-slate-900 shadow-sm focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                          className="flex h-9 w-full rounded-md border border-input bg-white px-2.5 py-1 text-sm text-ink shadow-sm focus:border-forest focus:outline-none focus:ring-1 focus:ring-ring"
                         >
                           {PROCEDURE_FIELD_TYPES.map((t) => (
                             <option key={t} value={t}>{FIELD_TYPE_LABELS[t]}</option>
@@ -361,7 +361,7 @@ export const DynamicProcedureFieldChecklist = React.forwardRef<DynamicFieldEdito
 
                     {(editDraft.type === "select" || editDraft.type === "radio") && (
                       <div className="space-y-1.5">
-                        <Label htmlFor={`${prefix}-edit-options-${field.id}`} className="text-xs text-slate-700">
+                        <Label htmlFor={`${prefix}-edit-options-${field.id}`} className="text-xs text-ink">
                           Choices (comma-separated)
                         </Label>
                         <Input
@@ -378,7 +378,7 @@ export const DynamicProcedureFieldChecklist = React.forwardRef<DynamicFieldEdito
                         {parseOptionsText(editDraft.optionsText).length > 0 && (
                           <div className="flex flex-wrap gap-1.5 pt-0.5">
                             {parseOptionsText(editDraft.optionsText).map((opt) => (
-                              <span key={opt} className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-700">
+                              <span key={opt} className="rounded-md border border-line-soft bg-mist px-2 py-0.5 text-[11px] font-medium text-ink">
                                 {opt}
                               </span>
                             ))}
@@ -387,7 +387,7 @@ export const DynamicProcedureFieldChecklist = React.forwardRef<DynamicFieldEdito
                       </div>
                     )}
 
-                    {editError && <p role="alert" className="text-xs font-medium text-rose-700">{editError}</p>}
+                    {editError && <p role="alert" className="text-xs font-medium text-status-foreground">{editError}</p>}
 
                     <div className="flex items-center justify-end gap-2">
                       <Button type="button" variant="outline" size="sm" onClick={cancelEdit} disabled={interactionDisabled}>
@@ -400,37 +400,37 @@ export const DynamicProcedureFieldChecklist = React.forwardRef<DynamicFieldEdito
                   </div>
                 ) : (
                   <div className="flex items-start justify-between gap-3">
-                    <label htmlFor={`${prefix}-check-${field.id}`} className="flex min-w-0 flex-1 cursor-pointer items-start gap-2.5 text-sm text-slate-800">
+                    <label htmlFor={`${prefix}-check-${field.id}`} className="flex min-w-0 flex-1 cursor-pointer items-start gap-2.5 text-sm text-ink">
                       <input
                         id={`${prefix}-check-${field.id}`}
                         type="checkbox"
                         disabled={interactionDisabled}
                         checked={isChecked}
                         onChange={(e) => handleCheckboxToggle(field, e.target.checked)}
-                        className="mt-0.5 h-4 w-4 shrink-0 accent-teal-700"
+                        className="mt-0.5 h-4 w-4 shrink-0 accent-forest"
                       />
                       <div className="min-w-0 flex-1 space-y-1">
                         <div className="flex flex-wrap items-center gap-1.5">
-                          <span className="font-medium text-slate-900 break-words">{field.label}</span>
+                          <span className="font-medium text-ink break-words">{field.label}</span>
                           <Badge
                             variant="outline"
                             className={isChecked
-                              ? "border-teal-200 bg-teal-50 text-teal-800 text-[10px] px-1.5 py-0"
-                              : "border-slate-200 bg-slate-100 text-slate-600 text-[10px] px-1.5 py-0"}
+                              ? "border-line-soft bg-mist text-forest text-[10px] px-1.5 py-0"
+                              : "border-line-soft bg-sage text-soft-ink text-[10px] px-1.5 py-0"}
                           >
                             {isChecked ? "Required" : "Optional"}
                           </Badge>
-                          <Badge variant="outline" className="border-slate-200 bg-white text-slate-500 text-[10px] px-1.5 py-0">
+                          <Badge variant="outline" className="border-line-soft bg-white text-helper text-[10px] px-1.5 py-0">
                             {FIELD_TYPE_LABELS[field.type]}
                           </Badge>
                           {field.isCustom && (
-                            <Badge variant="outline" className="border-cyan-200 bg-cyan-50 text-cyan-800 text-[10px] px-1.5 py-0">
+                            <Badge variant="outline" className="border-line-soft bg-mist text-forest text-[10px] px-1.5 py-0">
                               Custom
                             </Badge>
                           )}
                         </div>
                         {field.options && field.options.length > 0 && (
-                          <p className="text-xs text-slate-500 break-words">
+                          <p className="text-xs text-helper break-words">
                             Choices: {field.options.join(" · ")}
                           </p>
                         )}
@@ -442,7 +442,7 @@ export const DynamicProcedureFieldChecklist = React.forwardRef<DynamicFieldEdito
                           type="button"
                           variant="ghost"
                           size="icon"
-                          className="h-7 w-7 text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                          className="h-7 w-7 text-soft-ink hover:bg-sage hover:text-ink"
                           aria-label={`Edit ${field.label}`}
                           disabled={interactionDisabled}
                           onClick={() => startEdit(field)}
@@ -453,7 +453,7 @@ export const DynamicProcedureFieldChecklist = React.forwardRef<DynamicFieldEdito
                           type="button"
                           variant="ghost"
                           size="icon"
-                          className="h-7 w-7 text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+                          className="h-7 w-7 text-status-foreground hover:bg-status hover:text-status-foreground"
                           aria-label={`Delete ${field.label}`}
                           disabled={interactionDisabled}
                           onClick={() => deleteField(field.id)}
@@ -471,13 +471,13 @@ export const DynamicProcedureFieldChecklist = React.forwardRef<DynamicFieldEdito
       )}
 
       {isAdding && (
-        <div role="group" aria-label="Add Custom Field" className="space-y-3 rounded-lg border border-teal-200 bg-teal-50/30 p-3">
+        <div role="group" aria-label="Add Custom Field" className="space-y-3 rounded-lg border border-line-soft bg-mist p-3">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wide text-teal-900">New custom field</span>
+            <span className="text-xs font-semibold uppercase tracking-wide text-forest">New custom field</span>
           </div>
           <div className="grid gap-3 sm:grid-cols-[1fr_11rem]">
             <div className="space-y-1">
-              <Label htmlFor={`${prefix}-add-label`} className="text-xs text-slate-700">Field title</Label>
+              <Label htmlFor={`${prefix}-add-label`} className="text-xs text-ink">Field title</Label>
               <Input
                 id={`${prefix}-add-label`}
                 autoFocus
@@ -493,13 +493,13 @@ export const DynamicProcedureFieldChecklist = React.forwardRef<DynamicFieldEdito
               />
             </div>
             <div className="space-y-1">
-              <Label htmlFor={`${prefix}-add-type`} className="text-xs text-slate-700">Input type</Label>
+              <Label htmlFor={`${prefix}-add-type`} className="text-xs text-ink">Input type</Label>
               <select
                 id={`${prefix}-add-type`}
                 disabled={interactionDisabled}
                 value={addDraft.type}
                 onChange={(e) => { setAddDraft((prev) => ({ ...prev, type: e.target.value as ProcedureFieldType })); setAddError(""); }}
-                className="flex h-9 w-full rounded-md border border-slate-200 bg-white px-2.5 py-1 text-sm text-slate-900 shadow-sm focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                className="flex h-9 w-full rounded-md border border-input bg-white px-2.5 py-1 text-sm text-ink shadow-sm focus:border-forest focus:outline-none focus:ring-1 focus:ring-ring"
               >
                 {PROCEDURE_FIELD_TYPES.map((t) => (
                   <option key={t} value={t}>{FIELD_TYPE_LABELS[t]}</option>
@@ -510,7 +510,7 @@ export const DynamicProcedureFieldChecklist = React.forwardRef<DynamicFieldEdito
 
           {(addDraft.type === "select" || addDraft.type === "radio") && (
             <div className="space-y-1.5">
-              <Label htmlFor={`${prefix}-add-options`} className="text-xs text-slate-700">
+              <Label htmlFor={`${prefix}-add-options`} className="text-xs text-ink">
                 Choices (comma-separated)
               </Label>
               <Input
@@ -527,7 +527,7 @@ export const DynamicProcedureFieldChecklist = React.forwardRef<DynamicFieldEdito
               {parseOptionsText(addDraft.optionsText).length > 0 && (
                 <div className="flex flex-wrap gap-1.5 pt-0.5">
                   {parseOptionsText(addDraft.optionsText).map((opt) => (
-                    <span key={opt} className="rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-700">
+                    <span key={opt} className="rounded-md border border-line-soft bg-white px-2 py-0.5 text-[11px] font-medium text-ink">
                       {opt}
                     </span>
                   ))}
@@ -536,19 +536,19 @@ export const DynamicProcedureFieldChecklist = React.forwardRef<DynamicFieldEdito
             </div>
           )}
 
-          <label htmlFor={`${prefix}-add-required`} className="flex items-center gap-2 text-xs font-medium text-slate-700">
+          <label htmlFor={`${prefix}-add-required`} className="flex items-center gap-2 text-xs font-medium text-ink">
             <input
               id={`${prefix}-add-required`}
               type="checkbox"
               disabled={interactionDisabled}
               checked={addDraft.isRequired}
               onChange={(e) => setAddDraft((prev) => ({ ...prev, isRequired: e.target.checked }))}
-              className="h-4 w-4 accent-teal-700"
+              className="h-4 w-4 accent-forest"
             />
             Required by default for residents
           </label>
 
-          {addError && <p role="alert" className="text-xs font-medium text-rose-700">{addError}</p>}
+          {addError && <p role="alert" className="text-xs font-medium text-status-foreground">{addError}</p>}
 
           <div className="flex items-center justify-end gap-2">
             <Button type="button" variant="outline" size="sm" onClick={cancelAdd} disabled={interactionDisabled}>
@@ -566,7 +566,7 @@ export const DynamicProcedureFieldChecklist = React.forwardRef<DynamicFieldEdito
   if (!showCardChrome) return <div className="min-w-0 space-y-3">{innerContent}</div>;
 
   return (
-    <div className="min-w-0 space-y-3 rounded-xl border border-slate-200 bg-white p-4">
+    <div className="min-w-0 space-y-3 rounded-xl border border-line-soft bg-white p-4">
       {innerContent}
     </div>
   );
@@ -639,7 +639,7 @@ export function DepartmentProcedureFieldsCard() {
   };
 
   return (
-    <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="space-y-3 rounded-xl border border-line-soft bg-white p-4 shadow-sm">
       <DynamicProcedureFieldChecklist
         key={resetKey}
         ref={editorRef}
@@ -654,20 +654,20 @@ export function DepartmentProcedureFieldsCard() {
       />
 
       {!readOnlyConfig && (
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">
-          <label className="flex items-center gap-2 text-xs text-slate-600">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line-soft pt-3">
+          <label className="flex items-center gap-2 text-xs text-soft-ink">
             <input
               type="checkbox"
               checked={applyToExisting}
               disabled={saving}
               onChange={(e) => setApplyToExisting(e.target.checked)}
-              className="h-3.5 w-3.5 accent-teal-700"
+              className="h-3.5 w-3.5 accent-forest"
             />
             Apply added fields &amp; required/optional changes to existing procedures
           </label>
           <div className="flex items-center gap-2">
             {isDirty && (
-              <span className="text-xs font-medium text-amber-700">Unsaved changes</span>
+              <span className="text-xs font-medium text-status-foreground">Unsaved changes</span>
             )}
             <Button type="button" variant="outline" size="sm" onClick={handleCancel} disabled={saving || !isDirty}>
               Cancel
@@ -679,7 +679,7 @@ export function DepartmentProcedureFieldsCard() {
         </div>
       )}
 
-      {error && <p role="alert" className="text-sm text-rose-700">{error}</p>}
+      {error && <p role="alert" className="text-sm text-status-foreground">{error}</p>}
     </div>
   );
 }
@@ -715,12 +715,12 @@ export function ProcedureFieldSelector({
     );
   }
 
-  return <fieldset disabled={disabled} className="min-w-0 space-y-3 rounded-lg border border-slate-200 bg-white p-3">
-    <legend className="px-1 text-sm font-semibold text-slate-900">Required details in each resident entry</legend>
-    <p className="text-xs text-slate-600">Residents must supply the checked details when logging this procedure.</p>
+  return <fieldset disabled={disabled} className="min-w-0 space-y-3 rounded-lg border border-line-soft bg-white p-3">
+    <legend className="px-1 text-sm font-semibold text-ink">Required details in each resident entry</legend>
+    <p className="text-xs text-soft-ink">Residents must supply the checked details when logging this procedure.</p>
     <div className="grid gap-3 sm:grid-cols-2">
-      {PROCEDURE_LOG_FIELDS.map((field) => <label key={field} htmlFor={`${prefix}-${field}`} className="flex items-start gap-2 text-sm text-slate-800">
-        <input id={`${prefix}-${field}`} type="checkbox" className="mt-0.5 h-4 w-4 shrink-0 accent-teal-700"
+      {PROCEDURE_LOG_FIELDS.map((field) => <label key={field} htmlFor={`${prefix}-${field}`} className="flex items-start gap-2 text-sm text-ink">
+        <input id={`${prefix}-${field}`} type="checkbox" className="mt-0.5 h-4 w-4 shrink-0 accent-forest"
           checked={value.includes(field)} onChange={(event) => onChange(event.target.checked
             ? [...value, field] : value.filter((item) => item !== field))} />
         <span>{PROCEDURE_LOG_FIELD_LABELS[field]}{field === "setting" ? " (Ward / Casualty / OT / NICU)" : field === "competencyLevel" ? " (O / A / PS / PI)" : ""}</span>
@@ -817,7 +817,7 @@ export function ProcedureFieldRequirementsEditor({ procedure }: {
   };
 
   return <details className="mt-2 w-full min-w-0">
-    <summary className="cursor-pointer text-xs font-medium text-teal-700">Required entry details ({fields.length})</summary>
+    <summary className="cursor-pointer text-xs font-medium text-forest">Required entry details ({fields.length})</summary>
     <div className="mt-3 space-y-3">
       {dynamicEnabled ? (
         <DynamicProcedureFieldChecklist
@@ -835,7 +835,7 @@ export function ProcedureFieldRequirementsEditor({ procedure }: {
       ) : (
         <ProcedureFieldSelector value={fields} onChange={setFields} disabled={saving} />
       )}
-      {error && <p role="alert" className="text-sm text-rose-700">{error}</p>}
+      {error && <p role="alert" className="text-sm text-status-foreground">{error}</p>}
       {!readOnlyConfig && (
         <div className="flex items-center gap-2">
           <Button type="button" size="sm" onClick={save} disabled={saving || !changed}>{saving ? "Saving…" : "Save required details"}</Button>

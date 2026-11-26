@@ -109,17 +109,17 @@ export function ProfileNameHistory({ refreshKey = 0 }: { refreshKey?: number }) 
   };
 
   return (
-    <Card className="rounded-2xl border-slate-200/80 shadow-sm">
+    <Card className="rounded-2xl border-line-soft shadow-sm">
       <CardHeader><CardTitle className="text-lg">Name history</CardTitle></CardHeader>
       <CardContent className="space-y-4">
-        {loading ? <p role="status" className="text-sm text-slate-500">Loading name history…</p> : null}
-        {error ? <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{error}<Button variant="link" className="ml-2 h-auto p-0" onClick={() => void refreshFirstPage()}>Retry</Button></div> : null}
-        {!loading && !error && items.length === 0 ? <p className="text-sm leading-6 text-slate-600">No profile name changes have been recorded. Names changed before this feature launched are not available in this history.</p> : null}
-        {items.length > 0 ? <ol className="divide-y divide-slate-100">
+        {loading ? <p role="status" className="text-sm text-helper">Loading name history…</p> : null}
+        {error ? <div role="alert" className="rounded-lg border border-status-border bg-status p-3 text-sm text-status-foreground">{error}<Button variant="link" className="ml-2 h-auto p-0" onClick={() => void refreshFirstPage()}>Retry</Button></div> : null}
+        {!loading && !error && items.length === 0 ? <p className="text-sm leading-6 text-soft-ink">No profile name changes have been recorded. Names changed before this feature launched are not available in this history.</p> : null}
+        {items.length > 0 ? <ol className="divide-y divide-line-soft">
           {items.map((item) => <li key={item.id} className="space-y-1 py-4 first:pt-0 last:pb-0">
-            <p className="text-sm font-semibold text-slate-900">{item.previousName} <span aria-hidden="true">→</span> {item.newName}</p>
-            <p className="text-xs text-slate-500">{item.source === "admin_roster" ? "Updated by an administrator" : "Changed by you"} · {formatDate(item.changedAt)}</p>
-            {item.emailStatus ? <p className="text-xs text-slate-600">{emailStatusLabel(item.emailStatus)}</p> : null}
+            <p className="text-sm font-semibold text-ink">{item.previousName} <span aria-hidden="true">→</span> {item.newName}</p>
+            <p className="text-xs text-helper">{item.source === "admin_roster" ? "Updated by an administrator" : "Changed by you"} · {formatDate(item.changedAt)}</p>
+            {item.emailStatus ? <p className="text-xs text-soft-ink">{emailStatusLabel(item.emailStatus)}</p> : null}
           </li>)}
         </ol> : null}
         {hasMore && nextCursor ? <Button variant="outline" onClick={() => void loadMore()} disabled={loadingMore}>{loadingMore ? "Loading…" : "Load more"}</Button> : null}

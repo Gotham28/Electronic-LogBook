@@ -92,7 +92,7 @@ export function DepartmentProvider({ departmentId, children }: { departmentId: n
     {error && <><Button onClick={refresh}>Try again</Button><Button variant="outline" onClick={() => { clearSession(); window.location.assign("/"); }}>Return to sign in</Button></>}
   </div>;
   return <DepartmentContext.Provider value={{ ...data, refresh, label }}>
-    {error && <p role="alert" className="bg-rose-50 p-3 text-rose-700">{error}</p>}{children}
+    {error && <p role="alert" className="bg-status p-3 text-status-foreground">{error}</p>}{children}
   </DepartmentContext.Provider>;
 }
 

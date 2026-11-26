@@ -32,9 +32,9 @@ export type CaseLogDetailRecord = {
 function DetailField({ label, value }: { label: string; value?: string | number | null }) {
   return (
     <div className="min-w-0">
-      <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</dt>
-      <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">
-        {value === null || value === undefined || value === "" ? <span className="text-slate-400">Not recorded</span> : value}
+      <dt className="text-[11px] font-semibold uppercase tracking-wide text-helper">{label}</dt>
+      <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-ink">
+        {value === null || value === undefined || value === "" ? <span className="text-helper">Not recorded</span> : value}
       </dd>
     </div>
   );
@@ -57,9 +57,9 @@ export function CaseLogDetails({
 }) {
   const shortCase = isPsychiatryShortCase(caseLog);
   return (
-    <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
+    <div className="space-y-4 rounded-xl border border-line-soft bg-white p-4 sm:p-5">
       <section aria-labelledby="case-context-heading">
-        <h4 id="case-context-heading" className="mb-3 text-xs font-bold uppercase tracking-wide text-teal-800">Case and patient context</h4>
+        <h4 id="case-context-heading" className="mb-3 text-xs font-bold uppercase tracking-wide text-forest">Case and patient context</h4>
         <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <DetailField label="Date" value={formatLogbookDate(caseLog.date)} />
           <DetailField label="Attempt" value={caseLog.attemptNumber ?? 1} />
@@ -81,7 +81,7 @@ export function CaseLogDetails({
         </dl>
       </section> : microbiologyCaseFields ? (
         <section aria-labelledby="case-microbiology-heading">
-          <h4 id="case-microbiology-heading" className="mb-3 text-xs font-bold uppercase tracking-wide text-teal-800">Laboratory and diagnostic details</h4>
+          <h4 id="case-microbiology-heading" className="mb-3 text-xs font-bold uppercase tracking-wide text-forest">Laboratory and diagnostic details</h4>
           <dl className="grid grid-cols-1 gap-4">
             <DetailField label="Provisional diagnosis" value={caseLog.diagnosisProvisional || caseLog.diagnosisFinal} />
             <DetailField label="Sample processing in lab" value={caseLog.investigations || caseLog.managementPlan} />
@@ -97,7 +97,7 @@ export function CaseLogDetails({
             </section>
           )}
           <section aria-labelledby="case-clinical-heading">
-            <h4 id="case-clinical-heading" className="mb-3 text-xs font-bold uppercase tracking-wide text-teal-800">Clinical details</h4>
+            <h4 id="case-clinical-heading" className="mb-3 text-xs font-bold uppercase tracking-wide text-forest">Clinical details</h4>
             <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               {!medicalSummaryCaseFields && <DetailField label="Chief complaints" value={caseLog.chiefComplaints} />}
               {!medicalSummaryCaseFields && <DetailField label="History" value={caseLog.history} />}
@@ -115,8 +115,8 @@ export function CaseLogDetails({
       )}
       {!shortCase && <LogCustomFieldValues fields={customFieldDefinitions} values={caseLog.customFields} />}
       {showReview && (caseLog.status !== "pending" || caseLog.facultyRemarks || caseLog.facultyGrade || caseLog.reviewedAt) && (
-        <section aria-labelledby="case-review-heading" className="border-t border-slate-100 pt-4">
-          <h4 id="case-review-heading" className="mb-3 text-xs font-bold uppercase tracking-wide text-teal-800">Faculty review</h4>
+        <section aria-labelledby="case-review-heading" className="border-t border-line-soft pt-4">
+          <h4 id="case-review-heading" className="mb-3 text-xs font-bold uppercase tracking-wide text-forest">Faculty review</h4>
           <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <DetailField label="Status" value={caseLog.status} />
             <DetailField label="Faculty grade" value={caseLog.facultyGrade} />

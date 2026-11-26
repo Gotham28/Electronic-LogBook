@@ -61,18 +61,18 @@ export function ThesisPage() {
   const guideName = (id: number | null) => faculty.find((person) => person.id === id)?.fullName || (id ? "Inactive faculty member" : "Not selected");
   return <div className="space-y-6 pb-12">
     <div><p className="page-eyebrow">Research</p><h2 className="page-title mt-1">{label}</h2>
-      <p className="mt-2 text-sm text-slate-500">{isPubOnly ? "Record your thesis and publications." : "Record your research timeline and milestones."}</p></div>
-    {error && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-rose-700">{error} <Button variant="outline" onClick={load}>Try again</Button></div>}
+      <p className="mt-2 text-sm text-helper">{isPubOnly ? "Record your thesis and publications." : "Record your research timeline and milestones."}</p></div>
+    {error && <div role="alert" className="rounded-xl border border-status-border bg-status p-4 text-status-foreground">{error} <Button variant="outline" onClick={load}>Try again</Button></div>}
     {loading ? <p role="status">Loading?</p> : !error && <>
-      <Card data-tour="student-thesis" className="overflow-hidden border-white/70 bg-white/80">
+      <Card data-tour="student-thesis" className="overflow-hidden border-card-edge bg-card">
         <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-4">
           <div><p className="page-eyebrow">{isPubOnly ? "Publication details" : "Thesis milestone tracker"}</p>
             <CardTitle className="mt-2 max-w-3xl text-xl">{thesis?.thesisTitle || (isPubOnly ? "No publications recorded yet" : "No thesis recorded yet")}</CardTitle>
-            {!isPubOnly && thesis && <p className="mt-2 text-sm text-slate-600">Guide: {guideName(thesis.guideId)} | Co-guide: {guideName(thesis.coGuideId)}</p>}
+            {!isPubOnly && thesis && <p className="mt-2 text-sm text-soft-ink">Guide: {guideName(thesis.guideId)} | Co-guide: {guideName(thesis.coGuideId)}</p>}
             {thesis && (thesis as any).facultyRemarks && (
-              <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
-                <p className="text-xs font-semibold text-amber-800">Guide remarks</p>
-                <p className="mt-0.5 text-xs text-amber-700">{(thesis as any).facultyRemarks}</p>
+              <div className="mt-2 rounded-lg border border-status-border bg-status px-3 py-2">
+                <p className="text-xs font-semibold text-status-foreground">Guide remarks</p>
+                <p className="mt-0.5 text-xs text-status-foreground">{(thesis as any).facultyRemarks}</p>
               </div>
             )}
           </div>
@@ -80,8 +80,8 @@ export function ThesisPage() {
         </CardHeader>
         {!isPubOnly && (
           <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-            {dateFields.map(([key, label]) => <div key={key} className="rounded-xl border border-slate-200 p-4">
-              <p className="text-xs font-semibold text-slate-500">{label}</p><p className="mt-2 text-sm">{thesis?.[key] ? formatLogbookDate(thesis[key]!) : "Not recorded"}</p>
+            {dateFields.map(([key, label]) => <div key={key} className="rounded-xl border border-line-soft p-4">
+              <p className="text-xs font-semibold text-helper">{label}</p><p className="mt-2 text-sm">{thesis?.[key] ? formatLogbookDate(thesis[key]!) : "Not recorded"}</p>
             </div>)}
           </CardContent>
         )}

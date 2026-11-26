@@ -1,3 +1,4 @@
+import { ProgressRing } from "@/components/ui/progress";
 import * as React from "react";
 import { Link } from "wouter";
 import {
@@ -104,8 +105,8 @@ export function Dashboard() {
   if (isLoading) {
     return (
       <div className="flex min-h-[50vh] flex-col items-center justify-center space-y-4">
-        <Loader2 className="h-8 w-8 animate-spin text-teal-600" />
-        <p className="text-sm text-slate-500">Loading your logbook data...</p>
+        <Loader2 className="h-8 w-8 animate-spin text-forest" />
+        <p className="text-sm text-helper">Loading your logbook data...</p>
       </div>
     );
   }
@@ -113,9 +114,9 @@ export function Dashboard() {
   if (error) {
     return (
       <div className="flex min-h-[50vh] flex-col items-center justify-center space-y-4">
-        <AlertTriangle className="h-10 w-10 text-amber-500" />
-        <p className="text-sm font-medium text-slate-900">{error}</p>
-        <Button onClick={fetchDashboardData} variant="outline" className="text-teal-700">
+        <AlertTriangle className="h-10 w-10 text-status-foreground" />
+        <p className="text-sm font-medium text-ink">{error}</p>
+        <Button onClick={fetchDashboardData} variant="outline" className="text-forest">
           <RefreshCcw className="mr-2 h-4 w-4" /> Try again
         </Button>
       </div>
@@ -127,10 +128,10 @@ export function Dashboard() {
   // The HOD's per-category minimums, summed the same way the server sums them for completion.
   const clinicalTarget = clinicalWorkCategories.filter((item) => item.period === "total").reduce((sum, item) => sum + item.required, 0);
   const allCategories = [
-    { label: "Clinical cases", logged: logs.caseLogs?.filter((l: any) => l.status !== "rejected").length || 0, required: deptConfig?.requiredCases ?? 0, verified: logs.caseLogs?.filter((l: any) => l.status === "verified").length || 0, icon: FileText, href: "/cases", tone: "from-teal-500 to-cyan-500", hasTarget: deptConfig?.requiredCases !== null && deptConfig?.requiredCases !== undefined },
-    { label: "Procedures", logged: logs.procedureLogs?.filter((l: any) => l.status !== "rejected").length || 0, required: deptConfig?.requiredProcedures ?? 0, verified: logs.procedureLogs?.filter((l: any) => l.status === "verified").length || 0, icon: Stethoscope, href: "/procedures", tone: "from-cyan-500 to-sky-500", hasTarget: deptConfig?.requiredProcedures !== null && deptConfig?.requiredProcedures !== undefined },
-    { label: "Clinical work", logged: logs.clinicalWorkLogs?.filter((l: any) => l.status !== "rejected").length || 0, required: clinicalTarget, verified: logs.clinicalWorkLogs?.filter((l: any) => l.status === "verified").length || 0, icon: Stethoscope, href: "/clinical-works", tone: "from-cyan-500 to-sky-500", hasTarget: clinicalTarget > 0 },
-    { label: "Academic activities", logged: logs.academicLogs?.filter((l: any) => l.status !== "rejected").length || 0, required: deptConfig?.requiredAcademic ?? 0, verified: logs.academicLogs?.filter((l: any) => l.status === "verified").length || 0, icon: GraduationCap, href: "/academics", tone: "from-emerald-500 to-teal-500", hasTarget: deptConfig?.requiredAcademic !== null && deptConfig?.requiredAcademic !== undefined },
+    { label: "Clinical cases", logged: logs.caseLogs?.filter((l: any) => l.status !== "rejected").length || 0, required: deptConfig?.requiredCases ?? 0, verified: logs.caseLogs?.filter((l: any) => l.status === "verified").length || 0, icon: FileText, href: "/cases", hasTarget: deptConfig?.requiredCases !== null && deptConfig?.requiredCases !== undefined },
+    { label: "Procedures", logged: logs.procedureLogs?.filter((l: any) => l.status !== "rejected").length || 0, required: deptConfig?.requiredProcedures ?? 0, verified: logs.procedureLogs?.filter((l: any) => l.status === "verified").length || 0, icon: Stethoscope, href: "/procedures", hasTarget: deptConfig?.requiredProcedures !== null && deptConfig?.requiredProcedures !== undefined },
+    { label: "Clinical work", logged: logs.clinicalWorkLogs?.filter((l: any) => l.status !== "rejected").length || 0, required: clinicalTarget, verified: logs.clinicalWorkLogs?.filter((l: any) => l.status === "verified").length || 0, icon: Stethoscope, href: "/clinical-works", hasTarget: clinicalTarget > 0 },
+    { label: "Academic activities", logged: logs.academicLogs?.filter((l: any) => l.status !== "rejected").length || 0, required: deptConfig?.requiredAcademic ?? 0, verified: logs.academicLogs?.filter((l: any) => l.status === "verified").length || 0, icon: GraduationCap, href: "/academics", hasTarget: deptConfig?.requiredAcademic !== null && deptConfig?.requiredAcademic !== undefined },
   ];
   const categories = allCategories.filter((item) =>
     item.href === "/cases" ? !features.hideCaseLogs
@@ -334,51 +335,51 @@ export function Dashboard() {
         </Card>
       )}
       {rejectedCount > 0 && (
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-rose-200 bg-rose-50/90 p-4 text-rose-900 shadow-sm animate-float-up">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-status-border bg-status p-4 text-status-foreground shadow-sm animate-float-up">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-100 text-rose-700">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-status text-status-foreground">
               <RotateCcw className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-sm font-bold text-rose-950">
+              <p className="text-sm font-bold text-status-foreground">
                 {rejectedCount} {rejectedCount === 1 ? "entry requires" : "entries require"} revision
               </p>
-              <p className="text-xs text-rose-800">
+              <p className="text-xs text-status-foreground">
                 Faculty requested changes on your submitted logs. Review the feedback and resubmit them.
               </p>
             </div>
           </div>
-          <Button asChild size="sm" variant="outline" className="border-rose-300 bg-white text-rose-700 hover:bg-rose-100 shrink-0 font-semibold text-xs">
+          <Button asChild size="sm" variant="outline" className="border-status-border bg-white text-status-foreground hover:bg-status shrink-0 font-semibold text-xs">
             <Link href={primaryLogHref}>Review &amp; resubmit <ArrowRight className="ml-1 h-3.5 w-3.5" /></Link>
           </Button>
         </div>
       )}
-      {!configured.length && <p className="rounded-xl bg-teal-50 p-4 text-sm text-teal-800">Your HOD has not configured completion targets yet.</p>}
-      <Card className="overflow-hidden border-white/70 bg-white/72 layer-2 animate-float-up">
-        <div className="h-1.5 bg-gradient-to-r from-teal-500 via-cyan-400 to-emerald-400" />
+      {!configured.length && <p className="rounded-xl bg-mist p-4 text-sm text-forest">Your HOD has not configured completion targets yet.</p>}
+      <Card className="overflow-hidden border-card-edge bg-card layer-2 animate-float-up">
+        <div className="h-1.5 hero-rule" />
         <CardContent className="p-4 sm:p-6 md:p-8">
           <div className="grid items-stretch gap-7 xl:grid-cols-[.8fr_1.2fr]">
-            <div data-tour="dashboard-welcome" className="flex flex-col justify-center rounded-[24px] bg-gradient-to-br from-teal-950 via-teal-800 to-cyan-700 p-6 text-white md:p-9">
-              <p className="text-[10px] font-bold uppercase tracking-[.2em] text-teal-100">{logs.profile?.department || "Department Unassigned"}</p>
+            <div data-tour="dashboard-welcome" className="flex flex-col justify-center rounded-[24px] bg-deep p-6 text-white md:p-9">
+              <p className="text-[10px] font-bold uppercase tracking-[.2em] text-white">{logs.profile?.department || "Department Unassigned"}</p>
               <h1 className="mt-3 text-3xl font-semibold leading-tight tracking-tight md:text-4xl">Welcome back, {user?.name?.split(" ")[0] || "Student"}</h1>
-              <p className="mt-4 max-w-lg text-sm leading-6 text-teal-50/85">Your clinical record, academic work, and verification status are summarised here.</p>
-              <div className="mt-8 flex items-center gap-3 text-xs text-teal-50/80">
-                <div className="h-px w-10 bg-teal-200/60" />
+              <p className="mt-4 max-w-lg text-sm leading-6 text-white">Your clinical record, academic work, and verification status are summarised here.</p>
+              <div className="mt-8 flex items-center gap-3 text-xs text-white">
+                <div className="h-px w-10 bg-sage" />
                 <span>Batch {logs.profile?.joiningYear || "—"}</span>
               </div>
             </div>
-            <Card className="min-w-0 border-slate-200/80 bg-white layer-1">
+            <Card className="min-w-0 border-line-soft bg-white layer-1">
               <CardContent className="p-0">
-                <div className="flex items-center gap-4 border-b border-slate-100 p-5 md:p-6">
-                  <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-teal-500 to-cyan-500 text-lg font-bold text-white shadow-[0_14px_30px_rgba(13,148,136,.2)]">
+                <div className="flex items-center gap-4 border-b border-line-soft p-5 md:p-6">
+                  <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-forest text-lg font-bold text-white shadow-[0_14px_30px_color-mix(in_srgb,var(--gothos-forest)_20%,transparent)]">
                     {(user?.name || "Student").split(" ").map((part: string) => part[0]).join("").slice(0, 2).toUpperCase()}
                   </div>
                   <div className="min-w-0">
-                    <p className="text-[10px] font-bold uppercase tracking-[.16em] text-teal-700">Resident profile</p>
-                    <p className="mt-1 truncate text-xl font-semibold text-slate-950">{user?.name || "Student"}</p>
+                    <p className="text-[10px] font-bold uppercase tracking-[.16em] text-forest">Resident profile</p>
+                    <p className="mt-1 truncate text-xl font-semibold text-ink">{user?.name || "Student"}</p>
                   </div>
                 </div>
-                <div className="grid gap-px bg-slate-100 sm:grid-cols-2">
+                <div className="grid gap-px bg-sage sm:grid-cols-2">
                   <ProfileField label="Registration number" value={logs.profile?.registrationNumber || "—"} />
                   <ProfileField label="Department" value={logs.profile?.department || "Unassigned"} />
                   <ProfileField label="Date of joining" value={formatLogbookDate(logs.profile?.dateOfJoining || "—")} />
@@ -390,7 +391,7 @@ export function Dashboard() {
         </CardContent>
       </Card>
 
-      <Card data-tour="dashboard-progress" className="overflow-hidden border-white/70 bg-white/78 layer-2">
+      <Card data-tour="dashboard-progress" className="overflow-hidden border-card-edge bg-card layer-2">
         <CardContent className="p-4 sm:p-6 md:p-8">
           <div className="grid gap-8 lg:grid-cols-[1fr_.9fr] lg:items-center">
             <div className="flex flex-col items-start gap-5 sm:flex-row sm:items-center sm:gap-6">
@@ -398,25 +399,25 @@ export function Dashboard() {
               <div>
                 <p className="page-eyebrow">Dashboard insights</p>
                 {hasAnyNumericTargets ? (
-                  <h2 className="mt-1 text-xl font-semibold text-slate-950 sm:text-2xl">You need <DemoCount value={overallRemaining} /> more entries to complete the core targets.</h2>
+                  <h2 className="mt-1 text-xl font-semibold text-ink sm:text-2xl">You need <DemoCount value={overallRemaining} /> more entries to complete the core targets.</h2>
                 ) : (
-                  <h2 className="mt-1 text-xl font-semibold text-slate-950 sm:text-2xl">Keep logging your work.</h2>
+                  <h2 className="mt-1 text-xl font-semibold text-ink sm:text-2xl">Keep logging your work.</h2>
                 )}
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">{pendingCount > 0 ? <><DemoCount value={pendingCount} /> {pendingCount === 1 ? "entry is" : "entries are"} waiting for faculty verification.</> : "All submitted entries have been reviewed."}</p>
-                {hasAnyNumericTargets && <Badge variant="secondary" className="mt-4 rounded-full border-white/70 bg-teal-50 px-3 py-1 text-teal-800">{progressLabel}</Badge>}
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-soft-ink">{pendingCount > 0 ? <><DemoCount value={pendingCount} /> {pendingCount === 1 ? "entry is" : "entries are"} waiting for faculty verification.</> : "All submitted entries have been reviewed."}</p>
+                {hasAnyNumericTargets && <Badge variant="secondary" className="mt-4 rounded-full border-card-edge bg-mist px-3 py-1 text-forest">{progressLabel}</Badge>}
               </div>
             </div>
             {hasAnyNumericTargets && (
-              <div className="space-y-4 rounded-[22px] border border-slate-100 bg-slate-50/75 p-5">
+              <div className="space-y-4 rounded-[22px] border border-line-soft bg-mist p-5">
                 {configured.map((item) => {
                   const percent = item.required > 0 ? Math.min(Math.round(item.verified / item.required * 100), 100) : 0;
                   return (
                     <div key={item.label}>
                       <div className="mb-2 flex items-center justify-between text-xs">
-                        <span className="font-semibold text-slate-700">{item.label}</span>
-                        <span className="font-bold text-teal-700"><DemoCount value={percent} suffix="%" /></span>
+                        <span className="font-semibold text-ink">{item.label}</span>
+                        <span className="font-bold text-forest"><DemoCount value={percent} suffix="%" /></span>
                       </div>
-                      <DemoProgress value={percent} className="h-2 bg-slate-200" />
+                      <DemoProgress value={percent} className="h-2 bg-sage" />
                     </div>
                   );
                 })}
@@ -433,33 +434,33 @@ export function Dashboard() {
           const remaining = Math.max(item.required - item.verified, 0);
           return (
             <Link key={item.label} href={item.href}>
-              <Card data-tour={`dashboard-${item.href.slice(1)}`} className={`h-full cursor-pointer border-white/70 bg-white/76 shadow-[0_18px_48px_rgba(15,23,42,0.05)] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_24px_70px_rgba(15,23,42,0.08)] ${isDemoMode() ? "demo-lift-card" : ""}`}>
+              <Card data-tour={`dashboard-${item.href.slice(1)}`} className={`h-full cursor-pointer border-card-edge bg-card shadow-[0_18px_48px_color-mix(in_srgb,var(--gothos-forest)_5%,transparent)] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_24px_70px_color-mix(in_srgb,var(--gothos-forest)_8%,transparent)] ${isDemoMode() ? "demo-lift-card" : ""}`}>
                 <CardContent className="p-5">
                   <div className="flex items-start justify-between gap-4">
-                    <div className={`flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br ${item.tone} text-white shadow-[0_12px_28px_rgba(13,148,136,0.18)]`}><Icon className="h-5 w-5" /></div>
+                    <div className={`flex h-11 w-11 items-center justify-center rounded-2xl bg-forest text-white shadow-[0_12px_28px_color-mix(in_srgb,var(--gothos-forest)_18%,transparent)]`}><Icon className="h-5 w-5" /></div>
                     {item.hasTarget ? (
                       <CircularProgress value={percent} />
                     ) : (
-                      <div className="grid h-14 w-14 place-items-center rounded-full bg-slate-100 shadow-inner">
-                        <div className="grid h-10 w-10 place-items-center rounded-full bg-white text-xs font-bold text-slate-900"><DemoCount value={item.logged} /></div>
+                      <div className="grid h-14 w-14 place-items-center rounded-full bg-sage shadow-inner">
+                        <div className="grid h-10 w-10 place-items-center rounded-full bg-white text-xs font-bold text-ink"><DemoCount value={item.logged} /></div>
                       </div>
                     )}
                     <div className="sr-only">
-                      <div className="text-4xl font-semibold leading-none text-slate-950">{item.logged}</div>
+                      <div className="text-4xl font-semibold leading-none text-ink">{item.logged}</div>
                     </div>
                   </div>
-                  <p className="mt-4 text-sm font-semibold text-slate-900">{item.label}</p>
+                  <p className="mt-4 text-sm font-semibold text-ink">{item.label}</p>
                   {item.hasTarget ? (
                     <>
-                      <p className="mt-1 text-[11px] text-slate-500"><DemoCount value={item.logged} /> of <DemoCount value={item.required} /> required</p>
+                      <p className="mt-1 text-[11px] text-helper"><DemoCount value={item.logged} /> of <DemoCount value={item.required} /> required</p>
                       <DemoProgress value={percent} className="mt-4 h-2" />
-                      <div className="mt-3 flex items-center justify-between text-[11px] text-slate-500">
+                      <div className="mt-3 flex items-center justify-between text-[11px] text-helper">
                         <span><DemoCount value={remaining} /> remaining</span>
                         <span><DemoCount value={percent} suffix="%" /></span>
                       </div>
                     </>
                   ) : (
-                    <p className="mt-1 text-[11px] text-slate-500"><DemoCount value={item.logged} /> logged</p>
+                    <p className="mt-1 text-[11px] text-helper"><DemoCount value={item.logged} /> logged</p>
                   )}
                 </CardContent>
               </Card>
@@ -469,8 +470,8 @@ export function Dashboard() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1.4fr_.6fr]">
-        <Card data-tour="dashboard-recent" className="border-white/70 bg-white/76">
-          <CardHeader className="flex flex-row items-center justify-between border-b border-white/70">
+        <Card data-tour="dashboard-recent" className="border-card-edge bg-card">
+          <CardHeader className="flex flex-row items-center justify-between border-b border-card-edge">
             <div>
               <p className="page-eyebrow">Student activity</p>
               <CardTitle className="mt-1 text-xl">Recent entries</CardTitle>
@@ -480,11 +481,11 @@ export function Dashboard() {
           <CardContent className="p-0">
             {recent.length === 0 ? (
               <div className="flex flex-col items-center justify-center p-12 text-center">
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-teal-50 text-teal-700">
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-mist text-forest">
                   <FileText className="h-6 w-6" />
                 </div>
-                <h3 className="mt-4 text-base font-semibold text-slate-950">No entries yet</h3>
-                <p className="mt-2 max-w-sm text-sm leading-6 text-slate-500">Your logbook is empty. Add your first entry and the dashboard will begin to fill in immediately.</p>
+                <h3 className="mt-4 text-base font-semibold text-ink">No entries yet</h3>
+                <p className="mt-2 max-w-sm text-sm leading-6 text-helper">Your logbook is empty. Add your first entry and the dashboard will begin to fill in immediately.</p>
                 <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
                   {!features.hideCaseLogs && <Button asChild><Link href="/cases">Log first case</Link></Button>}
                   {features.clinicalWorks && <Button asChild><Link href="/clinical-works">Log clinical work</Link></Button>}
@@ -499,19 +500,19 @@ export function Dashboard() {
                     <TableRow key={`${item.type}-${item.number}`} className={isDemoMode() ? "demo-stagger-item" : undefined} style={isDemoMode() ? { "--demo-stagger-index": index } as React.CSSProperties : undefined}>
                       <TableCell className="font-bold">{index + 1}</TableCell>
                       <TableCell>{formatLogbookDate(item.date)}</TableCell>
-                      <TableCell><Badge variant="outline" className="border-teal-100 bg-teal-50 text-teal-800">{item.type}</Badge></TableCell>
+                      <TableCell><Badge variant="outline" className="border-line-soft bg-mist text-forest">{item.type}</Badge></TableCell>
                       <TableCell className="max-w-xs font-semibold">{item.title}</TableCell>
-                      {!hideUhid && <TableCell className="text-xs font-semibold text-teal-800">{item.patientUhid}</TableCell>}
+                      {!hideUhid && <TableCell className="text-xs font-semibold text-forest">{item.patientUhid}</TableCell>}
                       <TableCell><Status value={item.status} /></TableCell>
                       <TableCell className="text-right">
                         {item.status === "rejected" ? (
-                          <Button asChild size="sm" variant="outline" className="border-rose-300 text-rose-700 bg-rose-50 hover:bg-rose-100 hover:text-rose-800 text-xs font-semibold h-7 px-2.5">
+                          <Button asChild size="sm" variant="outline" className="border-status-border text-status-foreground bg-status hover:bg-status hover:text-status-foreground text-xs font-semibold h-7 px-2.5">
                             <Link href={item.href}>
                               <RotateCcw className="h-3 w-3 mr-1" /> Resubmit
                             </Link>
                           </Button>
                         ) : (
-                          <Button asChild size="sm" variant="ghost" className="text-teal-600 hover:text-teal-800 hover:bg-teal-50 text-xs h-7 px-2">
+                          <Button asChild size="sm" variant="ghost" className="text-forest hover:text-forest hover:bg-mist text-xs h-7 px-2">
                             <Link href={item.href}>
                               View
                             </Link>
@@ -527,26 +528,26 @@ export function Dashboard() {
         </Card>
 
         <div className="space-y-4">
-          {!features.hideProcedureLogs && (deptConfig?.requiredProcedures ?? 0) > 0 && <Card className="border-white/70 bg-white/76">
+          {!features.hideProcedureLogs && (deptConfig?.requiredProcedures ?? 0) > 0 && <Card className="border-card-edge bg-card">
             <CardContent className="p-5">
               <div className="flex items-start gap-3">
-                <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-700" />
+                <AlertTriangle className="mt-0.5 h-5 w-5 text-status-foreground" />
                 <div>
-                  <p className="text-sm font-bold text-amber-950">Procedure shortfall</p>
-                  <p className="mt-1 text-xs leading-5 text-amber-900/80">Complete and verify every named procedure requirement; the combined target is {deptConfig?.requiredProcedures}.</p>
-                  <Button asChild variant="link" className="mt-2 h-auto p-0 text-amber-800"><Link href="/procedures">Review requirements <ArrowRight className="h-3 w-3" /></Link></Button>
+                  <p className="text-sm font-bold text-status-foreground">Procedure shortfall</p>
+                  <p className="mt-1 text-xs leading-5 text-status-foreground">Complete and verify every named procedure requirement; the combined target is {deptConfig?.requiredProcedures}.</p>
+                  <Button asChild variant="link" className="mt-2 h-auto p-0 text-status-foreground"><Link href="/procedures">Review requirements <ArrowRight className="h-3 w-3" /></Link></Button>
                 </div>
               </div>
             </CardContent>
           </Card>}
 
-          <Card className="border-white/70 bg-white/76">
+          <Card className="border-card-edge bg-card">
             <CardContent className="p-5">
               <div className="flex items-start gap-3">
-                <Printer className="mt-0.5 h-5 w-5 text-cyan-700" />
+                <Printer className="mt-0.5 h-5 w-5 text-forest" />
                 <div>
-                  <p className="text-sm font-bold text-slate-900">Print at any point</p>
-                  <p className="mt-1 text-xs leading-5 text-slate-500">Use Print PDF for a current copy. Incomplete records are automatically marked Draft; finalized records print as an official copy.</p>
+                  <p className="text-sm font-bold text-ink">Print at any point</p>
+                  <p className="mt-1 text-xs leading-5 text-helper">Use Print PDF for a current copy. Incomplete records are automatically marked Draft; finalized records print as an official copy.</p>
                 </div>
               </div>
             </CardContent>
@@ -554,11 +555,11 @@ export function Dashboard() {
         </div>
       </div>
 
-      <Card data-tour="dashboard-bottom" className="border-white/70 bg-white/76">
+      <Card data-tour="dashboard-bottom" className="border-card-edge bg-card">
         <CardContent className="flex flex-col justify-between gap-4 p-5 sm:flex-row sm:items-center">
           <div className="flex items-center gap-3">
-            <CalendarDays className="h-5 w-5 text-teal-600" />
-            <div><p className="text-sm font-bold">Next quarterly assessment</p><p className="text-xs text-slate-500 italic">Assessment tracking coming soon</p></div>
+            <CalendarDays className="h-5 w-5 text-forest" />
+            <div><p className="text-sm font-bold">Next quarterly assessment</p><p className="text-xs text-helper italic">Assessment tracking coming soon</p></div>
           </div>
           <Button asChild variant="outline" size="sm" disabled className="opacity-50 cursor-not-allowed">
             <span><Award className="h-4 w-4 mr-2 inline" /> View assessments</span>
@@ -570,21 +571,22 @@ export function Dashboard() {
 }
 
 function ProfileField({ label, value }: { label: string; value: string }) {
-  return <div className="min-w-0 bg-white px-5 py-4 md:px-6"><p className="text-[9px] font-bold uppercase tracking-[.15em] text-teal-700">{label}</p><p className="mt-1 truncate text-sm font-semibold text-slate-950">{value}</p></div>;
+  return <div className="min-w-0 bg-white px-5 py-4 md:px-6"><p className="text-[9px] font-bold uppercase tracking-[.15em] text-forest">{label}</p><p className="mt-1 truncate text-sm font-semibold text-ink">{value}</p></div>;
 }
 
 function Status({ value }: { value: string }) {
-  if (value === "verified") return <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700"><CheckCircle2 className="mr-1 h-3 w-3" /> Verified</Badge>;
-  if (value === "rejected") return <Badge className="border-rose-200 bg-rose-50 text-rose-700">Revision</Badge>;
-  return <Badge className="border-amber-200 bg-amber-50 text-amber-700">Pending</Badge>;
+  if (value === "verified") return <Badge className="border-status-border bg-status text-status-foreground"><CheckCircle2 className="mr-1 h-3 w-3" /> Verified</Badge>;
+  if (value === "rejected") return <Badge className="border-status-border bg-status text-status-foreground">Revision</Badge>;
+  return <Badge className="border-status-border bg-status text-status-foreground">Pending</Badge>;
 }
 
 function CircularProgress({ value }: { value: number }) {
   const animatedValue = useDemoAnimatedValue(value);
   const safeValue = Math.max(0, Math.min(Math.round(animatedValue), 100));
   return (
-    <div className="relative grid h-14 w-14 place-items-center rounded-full" style={{ background: `conic-gradient(#0d9488 ${safeValue * 3.6}deg, #e2e8f0 0deg)` }}>
-      <div className="grid h-10 w-10 place-items-center rounded-full bg-white text-[11px] font-bold text-slate-900">{safeValue}%</div>
+    <div className="relative grid h-14 w-14 place-items-center rounded-full">
+      <ProgressRing value={safeValue} strokeWidth={14.2857} />
+      <div className="grid h-10 w-10 place-items-center relative rounded-full bg-white text-[11px] font-bold text-ink">{safeValue}%</div>
     </div>
   );
 }
@@ -593,9 +595,10 @@ function ProgressDonut({ value }: { value: number }) {
   const animatedValue = useDemoAnimatedValue(value);
   const safeValue = Math.max(0, Math.min(Math.round(animatedValue), 100));
   return (
-    <div className="relative grid h-32 w-32 shrink-0 place-items-center rounded-full p-3 shadow-[0_18px_45px_rgba(13,148,136,.12)]" style={{ background: `conic-gradient(from -90deg, #0d9488 0deg, #06b6d4 ${safeValue * 3.6}deg, #e2e8f0 ${safeValue * 3.6}deg)` }} aria-label={`Overall progress ${safeValue}%`}>
-      <div className="grid h-full w-full place-items-center rounded-full bg-white text-center shadow-inner">
-        <div><p className="text-2xl font-semibold text-slate-950">{safeValue}%</p><p className="text-[8px] font-bold uppercase tracking-[.14em] text-slate-500">Complete</p></div>
+    <div className="relative grid h-32 w-32 shrink-0 place-items-center rounded-full p-3 shadow-[0_18px_45px_color-mix(in_srgb,var(--gothos-forest)_12%,transparent)]" aria-label={`Overall progress ${safeValue}%`}>
+      <ProgressRing value={safeValue} strokeWidth={9.375} />
+      <div className="grid h-full w-full place-items-center relative rounded-full bg-white text-center shadow-inner">
+        <div><p className="text-2xl font-semibold text-ink">{safeValue}%</p><p className="text-[8px] font-bold uppercase tracking-[.14em] text-helper">Complete</p></div>
       </div>
     </div>
   );
