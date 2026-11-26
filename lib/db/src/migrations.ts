@@ -24,6 +24,7 @@ export async function applyMigrations(connection: MigrationConnection, adoptExis
   files.push("0036_case_log_custom_fields.sql");
   files.push("0037_psychiatry_workspace.sql");
   files.push("0038_posting_attachments.sql");
+  files.push("0039_enable_microbiology_posting_attachments.sql");
   await connection.query("BEGIN");
   try {
     await connection.query("SELECT pg_advisory_xact_lock(hashtext('elogbook-schema-migrations'))");
