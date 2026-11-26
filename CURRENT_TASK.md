@@ -1,4 +1,4 @@
 # Current Task
 
 ## Status
-IDLE — Psychiatry workspace submitted for review on codex/psychiatry-logbook. See HANDOFF.md.
+IDLE — Psychiatry patient ID privacy change submitted for review.

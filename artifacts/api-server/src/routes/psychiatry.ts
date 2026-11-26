@@ -54,6 +54,7 @@ async function describe(rows: Entry[], departmentId: number, studentId?: number)
     attendeesByEntry.set(row.entryId, namesForEntry);
   }
   return rows.map(({ departmentId: _department, studentId: ownerId, ...entry }) => {
+    const { recordNumber: _legacyPatientId, ...values } = entry.values;
     const own = studentId === ownerId;
     const attendees = attendeesByEntry.get(entry.id) ?? [];
     if (studentId !== undefined && !own) {
@@ -63,7 +64,7 @@ async function describe(rows: Entry[], departmentId: number, studentId?: number)
         reviewerName: verified ? names.get(entry.reviewerId ?? 0) : undefined,
         attendeeNames: verified ? attendees.map(({ name }) => name) : [] };
     }
-    return { ...entry, own, reviewerName: names.get(entry.reviewerId ?? 0), residentName: residentNames.get(ownerId), attendeeNames: attendees.map(({ name }) => name),
+    return { ...entry, values, own, reviewerName: names.get(entry.reviewerId ?? 0), residentName: residentNames.get(ownerId), attendeeNames: attendees.map(({ name }) => name),
       ...(own ? { attendeeIds: attendees.map(({ id }) => id) } : {}) };
   });
 }
@@ -164,13 +165,15 @@ async function writeEntry(req: Request, res: Response) {
 
   if (entryId?.success) {
     const [row] = await db.select({ id: psychiatryEntriesTable.id, studentId: psychiatryEntriesTable.studentId, status: psychiatryEntriesTable.status,
-      revision: psychiatryEntriesTable.revision, departmentId: psychiatryEntriesTable.departmentId }).from(psychiatryEntriesTable).where(and(
+      revision: psychiatryEntriesTable.revision, departmentId: psychiatryEntriesTable.departmentId, values: psychiatryEntriesTable.values }).from(psychiatryEntriesTable).where(and(
       eq(psychiatryEntriesTable.id, entryId.data), eq(psychiatryEntriesTable.section, section))).limit(1);
     if (!row) { res.status(404).json({ message: "Entry not found" }); return; }
     if (row.studentId !== student.id || row.departmentId !== departmentId) { res.status(403).json({ message: "Entry is outside your access scope" }); return; }
     if (row.status === "verified" || row.revision !== input.data.revision) { res.status(409).json({ message: "This entry changed or was already verified" }); return; }
     const updated = await db.transaction(async (tx) => {
-      const [result] = await tx.update(psychiatryEntriesTable).set({ ...record, revision: row.revision + 1,
+      const legacyPatientId = row.values.recordNumber;
+      const retainedValues = legacyPatientId === undefined ? values : { ...values, recordNumber: legacyPatientId };
+      const [result] = await tx.update(psychiatryEntriesTable).set({ ...record, values: retainedValues, revision: row.revision + 1,
         reviewNote: null, reviewedBy: null, reviewedAt: null }).where(and(eq(psychiatryEntriesTable.id, row.id),
         scopedToDepartment(departmentId), eq(psychiatryEntriesTable.studentId, student.id), eq(psychiatryEntriesTable.revision, row.revision))).returning({ id: psychiatryEntriesTable.id });
       if (!result) return false;

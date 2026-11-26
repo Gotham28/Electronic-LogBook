@@ -48,7 +48,7 @@ export const psychiatryPages: Record<string, PsychiatryPage> = {
   opd: monthly("OPD log", "Add OPD month", "counts"),
   ward: monthly("Ward log", "Add ward month", "counts"),
   long: { title: "Long cases", add: "Add long case", draft: true, review: true, fields: [
-    field("recordNumber", "ID number"), field("age", "Age", "number"), field("sex", "Sex", "select", { choices: ["Male", "Female", "Other"] }),
+    field("age", "Age", "number"), field("sex", "Sex", "select", { choices: ["Male", "Female", "Other"] }),
     field("admission", "When admitted", "radio", { choices: ["Month and year", "Specific dates"] }),
     field("month", "Month and year of admission", "month", { optional: true }),
     field("admittedAt", "Date of admission", "date", { optional: true }), field("dischargedAt", "Date of discharge", "date", { optional: true }),
@@ -57,7 +57,7 @@ export const psychiatryPages: Record<string, PsychiatryPage> = {
     field("activities", "What you did", "chips", { choices: ["History", "MSE", "Risk", "Capacity", "Physical exam", "Rating scale", "Family interview", "Psychoeducation"], optional: true }),
     field("scales", "Scales administered", "text", { optional: true }), field("outcome", "Management / learning outcome", "textarea", { optional: true }),
     field("unit", "Unit", "select", { choices: ["Unit 1", "Unit 2"] }), consultant,
-  ], columns: [["period", "Dates / month"], ["recordNumber", "ID no."], ["diagnosis", "Diagnosis"], ["tags", "Tags"], ["scales", "Scales administered"], ["unit", "Unit"], ["status", "Status"]] },
+  ], columns: [["period", "Dates / month"], ["diagnosis", "Diagnosis"], ["tags", "Tags"], ["scales", "Scales administered"], ["unit", "Unit"], ["status", "Status"]] },
   cl: monthly("Consultation liaison", "Add C-L month", "referrals"),
   emer: monthly("Psychiatric emergencies", "Add emergencies month", "referrals"),
   "psy-intervention": { title: "Interventions", add: "Add intervention", fields: [date, field("name", "Name of intervention"), field("role", "Your role", "radio", { choices: ["Observed", "Performed"] })], columns: [["date", "Date"], ["name", "Name of intervention"], ["role", "Observed / Performed"]] },
