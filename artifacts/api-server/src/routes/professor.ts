@@ -8,7 +8,7 @@ import { resolveConfigDepartmentId } from "../lib/department-config-source.js";
 import { clinicalWorkTarget, verifiedClinicalWorkCounts } from "../lib/clinical-work-progress.js";
 import { getDepartmentFeatures } from "../lib/department-features.js";
 import { getAcademicLogbook } from "../lib/academic-logbook.js";
-import { academicFieldVisible, academicSectionForRecord, academicSectionName, isBuiltInProcedureField, PROCEDURE_LOG_FIELDS, readAcademicRecord, resolveProcedureFieldDefinitions } from "@workspace/api-zod";
+import { academicFieldVisible, academicSectionForRecord, academicSectionName, isBuiltInProcedureField, isPsychiatryShortCase, PROCEDURE_LOG_FIELDS, readAcademicRecord, resolveProcedureFieldDefinitions } from "@workspace/api-zod";
 
 const router: IRouter = Router();
 
@@ -506,6 +506,7 @@ router.get("/:professorId/review-queue", async (req, res) => {
       };
 
       const duplicateKey = ({ kind, log }: typeof clinicalRows[number]) => {
+        if (kind === "case" && isPsychiatryShortCase(log)) return null;
         const uhid = log.patientUhid?.trim();
         if (!uhid || uhid.toUpperCase() === "N/A" || !dateSchema.safeParse(log.date).success) return null;
         return JSON.stringify([kind, log.studentId, log.date, uhid]);
@@ -563,7 +564,7 @@ router.get("/:professorId/review-queue", async (req, res) => {
         title: `${c.log.diagnosisProvisional || c.log.diagnosisFinal} — ${c.log.patientAge}, ${c.log.patientGender}`,
         date: c.log.date,
         reviewFlags: reviewFlags.get(`case-${c.log.id}`) ?? [],
-        patientUhid: c.log.patientUhid,
+        patientUhid: isPsychiatryShortCase(c.log) ? null : c.log.patientUhid,
         patientInfo: `${c.log.patientAge} / ${c.log.patientGender}`,
         patientAge: c.log.patientAge,
         patientGender: c.log.patientGender,

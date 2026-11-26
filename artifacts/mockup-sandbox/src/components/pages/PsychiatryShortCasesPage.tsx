@@ -14,7 +14,6 @@ type CaseEntry = {
   id: number;
   category: string;
   date: string;
-  patientUhid: string | null;
   patientAge: string;
   patientGender: "male" | "female" | "other";
   diagnosisFinal: string;
@@ -27,8 +26,8 @@ type CaseEntry = {
   customFields: Record<string, string>;
 };
 
-type Form = PsychiatryShortCase & { idNumber: string; age: string; sex: CaseEntry["patientGender"] | ""; plan: string; consultant: string; learningPoint: string };
-const initialForm: Form = { seenIn: "OPD", diagnosisCode: "", tags: [], activities: [], referredFrom: "", idNumber: "", age: "", sex: "", plan: "", consultant: "", learningPoint: "" };
+type Form = PsychiatryShortCase & { age: string; sex: CaseEntry["patientGender"] | ""; plan: string; consultant: string; learningPoint: string };
+const initialForm: Form = { seenIn: "OPD", diagnosisCode: "", tags: [], activities: [], referredFrom: "", age: "", sex: "", plan: "", consultant: "", learningPoint: "" };
 const statusLabels = { pending: "Pending", verified: "Verified", rejected: "Returned" };
 const selectStyle = "h-10 w-full rounded-lg border border-input bg-background px-3 text-sm";
 
@@ -58,7 +57,7 @@ function formFor(entry?: CaseEntry): Form {
     tags: SHORT_CASE_TAGS.filter((option) => values.psychiatryTags?.split(", ").includes(option)),
     activities: SHORT_CASE_ACTIVITIES.filter((option) => values.psychiatryActivities?.split(", ").includes(option)),
     referredFrom: SHORT_CASE_REFERRALS.find((option) => option === values.psychiatryReferredFrom) ?? "",
-    idNumber: entry.patientUhid ?? "", age: entry.patientAge, sex: entry.patientGender,
+    age: entry.patientAge, sex: entry.patientGender,
     plan: entry.managementPlan ?? "", consultant: String(entry.supervisorId ?? ""), learningPoint: entry.learningPoints ?? "",
   };
 }
@@ -89,7 +88,7 @@ function ShortCaseForm({ entry, studentId, departmentId, onSave }: { entry?: Cas
     const endpoint = `/api/students/${studentId}/case-logs`;
     const payload = {
       date: entry?.date ?? localDateValue(), category: SHORT_CASE_CATEGORY,
-      patientUhid: form.idNumber, patientAge: form.age, patientGender: form.sex,
+      patientAge: form.age, patientGender: form.sex,
       supervisorId: Number(form.consultant), diagnosisFinal: `${diagnosis.code} ${diagnosis.title}`,
       managementPlan: form.plan, learningPoints: form.learningPoint,
       psychiatryShortCase: { seenIn: form.seenIn, diagnosisCode: diagnosis.code, tags: form.tags, activities: form.activities, referredFrom: form.referredFrom },
@@ -116,8 +115,7 @@ function ShortCaseForm({ entry, studentId, departmentId, onSave }: { entry?: Cas
       {error && <p role="alert" className="rounded-lg bg-rose-50 p-3 text-sm text-rose-800">{error}</p>}
       {entry?.facultyRemarks && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">{entry.facultyRemarks}</p>}
       <Chips label="Seen in" options={SHORT_CASE_SETTINGS} selected={[form.seenIn]} onToggle={(value) => update("seenIn", value)} />
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Field label="ID number"><Input className="rounded-[10px] border-[#d9e6e2]" required maxLength={160} value={form.idNumber} onChange={(event) => update("idNumber", event.target.value)} /></Field>
+      <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Age"><Input className="rounded-[10px] border-[#d9e6e2]" required type="number" min={0} step={1} value={form.age} onChange={(event) => update("age", event.target.value)} /></Field>
         <Field label="Sex"><select required className={selectStyle} value={form.sex} onChange={(event) => update("sex", event.target.value as Form["sex"])}>
           <option value="">Select</option><option value="male">Male</option><option value="female">Female</option><option value="other">Other</option>
@@ -176,9 +174,9 @@ export function PsychiatryShortCasesPage({ mode = "list", entryId, onSave }: { m
       <div className="overflow-x-auto rounded-xl border border-teal-200 bg-white">
         {entries === null ? <p role="status" className="p-4">Loading short cases…</p> : entries.length === 0 ? <p className="p-4 text-sm text-slate-600">Nothing here yet.</p> :
           <table className="w-full text-left text-sm">
-            <thead className="bg-teal-50 text-xs uppercase tracking-wide text-teal-950"><tr>{["Date", "Seen in", "ID no.", "Diagnosis", "Tags", "What you did", "Status", "Actions"].map((label) => <th key={label} className="px-3 py-3">{label}</th>)}</tr></thead>
+            <thead className="bg-teal-50 text-xs uppercase tracking-wide text-teal-950"><tr>{["Date", "Seen in", "Diagnosis", "Tags", "What you did", "Status", "Actions"].map((label) => <th key={label} className="px-3 py-3">{label}</th>)}</tr></thead>
             <tbody>{entries.map((row) => <tr key={row.id} className="border-t border-teal-100 align-top">
-              <td className="whitespace-nowrap p-3">{row.date}</td><td className="p-3">{row.customFields.psychiatrySeenIn}</td><td className="p-3">{row.patientUhid}</td>
+              <td className="whitespace-nowrap p-3">{row.date}</td><td className="p-3">{row.customFields.psychiatrySeenIn}</td>
               <td className="p-3">{row.diagnosisFinal}</td><td className="p-3">{row.customFields.psychiatryTags}</td><td className="p-3">{row.customFields.psychiatryActivities}</td>
               <td className="p-3"><span className="rounded-full bg-teal-50 px-2 py-1">{statusLabels[row.status]}</span></td>
               <td className="p-3">{row.status !== "verified" && <Link className="text-teal-800 underline" href={`${SHORT_CASES_PATH}/${row.id}/edit`}>{row.status === "rejected" ? "Revise" : "Edit"}</Link>}</td>

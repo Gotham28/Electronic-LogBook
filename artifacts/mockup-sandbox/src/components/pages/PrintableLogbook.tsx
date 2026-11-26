@@ -177,6 +177,7 @@ export function PrintableLogbook() {
   const shouldReduceMotion = useReducedMotion();
   const { config, clinicalWorkCategories, clinicalWorkSubtypes, competencyLevels, procedureFields, caseLogFields = [], academicLogbook, label } = useDepartment();
   const features = config?.enabledFeatures ?? {};
+  const hideCaseId = hideUhid || features.psychiatryWorkspace === true;
   const dynamicProcedureFields = Boolean(features.dynamicProcedureFields);
   const activeProcedureFields = dynamicProcedureFields ? (procedureFields ?? []) : undefined;
   const [data, setData] = React.useState<any>(null);
@@ -433,7 +434,7 @@ export function PrintableLogbook() {
               <table data-mobile="cards" className="w-full border-collapse">
                 <thead><tr>
                   <Th>#</Th><Th>Date</Th>
-                  {!hideUhid && <Th>{label("caseLog.caseId")}</Th>}
+                  {!hideCaseId && <Th>{label("caseLog.caseId")}</Th>}
                   <Th>Age / Gender</Th><Th>Category</Th><Th>Diagnosis</Th><Th>Status</Th>
                 </tr></thead>
                 <tbody>
@@ -441,7 +442,7 @@ export function PrintableLogbook() {
                     <tr key={c.id} className={i % 2 === 0 ? "" : "bg-slate-50/50"}>
                       <Td muted>{rows.length - i}</Td>
                       <Td>{formatLogbookDate(c.date)}</Td>
-                      {!hideUhid && <Td muted={!c.patientUhid}>{c.patientUhid || "—"}</Td>}
+                      {!hideCaseId && <Td muted={!c.patientUhid}>{c.patientUhid || "—"}</Td>}
                       <Td>{[c.patientAge, c.patientGender].filter(Boolean).join(" / ") || "—"}</Td>
                       <Td>{c.category || "—"}</Td>
                       <Td>

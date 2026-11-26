@@ -66,7 +66,7 @@ export function CaseLogDetails({
           <DetailField label={microbiologyCaseFields && !shortCase ? "Sample category" : "Category"} value={shortCase ? "Short case" : caseLog.category} />
           <DetailField label="Patient age" value={caseLog.patientAge} />
           <DetailField label="Patient gender" value={caseLog.patientGender} />
-          {!hideUhid && <DetailField label="UHID" value={caseLog.patientUhid} />}
+          {!hideUhid && !shortCase && <DetailField label="UHID" value={caseLog.patientUhid} />}
         </dl>
       </section>
       {shortCase ? <section aria-label="Short-case details">
