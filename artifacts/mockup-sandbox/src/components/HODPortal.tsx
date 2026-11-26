@@ -30,7 +30,6 @@ import { formatLogbookDate } from "@/lib/logbook-config";
 import { isoToIstDateTimeInput, istDateTimeInputToIso } from "@/lib/maintenanceTime";
 import { useDepartment } from "@/lib/department-context";
 import { DepartmentSettings } from "@/components/DepartmentSettings";
-import { DemoDepartmentCustomizer } from "@/components/DemoDepartmentCustomizer";
 import { apiGet, apiPost, apiDelete } from "@/lib/apiClient";
 import { getCurrentUser, isDemoMode } from "@/lib/session";
 import { useCurrentUser } from "@/hooks/use-current-user";
@@ -908,7 +907,6 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
 
 
         <TabsContent value="requirements" className="pt-4">
-          {isDemoMode() && <DemoDepartmentCustomizer />}
           <DepartmentSettings />
         </TabsContent>
       </Tabs>

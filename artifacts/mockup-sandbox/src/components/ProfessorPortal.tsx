@@ -64,6 +64,8 @@ import {
   Pencil,
   CalendarDays,
   Clock,
+  LayoutDashboard,
+  ArrowRight,
 } from "lucide-react";
 import { formatLogbookDate, todayForInput } from "@/lib/logbook-config";
 import { CaseLogDetails, type CaseLogDetailRecord } from "@/components/CaseLogDetails";
@@ -220,16 +222,18 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
 
   const getTabFromPath = () => {
     if (activeTab) return activeTab;
+    if (location === "/review-queue") return "review-queue";
     if (location === "/mentees") return "mentees";
     if (location === "/assessments") return "assessments";
     if (location === "/daily-attendance" || location === "/attendance") return "daily-attendance";
-    return "review-queue";
+    return "dashboard";
   };
 
   const currentTab = getTabFromPath();
 
   const handleTabChange = (val: string) => {
-    if (val === "mentees") setLocation("/mentees");
+    if (val === "review-queue") setLocation("/review-queue");
+    else if (val === "mentees") setLocation("/mentees");
     else if (val === "assessments") setLocation("/assessments");
     else if (val === "daily-attendance") setLocation("/daily-attendance");
     else setLocation("/");
@@ -503,6 +507,9 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
         {/* Inner tab bar — hidden when embedded in HOD portal (HOD sidebar handles navigation) */}
         {!embedded && (
           <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-xl border border-line-soft bg-white p-1 shadow-sm sm:w-auto">
+            <TabsTrigger value="dashboard" className="gap-2 text-xs font-semibold">
+              <LayoutDashboard className="h-4 w-4" /> Dashboard
+            </TabsTrigger>
             <TabsTrigger value="review-queue" className="gap-2 text-xs font-semibold">
               <FileCheck className="h-4 w-4" /> Sequential Review Queue (<DemoCount value={Math.max(0, reviews.length - Object.keys(evaluatedLogs).length)} />)
             </TabsTrigger>
@@ -519,6 +526,184 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
             )}
           </TabsList>
         )}
+
+        {/* Tab 0: Faculty Dashboard */}
+        <TabsContent value="dashboard" className="pt-4 space-y-6">
+          {(() => {
+            const pendingCount = Math.max(0, reviews.length - Object.keys(evaluatedLogs).length);
+            const trackedStudents = allStudents.filter((s: any) => s.overallCompletion !== null && s.overallCompletion !== undefined);
+            const avgCompletion = trackedStudents.length > 0
+              ? Math.round(trackedStudents.reduce((sum: number, s: any) => sum + Number(s.overallCompletion || 0), 0) / trackedStudents.length)
+              : null;
+            const attentionCount = allStudents.filter((s: any) => s.shortfallStatus === "at_risk" || s.shortfallStatus === "behind").length;
+            const activeReviews = reviews.filter((r: any) => !evaluatedLogs[String(r.id)]);
+            const typeCounts = [
+              { label: "Case Logs", count: activeReviews.filter((r: any) => r.logType === "case").length },
+              { label: "Procedure Logs", count: activeReviews.filter((r: any) => r.logType === "procedure").length },
+              { label: "Academic Activities", count: activeReviews.filter((r: any) => r.logType === "academic").length },
+              { label: "Clinical Work", count: activeReviews.filter((r: any) => r.logType === "clinical_work").length },
+              { label: "Conferences", count: activeReviews.filter((r: any) => r.logType === "conference").length },
+            ].filter((item) => item.count > 0);
+            const priorityOrder: Record<string, number> = { behind: 0, at_risk: 1, on_track: 2, not_tracked: 3 };
+            const residentSnapshot = [...allStudents]
+              .sort((a: any, b: any) => {
+                const pa = priorityOrder[a.shortfallStatus] ?? 3;
+                const pb = priorityOrder[b.shortfallStatus] ?? 3;
+                if (pa !== pb) return pa - pb;
+                return (a.overallCompletion ?? 999) - (b.overallCompletion ?? 999);
+              })
+              .slice(0, 6);
+
+            return (
+              <>
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                  <Card className="border-line-soft bg-white shadow-xs">
+                    <CardContent className="p-5">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-helper">Pending Reviews</p>
+                      <p className="mt-2 text-2xl font-black text-ink"><DemoCount value={pendingCount} /></p>
+                      <p className="mt-1 text-xs text-soft-ink">Entries awaiting verification</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="border-line-soft bg-white shadow-xs">
+                    <CardContent className="p-5">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-helper">Approved Residents</p>
+                      <p className="mt-2 text-2xl font-black text-ink"><DemoCount value={allStudents.length} /></p>
+                      <p className="mt-1 text-xs text-soft-ink">Active in your department</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="border-line-soft bg-white shadow-xs">
+                    <CardContent className="p-5">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-helper">Average Progress</p>
+                      <p className="mt-2 text-2xl font-black text-ink">
+                        {avgCompletion !== null ? <DemoCount value={avgCompletion} suffix="%" /> : <span className="text-base font-semibold text-helper">Not configured</span>}
+                      </p>
+                      <p className="mt-1 text-xs text-soft-ink">Across tracked requirements</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="border-line-soft bg-white shadow-xs">
+                    <CardContent className="p-5">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-helper">Need Attention</p>
+                      <p className="mt-2 text-2xl font-black text-ink"><DemoCount value={attentionCount} /></p>
+                      <p className="mt-1 text-xs text-soft-ink">Residents behind or at risk</p>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <div className="grid gap-6 lg:grid-cols-2">
+                  <Card className="border border-line-soft bg-white shadow-xs">
+                    <CardHeader className="pb-3 border-b border-line-soft flex flex-row items-center justify-between gap-2">
+                      <div>
+                        <CardTitle className="text-base font-bold text-ink">Evaluation Queue Overview</CardTitle>
+                        <CardDescription className="text-xs text-helper">
+                          Pending submissions awaiting your review
+                        </CardDescription>
+                      </div>
+                      <Button size="sm" onClick={() => setLocation("/review-queue")} className="bg-forest hover:bg-forest text-white text-xs font-semibold gap-1.5">
+                        Open Queue <ArrowRight className="h-3.5 w-3.5" />
+                      </Button>
+                    </CardHeader>
+                    <CardContent className="pt-4 space-y-4">
+                      {activeReviews.length === 0 ? (
+                        <div className="py-8 text-center">
+                          <CheckCircle2 className="mx-auto h-8 w-8 text-forest mb-2" />
+                          <p className="text-sm font-semibold text-ink">All caught up</p>
+                          <p className="text-xs text-helper mt-1">There are no pending entries in your evaluation queue.</p>
+                        </div>
+                      ) : (
+                        <>
+                          {typeCounts.length > 0 && (
+                            <div className="flex flex-wrap gap-2">
+                              {typeCounts.map((tc) => (
+                                <Badge key={tc.label} variant="secondary" className="bg-mist text-ink border border-line-soft text-xs font-semibold">
+                                  {tc.label}: {tc.count}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
+                          <div className="divide-y divide-line-soft rounded-lg border border-line-soft">
+                            {activeReviews.slice(0, 5).map((item: any) => (
+                              <div key={item.id} className="flex items-center justify-between gap-3 px-3.5 py-2.5 text-xs">
+                                <div className="min-w-0">
+                                  <p className="font-semibold text-ink truncate">
+                                    {item.title || item.procedureName || item.diagnosisProvisional || item.topic || "Log Entry"}
+                                  </p>
+                                  <p className="text-[11px] text-helper truncate">
+                                    {item.studentName || "Resident"} · {formatLogbookDate(item.date)}
+                                  </p>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  {Array.isArray(item.flags) && item.flags.length > 0 && (
+                                    <Badge variant="outline" className="border-status-border text-status-foreground text-[10px]">
+                                      Flagged
+                                    </Badge>
+                                  )}
+                                  <Badge variant="outline" className="text-[10px] capitalize">
+                                    {String(item.logType || "log").replace("_", " ")}
+                                  </Badge>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border border-line-soft bg-white shadow-xs">
+                    <CardHeader className="pb-3 border-b border-line-soft flex flex-row items-center justify-between gap-2">
+                      <div>
+                        <CardTitle className="text-base font-bold text-ink">Resident Progress Snapshot</CardTitle>
+                        <CardDescription className="text-xs text-helper">
+                          Training progress across your department
+                        </CardDescription>
+                      </div>
+                      <Button size="sm" variant="outline" onClick={() => setLocation("/mentees")} className="text-xs font-semibold gap-1.5">
+                        All Students <ArrowRight className="h-3.5 w-3.5" />
+                      </Button>
+                    </CardHeader>
+                    <CardContent className="pt-4">
+                      {residentSnapshot.length === 0 ? (
+                        <p className="py-8 text-center text-xs text-helper">No approved residents found in this department.</p>
+                      ) : (
+                        <div className="divide-y divide-line-soft rounded-lg border border-line-soft">
+                          {residentSnapshot.map((m: any) => (
+                            <div key={m.id} className="flex items-center justify-between gap-3 px-3.5 py-2.5">
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2">
+                                  <p className="text-xs font-bold text-ink truncate">{m.name}</p>
+                                  {renderShortfallBadge(m.shortfallStatus)}
+                                </div>
+                                {m.overallCompletion !== null && m.overallCompletion !== undefined ? (
+                                  <div className="mt-1.5 flex items-center gap-2 max-w-[220px]">
+                                    <DemoProgress value={m.overallCompletion} className="h-1.5 flex-1" />
+                                    <span className="text-[11px] font-semibold text-ink"><DemoCount value={m.overallCompletion} suffix="%" /></span>
+                                  </div>
+                                ) : (
+                                  <p className="mt-1 text-[11px] text-helper">{m.registrationNumber || "Targets not configured"}</p>
+                                )}
+                              </div>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setSelectedMentee(m);
+                                  toast.info(`Opening Logbook for ${m.name}`);
+                                }}
+                                className="text-xs text-forest border-line font-semibold gap-1 shrink-0"
+                              >
+                                <BookOpen className="h-3.5 w-3.5" /> View
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              </>
+            );
+          })()}
+        </TabsContent>
 
         {/* Tab 1: Sequential Fast Review Queue */}
         <TabsContent value="review-queue" className="pt-4 space-y-6" data-tour="review-queue">

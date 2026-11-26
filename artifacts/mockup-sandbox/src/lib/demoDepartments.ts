@@ -463,7 +463,69 @@ surgeryProfile.data.departmentCatalog.leaveTypes = [
   { id: 2, name: "Academic leave", value: "academic", required: 14, period: "total" },
 ];
 
-export const demoDepartmentProfiles: DemoDepartmentProfile[] = [pediatricsProfile, radiologyProfile, dermatologyProfile, microbiologyProfile, surgeryProfile];
+const gynecologyProfile = createEmptyDepartmentProfile({
+  id: 28,
+  label: "Gynecology",
+  name: "Gynecology",
+  code: "GYN",
+  accent: "var(--gothos-forest)",
+  enabledFeatures: {
+    procedureExperience: true,
+  },
+  caseCategories: [
+    { id: 867, name: "Obstetrics", value: "Obstetrics", required: 50, period: "total" },
+    { id: 868, name: "Gynaecology", value: "Gynaecology", required: 50, period: "total" },
+  ],
+});
+
+gynecologyProfile.data.departmentCatalog.config.requiredCases = 100;
+gynecologyProfile.data.departmentCatalog.config.requiredProcedures = 1592;
+gynecologyProfile.data.departmentCatalog.config.requiredAcademic = 5;
+gynecologyProfile.data.departmentCatalog.competencyLevels = [
+  { id: 859, name: "Observed / procedure seen", value: "observed", required: 0, period: "total" },
+  { id: 860, name: "Assisted", value: "assisted", required: 0, period: "total" },
+  { id: 861, name: "Performed under supervision", value: "performed_under_supervision", required: 0, period: "total" },
+  { id: 862, name: "Performed independently", value: "performed_independently", required: 0, period: "total" },
+];
+gynecologyProfile.data.departmentCatalog.procedures = [
+  { id: 83, name: "Endometrial / cervical biopsy", group: "Gynaecology", required: 120, requiredLogFields: [] },
+  { id: 84, name: "Dilatation and curettage", group: "Gynaecology", required: 120, requiredLogFields: [] },
+  { id: 87, name: "Operations for pelvic organ prolapse", group: "Gynaecology", required: 0, requiredLogFields: [] },
+  { id: 88, name: "Ovarian cyst operation", group: "Gynaecology", required: 25, requiredLogFields: [] },
+  { id: 89, name: "Operation for ectopic pregnancy", group: "Gynaecology", required: 40, requiredLogFields: [] },
+  { id: 92, name: "TAH + BSO", group: "Gynaecology", required: 110, requiredLogFields: [] },
+  { id: 94, name: "VH + PFR", group: "Gynaecology", required: 30, requiredLogFields: [] },
+  { id: 95, name: "Lap Sterilisation", group: "Gynaecology", required: 12, requiredLogFields: [] },
+  { id: 96, name: "Hysteroscopy", group: "Gynaecology", required: 10, requiredLogFields: [] },
+  { id: 73, name: "Application of forceps and ventouse", group: "Obstetrics", required: 15, requiredLogFields: [] },
+  { id: 74, name: "Venesection", group: "Obstetrics", required: 0, requiredLogFields: [] },
+  { id: 75, name: "Culdocentesis", group: "Obstetrics", required: 0, requiredLogFields: [] },
+  { id: 76, name: "Conduct normal deliveries", group: "Obstetrics", required: 450, requiredLogFields: [] },
+  { id: 77, name: "Episiotomy and its repair", group: "Obstetrics", required: 350, requiredLogFields: [] },
+  { id: 78, name: "Caesarian section delivery", group: "Obstetrics", required: 200, requiredLogFields: [] },
+  { id: 79, name: "Manual removal of placenta", group: "Obstetrics", required: 10, requiredLogFields: [] },
+  { id: 80, name: "Management of genital tract obstetrical injuries", group: "Obstetrics", required: 50, requiredLogFields: [] },
+  { id: 81, name: "Post partum sterilization / Minilap tubal ligation", group: "Obstetrics", required: 30, requiredLogFields: [] },
+  { id: 82, name: "Medical termination of pregnancy - various methods", group: "Obstetrics", required: 20, requiredLogFields: [] },
+];
+gynecologyProfile.data.departmentCatalog.postings = [
+  { id: 874, name: "District Residency Programme (DRP) - three-month residential rotation", value: "District Residency Programme (DRP) - three-month residential rotation", required: 0, period: "total" },
+];
+gynecologyProfile.data.departmentCatalog.academics = [
+  { id: 869, name: "Course on Research Methodology", value: "Course on Research Methodology", required: 1, period: "total" },
+  { id: 870, name: "Course in Ethics (GCP and GLP)", value: "Course in Ethics (GCP and GLP)", required: 1, period: "total" },
+  { id: 871, name: "Basic Cardiac Life Support (BCLS) course", value: "Basic Cardiac Life Support (BCLS) course", required: 1, period: "total" },
+  { id: 872, name: "Advanced Cardiac Life Support (ACLS) course", value: "Advanced Cardiac Life Support (ACLS) course", required: 1, period: "total" },
+  { id: 873, name: "Thesis / Dissertation", value: "Thesis / Dissertation", required: 1, period: "total" },
+];
+gynecologyProfile.data.departmentCatalog.leaveTypes = [
+  { id: 863, name: "Casual Leave", value: "casual", required: 0, period: "total" },
+  { id: 864, name: "Academic Leave", value: "academic", required: 0, period: "total" },
+  { id: 865, name: "Medical Leave", value: "medical", required: 0, period: "total" },
+  { id: 866, name: "Maternity / Paternity Leave", value: "maternity_paternity", required: 0, period: "total" },
+];
+
+export const demoDepartmentProfiles: DemoDepartmentProfile[] = [pediatricsProfile, radiologyProfile, dermatologyProfile, microbiologyProfile, surgeryProfile, gynecologyProfile];
 const defaultFeatureFlags = new Map(demoDepartmentProfiles.map((profile) => [
   profile.id,
   { ...profile.data.departmentCatalog.config.enabledFeatures },
