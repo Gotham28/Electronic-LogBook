@@ -23,6 +23,7 @@ export async function applyMigrations(connection: MigrationConnection, adoptExis
   files.push("0035_department_behaviour_settings.sql");
   files.push("0036_case_log_custom_fields.sql");
   files.push("0037_psychiatry_workspace.sql");
+  files.push("0038_posting_attachments.sql");
   await connection.query("BEGIN");
   try {
     await connection.query("SELECT pg_advisory_xact_lock(hashtext('elogbook-schema-migrations'))");

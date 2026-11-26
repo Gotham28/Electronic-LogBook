@@ -39,6 +39,7 @@ import { extractVoiceLog } from "../lib/voice-log/provider.js";
 import { clinicalWorkTarget } from "../lib/clinical-work-progress.js";
 import { validateAcademicRecord, readAcademicRecord, writeAcademicRecord, academicSectionForRecord } from "@workspace/api-zod";
 import { getAcademicLogbook } from "../lib/academic-logbook.js";
+import postingAttachmentsRouter from "./posting-attachments.js";
 
 const router: IRouter = Router();
 router.use(requireAuth, requireRole(["student", "professor", "hod"]), requireDepartment);
@@ -53,6 +54,7 @@ router.get("/requirements", async (req, res) => {
   res.json({ procedureRequirements, academicRequirements });
 });
 router.use("/:studentId", studentAccess);
+router.use("/:studentId/postings/:postingId/attachments", postingAttachmentsRouter);
 
 // Helper for validating supervisor
 async function validateSupervisor(supervisorId: number, departmentId: number) {

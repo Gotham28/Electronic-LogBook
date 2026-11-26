@@ -67,6 +67,7 @@ import {
 } from "lucide-react";
 import { formatLogbookDate, todayForInput } from "@/lib/logbook-config";
 import { CaseLogDetails, type CaseLogDetailRecord } from "@/components/CaseLogDetails";
+import { PostingAttachments } from "@/components/PostingAttachments";
 import { apiGet, apiPatch, apiPost, apiDelete, openCertificateFile } from "@/lib/apiClient";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { getCurrentUser, isDemoMode } from "@/lib/session";
@@ -1528,6 +1529,13 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                               "bg-amber-100 text-amber-700"
                             }`}>{posting.status === "verified" ? "Verified" : posting.status === "rejected" ? "Rejected" : "Pending"}</span>
                           </div>
+                          {config?.enabledFeatures?.postingAttachments === true && !isDemoMode() && (
+                            isHodUser || posting.supervisorId === currentUser?.id
+                          ) && (
+                            <div className="mt-3">
+                              <PostingAttachments studentId={selectedMentee.id} postingId={posting.id} />
+                            </div>
+                          )}
                           <PostingReviewForm
                             posting={posting}
                             studentId={selectedMentee.id}
