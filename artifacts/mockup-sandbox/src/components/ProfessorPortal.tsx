@@ -67,6 +67,7 @@ import {
 } from "lucide-react";
 import { formatLogbookDate, todayForInput } from "@/lib/logbook-config";
 import { CaseLogDetails, type CaseLogDetailRecord } from "@/components/CaseLogDetails";
+import { PostingAttachments } from "@/components/PostingAttachments";
 import { apiGet, apiPatch, apiPost, apiDelete, openCertificateFile } from "@/lib/apiClient";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { getCurrentUser, isDemoMode } from "@/lib/session";
@@ -144,7 +145,7 @@ const PROFESSOR_REVIEW_FLAG_LABELS: Record<string, string> = {
 export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; embedded?: boolean }) {
   const currentUser = useCurrentUser();
   const hideUhid = isDemoMode();
-  const { config, competencyLevels, caseCategories: deptCaseCategories, procedures: deptProcedures, procedureFields, academics: deptAcademics,
+  const { config, competencyLevels, caseCategories: deptCaseCategories, procedures: deptProcedures, procedureFields, caseLogFields, academics: deptAcademics,
     clinicalWorkCategories, clinicalWorkSubtypes, academicLogbook, label } = useDepartment();
   const dynamicProcedureFields = Boolean(config?.enabledFeatures?.dynamicProcedureFields);
   const activeProcedureFields = dynamicProcedureFields ? (procedureFields ?? []) : undefined;
@@ -158,7 +159,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
   const yearlyAttendance = Boolean(config?.enabledFeatures?.yearlyAttendance);
   const isHodUser = Boolean(embedded || currentUser?.role === "hod");
   const askMochiButton = (
-    <Button type="button" variant="outline" size="sm" onClick={openArogya}>
+    <Button type="button" variant="outline" size="sm" onClick={() => openArogya("Why is this record flagged or pending review?")}>
       Ask Mochi about this
     </Button>
   );
@@ -589,7 +590,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                           variant="outline"
                           size="sm"
                           onClick={() => {
-                            openArogya();
+                            openArogya("Why is this log flagged or pending review?");
                             void apiPost("/api/arogya/usage", { eventType: "nudge_click" }).catch(() => {});
                           }}
                         >
@@ -599,7 +600,7 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                     )}
 
                     {currentItem.type === "Case Log" ? (
-                      <CaseLogDetails caseLog={currentItem as CaseLogDetailRecord} hideUhid={hideUhid} medicalSummaryCaseFields={Boolean(config?.enabledFeatures?.medicalSummaryCaseFields)} microbiologyCaseFields={microbiologyCaseFields} />
+                      <CaseLogDetails caseLog={currentItem as CaseLogDetailRecord} hideUhid={hideUhid} medicalSummaryCaseFields={Boolean(config?.enabledFeatures?.medicalSummaryCaseFields)} microbiologyCaseFields={microbiologyCaseFields} customFieldDefinitions={caseLogFields} />
                     ) : (
                       <div className="bg-mist p-4 rounded-xl space-y-2 border border-line-soft">
                         <h4 className="text-xs font-semibold uppercase text-helper">Submission Details</h4>
@@ -1146,8 +1147,8 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                                     </div>
                                   </TableCell>
                                 </TableRow>
-                                {expanded && <TableRow><TableCell id={`case-details-${log.id}`} colSpan={4} className="bg-mist p-3">
-                                  <CaseLogDetails caseLog={log} hideUhid={hideUhid} showReview medicalSummaryCaseFields={Boolean(config?.enabledFeatures?.medicalSummaryCaseFields)} microbiologyCaseFields={microbiologyCaseFields} />
+                                {expanded && <TableRow><TableCell id={`case-details-${log.id}`} colSpan={4} className="bg-slate-50 p-3">
+                                  <CaseLogDetails caseLog={log} hideUhid={hideUhid} showReview medicalSummaryCaseFields={Boolean(config?.enabledFeatures?.medicalSummaryCaseFields)} microbiologyCaseFields={microbiologyCaseFields} customFieldDefinitions={caseLogFields} />
                                 </TableCell></TableRow>}
                               </React.Fragment>
                             );
@@ -1528,6 +1529,13 @@ export function ProfessorPortal({ activeTab, embedded }: { activeTab?: string; e
                               "bg-status text-status-foreground"
                             }`}>{posting.status === "verified" ? "Verified" : posting.status === "rejected" ? "Rejected" : "Pending"}</span>
                           </div>
+                          {config?.enabledFeatures?.postingAttachments === true && !isDemoMode() && (
+                            isHodUser || posting.supervisorId === currentUser?.id
+                          ) && (
+                            <div className="mt-3">
+                              <PostingAttachments studentId={selectedMentee.id} postingId={posting.id} />
+                            </div>
+                          )}
                           <PostingReviewForm
                             posting={posting}
                             studentId={selectedMentee.id}

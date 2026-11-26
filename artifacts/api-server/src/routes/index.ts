@@ -18,6 +18,7 @@ import logbookSectionsRouter from "./logbook-sections.js";
 import departmentConfigSettingsRouter from "./department-config-settings.js";
 import supportRouter from "./support.js";
 import departmentLabelsRouter from "./department-labels.js";
+import psychiatryRouter from "./psychiatry.js";
 
 const router: IRouter = Router();
 
@@ -38,6 +39,7 @@ router.use("/professors", professorRouter);
 router.use("/departments", departmentRouter);
 router.use("/logs", logsRouter);
 router.use("/assignments", assignmentsRouter);
+router.use("/psychiatry", psychiatryRouter);
 router.use("/appraisals", appraisalsRouter);
 // Mounted before paymentsRouter: paymentsRouter gates every route it owns behind
 // requirePaymentToken (payments.ts:12), which the unauthenticated Razorpay webhook caller can

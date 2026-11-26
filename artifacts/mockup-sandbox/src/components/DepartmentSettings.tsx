@@ -1,6 +1,7 @@
 import * as React from "react";
 import { toast } from "sonner";
 import { apiPost, apiPatch, apiGet, apiDelete } from "@/lib/apiClient";
+import { isDemoMode } from "@/lib/session";
 import { Trash2, AlertTriangle, ChevronDown, Search } from "lucide-react";
 import { useDepartment, DEPARTMENT_LABELS, DEPARTMENT_LABEL_GROUPS, defaultDepartmentLabel, type DepartmentLabelKey } from "@/lib/department-context";
 import { Button } from "@/components/ui/button";
@@ -8,6 +9,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LogbookSectionSettings } from "./LogbookSectionSettings";
+import { NavOrderSettings } from "./NavOrderSettings";
+import { PsychiatrySettings } from "./PsychiatrySettings";
+import { CaseLogFieldsCard } from "./CaseLogFieldsCard";
 import {
   DepartmentProcedureFieldsCard,
   DynamicProcedureFieldChecklist,
@@ -152,6 +156,49 @@ function useSearch<T extends { name: string }>(items: T[], query: string): T[] {
   }, [items, q]) as T[];
 }
 
+function PostingAttachmentSetting() {
+  const { config, readOnlyConfig, refresh } = useDepartment();
+  const enabled = config?.enabledFeatures?.postingAttachments ?? null;
+  const [saving, setSaving] = React.useState(false);
+  const [error, setError] = React.useState("");
+
+  async function save() {
+    setSaving(true);
+    setError("");
+    try {
+      await apiPatch("/api/admin/department/config/settings/postingAttachments", {
+        value: enabled !== true,
+        expectedValue: enabled,
+      });
+      if (await refresh()) toast.success(enabled ? "Posting attachments disabled" : "Posting attachments enabled");
+      else setError("The setting was saved. Reload this page to see it.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save the attachment setting.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="border-b border-slate-200 pb-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h4 className="text-sm font-semibold text-slate-900">Posting attachments</h4>
+          <p className="text-sm text-slate-600">
+            {enabled ? "Residents can attach PDF and JPEG files to postings." : "Posting attachments are disabled."}
+          </p>
+        </div>
+        {!readOnlyConfig && (
+          <Button type="button" size="sm" variant="outline" disabled={saving} onClick={() => void save()}>
+            {saving ? "Saving…" : enabled ? "Disable attachments" : "Enable attachments"}
+          </Button>
+        )}
+      </div>
+      {error && <p role="alert" className="mt-2 text-sm text-rose-700">{error}</p>}
+    </div>
+  );
+}
+
 export function DepartmentSettings() {
   const data = useDepartment();
   const features = data.config?.enabledFeatures ?? {};
@@ -169,6 +216,8 @@ export function DepartmentSettings() {
     if (features.conferenceLevels) list.push({ id: "conference", label: "Conference levels", items: data.conferenceLevels ?? [], kind: "conference_level", addLabel: "+ Add conference level" });
     list.push({ id: "leaves", label: "Leave types", items: data.leaveTypes ?? [], kind: "leave_type", addLabel: "+ Add leave type" });
     list.push({ id: "wording", label: "Wording", items: (Object.keys(DEPARTMENT_LABELS) as DepartmentLabelKey[]).map((key, index) => ({ id: index, name: key, required: 0 })), kind: "wording", addLabel: "" });
+    list.push({ id: "menu-order", label: "Residents' menu order", items: [], kind: "menu_order", addLabel: "" });
+    list.push({ id: "psychiatry", label: "Psychiatry workspace", items: [], kind: "psychiatry", addLabel: "" });
     return list;
   }, [procedureTypesEnabled, features, data]);
 
@@ -459,8 +508,8 @@ export function DepartmentSettings() {
         </div>
 
         <div className="min-w-0 flex flex-col gap-4 pb-12">
-          {activeSection.kind === "logbook" ? <LogbookSectionSettings /> : activeSection.kind === "wording" ? <WordingSettings /> : <>
-          <div className="flex flex-col gap-2 border-b border-line-soft pb-4">
+          {activeSection.kind === "logbook" ? <LogbookSectionSettings /> : activeSection.kind === "wording" ? <WordingSettings /> : activeSection.kind === "menu_order" ? <NavOrderSettings /> : activeSection.kind === "psychiatry" ? <PsychiatrySettings /> : <>
+          <div className="flex flex-col gap-2 border-b border-slate-200 pb-4">
             <div className="flex items-center justify-between gap-4">
               <h3 className="text-lg font-semibold text-ink">{activeSection.label}</h3>
               <Button data-tour="hod-requirements-add" size="sm" onClick={() => setIsAdding(!isAdding)}>
@@ -469,6 +518,8 @@ export function DepartmentSettings() {
             </div>
             {activeSection.desc && <p className="text-sm text-helper">{activeSection.desc}</p>}
           </div>
+
+          {activeSection.kind === "posting" && !isDemoMode() && <PostingAttachmentSetting />}
 
           {isAdding && (
             <div data-tour="hod-requirements-add-form" className="rounded-xl border border-line-soft bg-mist p-4 mb-2">
@@ -578,6 +629,12 @@ export function DepartmentSettings() {
               groupsError={groupsError}
               fetchGroups={fetchGroups}
             />
+          )}
+
+          {activeSection.kind === "case_category" && (
+            <div className="mb-4">
+              <CaseLogFieldsCard />
+            </div>
           )}
 
           {activeSection.kind === "clinical_work_category" && (

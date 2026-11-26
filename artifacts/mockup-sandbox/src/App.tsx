@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
 import { Redirect, Route, Switch, useLocation } from "wouter";
 import { AppLayout, type RoleType } from "@/components/layout/AppLayout";
 import { DemoBanner } from "@/components/layout/DemoBanner";
@@ -39,6 +39,9 @@ import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 
 import { modules as discoveredModules } from "./.generated/mockup-components";
+
+const PsychiatryWorkspace = lazy(() => import("@/components/pages/PsychiatryWorkspace").then((module) => ({ default: module.PsychiatryWorkspace })));
+const PsychiatryReviewPage = lazy(() => import("@/components/pages/PsychiatryWorkspace").then((module) => ({ default: module.PsychiatryReviewPage })));
 
 type ModuleMap = Record<string, () => Promise<Record<string, unknown>>>;
 
@@ -347,8 +350,9 @@ function App() {
 
   return (
     <DepartmentProvider departmentId={currentUser?.departmentId ?? null}>
-    <AppLayout
+    <DepartmentWorkspace
       activeRole={activeRole}
+      demo={Boolean(currentUser?.isDemoMode)}
       onSignOut={() => {
         void apiPost("/api/auth/logout", {}).catch(() => {});
         clearSession();
@@ -361,6 +365,7 @@ function App() {
       <Route path="/profile">{() => <ProfilePage />}</Route>
       <Route path="/notifications/name-changes/:notificationId">{(params) => <NameChangeNotificationPage notificationId={params.notificationId} />}</Route>
       <Route path="/notifications">{() => activeRole === "HOD" ? <NotificationsPage /> : <AccessDeniedPage />}</Route>
+      <Route path="/psychiatry/reviews">{() => activeRole === "Faculty" || activeRole === "HOD" ? <FeatureGate requires="psychiatryWorkspace"><Suspense fallback={<p role="status">Loading Psychiatry reviews…</p>}><PsychiatryReviewPage /></Suspense></FeatureGate> : <Redirect to="/" />}</Route>
       <Route>
       {activeRole === "Faculty" && (
         <ProfessorPortal />
@@ -390,9 +395,19 @@ function App() {
       )}
       </Route>
       </Switch>
-    </AppLayout>
+    </DepartmentWorkspace>
     </DepartmentProvider>
   );
+}
+
+function DepartmentWorkspace({ activeRole, demo, onSignOut, children }: { activeRole: RoleType; demo: boolean; onSignOut: () => void; children: ReactNode }) {
+  const { config } = useDepartment();
+  const [location] = useLocation();
+  const psychiatryPath = location === "/" || location === "/dashboard" || location === "/psychiatry" || location.startsWith("/psychiatry/");
+  if (activeRole === "Student" && !demo && psychiatryPath && config?.enabledFeatures?.psychiatryWorkspace === true) {
+    return <Suspense fallback={<p role="status" className="p-6">Loading your Psychiatry logbook…</p>}><PsychiatryWorkspace onSignOut={onSignOut} /></Suspense>;
+  }
+  return <AppLayout activeRole={activeRole} onSignOut={onSignOut}>{children}</AppLayout>;
 }
 
 function AccessDeniedPage() {

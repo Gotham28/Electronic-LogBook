@@ -30,13 +30,13 @@ const SHORT_LABELS: Record<string, string> = {
 
 // Phones only (hidden from 640px up, and in print): up to four main pages one tap away, and
 // "More" for the full menu.
-export function MobileBottomNav({ role, items, location, departmentKey, switching = false }: { role: "Student" | "Faculty" | "HOD"; items: BottomNavItem[]; location: string; departmentKey: number; switching?: boolean }) {
+export function MobileBottomNav({ role, items, location, departmentKey, switching = false, hasCustomOrder = false }: { role: "Student" | "Faculty" | "HOD"; items: BottomNavItem[]; location: string; departmentKey: number; switching?: boolean; hasCustomOrder?: boolean }) {
   const { setOpenMobile } = useSidebar();
   const demoMode = isDemoMode();
   const reduceMotion = useReducedMotion();
   // Picking a page from the full menu closes it, so the page is not left hidden behind the menu.
   React.useEffect(() => { setOpenMobile(false); }, [location, setOpenMobile]);
-  const slots = mobileNavigationItems(role, items);
+  const slots = mobileNavigationItems(role, items, hasCustomOrder);
   const visibleSlots = switching ? [] : slots;
   const cell = "flex min-h-[60px] min-w-0 flex-1 flex-col items-center justify-center gap-1 px-0.5 pt-1 text-xs font-semibold leading-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring";
 

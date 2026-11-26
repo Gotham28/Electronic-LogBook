@@ -176,8 +176,16 @@ export function apiDelete<T = any>(path: string, options?: RequestInit): Promise
 
 /** PUT raw file bytes (Bearer auth via fetchWithAuth). The server detects the real type from the bytes. */
 export function apiPutFile<T = any>(path: string, file: Blob, fileName: string): Promise<T> {
+  return uploadFile(path, file, fileName, "PUT");
+}
+
+export function apiPostFile<T>(path: string, file: File): Promise<T> {
+  return uploadFile(path, file, file.name, "POST");
+}
+
+function uploadFile<T>(path: string, file: Blob, fileName: string, method: "PUT" | "POST"): Promise<T> {
   return fetchWithAuth(path, {
-    method: "PUT",
+    method,
     body: file,
     headers: { "Content-Type": "application/octet-stream", "X-File-Name": encodeURIComponent(fileName) },
   });

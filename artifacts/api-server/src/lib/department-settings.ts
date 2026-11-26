@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { auditTable, db, departmentConfigsTable, departmentsTable } from "@workspace/db";
 import {
   DEPARTMENT_SETTING_TIERS, DEPARTMENT_SETTING_VALUE_TYPES, departmentSettingKeySchema, departmentSettingValueSchemas,
-  type DepartmentSettingKey, type DepartmentSettingTier,
+  type DepartmentSettingKey, type DepartmentSettingTier, type DepartmentSettingValue, type DepartmentSettingValueType,
 } from "@workspace/api-zod";
 import { resolveConfigDepartmentId } from "./department-config-source.js";
 
@@ -11,14 +11,14 @@ export type DepartmentSettingActor = "hod" | "mochi";
 export type DepartmentSettingView = {
   key: DepartmentSettingKey;
   tier: DepartmentSettingTier;
-  valueType: "boolean";
-  value: boolean | null;
+  valueType: DepartmentSettingValueType;
+  value: DepartmentSettingValue | null;
 };
 
 export type DepartmentSettingChange = {
   key: DepartmentSettingKey;
-  before: boolean | null;
-  after: boolean;
+  before: DepartmentSettingValue | null;
+  after: DepartmentSettingValue;
   auditId: string | null;
 };
 
@@ -31,10 +31,16 @@ export class DepartmentSettingError extends Error {
 // Stored values, not effective values: this reads the raw enabledFeatures[key] (null means unset) and
 // deliberately does not call getDepartmentFeatures(), whose microbiology name-check defaults are
 // being moved by task 2b. A caller's expectedValue is compared against this stored value.
-function storedValue(features: Record<string, unknown> | null | undefined, key: DepartmentSettingKey): boolean | null {
+function readStoredValue(features: Record<string, unknown> | null | undefined, key: DepartmentSettingKey): DepartmentSettingValue | null {
   const value = features?.[key];
+  if (DEPARTMENT_SETTING_VALUE_TYPES[key] === "path_list") {
+    const parsed = departmentSettingValueSchemas[key].safeParse(value);
+    return parsed.success ? (parsed.data as string[]) : null;
+  }
   return typeof value === "boolean" ? value : null;
 }
+
+const valuesEqual = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
 
 export async function getDepartmentSettings(departmentId: number): Promise<DepartmentSettingView[]> {
   // Mirrored test departments read their source department's configuration.
@@ -45,7 +51,7 @@ export async function getDepartmentSettings(departmentId: number): Promise<Depar
     key,
     tier: DEPARTMENT_SETTING_TIERS[key],
     valueType: DEPARTMENT_SETTING_VALUE_TYPES[key],
-    value: storedValue(config?.enabledFeatures, key),
+    value: readStoredValue(config?.enabledFeatures, key),
   }));
 }
 
@@ -54,7 +60,7 @@ export async function setDepartmentSetting(input: {
   userId: number; // usersTable.id of the person (or the person Mochi acts for), never studentsTable.id
   key: string;
   value: unknown;
-  expectedValue: boolean | null;
+  expectedValue: DepartmentSettingValue | null;
   actor: DepartmentSettingActor;
   undoOf?: string; // audit id of the change this one reverses; written with the audit row, in the same transaction
 }): Promise<DepartmentSettingChange> {
@@ -69,7 +75,7 @@ export async function setDepartmentSetting(input: {
   }
   const parsedValue = departmentSettingValueSchemas[key].safeParse(input.value);
   if (!parsedValue.success) throw new DepartmentSettingError(400, "Invalid value for this setting");
-  const value = parsedValue.data as boolean;
+  const value = parsedValue.data as DepartmentSettingValue;
 
   if (!Number.isSafeInteger(departmentId) || departmentId <= 0) throw new DepartmentSettingError(403, "A department assignment is required");
   const [department] = await db.select({ configSourceDepartmentId: departmentsTable.configSourceDepartmentId })
@@ -82,23 +88,23 @@ export async function setDepartmentSetting(input: {
   return db.transaction(async (tx) => {
     const [existing] = await tx.select({ enabledFeatures: departmentConfigsTable.enabledFeatures })
       .from(departmentConfigsTable).where(eq(departmentConfigsTable.departmentId, departmentId)).limit(1).for("update");
-    const before = storedValue(existing?.enabledFeatures, key);
-    if (before !== expectedValue) throw new DepartmentSettingError(409, "This setting changed since you loaded it. Reload and try again.");
-    if (before === value) return { key, before, after: value, auditId: null };
+    const before = readStoredValue(existing?.enabledFeatures, key);
+    if (!valuesEqual(before, expectedValue)) throw new DepartmentSettingError(409, "This setting changed since you loaded it. Reload and try again.");
+    if (valuesEqual(before, value)) return { key, before, after: value, auditId: null };
 
     if (existing) {
-      await tx.update(departmentConfigsTable).set({ enabledFeatures: { ...existing.enabledFeatures, [key]: value } })
+      await tx.update(departmentConfigsTable).set({ enabledFeatures: { ...existing.enabledFeatures, [key]: value } as any })
         .where(eq(departmentConfigsTable.departmentId, departmentId));
     } else {
       // No row yet: insert only this key. The column default (procedureExperience: true) is NOT applied,
       // because that would silently change a second setting.
-      const inserted = await tx.insert(departmentConfigsTable).values({ departmentId, enabledFeatures: { [key]: value } })
+      const inserted = await tx.insert(departmentConfigsTable).values({ departmentId, enabledFeatures: { [key]: value } as any })
         .onConflictDoNothing().returning({ id: departmentConfigsTable.id });
       // A concurrent insert for the same department won the unique department_id constraint.
       if (!inserted.length) throw new DepartmentSettingError(409, "This setting changed since you loaded it. Reload and try again.");
     }
 
-    // Setting keys and booleans only: nothing here can carry patient text or leave reasons.
+    // Setting keys and values only: nothing here can carry patient text or leave reasons.
     const [audit] = await tx.insert(auditTable).values({
       tableName: "department_configs",
       recordId: String(departmentId),

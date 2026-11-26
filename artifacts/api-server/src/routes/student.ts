@@ -20,8 +20,15 @@ import {
   procedureFieldIdSchema,
   isBuiltInProcedureField,
   normalizeCustomProcedureFieldValues,
+  normalizeLogCustomFieldValues,
+  isPsychiatryShortCase,
+  redactPsychiatryShortCaseId,
+  psychiatryShortCaseSchema,
+  psychiatryShortCaseValues,
+  SHORT_CASE_CATEGORY,
   resolveProcedureFieldDefinitions,
   validateDynamicProcedureLogFields,
+  validateLogCustomFieldValues,
   validateProcedureLogFields,
   voiceLogTypeSchema,
 } from "@workspace/api-zod";
@@ -32,6 +39,7 @@ import { extractVoiceLog } from "../lib/voice-log/provider.js";
 import { clinicalWorkTarget } from "../lib/clinical-work-progress.js";
 import { validateAcademicRecord, readAcademicRecord, writeAcademicRecord, academicSectionForRecord } from "@workspace/api-zod";
 import { getAcademicLogbook } from "../lib/academic-logbook.js";
+import postingAttachmentsRouter from "./posting-attachments.js";
 
 const router: IRouter = Router();
 router.use(requireAuth, requireRole(["student", "professor", "hod"]), requireDepartment);
@@ -46,6 +54,7 @@ router.get("/requirements", async (req, res) => {
   res.json({ procedureRequirements, academicRequirements });
 });
 router.use("/:studentId", studentAccess);
+router.use("/:studentId/postings/:postingId/attachments", postingAttachmentsRouter);
 
 // Helper for validating supervisor
 async function validateSupervisor(supervisorId: number, departmentId: number) {
@@ -277,7 +286,7 @@ router.get("/:studentId/logs", requireAuth, async (req, res) => {
         mentorRole: studentMatch[0].mentorRole,
         course: studentMatch[0].specialty,
       },
-      caseLogs: caseLogsRaw.map((r: any) => ({ ...r.log, supervisorName: r.supervisorName })),
+      caseLogs: caseLogsRaw.map((r) => ({ ...redactPsychiatryShortCaseId(r.log), supervisorName: r.supervisorName })),
       procedureLogs: procedureLogsRaw.map((r: any) => ({ ...r.log, supervisorName: r.supervisorName })),
       academicLogs: academicLogsRaw.map((r: any) => ({ ...r.log, supervisorName: r.supervisorName })),
       conferenceLogs: conferenceLogsRaw.map((r: any) => ({ ...r.log, supervisorName: r.supervisorName })),
@@ -1433,11 +1442,17 @@ const customFieldsInputSchema = z.record(procedureFieldIdSchema, z.string().max(
   (obj) => Object.keys(obj).length <= 40,
   "Too many custom fields",
 ).optional();
+const caseCustomFieldsInputSchema = z
+  .record(z.string().max(4000).nullable())
+  .refine((val) => Object.keys(val).length <= 40, "At most 40 custom fields are allowed")
+  .optional();
+
 router.post("/:studentId/case-logs", validate(z.object({ supervisorId: idSchema, date: dateSchema, patientAge: nameSchema,
   patientGender: z.enum(["male", "female", "other"]), diagnosisFinal: z.string().trim().min(1).max(8000),
   patientUhid: optionalText, chiefComplaints: optionalText, diagnosisProvisional: optionalText, history: optionalText,
   examination: optionalText, investigations: optionalText, differentialDiagnosis: optionalText, managementPlan: optionalText,
-  outcome: optionalText, learningPoints: optionalText, category: optionalText }).strict()), async (req, res) => {
+  outcome: optionalText, learningPoints: optionalText, category: optionalText,
+  customFields: caseCustomFieldsInputSchema, psychiatryShortCase: psychiatryShortCaseSchema.optional() }).strict()), async (req, res) => {
   try {
     const studentId = parseInt(String(req.params.studentId), 10);
     const { supervisorId, date, patientAge, patientGender, diagnosisFinal } = req.body;
@@ -1446,10 +1461,31 @@ router.post("/:studentId/case-logs", validate(z.object({ supervisorId: idSchema,
       res.status(400).json({ message: "Invalid supervisorId" });
       return;
     }
+
+    const { caseLogFields, features } = await getDepartmentFeatures(req.user!.departmentId!);
+    const isShortCase = Boolean(req.body.psychiatryShortCase);
+    if (isShortCase && features.psychiatryWorkspace !== true) {
+      res.status(403).json({ message: "Short cases are unavailable for your department" }); return;
+    }
+    if (isShortCase && req.body.category !== SHORT_CASE_CATEGORY) {
+      res.status(400).json({ message: "Short-case details and category must be submitted together" }); return;
+    }
+    if (isShortCase && (req.body.patientUhid || !/^\d+$/.test(patientAge))) {
+      res.status(400).json({ message: "Short cases require a whole-number age and do not accept a patient ID" }); return;
+    }
+    const shortCase = isShortCase ? psychiatryShortCaseValues(req.body.psychiatryShortCase) : undefined;
+    const defs = caseLogFields ?? [];
+    const rawCustomFields = req.body.customFields ?? {};
+    const customFieldError = !shortCase && validateLogCustomFieldValues(defs, rawCustomFields);
+    if (customFieldError) {
+      res.status(400).json({ message: customFieldError });
+      return;
+    }
+    const normalizedCustomFields = normalizeLogCustomFieldValues(defs, rawCustomFields);
     
     const [inserted] = await db.insert(caseLogsTable).values({
       studentId, supervisorId: supervisorIdNum, date, patientAge, patientGender, 
-      diagnosisFinal,
+      diagnosisFinal: shortCase?.diagnosisFinal ?? diagnosisFinal,
       patientUhid: req.body.patientUhid,
       chiefComplaints: req.body.chiefComplaints,
       diagnosisProvisional: req.body.diagnosisProvisional,
@@ -1457,10 +1493,12 @@ router.post("/:studentId/case-logs", validate(z.object({ supervisorId: idSchema,
       history: req.body.history, 
       examination: req.body.examination, investigations: req.body.investigations, 
       differentialDiagnosis: req.body.differentialDiagnosis, managementPlan: req.body.managementPlan, 
-      outcome: req.body.outcome, learningPoints: req.body.learningPoints, status: "pending"
+      outcome: req.body.outcome, learningPoints: req.body.learningPoints,
+      customFields: shortCase?.customFields ?? normalizedCustomFields,
+      status: "pending"
     }).returning();
-    res.status(201).json(inserted);
-  } catch (error) {
+    res.status(201).json(redactPsychiatryShortCaseId(inserted));
+  } catch {
     res.status(500).json({ message: "Internal server error" });
   }
 });
@@ -1929,12 +1967,15 @@ router.patch("/:studentId/case-logs/:logId", requireAuth, validate(z.object({ su
   patientGender: z.enum(["male", "female", "other"]), diagnosisFinal: z.string().trim().min(1).max(8000),
   patientUhid: optionalText, chiefComplaints: optionalText, diagnosisProvisional: optionalText, history: optionalText,
   examination: optionalText, investigations: optionalText, differentialDiagnosis: optionalText, managementPlan: optionalText,
-  outcome: optionalText, learningPoints: optionalText, category: optionalText }).strict().partial()), async (req, res) => {
+  outcome: optionalText, learningPoints: optionalText, category: optionalText,
+  customFields: caseCustomFieldsInputSchema, psychiatryShortCase: psychiatryShortCaseSchema }).strict().partial()), async (req, res) => {
   try {
     const studentId = parseInt(String(req.params.studentId), 10);
     const logId = parseInt(String(req.params.logId), 10);
     const guard = await studentEditGuard(req, res, caseLogsTable, logId, studentId);
     if (guard.error) { res.status(guard.error).json({ message: guard.message }); return; }
+    const currentLog = guard.log;
+    if (!currentLog) { res.status(404).json({ message: "Log not found" }); return; }
     
     if (req.body.supervisorId) {
       if (!(await validateSupervisor(parseInt(req.body.supervisorId, 10), guard.caller.departmentId!))) {
@@ -1943,12 +1984,49 @@ router.patch("/:studentId/case-logs/:logId", requireAuth, validate(z.object({ su
       req.body.supervisorId = parseInt(req.body.supervisorId, 10);
     }
 
-    const updateBody = { ...req.body, status: "pending", facultyRemarks: null };
+    const { caseLogFields, features } = await getDepartmentFeatures(guard.caller.departmentId!);
+    const { psychiatryShortCase, ...changes } = req.body;
+    const isShortCase = isPsychiatryShortCase(currentLog);
+    const nextCategory = changes.category === undefined ? currentLog.category : changes.category;
+    if ((isShortCase && nextCategory !== SHORT_CASE_CATEGORY) || isShortCase !== Boolean(psychiatryShortCase)) {
+      res.status(400).json({ message: "Use the matching case form to update this entry" }); return;
+    }
+    if (isShortCase && features.psychiatryWorkspace !== true) {
+      res.status(403).json({ message: "Short cases are unavailable for your department" }); return;
+    }
+    if (isShortCase && (changes.patientUhid ||
+      !/^\d+$/.test(changes.patientAge ?? currentLog.patientAge))) {
+      res.status(400).json({ message: "Short cases require a whole-number age and do not accept a patient ID" }); return;
+    }
+    const shortCase = isShortCase ? psychiatryShortCaseValues(psychiatryShortCase) : undefined;
+    const defs = caseLogFields ?? [];
+    const previousCustomFields = (currentLog.customFields ?? {}) as Record<string, string>;
+    const mergedCustomFields: Record<string, string | null | undefined> = { ...previousCustomFields };
+    if (req.body.customFields) {
+      for (const [k, v] of Object.entries(req.body.customFields as Record<string, string | null>)) {
+        if (v === null || v.trim() === "") {
+          delete mergedCustomFields[k];
+        } else {
+          mergedCustomFields[k] = v;
+        }
+      }
+    }
+    const customFieldError = !shortCase && validateLogCustomFieldValues(defs, mergedCustomFields, previousCustomFields);
+    if (customFieldError) {
+      res.status(400).json({ message: customFieldError });
+      return;
+    }
+    const normalizedCustomFields = normalizeLogCustomFieldValues(defs, mergedCustomFields, previousCustomFields);
+
+    const { patientUhid, ...otherChanges } = changes;
+    const updateBody = { ...otherChanges, ...(!isShortCase && { patientUhid }), customFields: normalizedCustomFields, ...shortCase, status: "pending", facultyRemarks: null };
     const [updated] = await db.update(caseLogsTable).set(updateBody)
-      .where(and(eq(caseLogsTable.id, logId), eq(caseLogsTable.studentId, studentId), isNull(caseLogsTable.deletedAt))).returning();
+      .where(and(eq(caseLogsTable.id, logId), eq(caseLogsTable.studentId, studentId), isNull(caseLogsTable.deletedAt),
+        isShortCase ? eq(caseLogsTable.status, currentLog.status) : undefined)).returning();
+    if (!updated && isShortCase) { res.status(409).json({ message: "The short case changed. Reload it before editing." }); return; }
     if (!updated) { res.status(400).json({ message: "Log not found" }); return; }
-    res.json(updated);
-  } catch (error) { res.status(500).json({ message: "Internal server error" }); }
+    res.json(redactPsychiatryShortCaseId(updated));
+  } catch { res.status(500).json({ message: "Internal server error" }); }
 });
 
 // 2. Procedure Logs

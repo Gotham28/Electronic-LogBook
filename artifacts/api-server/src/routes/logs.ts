@@ -5,7 +5,7 @@ import { requireAuth, requireRole, requireDepartment } from "../middlewares/auth
 import { z } from "zod";
 import { validate } from "../lib/validation.js";
 import { resolveConfigDepartmentId } from "../lib/department-config-source.js";
-import { PROCEDURE_ROLE_CODES, resolveProcedureFieldDefinitions } from "@workspace/api-zod";
+import { PROCEDURE_ROLE_CODES, redactPsychiatryShortCaseId, resolveProcedureFieldDefinitions } from "@workspace/api-zod";
 
 const router: IRouter = Router();
 
@@ -152,7 +152,7 @@ router.patch("/:logType/:logId/review", requireAuth, requireRole(["professor", "
       return;
     }
 
-    res.json(updatedRows[0]);
+    res.json(logType === "case" ? redactPsychiatryShortCaseId(updatedRows[0]) : updatedRows[0]);
   } catch (error) {
     req.log.error({ logType: req.params.logType, logId: req.params.logId, status: 500 }, "Error updating log review status");
     res.status(500).json({ message: "Internal server error" });

@@ -1,6 +1,9 @@
 import * as React from "react";
 import { formatLogbookDate } from "@/lib/logbook-config";
 import { getCaseMedicalSummary } from "@/lib/case-medical-summary";
+import { LogCustomFieldValues } from "@/components/LogCustomFields";
+import type { LogCustomFieldDefinition } from "@/lib/log-custom-fields";
+import { isPsychiatryShortCase } from "@workspace/api-zod";
 
 export type CaseLogDetailRecord = {
   date: string;
@@ -23,6 +26,7 @@ export type CaseLogDetailRecord = {
   facultyRemarks?: string | null;
   facultyGrade?: string | null;
   reviewedAt?: string | Date | null;
+  customFields?: Record<string, string> | null;
 };
 
 function DetailField({ label, value }: { label: string; value?: string | number | null }) {
@@ -42,13 +46,16 @@ export function CaseLogDetails({
   showReview = false,
   medicalSummaryCaseFields = false,
   microbiologyCaseFields = false,
+  customFieldDefinitions,
 }: {
   caseLog: CaseLogDetailRecord;
   hideUhid?: boolean;
   showReview?: boolean;
   medicalSummaryCaseFields?: boolean;
   microbiologyCaseFields?: boolean;
+  customFieldDefinitions?: LogCustomFieldDefinition[];
 }) {
+  const shortCase = isPsychiatryShortCase(caseLog);
   return (
     <div className="space-y-4 rounded-xl border border-line-soft bg-white p-4 sm:p-5">
       <section aria-labelledby="case-context-heading">
@@ -56,13 +63,23 @@ export function CaseLogDetails({
         <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <DetailField label="Date" value={formatLogbookDate(caseLog.date)} />
           <DetailField label="Attempt" value={caseLog.attemptNumber ?? 1} />
-          <DetailField label={microbiologyCaseFields ? "Sample category" : "Category"} value={caseLog.category} />
+          <DetailField label={microbiologyCaseFields && !shortCase ? "Sample category" : "Category"} value={shortCase ? "Short case" : caseLog.category} />
           <DetailField label="Patient age" value={caseLog.patientAge} />
           <DetailField label="Patient gender" value={caseLog.patientGender} />
-          {!hideUhid && <DetailField label="UHID" value={caseLog.patientUhid} />}
+          {!hideUhid && !shortCase && <DetailField label="UHID" value={caseLog.patientUhid} />}
         </dl>
       </section>
-      {microbiologyCaseFields ? (
+      {shortCase ? <section aria-label="Short-case details">
+        <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <DetailField label="Seen in" value={caseLog.customFields?.psychiatrySeenIn} />
+          <DetailField label="ICD-11 diagnosis" value={caseLog.diagnosisFinal} />
+          <DetailField label="Tags" value={caseLog.customFields?.psychiatryTags} />
+          <DetailField label="What you did" value={caseLog.customFields?.psychiatryActivities} />
+          <DetailField label="Plan" value={caseLog.managementPlan} />
+          <DetailField label="Referred from" value={caseLog.customFields?.psychiatryReferredFrom} />
+          <DetailField label="Learning point" value={caseLog.learningPoints} />
+        </dl>
+      </section> : microbiologyCaseFields ? (
         <section aria-labelledby="case-microbiology-heading">
           <h4 id="case-microbiology-heading" className="mb-3 text-xs font-bold uppercase tracking-wide text-forest">Laboratory and diagnostic details</h4>
           <dl className="grid grid-cols-1 gap-4">
@@ -96,6 +113,7 @@ export function CaseLogDetails({
           </section>
         </>
       )}
+      {!shortCase && <LogCustomFieldValues fields={customFieldDefinitions} values={caseLog.customFields} />}
       {showReview && (caseLog.status !== "pending" || caseLog.facultyRemarks || caseLog.facultyGrade || caseLog.reviewedAt) && (
         <section aria-labelledby="case-review-heading" className="border-t border-line-soft pt-4">
           <h4 id="case-review-heading" className="mb-3 text-xs font-bold uppercase tracking-wide text-forest">Faculty review</h4>

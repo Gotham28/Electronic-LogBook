@@ -25,8 +25,10 @@ import { Kbd } from "@/components/ui/kbd";
 import { formatLogbookDate, todayForInput } from "@/lib/logbook-config";
 import { VoiceLogRecorder } from "@/components/VoiceLogRecorder";
 import { mergeCaseVoiceFields } from "@/lib/voiceLogMerge";
-import type { VoiceLogExtractResponse } from "@workspace/api-zod";
+import { isPsychiatryShortCase, type VoiceLogExtractResponse } from "@workspace/api-zod";
 import { useDepartment } from "@/lib/department-context";
+import { LogCustomFieldInputs, LogCustomFieldValues } from "@/components/LogCustomFields";
+import { logCustomFieldVisible } from "@/lib/log-custom-fields";
 import { getCaseMedicalSummary } from "@/lib/case-medical-summary";
 
 type CaseLog = {
@@ -83,6 +85,7 @@ export function CaseLogsPage() {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [form, setForm] = React.useState(emptyForm);
+  const [customFields, setCustomFields] = React.useState<Record<string, string>>({});
   const [editLogId, setEditLogId] = React.useState<number | null>(null);
   const [editLogRemarks, setEditLogRemarks] = React.useState<string | null>(null);
   const [editLogStatus, setEditLogStatus] = React.useState<string | null>(null);
@@ -124,6 +127,7 @@ export function CaseLogsPage() {
       learningPoints: log.learningPoints || "",
       supervisorId: String(log.supervisorId || ""),
     });
+    setCustomFields({ ...(log.customFields ?? {}) });
     setIsModalOpen(true);
   };
 
@@ -132,7 +136,7 @@ export function CaseLogsPage() {
   const [professors, setProfessors] = React.useState<any[]>([]);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
-  const { caseCategories, config: deptConfig } = useDepartment();
+  const { caseCategories, caseLogFields = [], config: deptConfig } = useDepartment();
   const medicalSummaryCaseFields = Boolean(deptConfig?.enabledFeatures?.medicalSummaryCaseFields);
   const microbiologyCaseFields = Boolean(deptConfig?.enabledFeatures?.microbiologyCaseFields);
 
@@ -156,16 +160,17 @@ export function CaseLogsPage() {
     }
     try {
       setLoading(true);
-      const data = await apiGet(`/api/students/${user.studentProfileId}/logs`);
+      const data = await apiGet<{ caseLogs: Array<CaseLog & { id: number }> }>(`/api/students/${user.studentProfileId}/logs`);
       // Sort so newest are first
-      const sortedLogs = (data.caseLogs || []).sort((a: any, b: any) => b.id - a.id);
+      const sortedLogs = (data.caseLogs || []).filter((log) => !deptConfig?.enabledFeatures.psychiatryWorkspace || !isPsychiatryShortCase(log))
+        .sort((a, b) => b.id - a.id);
       setCaseLogs(sortedLogs.map((log: any, index: number) => ({ ...log, number: sortedLogs.length - index })));
     } catch (err: any) {
       setError(err.message || "Failed to load case logs");
     } finally {
       setLoading(false);
     }
-  }, [user?.studentProfileId]);
+  }, [user?.studentProfileId, deptConfig?.enabledFeatures.psychiatryWorkspace]);
 
   React.useEffect(() => {
     fetchLogs();
@@ -191,6 +196,16 @@ export function CaseLogsPage() {
     
     setIsSubmitting(true);
     try {
+      const customFieldsPayload = caseLogFields.length > 0
+        ? Object.fromEntries(
+            caseLogFields.map((field) => {
+              const visible = logCustomFieldVisible(field, customFields);
+              const raw = visible ? customFields[field.key] : "";
+              const trimmed = typeof raw === "string" ? raw.trim() : "";
+              return [field.key, trimmed ? trimmed : editLogId ? null : ""];
+            }).filter(([, val]) => val !== "" || (editLogId && val === null)),
+          )
+        : undefined;
       const payload = {
         date: form.date,
         patientUhid: form.patientUhid,
@@ -208,6 +223,7 @@ export function CaseLogsPage() {
         outcome: microbiologyCaseFields ? "" : form.outcome,
         learningPoints: microbiologyCaseFields ? "" : form.learningPoints,
         supervisorId: form.supervisorId,
+        ...(customFieldsPayload ? { customFields: customFieldsPayload } : {}),
       };
       
       if (editLogId) {
@@ -218,6 +234,7 @@ export function CaseLogsPage() {
       
       await fetchLogs();
       setForm({ ...emptyForm, date: todayForInput() });
+      setCustomFields({});
       setIsModalOpen(false);
       setEditLogId(null);
       setEditLogRemarks(null);
@@ -377,6 +394,7 @@ export function CaseLogsPage() {
           setIsModalOpen(val); 
           if (!val) {
             setForm({ ...emptyForm, date: todayForInput() });
+            setCustomFields({});
             setEditLogId(null);
             setEditLogRemarks(null);
             setEditLogStatus(null);
@@ -384,7 +402,7 @@ export function CaseLogsPage() {
           } 
         }}>
           <DialogTrigger asChild>
-            <Button data-tour="caselog-add"><PlusCircle className="h-4 w-4" /> Log clinical case</Button>
+            <Button data-tour="caselog-add" onClick={() => { setEditLogId(null); setCustomFields({}); }}><PlusCircle className="h-4 w-4" /> Log clinical case</Button>
           </DialogTrigger>
           <DialogContent className="max-h-[90vh] overflow-y-auto rounded-2xl bg-white sm:max-w-3xl">
             <DialogHeader>
@@ -488,6 +506,14 @@ export function CaseLogsPage() {
                     <Field label="Learning points" isAiFilled={aiFilledFields.has("learningPoints")}><Textarea rows={2} value={form.learningPoints} onChange={(e) => setField("learningPoints", e.target.value)} /></Field>
                   </div>
                 </>
+              )}
+              {caseLogFields.length > 0 && (
+                <LogCustomFieldInputs
+                  fields={caseLogFields}
+                  values={customFields}
+                  onChange={(key, value) => setCustomFields((prev) => ({ ...prev, [key]: value }))}
+                  disabled={isSubmitting}
+                />
               )}
               <div data-tour="caselog-reviewer">
               <Field label="Reviewing faculty member">
@@ -711,6 +737,7 @@ export function CaseLogsPage() {
                     <Detail label="Learning points" value={selectedLog.learningPoints} />
                   </>
                 )}
+                <LogCustomFieldValues fields={caseLogFields} values={selectedLog.customFields} />
                 {selectedLog.status === "rejected" ? (
                   <div className="rounded-2xl border border-status-border bg-status p-4 space-y-3">
                     <div>

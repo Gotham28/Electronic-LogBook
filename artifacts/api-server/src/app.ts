@@ -66,6 +66,7 @@ app.use(cookieParser());
 // The write routes that carry raw file bytes (route-level express.raw, real type sniffed server-side).
 // Only the JSON content-type requirement is waived for them; the Origin and cookie checks below still apply.
 const CERTIFICATE_FILE_UPLOAD = /^\/api\/students\/[^/]+\/certifications\/[^/]+\/file$/;
+const POSTING_ATTACHMENT_UPLOAD = /^\/api\/students\/[^/]+\/postings\/[^/]+\/attachments\/?$/;
 const VOICE_LOG_EXTRACT = /^\/api\/students\/[^/]+\/voice-log\/extract$/;
 app.use((req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
@@ -73,7 +74,8 @@ app.use((req, res, next) => {
   if (!["GET", "HEAD", "OPTIONS"].includes(req.method)) {
     const isCertificateFileUpload = req.method === "PUT" && CERTIFICATE_FILE_UPLOAD.test(req.path);
     const isVoiceLogExtract = req.method === "POST" && VOICE_LOG_EXTRACT.test(req.path);
-    if (!isCertificateFileUpload && !isVoiceLogExtract && !/^application\/json(?:;|$)/i.test(req.headers["content-type"] || "")) {
+    const isPostingAttachmentUpload = req.method === "POST" && POSTING_ATTACHMENT_UPLOAD.test(req.path);
+    if (!isCertificateFileUpload && !isVoiceLogExtract && !isPostingAttachmentUpload && !/^application\/json(?:;|$)/i.test(req.headers["content-type"] || "")) {
       res.status(415).json({ message: "Use application/json" }); return;
     }
     const origin = req.headers.origin;
