@@ -99,8 +99,7 @@
   }
 }
 
-#root:has(.signed-out-entry) > .support-widget-floating,
-#root:has(.signed-out-support-button) > .support-widget-floating,
+#root:has([aria-label="E-Logbook demo video"]) > .support-widget-floating,
 #root:has(.signed-out-entry) > [data-testid="cookie-consent-banner"] {
   display: none;
 }

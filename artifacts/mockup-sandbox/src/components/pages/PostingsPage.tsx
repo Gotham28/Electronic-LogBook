@@ -36,15 +36,35 @@ type Posting = {
 };
 
 import { apiGet, apiPost, apiPatch } from "@/lib/apiClient";
-import { getCurrentUser } from "@/lib/session";
+import { getCurrentUser, isDemoMode } from "@/lib/session";
+import { isLogCreateEligible, useLogCreateIntent } from "@/lib/log-create-navigation";
 
 export function PostingsPage() {
-  const { postings: postingOptions, config, postingSchedule, label } = useDepartment();
+  const { postings: postingOptions, config, postingSchedule, label, academicLogbook } = useDepartment();
   const postingLabelTitle = label("postings.unitTitle");
   const postingLabelLower = label("postings.unitPhrase");
   const [open, setOpen] = React.useState(false);
   const [postings, setPostings] = React.useState<Posting[]>([]);
   const user = React.useMemo(() => getCurrentUser(), []);
+  useLogCreateIntent(["posting"], () => {
+    setEditId(null);
+    setWard("");
+    setStartDate(todayForInput());
+    setEndDate(todayForInput());
+    setSupervisorId("");
+    setOpen(true);
+  }, {
+    targetPath: "/postings",
+    ready: Boolean(config),
+    eligible: isLogCreateEligible({
+      action: "posting",
+      targetPath: "/postings",
+      isStudent: user?.role === "student",
+      config,
+      demoMode: isDemoMode(),
+      academicLogbook,
+    }),
+  });
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [professors, setProfessors] = React.useState<any[]>([]);

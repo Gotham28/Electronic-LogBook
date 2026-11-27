@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { apiGet, apiPost, apiDelete, apiPatch } from "@/lib/apiClient";
 import { openArogya, publishArogyaContext } from "@/lib/arogya-context";
 import { getCurrentUser, isDemoMode } from "@/lib/session";
+import { useLogCreateIntent, isLogCreateEligible } from "@/lib/log-create-navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -136,9 +137,36 @@ export function CaseLogsPage() {
   const [professors, setProfessors] = React.useState<any[]>([]);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
-  const { caseCategories, caseLogFields = [], config: deptConfig } = useDepartment();
+  const { caseCategories, caseLogFields = [], config: deptConfig, academicLogbook } = useDepartment();
   const medicalSummaryCaseFields = Boolean(deptConfig?.enabledFeatures?.medicalSummaryCaseFields);
   const microbiologyCaseFields = Boolean(deptConfig?.enabledFeatures?.microbiologyCaseFields);
+
+  const openNewCaseModal = React.useCallback(() => {
+    setSelectedLog(null);
+    publishArogyaContext(null);
+    if (editLogId !== null) {
+      setForm({ ...emptyForm, date: todayForInput() });
+      setCustomFields({});
+      resetVoiceState();
+    }
+    setEditLogId(null);
+    setEditLogRemarks(null);
+    setEditLogStatus(null);
+    setIsModalOpen(true);
+  }, [editLogId, resetVoiceState]);
+
+  useLogCreateIntent(["case"], openNewCaseModal, {
+    targetPath: "/cases",
+    ready: Boolean(deptConfig),
+    eligible: isLogCreateEligible({
+      action: "case",
+      targetPath: "/cases",
+      isStudent: user?.role === "student",
+      config: deptConfig,
+      demoMode: isDemoMode(),
+      academicLogbook,
+    }),
+  });
 
   const totalRequired = React.useMemo(() => 
     caseCategories?.reduce((acc: number, c: any) => acc + c.required, 0) || 50,
@@ -393,6 +421,7 @@ export function CaseLogsPage() {
         <Dialog open={isModalOpen} onOpenChange={(val) => { 
           setIsModalOpen(val); 
           if (!val) {
+            publishArogyaContext(null);
             setForm({ ...emptyForm, date: todayForInput() });
             setCustomFields({});
             setEditLogId(null);
@@ -402,7 +431,7 @@ export function CaseLogsPage() {
           } 
         }}>
           <DialogTrigger asChild>
-            <Button data-tour="caselog-add" onClick={() => { setEditLogId(null); setCustomFields({}); }}><PlusCircle className="h-4 w-4" /> Log clinical case</Button>
+            <Button data-tour="caselog-add" onClick={openNewCaseModal}><PlusCircle className="h-4 w-4" /> Log clinical case</Button>
           </DialogTrigger>
           <DialogContent className="max-h-[90vh] overflow-y-auto rounded-2xl bg-white sm:max-w-3xl">
             <DialogHeader>

@@ -4,7 +4,8 @@ import { AlertCircle, CheckCircle2, Clock, GraduationCap, PlusCircle, Loader2, E
 import { toast } from "sonner";
 import { apiGet, apiPost, apiPatch } from "@/lib/apiClient";
 import { openArogya, publishArogyaContext } from "@/lib/arogya-context";
-import { getCurrentUser } from "@/lib/session";
+import { getCurrentUser, isDemoMode } from "@/lib/session";
+import { isLogCreateEligible, useLogCreateIntent } from "@/lib/log-create-navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -110,6 +111,20 @@ export function AcademicLogsPage({ categoryId }: { categoryId?: string } = {}) {
     publishArogyaContext(null);
     if (openDialog) setOpen(true);
   };
+  const academicTargetPath = categoryId ? `/academics/${categoryId}` : "/academics";
+  useLogCreateIntent(["academic"], () => openNewLog("", true), {
+    targetPath: academicTargetPath,
+    ready: Boolean(config),
+    eligible: isLogCreateEligible({
+      action: "academic",
+      targetPath: academicTargetPath,
+      isStudent: user?.role === "student",
+      config,
+      demoMode: isDemoMode(),
+      academicLogbook,
+      academics: configuredAcademicOptions,
+    }),
+  });
   const visibleLogs = filterAcademicLogs(logs, academicLogbook, categoryId, selectedYear);
 
 

@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/apiClient";
 import { openArogya, publishArogyaContext } from "@/lib/arogya-context";
 import { getCurrentUser, isDemoMode } from "@/lib/session";
+import { isLogCreateEligible, useLogCreateIntent } from "@/lib/log-create-navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -47,7 +48,7 @@ const emptyForm = () => ({ date: todayForInput(), category: "", subType: "", pat
   organSystem: "", clinicalFindings: "", competency: "" });
 
 export function ClinicalWorksPage() {
-  const { clinicalWorkCategories, clinicalWorkSubtypes, competencyLevels } = useDepartment();
+  const { config, clinicalWorkCategories, clinicalWorkSubtypes, competencyLevels, academicLogbook } = useDepartment();
   const user = React.useMemo(() => getCurrentUser(), []);
   const hideCaseNumber = isDemoMode();
   const [logs, setLogs] = React.useState<ClinicalWorkLog[]>([]);
@@ -56,6 +57,26 @@ export function ClinicalWorksPage() {
   const [professors, setProfessors] = React.useState<Array<{ id: number; fullName: string }>>([]);
   const [professorsError, setProfessorsError] = React.useState<string | null>(null);
   const [open, setOpen] = React.useState(false);
+  useLogCreateIntent(["clinical-work"], () => {
+    publishArogyaContext(null);
+    setEditId(null);
+    setEditRemarks(null);
+    setEditStatus(null);
+    setForm(emptyForm());
+    setOpen(true);
+  }, {
+    targetPath: "/clinical-works",
+    ready: Boolean(config),
+    eligible: isLogCreateEligible({
+      action: "clinical-work",
+      targetPath: "/clinical-works",
+      isStudent: user?.role === "student",
+      config,
+      demoMode: isDemoMode(),
+      academicLogbook,
+      clinicalWorkCategoriesCount: clinicalWorkCategories.length,
+    }),
+  });
   const [form, setForm] = React.useState(emptyForm);
   const [editId, setEditId] = React.useState<number | null>(null);
   const [editRemarks, setEditRemarks] = React.useState<string | null>(null);

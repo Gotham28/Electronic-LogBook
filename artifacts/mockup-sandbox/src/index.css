@@ -126,6 +126,8 @@
   --gothos-scrim: #173c2c50;
   --gothos-card: rgba(255, 255, 255, .64);
   --gothos-card-edge: rgba(255, 255, 255, .9);
+  --workspace-surface: var(--gothos-mist);
+  --workspace-chrome: rgba(255, 255, 255, .92);
 
   --background: var(--gothos-bg);
   --foreground: var(--gothos-ink);

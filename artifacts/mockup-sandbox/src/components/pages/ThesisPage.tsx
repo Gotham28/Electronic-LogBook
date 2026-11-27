@@ -8,8 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatLogbookDate } from "@/lib/logbook-config";
 import { apiGet, apiPost } from "@/lib/apiClient";
-import { getCurrentUser } from "@/lib/session";
+import { getCurrentUser, isDemoMode } from "@/lib/session";
 import { useDepartment } from "@/lib/department-context";
+import { isLogCreateEligible, useLogCreateIntent } from "@/lib/log-create-navigation";
 
 const dateFields = [
   ["protocolSubmissionDate", "Protocol submission"], ["iecClearanceDate", "IEC clearance"],
@@ -24,7 +25,7 @@ const emptyThesis: Thesis = { thesisTitle: "", guideId: null, coGuideId: null, p
 
 export function ThesisPage() {
   const user = getCurrentUser()!;
-  const { config } = useDepartment();
+  const { config, academicLogbook } = useDepartment();
   const isPubOnly = config?.enabledFeatures?.publicationsOnly;
   const label = (config?.enabledFeatures?.useThesisAndPublicationsLabel || isPubOnly) ? "Thesis and Publications" : "Thesis";
   const base = `/api/students/${user.studentProfileId}`;
@@ -35,6 +36,22 @@ export function ThesisPage() {
   const [loading, setLoading] = React.useState(true);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState("");
+  const openThesisEditor = React.useCallback(() => {
+    setDraft(thesis || emptyThesis);
+    setThesisOpen(true);
+  }, [thesis]);
+  useLogCreateIntent(["thesis"], openThesisEditor, {
+    targetPath: "/thesis",
+    ready: Boolean(config) && !loading && !error,
+    eligible: isLogCreateEligible({
+      action: "thesis",
+      targetPath: "/thesis",
+      isStudent: user?.role === "student",
+      config,
+      demoMode: isDemoMode(),
+      academicLogbook,
+    }),
+  });
   const load = React.useCallback(async () => {
     setLoading(true); setError("");
     try {
@@ -76,7 +93,7 @@ export function ThesisPage() {
               </div>
             )}
           </div>
-          <Button variant="outline" size="sm" onClick={() => { setDraft(thesis || emptyThesis); setThesisOpen(true); }}><Edit3 className="h-4 w-4" /> {thesis ? "Edit" : "Add"}</Button>
+          <Button variant="outline" size="sm" onClick={openThesisEditor}><Edit3 className="h-4 w-4" /> {thesis ? "Edit" : "Add"}</Button>
         </CardHeader>
         {!isPubOnly && (
           <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">

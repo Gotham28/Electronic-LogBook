@@ -31,7 +31,6 @@ import { isDemoMode } from "@/lib/session";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useNameChangeNotifications } from "@/hooks/use-name-change-notifications";
 import { DEMO_DEPARTMENT_CHANGED_EVENT } from "@/lib/demoDepartments";
-import { GuidedTour, type TourStep } from "@/components/GuidedTour";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -69,10 +68,9 @@ import { MaintenanceNoticeBubble } from "@/components/arogya/MaintenanceNoticeBu
 import { useDepartment, defaultDepartmentLabel, resolveDepartmentLabel, type DepartmentLabelKey } from "@/lib/department-context";
 import type { AcademicLogbookProfile } from "@/lib/academic-logbook";
 import { applyNavOrder, navigationIsActive, profileNavigation, readStudentNavOrder } from "@/lib/academic-navigation";
-import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
+import { MobileBottomNav, type MobileAddLogOption } from "@/components/layout/MobileBottomNav";
+import { attachCreateIntentScopeToHistory, buildCreateIntentHref, dispatchLogCreateIntent, getCurrentLogCreateScope, isLogCreateEligible, type LogCreateActionId } from "@/lib/log-create-navigation";
 import { DemoBanner } from "@/components/layout/DemoBanner";
-import { DemoMovie } from "@/components/demo-movie/DemoMovie";
-import { DEMO_MOVIE_CHANGED_EVENT, isDemoMovieActive } from "@/lib/demoSession";
 
 export type RoleType = "Student" | "Faculty" | "HOD";
 
@@ -100,44 +98,6 @@ type NavigationItem = {
   badgeColor?: string;
   badgeLoading?: boolean;
   activePaths?: string[];
-};
-
-const navigationDescriptions: Record<string, string> = {
-  Dashboard: "See your overall training progress, recent activity, and the requirements that need your attention.",
-  "Postings & Rotations": "Review your clinical rotations, posting dates, and current department assignment.",
-  "Case Logs": "Record and review the clinical cases you have observed, assisted with, or managed.",
-  "Procedure Logs": "Track procedures, supervision levels, verification status, and required totals.",
-  "Academic Activities": "Document seminars, journal clubs, presentations, teaching sessions, and other academic work.",
-  Assessments: "View assessment records and feedback entered during your training.",
-  "Thesis & Certifications": "Keep thesis milestones, certifications, and supporting academic requirements together.",
-  "Thesis and mandatory certifications": "Keep thesis milestones, certifications, and supporting academic requirements together.",
-  "CME and Conferences": "Track conferences, workshops, and continuing medical education events attended.",
-  "Thesis and Publications": "Keep thesis milestones, publications, and related records together.",
-  Thesis: "Keep thesis milestones and related records together.",
-  Certifications: "Track certifications and supporting academic requirements.",
-  "Leave Records": "Check your leave balance, previous requests, and approval status.",
-  Attendance: "View your daily attendance marked by department faculty.",
-  "Daily Attendance": "Mark and review daily attendance records for department students.",
-  "Yearly Attendance": "Mark and review yearly attendance percentages for department students.",
-  "Teaching & Learning": "Record lectures, teaching, seminars, journal clubs and symposia.",
-  "Practicals & Postings": "Record practical activities and open your postings and rotations.",
-  "Research & Events": "Record thesis topics, papers and events, and open existing thesis and conference records.",
-  "Assessments & Appraisal": "Record assessment marks and appraisal, and open existing assessment records and feedback.",
-  "Daily Record & Attendance": "Record daily training activities and logbook attendance.",
-  "Evaluation Queue": "Open student log entries that are waiting for your review and verification.",
-  "Student Progress": "Follow the training progress and completion status of the students assigned to you.",
-  "Review Queue": "Review pending case and procedure entries submitted across the department.",
-  "Add Assessment": "Create and manage assessments for postgraduate trainees.",
-  "Pending Students": "Review new student registrations before granting access to the logbook.",
-  "Add Faculty": "Add faculty accounts and manage their department access.",
-  "Leave Approvals": "Review leave requests and record approval decisions.",
-  Requirements: "Configure the case, procedure, and academic requirements used to measure progress.",
-};
-// Titles for these two routes are department wording that a HOD can rename, so their descriptions are
-// found by route. Every other entry still looks up by title.
-const navigationDescriptionsByRoute: Record<string, string> = {
-  "/postings": navigationDescriptions["Postings & Rotations"],
-  "/milestones": navigationDescriptions["Thesis & Certifications"],
 };
 
 export function navigationForRole(role: RoleType, dashboardData?: any, loadingBadges?: boolean, config?: any, demoMode = false, academicLogbook?: AcademicLogbookProfile | null, department?: any, label?: (key: DepartmentLabelKey) => string, overrides?: Record<string, string>): NavigationItem[] {
@@ -297,7 +257,7 @@ export function AppLayout({
   onSignOut,
 }: AppLayoutProps) {
   const [location, setLocation] = useLocation();
-  const { department, config, academicLogbook, label, labels } = useDepartment();
+  const { department, config, academicLogbook, label, labels, clinicalWorkCategories, academics } = useDepartment();
   const demoMode = isDemoMode();
   const reduceMotion = useReducedMotion();
   const [isDepartmentSwitching, setIsDepartmentSwitching] = React.useState(false);
@@ -307,11 +267,8 @@ export function AppLayout({
   const [isChangePasswordOpen, setIsChangePasswordOpen] = React.useState(false);
   const [cpForm, setCpForm] = React.useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
   const [changingPassword, setChangingPassword] = React.useState(false);
-  const [isTourOpen, setIsTourOpen] = React.useState(false);
-  const [movieActive, setMovieActive] = React.useState(() => demoMode && isDemoMovieActive());
   const [arogyaOpen, setArogyaOpen] = React.useState(false);
   const [disclaimerBlocksNotice, setDisclaimerBlocksNotice] = React.useState(activeRole === "Student");
-  const tourButtonRef = React.useRef<HTMLButtonElement>(null);
   const loginSummaryShownRef = React.useRef(false);
   const [announcements, setAnnouncements] = React.useState<MaintenanceAnnouncement[]>([]);
   const [bubbleNotice, setBubbleNotice] = React.useState<MaintenanceAnnouncement | null>(null);
@@ -340,16 +297,6 @@ export function AppLayout({
     const onOpenArogya = () => setArogyaOpen(true);
     window.addEventListener(AROGYA_OPEN_EVENT, onOpenArogya);
     return () => window.removeEventListener(AROGYA_OPEN_EVENT, onOpenArogya);
-  }, []);
-
-  React.useEffect(() => {
-    const syncMovieState = () => {
-      const active = isDemoMode() && isDemoMovieActive();
-      setMovieActive(active);
-      if (active) setIsTourOpen(false);
-    };
-    window.addEventListener(DEMO_MOVIE_CHANGED_EVENT, syncMovieState);
-    return () => window.removeEventListener(DEMO_MOVIE_CHANGED_EVENT, syncMovieState);
   }, []);
 
   // Fix: Get actual user from session for the sidebar profile
@@ -535,38 +482,112 @@ export function AppLayout({
     [activeRole, studentNavOrder, navigationItems],
   );
   const visibleNavigationItems = isDepartmentSwitching ? [] : navigationItems;
-  const closeTour = React.useCallback(() => {
-    setIsTourOpen(false);
-    window.requestAnimationFrame(() => tourButtonRef.current?.focus());
-  }, []);
-  const tourSteps = React.useMemo<TourStep[]>(() => {
-    const navigationSteps = navigationItems.map((item, index) => ({
-      target: `navigation-${index}`,
-      title: item.title,
-      description: navigationDescriptionsByRoute[item.href] ?? navigationDescriptions[item.title] ?? `Open ${item.title} from the sidebar.`,
-    }));
+  const studentAddLogOptions = React.useMemo<MobileAddLogOption[]>(() => {
+    if (activeRole !== "Student" || isDepartmentSwitching || !config) return [];
+    const options: MobileAddLogOption[] = [];
+    const seenIds = new Set<string>();
 
-    return [
-      ...navigationSteps,
-      ...(activeRole === "Student"
-        ? [{
-            target: "print-logbook",
-            title: "Print your logbook",
-            description: "Open a consolidated, print-ready version of your training record for review or PDF export.",
-          }]
-        : []),
-      {
-        target: "notifications",
-        title: "Notifications",
-        description: "Check reminders, pending reviews, due requirements, and other important updates.",
-      },
-      {
-        target: "account-menu",
-        title: "Account menu",
-        description: "Open your profile menu to change your password or securely sign out.",
-      },
-    ];
-  }, [activeRole, navigationItems]);
+    const pushOption = (option: MobileAddLogOption) => {
+      if (seenIds.has(option.id)) return;
+      seenIds.add(option.id);
+      options.push(option);
+    };
+
+    const tryPush = (id: string, labelText: string, href: string, action: LogCreateActionId, icon: React.ComponentType<{ className?: string }>) => {
+      if (!isLogCreateEligible({
+        action,
+        targetPath: href,
+        isStudent: true,
+        config,
+        demoMode,
+        academicLogbook,
+        academics,
+        clinicalWorkCategoriesCount: clinicalWorkCategories.length,
+      })) {
+        return;
+      }
+      pushOption({ id, label: labelText, href, action, icon });
+    };
+
+    const addForRoute = (href: string, labelText: string, icon: React.ComponentType<{ className?: string }>) => {
+      if (href === "/" || href === "/dashboard" || href === "/assessments") return;
+      if (href === "/cases") {
+        tryPush("case", labelText, href, "case", icon);
+        return;
+      }
+      if (href === "/procedures") {
+        tryPush("procedure", labelText, href, "procedure", icon);
+        return;
+      }
+      if (href === "/clinical-works") {
+        tryPush("clinical-work", labelText, href, "clinical-work", icon);
+        return;
+      }
+      if (href === "/academics" || href.startsWith("/academics/")) {
+        tryPush(href, labelText, href, "academic", icon);
+        return;
+      }
+      if (href === "/conferences") {
+        tryPush("conference", labelText, href, "conference", icon);
+        return;
+      }
+      if (href === "/postings") {
+        tryPush("posting", labelText, href, "posting", icon);
+        return;
+      }
+      if (href === "/awards") {
+        tryPush("award", labelText, href, "award", icon);
+        return;
+      }
+      if (href === "/certifications") {
+        tryPush("certification", labelText, href, "certification", icon);
+        return;
+      }
+      if (href === "/thesis") {
+        tryPush("thesis", labelText, href, "thesis", icon);
+        return;
+      }
+      if (href === "/milestones") {
+        tryPush("milestone-thesis", `${labelText} — Thesis`, href, "milestone-thesis", FileText);
+        tryPush("milestone-certification", `${labelText} — Certification`, href, "milestone-certification", Award);
+        return;
+      }
+      if (href === "/attendance") {
+        tryPush("leave", labelText, href, "leave", icon);
+      }
+    };
+
+    for (const item of navigationItems) {
+      addForRoute(item.href, item.title, item.icon);
+      if (item.href.startsWith("/academics/") && academicLogbook) {
+        const categoryId = item.href.slice("/academics/".length);
+        const category = academicLogbook.navigationCategories?.find((c) => c.id === categoryId);
+        for (const related of category?.relatedPages ?? []) {
+          addForRoute(related.href, related.title, item.icon);
+        }
+      }
+    }
+
+    return options;
+  }, [activeRole, isDepartmentSwitching, config, demoMode, navigationItems, academicLogbook, academics, clinicalWorkCategories.length]);
+
+  const handleMobileAddLogSelect = React.useCallback((option: MobileAddLogOption) => {
+    if (isDepartmentSwitching || !config) return;
+    const scope = getCurrentLogCreateScope();
+    if (!scope) return;
+    const currentPath = typeof window !== "undefined" ? window.location.pathname : location;
+    if (currentPath === option.href) {
+      if (typeof window !== "undefined") {
+        const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+        window.history.replaceState(window.history.state, "", buildCreateIntentHref(currentUrl, option.action));
+        attachCreateIntentScopeToHistory(option.action, scope);
+      }
+      dispatchLogCreateIntent(option.action, option.href, scope);
+      return;
+    }
+    setLocation(buildCreateIntentHref(option.href, option.action));
+    attachCreateIntentScopeToHistory(option.action, scope);
+  }, [config, isDepartmentSwitching, location, setLocation]);
 
   
   React.useEffect(() => {
@@ -627,9 +648,9 @@ export function AppLayout({
 
   return (
     <SidebarProvider defaultOpen style={{ "--sidebar-width": "17rem", "--sidebar-width-icon": "5rem" } as React.CSSProperties}>
-      <div className="h-screen w-full overflow-hidden p-0 text-ink md:p-3 lg:p-4">
-        <div className="glass-panel mx-auto flex h-[100dvh] w-full max-w-[1600px] overflow-hidden rounded-none border-card-edge md:h-[calc(100vh-24px)] md:rounded-[30px] lg:h-[calc(100vh-32px)]">
-          <Sidebar collapsible="icon" className="print-hidden border-r border-line-soft bg-card shadow-[0_24px_80px_color-mix(in_srgb,var(--gothos-forest)_6%,transparent)] backdrop-blur-xl">
+      <div className="h-screen w-full overflow-hidden bg-mist p-0 text-ink md:p-3 lg:p-4">
+        <div className="glass-panel mx-auto flex h-[100dvh] w-full max-w-[1600px] overflow-hidden rounded-none border-line-soft bg-mist md:h-[calc(100vh-24px)] md:rounded-[30px] lg:h-[calc(100vh-32px)]">
+          <Sidebar collapsible="icon" className="print-hidden border-r border-line-soft bg-white/95 shadow-[0_24px_80px_color-mix(in_srgb,var(--gothos-forest)_6%,transparent)] backdrop-blur-xl">
             <SidebarHeader className="h-[74px] overflow-hidden border-b border-line-soft p-4 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-2">
               <div className="relative flex h-full w-full items-center overflow-hidden group-data-[collapsible=icon]:justify-center">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-forest text-white shadow-[0_12px_28px_color-mix(in_srgb,var(--gothos-forest)_20%,transparent)] transition-colors duration-200" style={demoMode ? { backgroundColor: "var(--demo-accent)", color: "var(--demo-accent-foreground)" } : undefined}>
@@ -744,7 +765,7 @@ export function AppLayout({
           </Sidebar>
 
           <SidebarInset className="flex min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto bg-transparent">
-            <header className="print-hidden sticky top-0 z-20 flex h-[72px] items-center justify-between border-b border-card-edge bg-card px-4 backdrop-blur-xl md:px-6">
+            <header className="print-hidden sticky top-0 z-20 flex h-[72px] items-center justify-between border-b border-line-soft bg-white/90 px-4 backdrop-blur-xl md:px-6">
               <div className="flex min-w-0 items-center gap-3">
                 <SidebarTrigger data-demo-sidebar-trigger className="rounded-xl text-forest hover:bg-white" />
                 <div className="hidden h-7 w-px bg-sage sm:block" />
@@ -769,20 +790,6 @@ export function AppLayout({
                     className="border-card-edge bg-card text-forest shadow-[0_12px_24px_color-mix(in_srgb,var(--gothos-forest)_5%,transparent)] h-8 w-8 px-0 sm:w-auto sm:px-3"
                   >
                     <Printer className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Print</span>
-                  </Button>
-                )}
-                {!movieActive && (
-                  <Button
-                    ref={tourButtonRef}
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setIsTourOpen(true)}
-                    aria-label="Take a guided tour"
-                    title="Take a guided tour"
-                    className="h-8 w-8 border-card-edge bg-card px-0 text-sm font-bold text-forest shadow-[0_12px_24px_color-mix(in_srgb,var(--gothos-forest)_5%,transparent)]"
-                  >
-                    ?
                   </Button>
                 )}
                 <DropdownMenu open={notificationsOpen} onOpenChange={(open) => {
@@ -864,7 +871,16 @@ export function AppLayout({
               ) : children}
             </main>
           </SidebarInset>
-          <MobileBottomNav role={activeRole} items={navigationItems} location={location} departmentKey={department.id} switching={isDepartmentSwitching} hasCustomOrder={hasCustomStudentOrder} />
+          <MobileBottomNav
+            role={activeRole}
+            items={navigationItems}
+            location={location}
+            departmentKey={department.id}
+            switching={isDepartmentSwitching}
+            hasCustomOrder={hasCustomStudentOrder}
+            addLogOptions={studentAddLogOptions}
+            onAddLogSelect={handleMobileAddLogSelect}
+          />
           <Toaster position="top-right" richColors />
 
           <ArogyaPanel 
@@ -879,17 +895,6 @@ export function AppLayout({
             maintenanceNotice={panelMaintenanceNotice}
             onNavigate={(href) => setLocation(href)}
           />
-
-          {demoMode && (
-            <DemoMovie 
-              activeRole={activeRole} 
-              navigationItems={navigationItems}
-              navigate={setLocation} 
-              blocked={disclaimerBlocksNotice} 
-              arogyaOpen={arogyaOpen} 
-              setArogyaOpen={setArogyaOpen} 
-            />
-          )}
 
           {bubbleNotice && !arogyaOpen && !disclaimerBlocksNotice && <MaintenanceNoticeBubble
             heading={bubbleNotice.title}
@@ -928,7 +933,6 @@ export function AppLayout({
               </form>
             </DialogContent>
           </Dialog>
-          <GuidedTour open={isTourOpen && !movieActive} steps={tourSteps} onClose={closeTour} />
           <LegalDisclaimerModal activeRole={activeRole} onBlockingChange={setDisclaimerBlocksNotice} />
         </div>
       </div>

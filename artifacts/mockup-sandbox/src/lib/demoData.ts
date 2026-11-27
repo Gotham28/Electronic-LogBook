@@ -1,6 +1,5 @@
 import { demoData, getDemoDepartmentProfile, getDemoResident, getActiveDemoProfile } from './demoDepartments';
 import { playDemoSound } from './demoSounds';
-import { isDemoMovieActive } from './demoSession';
 import {
   isBuiltInProcedureField,
   normalizeCustomProcedureFieldValues,
@@ -394,13 +393,11 @@ export async function handleDemoRequest(method: string, path: string, body?: any
         .map((student: any) => getDemoResident(student.id).logs[logKey].find((entry: any) => entry.id === dbId))
         .find(Boolean);
       if (item) {
-        if (!isDemoMovieActive()) {
-          item.status = body.status === "rejected" ? "rejected" : "verified";
-          item.reviewComments = body.comments || "";
-          item.facultyRemarks = body.comments || null;
-          if (reviewMatch[1] === "procedure" && body.facultyVerifiedLevel !== undefined) {
-            item.facultyVerifiedLevel = body.facultyVerifiedLevel || null;
-          }
+        item.status = body.status === "rejected" ? "rejected" : "verified";
+        item.reviewComments = body.comments || "";
+        item.facultyRemarks = body.comments || null;
+        if (reviewMatch[1] === "procedure" && body.facultyVerifiedLevel !== undefined) {
+          item.facultyVerifiedLevel = body.facultyVerifiedLevel || null;
         }
         if (body.status !== "rejected") playDemoSound("success");
       }

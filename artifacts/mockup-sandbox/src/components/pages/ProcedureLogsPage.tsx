@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { apiGet, apiPost, apiDelete, apiPatch } from "@/lib/apiClient";
 import { openArogya, publishArogyaContext } from "@/lib/arogya-context";
 import { getCurrentUser, isDemoMode } from "@/lib/session";
+import { isLogCreateEligible, useLogCreateIntent } from "@/lib/log-create-navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -53,7 +54,7 @@ type ProcedureLog = {
 
 
 export function ProcedureLogsPage() {
-  const { procedures: PROCEDURE_REQUIREMENTS, competencyLevels, config, procedureFields } = useDepartment();
+  const { procedures: PROCEDURE_REQUIREMENTS, competencyLevels, config, procedureFields, academicLogbook } = useDepartment();
   const dynamicProcedureFields = Boolean(config?.enabledFeatures?.dynamicProcedureFields);
   const activeProcedureFields: ProcedureFieldDefinition[] = React.useMemo(
     () => (dynamicProcedureFields ? (procedureFields ?? []) : []),
@@ -118,6 +119,32 @@ export function ProcedureLogsPage() {
     setLastVoiceExtraction(null);
     setVoiceResetKey((k) => k + 1);
   }, []);
+
+  const resetCreateForm = React.useCallback(() => {
+    publishArogyaContext(null);
+    setForm(createInitialForm());
+    setEditLogId(null);
+    setEditLogRemarks(null);
+    setEditLogStatus(null);
+    setEditingOriginalLog(null);
+    resetVoiceState();
+  }, [createInitialForm, resetVoiceState]);
+
+  useLogCreateIntent(["procedure"], () => {
+    resetCreateForm();
+    setOpen(true);
+  }, {
+    targetPath: "/procedures",
+    ready: Boolean(config),
+    eligible: isLogCreateEligible({
+      action: "procedure",
+      targetPath: "/procedures",
+      isStudent: user?.role === "student",
+      config,
+      demoMode: isDemoMode(),
+      academicLogbook,
+    }),
+  });
 
   const recordManualEdit = React.useCallback((fieldKey: string) => {
     setManuallyEditedFields((prev) => new Set(prev).add(fieldKey));
