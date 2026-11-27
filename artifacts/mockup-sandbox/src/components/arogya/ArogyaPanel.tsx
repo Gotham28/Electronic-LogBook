@@ -2,9 +2,10 @@ import * as React from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Mic, MicOff, SendHorizontal, X } from "lucide-react";
+import { HelpCircle, Mic, MicOff, SendHorizontal, X } from "lucide-react";
 import { ArogyaCharacter, type ArogyaState } from "./ArogyaCharacter";
 import { apiGet, apiPost, applyMochiAction, submitSupportTicket, undoMochiAction, type ArogyaAnswer, type ArogyaContextResponse } from "@/lib/apiClient";
+import { openSupportWidget, registerArogyaPanelMount } from "@/components/SupportWidget";
 import { useMochiDictation } from "@/hooks/use-mochi-dictation";
 import { isDemoMode } from "@/lib/session";
 import { AROGYA_CONTEXT_EVENT, AROGYA_OPEN_EVENT, type ArogyaSelectedContext } from "@/lib/arogya-context";
@@ -64,6 +65,7 @@ export function ArogyaPanel({ open, onOpenChange, role, actorKey, workflowId, st
   const wasOpen = React.useRef(false);
   const { refresh: refreshDepartment } = useDepartment();
 
+  React.useEffect(() => registerArogyaPanelMount(), []);
 
   const appendDictatedText = React.useCallback((transcript: string) => {
     const nextPart = transcript.trim();
@@ -387,7 +389,27 @@ export function ArogyaPanel({ open, onOpenChange, role, actorKey, workflowId, st
         aria-describedby="arogya-panel-description"
         data-tour="arogya-panel"
         data-demo-assistant-state={characterState}
-        className="arogya-chat-surface flex h-[min(68dvh,38rem)] min-h-0 w-[min(26rem,calc(100vw-1.5rem),var(--radix-popover-content-available-width,100vw))] max-h-[calc(100dvh-1.5rem)] flex-col gap-0 overflow-hidden rounded-[1.5rem] border border-line-soft bg-white p-0 text-ink shadow-[0_24px_70px_color-mix(in_srgb,var(--gothos-forest)_22%,transparent)]"
+        onEscapeKeyDown={(event) => {
+          if (document.querySelector('[data-support-dialog="true"][data-state="open"]')) {
+            event.preventDefault();
+          }
+        }}
+        onPointerDownOutside={(event) => {
+          if (document.querySelector('[data-support-dialog="true"][data-state="open"]')) {
+            event.preventDefault();
+          }
+        }}
+        onFocusOutside={(event) => {
+          if (document.querySelector('[data-support-dialog="true"][data-state="open"]')) {
+            event.preventDefault();
+          }
+        }}
+        onInteractOutside={(event) => {
+          if (document.querySelector('[data-support-dialog="true"][data-state="open"]')) {
+            event.preventDefault();
+          }
+        }}
+        className="arogya-chat-surface z-[45] flex h-[min(68dvh,38rem)] min-h-0 w-[min(26rem,calc(100vw-1.5rem),var(--radix-popover-content-available-width,100vw))] max-h-[calc(100dvh-1.5rem)] flex-col gap-0 overflow-hidden rounded-[1.5rem] border border-line-soft bg-white p-0 text-ink shadow-[0_24px_70px_color-mix(in_srgb,var(--gothos-forest)_22%,transparent)]"
       >
         <style>{`
           @keyframes arogya-expand {
@@ -417,16 +439,31 @@ export function ArogyaPanel({ open, onOpenChange, role, actorKey, workflowId, st
               <p className="mt-0.5 text-xs font-medium text-helper">Your assistant</p>
             </div>
           </div>
-          <Button
-            type="button"
-            size="icon"
-            variant="ghost"
-            aria-label="Close Mochi assistant"
-            onClick={() => onOpenChange(false)}
-            className="h-11 w-11 shrink-0 rounded-full text-helper hover:bg-card hover:text-ink"
-          >
-            <X className="h-4 w-4" aria-hidden="true" />
-          </Button>
+          <div className="flex shrink-0 items-center gap-1.5">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={(event) => {
+                dictation.abortCapture();
+                openSupportWidget({ trigger: event.currentTarget });
+              }}
+              className="h-9 rounded-full border-line-soft bg-white px-3 text-xs font-semibold text-forest hover:bg-mist"
+            >
+              <HelpCircle className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+              Help
+            </Button>
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              aria-label="Close Mochi assistant"
+              onClick={() => onOpenChange(false)}
+              className="h-11 w-11 shrink-0 rounded-full text-helper hover:bg-card hover:text-ink"
+            >
+              <X className="h-4 w-4" aria-hidden="true" />
+            </Button>
+          </div>
           <p id="arogya-panel-description" className="sr-only">Mochi assistant panel with role-specific suggestions and a prompt box.</p>
         </header>
 

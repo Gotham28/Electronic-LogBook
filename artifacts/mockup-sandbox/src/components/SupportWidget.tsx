@@ -24,11 +24,24 @@ import {
   type SupportTicketCategory,
 } from "@/lib/apiClient";
 import { getCurrentUser, isDemoMode, SESSION_USER_CHANGED_EVENT } from "@/lib/session";
+import { ArogyaCharacter } from "@/components/arogya/ArogyaCharacter";
 
 // Feature flag: reactivated with unauthenticated restriction (only "login_issue" permitted signed out)
 export const SUPPORT_FEATURE_ENABLED = true;
 
 export const OPEN_SUPPORT_WIDGET_EVENT = "elogbook:open-support";
+
+let arogyaPanelMountCount = 0;
+const arogyaPanelListeners = new Set<(mounted: boolean) => void>();
+
+export function registerArogyaPanelMount(): () => void {
+  arogyaPanelMountCount += 1;
+  arogyaPanelListeners.forEach((listener) => listener(arogyaPanelMountCount > 0));
+  return () => {
+    arogyaPanelMountCount = Math.max(0, arogyaPanelMountCount - 1);
+    arogyaPanelListeners.forEach((listener) => listener(arogyaPanelMountCount > 0));
+  };
+}
 
 export function openSupportWidget(preset?: { category?: SupportTicketCategory; trigger?: HTMLButtonElement }) {
   if (!SUPPORT_FEATURE_ENABLED) return;
@@ -84,8 +97,16 @@ export function SupportWidget() {
     };
   }, []);
 
-  // Arogya AI mascot is active in AppLayout for all authenticated non-admin users (Student, Faculty, HOD)
-  const hasArogyaLauncher = Boolean(currentUser && currentUser.role !== "admin");
+  // Drive fallback availability from whether the full Mochi panel is actually mounted in this layout/route.
+  const [hasArogyaLauncher, setHasArogyaLauncher] = React.useState(() => arogyaPanelMountCount > 0);
+  React.useEffect(() => {
+    setHasArogyaLauncher(arogyaPanelMountCount > 0);
+    const listener = (mounted: boolean) => setHasArogyaLauncher(mounted);
+    arogyaPanelListeners.add(listener);
+    return () => {
+      arogyaPanelListeners.delete(listener);
+    };
+  }, []);
 
   // Prefill user details if available and reset when dialog opens
   const initUserFields = React.useCallback(() => {
@@ -200,24 +221,26 @@ export function SupportWidget() {
 
   return (
     <>
-      {/* Floating Trigger Button */}
-      <button
-        type="button"
-        onClick={() => handleOpenChange(true)}
-        className={`support-widget-floating print:hidden fixed z-40 flex items-center gap-2 rounded-full border border-line-soft bg-card px-3.5 py-2 text-xs font-semibold text-forest shadow-md backdrop-blur-sm transition-all hover:bg-mist hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:px-4 sm:py-2.5 sm:text-sm ${
-          hasArogyaLauncher
-            ? "bottom-[calc(86px+env(safe-area-inset-bottom))] right-20 sm:bottom-[31px] sm:right-24"
-            : "bottom-4 right-4 sm:bottom-6 sm:right-6"
-        }`}
-        aria-label="Need help? Report a problem or contact support"
-      >
-        <HelpCircle className="h-4 w-4 text-forest sm:h-4 sm:w-4" />
-        <span>Need help?</span>
-      </button>
+      {/* Floating Trigger Button for users without the full Mochi panel */}
+      {!hasArogyaLauncher && (
+        <button
+          type="button"
+          onClick={(event) => {
+            signedOutTriggerRef.current = event.currentTarget;
+            handleOpenChange(true);
+          }}
+          className="support-widget-floating print:hidden fixed bottom-4 right-4 z-40 flex min-h-11 items-center gap-2 rounded-full border-2 border-forest bg-white py-1.5 pl-2 pr-3.5 text-xs font-semibold text-forest shadow-[0_12px_24px_color-mix(in_srgb,var(--gothos-forest)_12%,transparent)] transition-colors hover:bg-mist focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:bottom-6 sm:right-6 sm:text-sm"
+          aria-label="Mochi Help: Report a problem or contact support"
+        >
+          <ArogyaCharacter state="idle" size={28} closeUp decorative />
+          <span>Help</span>
+        </button>
+      )}
 
       {/* Support Dialog */}
       <Dialog open={isOpen} onOpenChange={handleOpenChange}>
         <DialogContent
+          data-support-dialog="true"
           className="max-w-md sm:max-w-lg"
           onCloseAutoFocus={(event) => {
             const trigger = signedOutTriggerRef.current;
