@@ -627,9 +627,9 @@ export function AppLayout({
 
   return (
     <SidebarProvider defaultOpen style={{ "--sidebar-width": "17rem", "--sidebar-width-icon": "5rem" } as React.CSSProperties}>
-      <div className="h-screen w-full overflow-hidden p-0 text-ink md:p-3 lg:p-4">
-        <div className="glass-panel mx-auto flex h-[100dvh] w-full max-w-[1600px] overflow-hidden rounded-none border-card-edge md:h-[calc(100vh-24px)] md:rounded-[30px] lg:h-[calc(100vh-32px)]">
-          <Sidebar collapsible="icon" className="print-hidden border-r border-line-soft bg-card shadow-[0_24px_80px_color-mix(in_srgb,var(--gothos-forest)_6%,transparent)] backdrop-blur-xl">
+      <div className="h-screen w-full overflow-hidden bg-mist p-0 text-ink md:p-3 lg:p-4">
+        <div className="glass-panel mx-auto flex h-[100dvh] w-full max-w-[1600px] overflow-hidden rounded-none border-line-soft bg-mist md:h-[calc(100vh-24px)] md:rounded-[30px] lg:h-[calc(100vh-32px)]">
+          <Sidebar collapsible="icon" className="print-hidden border-r border-line-soft bg-white/95 shadow-[0_24px_80px_color-mix(in_srgb,var(--gothos-forest)_6%,transparent)] backdrop-blur-xl">
             <SidebarHeader className="h-[74px] overflow-hidden border-b border-line-soft p-4 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-2">
               <div className="relative flex h-full w-full items-center overflow-hidden group-data-[collapsible=icon]:justify-center">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-forest text-white shadow-[0_12px_28px_color-mix(in_srgb,var(--gothos-forest)_20%,transparent)] transition-colors duration-200" style={demoMode ? { backgroundColor: "var(--demo-accent)", color: "var(--demo-accent-foreground)" } : undefined}>
@@ -744,7 +744,7 @@ export function AppLayout({
           </Sidebar>
 
           <SidebarInset className="flex min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto bg-transparent">
-            <header className="print-hidden sticky top-0 z-20 flex h-[72px] items-center justify-between border-b border-card-edge bg-card px-4 backdrop-blur-xl md:px-6">
+            <header className="print-hidden sticky top-0 z-20 flex h-[72px] items-center justify-between border-b border-line-soft bg-white/90 px-4 backdrop-blur-xl md:px-6">
               <div className="flex min-w-0 items-center gap-3">
                 <SidebarTrigger data-demo-sidebar-trigger className="rounded-xl text-forest hover:bg-white" />
                 <div className="hidden h-7 w-px bg-sage sm:block" />

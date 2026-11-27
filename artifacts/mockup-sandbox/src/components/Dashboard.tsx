@@ -206,12 +206,12 @@ export function Dashboard() {
         <div className="h-1.5 hero-rule" />
         <CardContent className="p-4 sm:p-6 md:p-8">
           <div className="grid items-stretch gap-7 xl:grid-cols-[.8fr_1.2fr]">
-            <div data-tour="dashboard-welcome" className="flex flex-col justify-center rounded-[24px] bg-deep p-6 text-white md:p-9">
-              <p className="text-[10px] font-bold uppercase tracking-[.2em] text-white">{logs.profile?.department || "Department Unassigned"}</p>
-              <h1 className="mt-3 text-3xl font-semibold leading-tight tracking-tight md:text-4xl">Welcome back, {user?.name?.split(" ")[0] || "Student"}</h1>
-              <p className="mt-4 max-w-lg text-sm leading-6 text-white">Your clinical record, academic work, and verification status are summarised here.</p>
-              <div className="mt-8 flex items-center gap-3 text-xs text-white">
-                <div className="h-px w-10 bg-sage" />
+            <div data-tour="dashboard-welcome" className="flex flex-col justify-center rounded-[24px] border border-line-soft bg-sage p-6 text-ink md:p-9">
+              <p className="text-[10px] font-bold uppercase tracking-[.2em] text-forest">{logs.profile?.department || "Department Unassigned"}</p>
+              <h1 className="mt-3 text-3xl font-semibold leading-tight tracking-tight text-ink md:text-4xl">Welcome back, {user?.name?.split(" ")[0] || "Student"}</h1>
+              <p className="mt-4 max-w-lg text-sm leading-6 text-soft-ink">Your clinical record, academic work, and verification status are summarised here.</p>
+              <div className="mt-8 flex items-center gap-3 text-xs font-medium text-ink">
+                <div className="h-px w-10 bg-forest/40" />
                 <span>Batch {logs.profile?.joiningYear || "—"}</span>
               </div>
             </div>

@@ -41,7 +41,7 @@ export function MobileBottomNav({ role, items, location, departmentKey, switchin
   const cell = "flex min-h-[60px] min-w-0 flex-1 flex-col items-center justify-center gap-1 px-0.5 pt-1 text-xs font-semibold leading-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring";
 
   return (
-    <nav aria-label="Main pages" className="print-hidden fixed inset-x-0 bottom-0 z-40 border-t border-line-soft bg-card pb-[env(safe-area-inset-bottom)] shadow-[0_-6px_24px_color-mix(in_srgb,var(--gothos-forest)_7%,transparent)] backdrop-blur-xl sm:hidden">
+    <nav aria-label="Main pages" className="print-hidden fixed inset-x-0 bottom-0 z-40 border-t border-line-soft bg-white/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-6px_24px_color-mix(in_srgb,var(--gothos-forest)_7%,transparent)] backdrop-blur-xl sm:hidden">
       <ul className="flex min-h-[60px]">
         <AnimatePresence>
         {visibleSlots.map((item) => {
