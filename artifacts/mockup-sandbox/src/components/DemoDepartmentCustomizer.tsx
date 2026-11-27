@@ -49,7 +49,6 @@ function ResidentPreview({ features }: { features: Record<string, boolean> }) {
     "Assessments",
     "Postings",
     ...(features.awards ? ["Awards"] : []),
-    "Leave records",
   ];
   const details = [
     ["Case form", features.useCaseTypeLabel ? "Case type" : "Case category"],

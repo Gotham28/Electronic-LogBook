@@ -54,6 +54,13 @@ test("privacy screening permits field-navigation questions and blocks clinical v
   assert.equal(containsSensitiveClinicalInput("patient presented with synthetic symptoms"), true);
 });
 
+test("retired leave workflows are absent from assistant navigation", () => {
+  const removed = new Set(["leave", "leave-approvals"]);
+  for (const role of ["student", "professor", "hod"] as const) {
+    assert.ok(!roleWorkflows(role, {}).some(({ id }) => removed.has(id)));
+  }
+});
+
 test("all curated knowledge source references still exist", () => {
   assert.ok(knowledgeSources.length > 0);
   const missing = knowledgeSources.filter((source) => !existsSync(resolve(repositoryRoot, source)));

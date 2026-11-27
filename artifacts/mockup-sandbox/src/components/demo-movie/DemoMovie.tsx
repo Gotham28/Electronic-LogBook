@@ -29,7 +29,7 @@ const PAGE_COPY: Record<string, string> = {
   "/academics": "Review academic activity records and the controls for adding an entry.",
   "/conferences": "Review conference records and the available entry controls.",
   "/postings": "Review rotation details and the controls for recording a posting.",
-  "/attendance": "Review leave information and the controls for a leave request.",
+  "/attendance": "Review the attendance records available for this department.",
   "/assessments": "Review assessment and appraisal views available to this role.",
   "/milestones": "Review thesis and certification progress in one place.",
   "/thesis": "Review thesis or publication records and their available controls.",
@@ -40,7 +40,6 @@ const PAGE_COPY: Record<string, string> = {
   "/roster": "Review the resident roster and its filters and management options.",
   "/student-access": "Review the student-access queue and its available review steps.",
   "/professors": "Review faculty-management options.",
-  "/leave-approvals": "Review leave requests and the approval workflow.",
   "/requirements": "Review department-configured training requirements and catalog options.",
 };
 const FINAL_ACTION = /^(save|submit|approve|reject|delete|remove|deactivate|activate|reactivate|restore|suspend|archive|unarchive|assign|unassign|revoke|withdraw|return|reopen|disable|enable|sign out|log out|print|reset|publish|complete|confirm|send|export|download|upload|import|verify|request revision|draft|create account|change password|apply changes|accept|decline)(?:\b|$)/i;

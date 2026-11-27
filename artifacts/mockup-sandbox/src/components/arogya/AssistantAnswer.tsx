@@ -4,12 +4,12 @@ import type { ArogyaAnswer, MochiActionResult, MochiProposal, MochiRefusal } fro
 const safeRoutes: Record<string, string> = {
   dashboard: "/", cases: "/cases", procedures: "/procedures", academics: "/academics",
   "clinical-work": "/clinical-works", conferences: "/conferences", postings: "/postings",
-  leave: "/attendance", assessments: "/assessments", milestones: "/milestones",
+  assessments: "/assessments", milestones: "/milestones",
   thesis: "/thesis", certifications: "/certifications", awards: "/awards", "print-logbook": "/print", "evaluation-queue": "/",
   "student-progress": "/mentees", "quarterly-appraisal": "/assessments",
   "department-dashboard": "/roster", "review-queue": "/review-queue",
   "student-approval": "/student-access", "faculty-management": "/professors",
-  "leave-approvals": "/leave-approvals", requirements: "/requirements",
+  requirements: "/requirements",
   // Department Settings is the requirements page; the HOD-only refusal links here.
   "department-settings": "/requirements",
 };

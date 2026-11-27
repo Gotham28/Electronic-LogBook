@@ -64,7 +64,7 @@ interface ToolEvidence {
 }
 
 const NO_ARGS_SCHEMA = { type: "object", properties: {}, required: [], additionalProperties: false };
-const WORKFLOW_IDS = ["dashboard", "cases", "procedures", "academics", "clinical-work", "conferences", "postings", "leave", "assessments", "milestones", "thesis", "certifications", "awards", "print-logbook", "account", "evaluation-queue", "student-progress", "quarterly-appraisal", "faculty-session", "department-dashboard", "review-queue", "department-report", "student-approval", "faculty-management", "leave-approvals", "requirements", "hod-session", "record-status", "assistant-scope"];
+const WORKFLOW_IDS = ["dashboard", "cases", "procedures", "academics", "clinical-work", "conferences", "postings", "assessments", "milestones", "thesis", "certifications", "awards", "print-logbook", "account", "evaluation-queue", "student-progress", "quarterly-appraisal", "faculty-session", "department-dashboard", "review-queue", "department-report", "student-approval", "faculty-management", "requirements", "hod-session", "record-status", "assistant-scope"];
 const tools = [
   { type: "function", function: { name: "get_workflow_help", description: "Retrieve one role- and department-applicable ELogbook workflow. Choose an ID from the supplied workflow list.", strict: true, parameters: { type: "object", properties: { workflowId: { type: "string", enum: WORKFLOW_IDS } }, required: ["workflowId"], additionalProperties: false } } },
   { type: "function", function: { name: "get_progress_summary", description: "Read verified, pending and rejected counts and configured progress targets for the already selected authorized resident. No clinical text is returned.", strict: true, parameters: NO_ARGS_SCHEMA } },

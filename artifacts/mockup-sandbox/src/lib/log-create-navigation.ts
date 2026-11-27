@@ -19,8 +19,7 @@ export type LogCreateActionId =
   | "certification"
   | "thesis"
   | "milestone-thesis"
-  | "milestone-certification"
-  | "leave";
+  | "milestone-certification";
 
 export const ALLOWLISTED_LOG_CREATE_ACTIONS: readonly LogCreateActionId[] = [
   "case",
@@ -34,7 +33,6 @@ export const ALLOWLISTED_LOG_CREATE_ACTIONS: readonly LogCreateActionId[] = [
   "thesis",
   "milestone-thesis",
   "milestone-certification",
-  "leave",
 ];
 
 export interface LogCreateEligibilityContext {
@@ -183,13 +181,6 @@ function isRouteActionEligible(
     case "milestone-thesis":
     case "milestone-certification":
       return targetPath === "/milestones";
-    case "leave":
-      return (
-        targetPath === "/attendance" &&
-        !features.yearlyAttendance &&
-        !features.dailyAttendance &&
-        !features.hideLeaveRecords
-      );
   }
 }
 
@@ -207,7 +198,7 @@ export function isLogCreateEligible({
   const features = config.enabledFeatures ?? {};
 
   if (academicLogbook?.navigationCategories?.length) {
-    const allowedProfileRoutes = new Set<string>(["/certifications", "/attendance"]);
+    const allowedProfileRoutes = new Set<string>(["/certifications"]);
     for (const category of academicLogbook.navigationCategories) {
       if (hasSelectableAcademicOptions(academicLogbook, academics, category.id)) {
         allowedProfileRoutes.add(`/academics/${category.id}`);

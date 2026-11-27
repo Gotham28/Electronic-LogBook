@@ -354,7 +354,7 @@ function App() {
         <ProfessorPortal />
       )}
       {activeRole === "HOD" && (
-        <HODPortal />
+        <HODPortal key={currentUser?.departmentId} />
       )}
       {activeRole === "Student" && (
         <Switch>
@@ -387,6 +387,7 @@ function App() {
 function DepartmentWorkspace({ activeRole, demo, onSignOut, children }: { activeRole: RoleType; demo: boolean; onSignOut: () => void; children: ReactNode }) {
   const { config } = useDepartment();
   const [location] = useLocation();
+  if (location === "/leave-approvals") return <Redirect to="/" replace />;
   const psychiatryPath = location === "/" || location === "/dashboard" || location === "/psychiatry" || location.startsWith("/psychiatry/");
   if (activeRole === "Student" && !demo && config?.enabledFeatures?.psychiatryWorkspace === true) {
     if (location === "/cases") return <Redirect to="/psychiatry/short-cases" replace />;

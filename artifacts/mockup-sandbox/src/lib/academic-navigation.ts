@@ -32,7 +32,6 @@ export function profileNavigation(profile: AcademicLogbookProfile | null | undef
       activePaths: (category.relatedPages ?? []).map((page) => page.href),
     })),
     { title: "Certifications", href: "/certifications", icon: "certifications", activePaths: [] },
-    { title: "Leave Records", href: "/attendance", icon: "daily", activePaths: [] },
   ];
 }
 
