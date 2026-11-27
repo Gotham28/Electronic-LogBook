@@ -220,3 +220,44 @@ test("uncoded diagnoses round-trip in short, long and monthly cases", async () =
   });
   assert.equal(empty.status, 400);
 });
+
+test("short and long cases preserve additional psychiatric diagnoses and optional medical diagnoses", async () => {
+  const { base } = runtime;
+  const resident = accounts.student0;
+  const reviewer = accounts.faculty0;
+  const details = { seenIn: "OPD", diagnosisCode: "6A70", tags: [], activities: [], referredFrom: "",
+    additionalDiagnosisCodes: ["evaluation", "text:Synthetic additional diagnosis"], medicalDiagnosis: "Synthetic medical diagnosis" };
+  const caseRoute = `/students/${resident.studentId}/case-logs`;
+  const short = await request(base, caseRoute, resident, "POST", {
+    supervisorId: reviewer.id, date: "2026-04-01", patientAge: "19", patientGender: "other",
+    diagnosisFinal: "6A70", category: SHORT_CASE_CATEGORY, psychiatryShortCase: details,
+  });
+  assert.equal(short.status, 201);
+  assert.equal(short.body.diagnosisFinal, "6A70 Single episode depressive disorder; Needs detailed evaluation; Synthetic additional diagnosis");
+  assert.deepEqual(JSON.parse(short.body.customFields.psychiatryAdditionalDiagnosisCodes), details.additionalDiagnosisCodes);
+  assert.equal(short.body.customFields.psychiatryMedicalDiagnosis, details.medicalDiagnosis);
+  const editedShort = await request(base, `${caseRoute}/${short.body.id}`, resident, "PATCH", {
+    psychiatryShortCase: { ...details, additionalDiagnosisCodes: [], medicalDiagnosis: "" },
+  });
+  assert.equal(editedShort.status, 200);
+  assert.equal(editedShort.body.customFields.psychiatryAdditionalDiagnosisCodes, undefined);
+  assert.equal(editedShort.body.customFields.psychiatryMedicalDiagnosis, undefined);
+
+  const longValues = { age: "19", sex: "Other", admission: "Month and year", month: "2026-04", diagnosis: "6A70",
+    additionalDiagnosis1: "evaluation", additionalDiagnosis2: "text:Synthetic additional diagnosis", medicalDiagnosis: details.medicalDiagnosis,
+    unit: "Unit 1", reviewerId: String(reviewer.id) };
+  const long = await request(base, "/psychiatry/entries/long", resident, "POST", { values: longValues });
+  assert.equal(long.status, 201);
+  for (const [route, actor] of [["/psychiatry/entries", resident], ["/psychiatry/reviews", reviewer]] as const) {
+    const list = await request(base, route, actor);
+    assert.equal(list.status, 200);
+    const saved = list.body.find((entry: { id: number }) => entry.id === long.body.id);
+    assert.equal(saved.values.additionalDiagnosis1.code, "evaluation");
+    assert.equal(saved.values.additionalDiagnosis2.title, "Synthetic additional diagnosis");
+    assert.equal(saved.values.medicalDiagnosis, details.medicalDiagnosis);
+  }
+  const invalid = await request(base, "/psychiatry/entries/long", resident, "POST", {
+    values: { ...longValues, additionalDiagnosis1: "INVALID" },
+  });
+  assert.equal(invalid.status, 400);
+});
