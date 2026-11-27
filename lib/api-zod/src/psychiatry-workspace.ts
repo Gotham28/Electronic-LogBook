@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { findIcd11Chapter06Diagnosis, SHORT_CASE_REFERRALS, SHORT_CASE_TAGS } from "./psychiatry-short-cases.js";
+import { psychiatryDiagnosisSelectionSchema, resolvePsychiatryDiagnosis, SHORT_CASE_REFERRALS, SHORT_CASE_TAGS } from "./psychiatry-short-cases.js";
 
 export const PSYCHIATRY_BASE = "/psychiatry";
 export const PSYCHIATRY_ICUS = ["GICU", "MICU", "PICU", "NSICU", "Burns ICU", "TICU", "SICU", "Cardiac ICU"] as const;
@@ -39,7 +39,7 @@ const sessionColumns: Array<[string, string]> = [["date", "Date"], ["topic", "To
 
 function monthly(title: string, add: string, mode: NonNullable<PsychiatryPage["monthly"]>): PsychiatryPage {
   return { title, add, fields: [month, consultant], monthly: mode, review: true, columns: [
-    ["diagnosis", "ICD-11 diagnosis"], ["medical", "Medical diagnosis"], ["count", "No."],
+    ["diagnosis", "Psychiatric diagnosis"], ["medical", "Medical diagnosis"], ["count", "No."],
     ...(mode === "counts" ? [["visit", "Fresh / Review"], ["tags", "Tags"]] : [["department", "Department"]]) as Array<[string, string]>,
   ] };
 }
@@ -52,7 +52,7 @@ export const psychiatryPages: Record<string, PsychiatryPage> = {
     field("admission", "When admitted", "radio", { choices: ["Month and year", "Specific dates"] }),
     field("month", "Month and year of admission", "month", { optional: true }),
     field("admittedAt", "Date of admission", "date", { optional: true }), field("dischargedAt", "Date of discharge", "date", { optional: true }),
-    field("diagnosis", "ICD-11 diagnosis", "diagnosis"), field("tags", "Tags (select all that apply)", "chips", { choices: SHORT_CASE_TAGS, optional: true }),
+    field("diagnosis", "Psychiatric diagnosis", "diagnosis"), field("tags", "Tags (select all that apply)", "chips", { choices: SHORT_CASE_TAGS, optional: true }),
     field("history", "Brief history and key MSE findings", "textarea", { optional: true }),
     field("activities", "What you did", "chips", { choices: ["History", "MSE", "Risk", "Capacity", "Physical exam", "Rating scale", "Family interview", "Psychoeducation"], optional: true }),
     field("scales", "Scales administered", "text", { optional: true }), field("outcome", "Management / learning outcome", "textarea", { optional: true }),
@@ -81,7 +81,7 @@ export type PsychiatryValue = string | string[];
 export type PsychiatryValues = Record<string, PsychiatryValue>;
 export const psychiatryValuesSchema = z.record(z.string(), z.union([z.string().trim().max(4000), z.array(z.string().trim().max(160)).max(50)]));
 const diagnosisRow = z.object({
-  diagnosisCode: z.string().max(16).refine((code) => Boolean(findIcd11Chapter06Diagnosis(code)), "Select an ICD-11 Chapter 06 diagnosis"),
+  diagnosisCode: psychiatryDiagnosisSelectionSchema,
   medical: z.string().trim().max(500), count: z.number().int().min(1).max(50),
   visit: z.enum(["Fresh", "Review"]), tags: z.array(z.enum(SHORT_CASE_TAGS)).max(SHORT_CASE_TAGS.length),
   department: z.enum(SHORT_CASE_REFERRALS), icu: z.union([z.enum(PSYCHIATRY_ICUS), z.literal("")]),
@@ -119,7 +119,7 @@ export function validatePsychiatryEntry(page: PsychiatryPage, input: z.infer<typ
     } else if (typeof value !== "string" ||
       (item.kind === "date" && !calendarDate(value)) || (item.kind === "month" && !/^\d{4}-(0[1-9]|1[0-2])$/.test(value)) ||
       (item.kind === "number" && !/^\d{1,3}$/.test(value)) || ((item.kind === "select" || item.kind === "radio") && !item.choices?.includes(value)) ||
-      (item.kind === "faculty" && !/^[1-9]\d{0,9}$/.test(value)) || (item.kind === "diagnosis" && !findIcd11Chapter06Diagnosis(value))) return `Check ${item.label.toLowerCase()}.`;
+      (item.kind === "faculty" && !/^[1-9]\d{0,9}$/.test(value)) || (item.kind === "diagnosis" && !resolvePsychiatryDiagnosis(value))) return `Check ${item.label.toLowerCase()}.`;
   }
   if (input.values.admission === "Specific dates" && typeof input.values.admittedAt === "string" && typeof input.values.dischargedAt === "string" && input.values.admittedAt > input.values.dischargedAt) return "Discharge must be on or after admission.";
   return undefined;

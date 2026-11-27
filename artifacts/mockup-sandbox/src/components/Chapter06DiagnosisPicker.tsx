@@ -1,5 +1,5 @@
-import { useId, useMemo, useRef, useState } from "react";
-import { findIcd11Chapter06Diagnosis, searchIcd11Chapter06Diagnoses, type Icd11Diagnosis } from "@workspace/api-zod";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { findIcd11Chapter06Diagnosis, psychiatryDiagnosisOptions, psychiatryDiagnosisTextLimit, searchIcd11Chapter06Diagnoses, type Icd11Diagnosis } from "@workspace/api-zod";
 import { Input } from "@/components/ui/input";
 
 type Group = { name: string; diagnosis?: Icd11Diagnosis; children: Group[] };
@@ -45,15 +45,53 @@ function DiagnosisBranch({ item, expanded, onSelect }: { item: Group; expanded: 
 }
 
 export function Chapter06DiagnosisPicker({ code, onSelect }: { code: string; onSelect: (code: string) => void }) {
+  const modeId = useId();
+  const textId = useId();
+  const mode = code.startsWith("text:") ? "text" : code === "other" || code === "evaluation" ? code : "icd11";
+  return <div className="space-y-3">
+    <label htmlFor={modeId} className="block text-sm font-medium">Diagnosis type</label>
+    <select id={modeId} className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm" value={mode}
+      onChange={(event) => onSelect(event.target.value === "icd11" ? "" : event.target.value === "text" ? "text:" : event.target.value)}>
+      <option value="icd11">ICD-11 diagnosis</option>
+      <option value="other">{psychiatryDiagnosisOptions.other}</option>
+      <option value="evaluation">{psychiatryDiagnosisOptions.evaluation}</option>
+      <option value="text">Enter a diagnosis</option>
+    </select>
+    {mode === "icd11" && <Icd11Search code={code} onSelect={onSelect} />}
+    {mode === "text" && <div className="space-y-1.5">
+      <label htmlFor={textId} className="text-sm font-medium">Psychiatric diagnosis</label>
+      <Input id={textId} value={code.slice(5)} maxLength={psychiatryDiagnosisTextLimit}
+        onChange={(event) => onSelect(`text:${event.target.value}`)} />
+    </div>}
+  </div>;
+}
+
+function Icd11Search({ code, onSelect }: { code: string; onSelect: (code: string) => void }) {
   const inputId = useId();
   const resultsId = useId();
   const input = useRef<HTMLInputElement>(null);
+  const picker = useRef<HTMLDivElement>(null);
   const restoringFocus = useRef(false);
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const selected = findIcd11Chapter06Diagnosis(code);
   const matches = useMemo(() => searchIcd11Chapter06Diagnoses(query), [query]);
   const tree = useMemo(() => open ? groupResults(matches) : null, [matches, open]);
+
+  useEffect(() => {
+    if (!open) return;
+    // A Safari tap can blur the input before the result receives its click.
+    function dismissOutside(event: Event) {
+      if (event.type === "focusin" && event.target === document.body) return;
+      if (event.target instanceof Node && !picker.current?.contains(event.target)) setOpen(false);
+    }
+    document.addEventListener("pointerdown", dismissOutside, true);
+    document.addEventListener("focusin", dismissOutside);
+    return () => {
+      document.removeEventListener("pointerdown", dismissOutside, true);
+      document.removeEventListener("focusin", dismissOutside);
+    };
+  }, [open]);
 
   function close(restore: boolean) {
     if (restore && input.current !== document.activeElement) {
@@ -70,9 +108,7 @@ export function Chapter06DiagnosisPicker({ code, onSelect }: { code: string; onS
     setQuery("");
   }
 
-  return <div className="relative space-y-1.5" onBlur={(event) => {
-    if (!event.currentTarget.contains(event.relatedTarget)) close(false);
-  }} onKeyDown={(event) => {
+  return <div ref={picker} className="relative space-y-1.5" onKeyDown={(event) => {
     if (event.key === "Escape" && open) { event.preventDefault(); close(true); }
   }}>
     <label htmlFor={inputId} className="text-sm font-medium">ICD-11 diagnosis</label>

@@ -166,3 +166,57 @@ test("production department deletion remains blocked when Psychiatry records exi
   assert.ok((await db.select({ id: psychiatryEntriesTable.id }).from(psychiatryEntriesTable)
     .where(eq(psychiatryEntriesTable.departmentId, departmentIds[0]))).length > 0);
 });
+
+test("uncoded diagnoses round-trip in short, long and monthly cases", async () => {
+  const { base } = runtime;
+  const resident = accounts.student0;
+  const reviewerId = accounts.faculty0.id;
+  for (const [selection, title, month] of [
+    ["other", "Other", "2026-01"],
+    ["evaluation", "Needs detailed evaluation", "2026-02"],
+    ["text:Synthetic clinician entry", "Synthetic clinician entry", "2026-03"],
+  ]) {
+    const short = await request(base, `/students/${resident.studentId}/case-logs`, resident, "POST", {
+      supervisorId: reviewerId, date: `${month}-01`, patientAge: "18", patientGender: "other",
+      diagnosisFinal: title, category: SHORT_CASE_CATEGORY,
+      psychiatryShortCase: { seenIn: "OPD", diagnosisCode: selection, tags: [], activities: [], referredFrom: "" },
+    });
+    assert.equal(short.status, 201);
+    assert.equal(short.body.diagnosisFinal, title);
+    assert.equal(short.body.customFields.psychiatryDiagnosisCode, selection);
+    assert.equal(short.body.customFields.psychiatryDiagnosisUri, "");
+    const editedShort = await request(base, `/students/${resident.studentId}/case-logs/${short.body.id}`, resident, "PATCH", {
+      patientAge: "19",
+      psychiatryShortCase: { seenIn: "OPD", diagnosisCode: selection, tags: [], activities: [], referredFrom: "" },
+    });
+    assert.equal(editedShort.status, 200);
+    assert.equal(editedShort.body.diagnosisFinal, title);
+    const queue = await request(base, `/professors/${reviewerId}/review-queue`, accounts.faculty0);
+    assert.equal(queue.status, 200);
+    assert.equal(queue.body.pendingReviews.find((item: { dbId: number; logType: string }) =>
+      item.logType === "case" && item.dbId === short.body.id).diagnosisFinal, title);
+
+    const longValues = { age: "18", sex: "Other", admission: "Month and year", month,
+      diagnosis: selection, unit: "Unit 1", reviewerId: String(reviewerId) };
+    const long = await request(base, "/psychiatry/entries/long", resident, "POST", { values: longValues });
+    assert.equal(long.status, 201);
+    const edited = await request(base, `/psychiatry/entries/long/${long.body.id}`, resident, "PATCH",
+      { values: { ...longValues, age: "19" }, revision: 1 });
+    assert.equal(edited.status, 200);
+    const monthly = await request(base, "/psychiatry/entries/opd", resident, "POST", {
+      values: { month, reviewerId: String(reviewerId) }, rows: [{ ...row, diagnosisCode: selection }],
+    });
+    assert.equal(monthly.status, 201);
+    const expected = { code: selection, title, uri: "" };
+    for (const [route, caller] of [["/psychiatry/entries", resident], ["/psychiatry/reviews", accounts.faculty0]] as const) {
+      const list = await request(base, route, caller);
+      assert.equal(list.status, 200);
+      assert.deepEqual(list.body.find((entry: { id: number }) => entry.id === long.body.id).values.diagnosis, expected);
+      assert.deepEqual(list.body.find((entry: { id: number }) => entry.id === monthly.body.id).diagnosisRows[0].diagnosis, expected);
+    }
+  }
+  const empty = await request(base, "/psychiatry/entries/opd", resident, "POST", {
+    values: { month: "2026-04", reviewerId: String(reviewerId) }, rows: [{ ...row, diagnosisCode: "text:  " }],
+  });
+  assert.equal(empty.status, 400);
+});

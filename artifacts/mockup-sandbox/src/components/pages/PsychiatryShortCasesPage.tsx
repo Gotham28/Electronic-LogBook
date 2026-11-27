@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
-import { SHORT_CASE_ACTIVITIES, SHORT_CASE_CATEGORY, SHORT_CASE_REFERRALS, SHORT_CASE_SETTINGS, SHORT_CASE_TAGS, findIcd11Chapter06Diagnosis, isPsychiatryShortCase, type PsychiatryShortCase } from "@workspace/api-zod";
+import { SHORT_CASE_ACTIVITIES, SHORT_CASE_CATEGORY, SHORT_CASE_REFERRALS, SHORT_CASE_SETTINGS, SHORT_CASE_TAGS, resolvePsychiatryDiagnosis, psychiatryDiagnosisLabel, isPsychiatryShortCase, type PsychiatryShortCase } from "@workspace/api-zod";
 import { Chapter06DiagnosisPicker } from "@/components/Chapter06DiagnosisPicker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -83,13 +83,13 @@ function ShortCaseForm({ entry, studentId, departmentId, onSave }: { entry?: Cas
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (saving || !faculty) return;
-    const diagnosis = findIcd11Chapter06Diagnosis(form.diagnosisCode);
-    if (!diagnosis) { setError("Select an ICD-11 Chapter 06 diagnosis from the list."); return; }
+    const diagnosis = resolvePsychiatryDiagnosis(form.diagnosisCode);
+    if (!diagnosis) { setError("Choose or enter a diagnosis."); return; }
     const endpoint = `/api/students/${studentId}/case-logs`;
     const payload = {
       date: entry?.date ?? localDateValue(), category: SHORT_CASE_CATEGORY,
       patientAge: form.age, patientGender: form.sex,
-      supervisorId: Number(form.consultant), diagnosisFinal: `${diagnosis.code} ${diagnosis.title}`,
+      supervisorId: Number(form.consultant), diagnosisFinal: psychiatryDiagnosisLabel(diagnosis),
       managementPlan: form.plan, learningPoints: form.learningPoint,
       psychiatryShortCase: { seenIn: form.seenIn, diagnosisCode: diagnosis.code, tags: form.tags, activities: form.activities, referredFrom: form.referredFrom },
     };
