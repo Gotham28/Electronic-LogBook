@@ -1172,13 +1172,19 @@ function DepartmentDetail({ department, onRefresh }: { department: AdminDepartme
 
   const handleImpersonate = async (userId: number) => {
     const snapshot = captureViewSnapshot();
+    const tab = window.open("about:blank", "_blank");
+    if (!tab) {
+      toast.error("Allow pop-ups to open the test account.");
+      return;
+    }
+    tab.opener = null;
     try {
       const result = await impersonateAdminUser(userId);
-      if (!isViewSnapshotCurrent(snapshot)) return;
-      if (result.token) {
-        window.open(`/?impersonationToken=${result.token}`, '_blank');
-      }
+      if (!isViewSnapshotCurrent(snapshot) || tab.closed) { tab.close(); return; }
+      if (!result.token) throw new Error("The test account session could not be opened.");
+      tab.location.replace(`/?${new URLSearchParams({ impersonationToken: result.token })}`);
     } catch (err: any) {
+      tab.close();
       if (!isViewSnapshotCurrent(snapshot)) return;
       toast.error(err.message || "Failed to log in as user");
     }

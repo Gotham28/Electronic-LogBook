@@ -77,8 +77,8 @@ export function applyNavOrder<T extends { href: string }>(items: T[], order: str
 export function mobileNavigationItems<T extends { href: string }>(role: "Student" | "Faculty" | "HOD", items: T[], hasCustomOrder = false): T[] {
   const priority = {
     Student: ["/", "/cases", "/clinical-works", "/procedures", "/academics", "/postings"],
-    Faculty: ["/", "/review-queue", "/mentees", "/assessments"],
-    HOD: ["/roster", "/mentees", "/review-queue", "/requirements"],
+    Faculty: ["/", "/psychiatry/reviews", "/review-queue", "/mentees", "/assessments"],
+    HOD: ["/roster", "/mentees", "/psychiatry/reviews", "/review-queue", "/requirements"],
   };
   const paths = role === "Student" && (hasCustomOrder || items.some((item) => item.href.startsWith("/academics/")))
     ? items.map((item) => item.href) : priority[role];
