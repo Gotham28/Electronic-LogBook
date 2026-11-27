@@ -73,6 +73,7 @@ export function CaseLogDetails({
         <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <DetailField label="Seen in" value={caseLog.customFields?.psychiatrySeenIn} />
           <DetailField label="Diagnosis" value={caseLog.diagnosisFinal} />
+          <DetailField label="Medical diagnosis" value={caseLog.customFields?.psychiatryMedicalDiagnosis} />
           <DetailField label="Tags" value={caseLog.customFields?.psychiatryTags} />
           <DetailField label="What you did" value={caseLog.customFields?.psychiatryActivities} />
           <DetailField label="Plan" value={caseLog.managementPlan} />

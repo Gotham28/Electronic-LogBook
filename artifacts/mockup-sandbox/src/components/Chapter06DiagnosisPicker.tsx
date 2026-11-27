@@ -50,7 +50,7 @@ export function Chapter06DiagnosisPicker({ code, onSelect }: { code: string; onS
   const mode = code.startsWith("text:") ? "text" : code === "other" || code === "evaluation" ? code : "icd11";
   return <div className="space-y-3">
     <label htmlFor={modeId} className="block text-sm font-medium">Diagnosis type</label>
-    <select id={modeId} className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm" value={mode}
+    <select id={modeId} className="h-10 w-full rounded-lg border border-input bg-background px-3 text-base sm:text-sm" value={mode}
       onChange={(event) => onSelect(event.target.value === "icd11" ? "" : event.target.value === "text" ? "text:" : event.target.value)}>
       <option value="icd11">ICD-11 diagnosis</option>
       <option value="other">{psychiatryDiagnosisOptions.other}</option>
