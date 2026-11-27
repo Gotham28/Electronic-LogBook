@@ -529,6 +529,7 @@ export function PsychiatryWorkspace({ onSignOut }: { onSignOut: () => void }) {
   const returnedShort = bundle?.data.caseLogs.filter((row) => isPsychiatryShortCase(row) && row.status === "rejected") ?? [];
   const notificationCount = returned.length + returnedShort.length;
   return <div className="min-h-screen bg-[#edf8f4] text-slate-900" style={{ backgroundImage: "linear-gradient(#cde5df 1px, transparent 1px), linear-gradient(90deg, #cde5df 1px, transparent 1px)", backgroundSize: "28px 28px" }}>
+    {menu && <div className="fixed inset-0 z-20 bg-black/40 lg:hidden" aria-hidden="true" onClick={() => setMenu(false)} />}
     <aside className={`${menu ? "flex" : "hidden"} fixed inset-y-0 left-0 z-30 w-64 flex-col border-r border-teal-100 bg-white lg:flex print:hidden`}>
       <div className="flex items-center gap-3 border-b border-teal-100 p-5"><span className="rounded-xl bg-teal-600 p-2.5 text-white"><ClipboardList className="size-5" /></span>
         <div className="flex-1"><p className="font-bold">E-Logbook</p><p className="text-xs text-slate-600">Clinical training records</p></div>
@@ -544,21 +545,24 @@ export function PsychiatryWorkspace({ onSignOut }: { onSignOut: () => void }) {
         </div>)}
       </nav>
       <div className="flex items-center justify-between gap-2 border-t border-teal-100 px-4 py-3"><Link className="rounded-md hover:underline" href="/profile"><p className="text-sm font-semibold">{user?.name}</p><p className="text-xs text-slate-600">Resident</p></Link>
-        <div className="flex items-center gap-3"><Link href="/cases/legacy" aria-label="Older case records" title="Older case records"><BookOpen className="size-4" /></Link>
-          <button type="button" aria-label="Sign out" onClick={onSignOut}><LogOut className="size-4" /></button></div></div>
+        <div className="flex items-center gap-3"><Link href="/cases/legacy" aria-label="Older case records" title="Older case records" className="inline-flex min-h-11 min-w-11 items-center justify-center"><BookOpen className="size-4" /></Link>
+          <button type="button" aria-label="Sign out" className="inline-flex min-h-11 min-w-11 items-center justify-center" onClick={onSignOut}><LogOut className="size-4" /></button></div></div>
     </aside>
     <div className="lg:ml-64 print:m-0">
       <header className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-teal-100 bg-white px-5 py-3 print:hidden">
-        <div className="flex items-center gap-3"><button className="lg:hidden" type="button" aria-label="Open menu" onClick={() => setMenu(true)}><Menu className="size-5" /></button>
+        <div className="flex items-center gap-3"><button className="inline-flex min-h-11 min-w-11 items-center justify-center lg:hidden" type="button" aria-label="Open menu" onClick={() => setMenu(true)}><Menu className="size-5" /></button>
           <div><p className="font-semibold">{department.name.toLowerCase().startsWith("department of") ? department.name : `Department of ${department.name}`}</p><p className="text-xs text-slate-600">Resident workspace</p></div>
         </div>
         <div className="relative flex items-center gap-2"><Button variant="outline" asChild><Link href={entryLink("summary")}><Printer className="size-4" />Print</Link></Button>
           <Button variant="outline" aria-label="Notifications" aria-expanded={notifications} onClick={() => setNotifications(!notifications)}><Bell className="size-4" />{notificationCount > 0 && <span>{notificationCount}</span>}</Button>
-          {notifications && <div className="absolute right-0 top-11 z-30 w-72 rounded-lg border bg-white p-4 shadow-lg"><p className="mb-2 font-semibold">Notifications</p>
-            {returned.map((row) => <Link key={row.id} className="block py-1 text-sm text-teal-900 underline" href={`${entryLink(row.section)}/${row.id}`}>{psychiatryPages[row.section]?.title} entry returned</Link>)}
-            {returnedShort.map((row) => <Link key={`short-${row.id}`} className="block py-1 text-sm text-teal-900 underline" href={`${SHORT_CASES_PATH}/${row.id}/edit`}>Short case returned</Link>)}
-            {!notificationCount && <p className="text-sm text-slate-600">No returned entries.</p>}
-          </div>}
+          {notifications && <>
+            <div className="fixed inset-0 z-20" aria-hidden="true" onClick={() => setNotifications(false)} />
+            <div className="absolute right-0 top-11 z-30 w-72 rounded-lg border bg-white p-4 shadow-lg"><p className="mb-2 font-semibold">Notifications</p>
+              {returned.map((row) => <Link key={row.id} className="block py-1 text-sm text-teal-900 underline" href={`${entryLink(row.section)}/${row.id}`}>{psychiatryPages[row.section]?.title} entry returned</Link>)}
+              {returnedShort.map((row) => <Link key={`short-${row.id}`} className="block py-1 text-sm text-teal-900 underline" href={`${SHORT_CASES_PATH}/${row.id}/edit`}>Short case returned</Link>)}
+              {!notificationCount && <p className="text-sm text-slate-600">No returned entries.</p>}
+            </div>
+          </>}
         </div>
       </header>
       <main className="mx-auto min-h-[85vh] max-w-[1200px] p-4 sm:p-7 print:p-0">{content()}</main>

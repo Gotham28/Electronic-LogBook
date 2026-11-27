@@ -81,15 +81,15 @@ function Icd11Search({ code, onSelect }: { code: string; onSelect: (code: string
   useEffect(() => {
     if (!open) return;
     // A Safari tap can blur the input before the result receives its click.
-    function dismissOutside(event: Event) {
-      if (event.type === "focusin" && event.target === document.body) return;
+    // Use pointerdown (capture) to detect outside taps on all browsers.
+    // Do NOT use focusin for dismiss: on Android Chrome focusin fires before
+    // pointerdown, closing the list before the click on a result can land.
+    function dismissOutside(event: PointerEvent) {
       if (event.target instanceof Node && !picker.current?.contains(event.target)) setOpen(false);
     }
     document.addEventListener("pointerdown", dismissOutside, true);
-    document.addEventListener("focusin", dismissOutside);
     return () => {
       document.removeEventListener("pointerdown", dismissOutside, true);
-      document.removeEventListener("focusin", dismissOutside);
     };
   }, [open]);
 
