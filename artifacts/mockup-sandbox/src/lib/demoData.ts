@@ -115,10 +115,28 @@ function buildReviewQueue() {
 }
 
 export async function handleDemoRequest(method: string, path: string, body?: any) {
+  const routePath = path.split("?")[0];
+  if (method === "POST" && routePath === "/api/admin/professors") {
+    const user = JSON.parse(window.sessionStorage.getItem("elogbook-user") || "null");
+    const fullName = typeof body?.fullName === "string" ? body.fullName.trim() : "";
+    const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
+    if (user?.role !== "hod") throw new Error("Only the demo HOD can add faculty.");
+    if (!fullName || !email) throw new Error("Enter a name and an email address.");
+
+    const profile = getDemoDepartmentProfile(user.departmentId);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    const professors = profile.data.professors;
+    if (professors.some((faculty) => faculty.email?.toLowerCase() === email)) {
+      throw new Error("Email already registered in this demo department.");
+    }
+    const professor = { id: Math.max(Date.now(), ...professors.map(({ id }) => id + 1)), fullName, name: fullName, email, role: "professor", status: "approved" };
+    profile.data.professors = [...professors, professor].sort((a, b) => a.fullName.localeCompare(b.fullName));
+    return { professor, emailAccepted: false };
+  }
+
   await new Promise(r => setTimeout(r, 400)); // Mock network delay for realism
 
   const demoUser = JSON.parse(window.sessionStorage.getItem("elogbook-user") || "null");
-  const routePath = path.split("?")[0];
   if (routePath === "/api/profile" && method === "GET") {
     const department = getDemoDepartmentProfile(demoUser?.departmentId).data.departmentCatalog;
     const resident = demoUser?.role === "student" ? getDemoResident(demoUser.studentProfileId) : null;

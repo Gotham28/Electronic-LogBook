@@ -206,10 +206,9 @@ export function PrintableLogbook() {
     setError(null);
     try {
       const id = user.studentProfileId;
-      const [logsBundle, postings, leaves, assessments, thesisRes, certRes, appraisalsRes] = await Promise.all([
+      const [logsBundle, postings, assessments, thesisRes, certRes, appraisalsRes] = await Promise.all([
         apiGet(`/api/students/${id}/logs`),
         apiGet(`/api/students/${id}/postings`),
-        apiGet(`/api/students/${id}/leave-records`),
         apiGet(`/api/students/${id}/assessments`),
         apiGet(`/api/students/${id}/thesis`),
         apiGet(`/api/students/${id}/certifications`),
@@ -223,7 +222,6 @@ export function PrintableLogbook() {
         clinicalWorks: logsBundle.clinicalWorkLogs || [],
         academics: logsBundle.academicLogs || [],
         postings: Array.isArray(postings) ? postings : postings?.data || [],
-        leaves: Array.isArray(leaves) ? leaves : leaves?.data || [],
         assessments: Array.isArray(assessments) ? assessments : assessments?.data || [],
         thesis: thesisRes.data || null,
         certifications: Array.isArray(certRes) ? certRes : [],
@@ -626,34 +624,6 @@ export function PrintableLogbook() {
                     <Td><StatusPill status={c.status ?? "pending"} /></Td>
                   </tr>
                 ))}
-              </tbody>
-            </table>
-          ); })()}
-        </div>
-
-        {/* ── 7. Leave Records ─────────────────────────── */}
-        <div className="mb-12 no-break">
-          <SectionHeader number={nextSection()} title="Leave Records" />
-          {(() => { const rows = data.leaves.filter((l: any) => l.status !== "rejected"); return rows.length === 0 ? <EmptySection /> : (
-            <table data-mobile="cards" className="w-full border-collapse">
-              <thead><tr>
-                <Th>Type</Th><Th>From</Th><Th>To</Th><Th right>Days</Th><Th>Status</Th>
-              </tr></thead>
-              <tbody>
-                {rows.map((l: any, i: number) => {
-                  const days = l.startDate && l.endDate
-                    ? Math.ceil((new Date(l.endDate).getTime() - new Date(l.startDate).getTime()) / 86400000) + 1
-                    : "—";
-                  return (
-                    <tr key={l.id} className={i % 2 === 0 ? "" : "bg-mist"}>
-                      <Td>{l.leaveType}</Td>
-                      <Td>{formatLogbookDate(l.startDate)}</Td>
-                      <Td>{formatLogbookDate(l.endDate)}</Td>
-                      <Td right>{days}</Td>
-                      <Td><StatusPill status={l.status ?? "pending"} /></Td>
-                    </tr>
-                  );
-                })}
               </tbody>
             </table>
           ); })()}

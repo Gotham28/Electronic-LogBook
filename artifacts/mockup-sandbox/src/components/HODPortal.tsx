@@ -50,24 +50,14 @@ type Registration = {
   createdAt: string;
 };
 
+type FacultyRosterEntry = { id: number; fullName: string; email: string; status?: string };
+type DepartmentRoster = { students: any[]; professors: FacultyRosterEntry[] };
+
 type AnalyticsData = {
   totalStudents: number;
   avgCompletion: number;
   logStats: { pending: number; verified: number; rejected: number };
   topProcedures: { name: string; count: number }[];
-};
-
-type LeaveRequest = {
-  id: string;
-  number: string;
-  residentName: string;
-  type: string;
-  fromDate: string;
-  toDate: string;
-  reason: string;
-  status: string;
-  totalDays: number;
-  availableByYear?: { year: string; available: number | null }[];
 };
 
 type WeeklyDigestResponse =
@@ -129,7 +119,6 @@ const paths: Record<string, string> = {
   "mentees": "/",
   "assessments": "/assessments",
   "student-access": "/student-access",
-  "leave-approvals": "/leave-approvals",
   "daily-attendance": "/daily-attendance",
   "professors": "/professors",
   "requirements": "/requirements",
@@ -150,7 +139,6 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
     if (location === "/roster") return "roster";
     if (location === "/student-access") return "student-access";
     if (location === "/professors") return "professors";
-    if (location === "/leave-approvals") return "leave-approvals";
     if (location === "/daily-attendance") return "daily-attendance";
     return "requirements";
   }, [activeTab, location]);
@@ -160,11 +148,11 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
   const [error, setError] = React.useState<string | null>(null);
   const [analyticsError, setAnalyticsError] = React.useState<string | null>(null);
   const [studentsError, setStudentsError] = React.useState<string | null>(null);
-  const [leavesError, setLeavesError] = React.useState<string | null>(null);
 
-  const [roster, setRoster] = React.useState<{ students: any[]; professors: any[] } | null>(null);
+  const [roster, setRoster] = React.useState<DepartmentRoster | null>(null);
   const [rosterLoading, setRosterLoading] = React.useState(false);
   const [rosterError, setRosterError] = React.useState<string | null>(null);
+  const rosterRequest = React.useRef(0);
 
   const [userToDelete, setUserToDelete] = React.useState<{id: number, name: string, role: string} | null>(null);
   const [deletingUser, setDeletingUser] = React.useState(false);
@@ -178,9 +166,6 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
   // Professor Form State
   const [profForm, setProfForm] = React.useState({ fullName: "", email: "" });
   const [creatingProf, setCreatingProf] = React.useState(false);
-
-  // Leave approvals
-  const [leaves, setLeaves] = React.useState<LeaveRequest[]>([]);
 
   // Weekly Mochi digest state for HOD
   const [digestState, setDigestState] = React.useState<DigestCardState | null>(null);
@@ -259,7 +244,6 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
     setLoading(true);
     setError(null);
     setAnalyticsError(null);
-    setLeavesError(null);
     try {
       const user = getCurrentUser();
       if (!user) {
@@ -277,14 +261,6 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
       }
 
       try {
-        const pendingLeaves = await apiGet<LeaveRequest[]>("/api/admin/leaves/pending");
-        setLeaves(pendingLeaves);
-      } catch (err) {
-        console.warn("Could not fetch pending leaves", err);
-        setLeavesError("Could not load pending leaves");
-      }
-
-      try {
         const data = await apiGet<AnalyticsData>(`/api/departments/${user.departmentId}/analytics`);
         setAnalyticsData(data);
       } catch (err) {
@@ -298,20 +274,21 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
   }, []);
 
   const fetchRoster = React.useCallback(async () => {
+    const request = ++rosterRequest.current;
     setRosterLoading(true);
     setRosterError(null);
     try {
-      const data = await apiGet<{ students: any[]; professors: any[] }>("/api/admin/roster");
-      setRoster(data);
+      const data = await apiGet<DepartmentRoster>("/api/admin/roster");
+      if (request === rosterRequest.current) setRoster(data);
     } catch (err: any) {
       // AGENTS.md sec 7: this file has regressed on the fallback-numbers rule twice
       // already (SEC-10, the analytics panel; SEC-15, this roster tab). A toast alone
       // fades - the summary cards and tables below must not fall back to "?? 0" /
       // "no students" while rosterError is set, or a failed load looks identical to a
       // real, empty department.
-      setRosterError(err.message || "Could not load the department roster");
+      if (request === rosterRequest.current) setRosterError(err.message || "Could not load the department roster");
     } finally {
-      setRosterLoading(false);
+      if (request === rosterRequest.current) setRosterLoading(false);
     }
   }, []);
 
@@ -319,9 +296,9 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
     fetchData();
   }, [fetchData]);
 
-  // Lazy-load roster only when that tab is active
+  // Keep the roster load scoped to the tabs that display it.
   React.useEffect(() => {
-    if (currentTab === "roster" && !roster) fetchRoster();
+    if ((currentTab === "roster" || currentTab === "professors") && !roster) void fetchRoster();
   }, [currentTab, roster, fetchRoster]);
 
   const approveStudent = async (id: number) => {
@@ -397,30 +374,19 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
     setCreatingProf(true);
     try {
       const result = await apiPost<{ emailAccepted: boolean; emailFailure?: { failure: string; providerStatus?: number } }>("/api/admin/professors", profForm);
-      toast.success("Faculty account created successfully");
-      if (!result.emailAccepted) {
+      toast.success(isDemoMode() ? "Demo faculty member added" : "Faculty account created successfully");
+      if (!isDemoMode() && !result.emailAccepted) {
         const detail = result.emailFailure?.failure === "missing_configuration" ? "Email service configuration is missing"
           : result.emailFailure?.failure === "provider_rejected" ? `Email provider rejected it${result.emailFailure.providerStatus ? ` (HTTP ${result.emailFailure.providerStatus})` : ""}`
             : "Email provider could not be reached";
         toast.warning(`Faculty account created. ${detail}; check the server log and Resend Events.`);
       }
       setProfForm({ fullName: "", email: "" });
-      setRoster(null);
+      await fetchRoster();
     } catch (err: any) {
       toast.error(err.message || "Failed to create faculty account");
     } finally {
       setCreatingProf(false);
-    }
-  };
-
-  const decideLeave = async (id: string, approved: boolean) => {
-    try {
-      const action = approved ? "approve" : "reject";
-      await apiPost(`/api/admin/leaves/${id}/action`, { action });
-      setLeaves((current) => current.filter((leave) => leave.id !== id));
-      toast.success(approved ? "Leave approved" : "Leave returned");
-    } catch (err: any) {
-      toast.error(err.message || "Failed to process leave request");
     }
   };
 
@@ -813,8 +779,8 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
           </Card>
         </TabsContent>
 
-        <TabsContent value="professors" className="space-y-4 pt-4">
-          <Card data-tour="hod-add-faculty" className="max-w-xl">
+        <TabsContent value="professors" className="grid items-start gap-4 pt-4 data-[state=inactive]:hidden lg:grid-cols-2">
+          <Card data-tour="hod-add-faculty" className="min-w-0">
             <CardHeader className="border-b border-line-soft">
               <CardTitle className="text-xl">Add Faculty</CardTitle>
             </CardHeader>
@@ -828,68 +794,36 @@ export function HODPortal({ activeTab }: { activeTab?: string }) {
                   <Label htmlFor="prof-email">Email Address</Label>
                   <Input id="prof-email" type="email" value={profForm.email} onChange={(e) => setProfForm({...profForm, email: e.target.value})} required />
                 </div>
-                <p className="text-sm text-soft-ink">A secure temporary password will be generated and sent to the faculty member’s email. They can change it after signing in.</p>
+                <p className="text-sm text-soft-ink">{isDemoMode()
+                  ? "Demo faculty appear in this department’s sample roster. No email is sent."
+                  : "A secure temporary password will be generated and sent to the faculty member’s email. They can change it after signing in."}</p>
                 <Button type="submit" disabled={creatingProf} className="w-full">
                   <UserPlus className="h-4 w-4 mr-2" /> {creatingProf ? "Creating..." : "Create Faculty Account"}
                 </Button>
               </form>
             </CardContent>
           </Card>
-        </TabsContent>
-
-        <TabsContent value="leave-approvals" className="pt-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between border-b border-line-soft">
-              <CardTitle className="text-xl">Pending leave requests</CardTitle>
+          <Card className="min-w-0">
+            <CardHeader className="border-b border-line-soft">
+              <CardTitle className="text-xl">Existing Faculty</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
-              {leavesError ? (
-                <p className="p-6 text-center text-sm text-status-foreground font-medium">{leavesError}</p>
-              ) : leaves.length === 0 ? (
-                <p className="p-6 text-center text-sm text-helper">No pending leave requests.</p>
-              ) : (
-                <Table>
-                  <TableHeader><TableRow><TableHead>Number</TableHead><TableHead>Resident</TableHead><TableHead>Type</TableHead><TableHead>Leave Period</TableHead><TableHead>Reason</TableHead><TableHead className="text-right">Decision</TableHead></TableRow></TableHeader>
-                  <TableBody>
-                    {leaves.map((leave, idx) => (
-                      <TableRow key={leave.id}>
-                        <TableCell className="font-bold">{idx + 1}</TableCell>
-                        <TableCell className="font-semibold">{leave.residentName}</TableCell>
-                        <TableCell className="font-medium">{leave.type}</TableCell>
-                        <TableCell>
-                          <div className="font-medium text-ink mb-1">
-                            {formatLogbookDate(leave.fromDate)} -&gt; {formatLogbookDate(leave.toDate)} &middot; {leave.totalDays} day(s)
-                          </div>
-                          {!leave.availableByYear ? (
-                            <div className="text-[10px] text-helper">Availability unavailable</div>
-                          ) : (
-                            leave.availableByYear.map((entry, i) => {
-                              if (entry.available === null) {
-                                return <div key={i} className="text-[10px] text-helper">No limit</div>;
-                              }
-                              const isMultiYear = leave.availableByYear!.length > 1;
-                              const isNegative = entry.available < 0;
-                              const label = isMultiYear ? `Available (${entry.year})` : "Available";
-                              return (
-                                <div key={i} className={`text-[10px] ${isNegative ? 'text-status-foreground font-semibold' : 'text-helper'}`}>
-                                  {label}: {entry.available} days
-                                </div>
-                              );
-                            })
-                          )}
-                        </TableCell>
-                        <TableCell>{leave.reason}</TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button size="sm" variant="outline" onClick={() => decideLeave(leave.id, false)} className="text-status-foreground"><XCircle className="h-4 w-4" /> Return</Button>
-                            <Button size="sm" onClick={() => decideLeave(leave.id, true)}><CheckCircle2 className="h-4 w-4" /> Approve</Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
+              {rosterError ? <div role="alert" className="space-y-3 p-5 text-sm">
+                <p>{rosterError}</p>
+                <Button size="sm" variant="outline" onClick={fetchRoster}>Try again</Button>
+              </div> : rosterLoading || !roster ? <p role="status" className="p-5 text-sm text-helper">Loading faculty…</p>
+                : roster.professors.length === 0 ? <p className="p-5 text-sm text-helper">No faculty in this department.</p>
+                : <ul className="max-h-96 divide-y divide-line-soft overflow-y-auto" aria-label="Department faculty">
+                  {roster.professors.map((faculty) => <li key={faculty.id} className="flex flex-wrap items-start justify-between gap-2 px-5 py-3">
+                    <div className="min-w-0 break-words">
+                      <p className="text-sm font-medium text-ink">{faculty.fullName}</p>
+                      <p className="text-xs text-helper">{faculty.email}</p>
+                    </div>
+                    {faculty.status && <Badge variant={faculty.status === "approved" ? "default" : "secondary"} className="capitalize">
+                      {faculty.status === "rejected" ? "Deactivated" : faculty.status}
+                    </Badge>}
+                  </li>)}
+                </ul>}
             </CardContent>
           </Card>
         </TabsContent>

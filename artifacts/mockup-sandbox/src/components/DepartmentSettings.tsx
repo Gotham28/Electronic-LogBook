@@ -202,6 +202,8 @@ function PostingAttachmentSetting() {
 export function DepartmentSettings() {
   const data = useDepartment();
   const features = data.config?.enabledFeatures ?? {};
+  const hasPsychiatrySettings = !isDemoMode() && (data.department.code.trim().toUpperCase() === "PSY" ||
+    /^(?:department of )?psychiatry(?: \(test\))?$/i.test(data.department.name.trim()));
   const procedureTypesEnabled = !features.freeTextProcedures && !features.hideProcedureLogs;
   
   const sections = React.useMemo(() => {
@@ -214,12 +216,11 @@ export function DepartmentSettings() {
     if (!features.hideCaseLogs) list.push({ id: "cases", label: "Case categories", items: data.caseCategories ?? [], kind: "case_category", addLabel: "+ Add case category" });
     if (!features.hideProcedureLogs) list.push({ id: "competency", label: "Competency levels", items: data.competencyLevels ?? [], kind: "competency_level", addLabel: "+ Add competency level" });
     if (features.conferenceLevels) list.push({ id: "conference", label: "Conference levels", items: data.conferenceLevels ?? [], kind: "conference_level", addLabel: "+ Add conference level" });
-    list.push({ id: "leaves", label: "Leave types", items: data.leaveTypes ?? [], kind: "leave_type", addLabel: "+ Add leave type" });
     list.push({ id: "wording", label: "Wording", items: (Object.keys(DEPARTMENT_LABELS) as DepartmentLabelKey[]).map((key, index) => ({ id: index, name: key, required: 0 })), kind: "wording", addLabel: "" });
     list.push({ id: "menu-order", label: "Residents' menu order", items: [], kind: "menu_order", addLabel: "" });
-    list.push({ id: "psychiatry", label: "Psychiatry workspace", items: [], kind: "psychiatry", addLabel: "" });
+    if (hasPsychiatrySettings) list.push({ id: "psychiatry", label: "Psychiatry workspace", items: [], kind: "psychiatry", addLabel: "" });
     return list;
-  }, [procedureTypesEnabled, features, data]);
+  }, [procedureTypesEnabled, features, data, hasPsychiatrySettings]);
 
   const [activeSectionId, setActiveSectionId] = React.useState(sections[0].id);
   React.useEffect(() => {
@@ -262,7 +263,7 @@ export function DepartmentSettings() {
     fetchGroups();
   }, [fetchGroups, data.department.id]);
 
-  const [deleteTarget, setDeleteTarget] = React.useState<{id: number | string, type: "procedure" | "posting" | "academic" | "case_category" | "competency_level" | "leave_type" | "procedure_group" | "conference_level" | "clinical_work_category" | "clinical_work_subtype", name: string, count: number | null} | null>(null);
+  const [deleteTarget, setDeleteTarget] = React.useState<{id: number | string, type: "procedure" | "posting" | "academic" | "case_category" | "competency_level" | "procedure_group" | "conference_level" | "clinical_work_category" | "clinical_work_subtype", name: string, count: number | null} | null>(null);
   const deleteRequestRef = React.useRef(0);
   const lastDeleteTarget = React.useRef<{id: number | string, type: any, name: string, count: number | null} | null>(null);
   React.useEffect(() => {
@@ -678,7 +679,7 @@ export function DepartmentSettings() {
                     activeSection.kind === "case_category" ? "No case categories configured." :
                     activeSection.kind === "competency_level" ? "No competency levels configured." :
                     activeSection.kind === "conference_level" ? "No conference levels configured." :
-                    "No leave types configured."
+                    "No options configured."
                   }
                 </p>
               ) : (
@@ -690,8 +691,7 @@ export function DepartmentSettings() {
                   )}
                   <div className="flex flex-col divide-y divide-line-soft border-t border-line-soft">
                     {visibleItems.map(item => {
-                      const hasCount = ["academic", "case_category", "conference_level", "leave_type"].includes(activeSection.kind);
-                      const isLeave = activeSection.kind === "leave_type";
+                      const hasCount = ["academic", "case_category", "conference_level"].includes(activeSection.kind);
                       return (
                         <div key={item.id} className="flex items-center justify-between py-3">
                           <div className="flex flex-col">
@@ -711,24 +711,20 @@ export function DepartmentSettings() {
                                   (item as any).period,
                                   activeSection.kind === "academic" ? "Academic target updated" :
                                   activeSection.kind === "case_category" ? "Case target updated" :
-                                  activeSection.kind === "conference_level" ? "Conference level target updated" :
-                                  "Leave allowance updated"
+                                  "Conference level target updated"
                                 );
                               }} className="flex items-center gap-2">
                                 <Label htmlFor={`target-${item.id}`} className="text-xs text-helper">
-                                  {isLeave ? "Days" : "Minimum"}
+                                  Minimum
                                 </Label>
                                 <Input 
                                   id={`target-${item.id}`}
                                   type="number" 
                                   min={0} 
-                                  max={isLeave ? 365 : 100000} 
+                                  max={100000}
                                   required 
                                   className="w-20"
-                                  aria-label={
-                                    isLeave ? `Allowance for ${item.name}` :
-                                    `Required count for ${item.name}`
-                                  }
+                                  aria-label={`Required count for ${item.name}`}
                                   value={getDraft(activeSection.kind, item.id, (item as any).required)}
                                   onChange={(e) => setDraft(activeSection.kind, item.id, e.target.value)}
                                 />

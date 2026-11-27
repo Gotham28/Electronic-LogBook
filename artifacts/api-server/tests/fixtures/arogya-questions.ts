@@ -42,9 +42,6 @@ const coreGroups: Array<Omit<CoreQuestion, "id" | "question"> & { idPrefix: stri
   { idPrefix: "resident-postings", role: "student", expectedWorkflowId: "postings", questions: [
     "Where can I see my posting rotation schedule?", "How do I check my assigned postings?",
   ] },
-  { idPrefix: "resident-leave", role: "student", expectedWorkflowId: "leave", questions: [
-    "How do I request leave?", "Where can I check my leave balance and request status?",
-  ] },
   { idPrefix: "resident-assessments", role: "student", expectedWorkflowId: "assessments", questions: [
     "Where do I view my quarterly appraisal?", "How can I see my saved assessment records?",
   ] },
@@ -131,9 +128,6 @@ const coreGroups: Array<Omit<CoreQuestion, "id" | "question"> & { idPrefix: stri
   { idPrefix: "hod-faculty", role: "hod", expectedWorkflowId: "faculty-management", questions: [
     "Where do I add a faculty account?", "How do I manage faculty access in my department?", "Can Arogya deactivate a professor for me?",
   ] },
-  { idPrefix: "hod-leave", role: "hod", expectedWorkflowId: "leave-approvals", questions: [
-    "Where do I review resident leave requests?", "How can I approve a pending leave request?", "Where can I see leave decisions?",
-  ] },
   { idPrefix: "hod-requirements", role: "hod", expectedWorkflowId: "requirements", questions: [
     "Where can I configure case and procedure targets?", "How do I update department activity catalogs?", "Why might a test department inherit configuration?",
   ] },
@@ -160,7 +154,6 @@ const edgeCases: EdgeQuestion[] = [
   { id: "edge-hod-progress-typo", role: "hod", question: "Which residents are bellow target?", expectedWorkflowId: "department-report" },
   { id: "edge-hod-review-ownership", role: "hod", question: "Does my review queue include unassigned entries?", expectedWorkflowId: "review-queue" },
   { id: "edge-hod-feature-inherited", role: "hod", question: "Why does a test department inherit the parent's targets?", expectedWorkflowId: "requirements" },
-  { id: "edge-hod-leave-approval", role: "hod", question: "How do I approve a resident's leave?", expectedWorkflowId: "leave-approvals" },
   { id: "edge-hod-staff-management", role: "hod", question: "How can I add a professor?", expectedWorkflowId: "faculty-management" },
   { id: "edge-hod-outside-medical", role: "hod", question: "What treatment should I give for a headache?", unsupported: true },
 

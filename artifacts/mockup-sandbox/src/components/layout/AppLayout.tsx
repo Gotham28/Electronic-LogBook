@@ -44,7 +44,6 @@ import {
   Bell,
   BookOpenCheck,
   CalendarDays,
-  CheckCircle2,
   ChevronDown,
   ClipboardCheck,
   FileText,
@@ -126,9 +125,6 @@ export function navigationForRole(role: RoleType, dashboardData?: any, loadingBa
       { title: "Pending Students", icon: UserPlus, href: "/student-access" },
       { title: "Add Faculty", icon: UserCheck, href: "/professors" },
     ];
-    if (!config?.enabledFeatures?.hideLeaveRecords) {
-      items.push({ title: "Leave Approvals", icon: CheckCircle2, href: "/leave-approvals" });
-    }
     if (config?.enabledFeatures?.yearlyAttendance || config?.enabledFeatures?.dailyAttendance) {
       items.push({ title: config?.enabledFeatures?.yearlyAttendance ? "Yearly Attendance" : "Daily Attendance", icon: CalendarDays, href: "/daily-attendance" });
     }
@@ -136,13 +132,17 @@ export function navigationForRole(role: RoleType, dashboardData?: any, loadingBa
     return items;
   }
 
+  const features = config?.enabledFeatures ?? {};
+  const attendance: NavigationItem | undefined = features.yearlyAttendance || features.dailyAttendance
+    ? { title: features.yearlyAttendance ? "Yearly Attendance" : "Attendance", icon: CalendarDays, href: "/attendance" }
+    : undefined;
   const academicNavigation = profileNavigation(academicLogbook);
   if (academicNavigation) {
     const icons: Record<string, NavigationItem["icon"]> = {
       dashboard: LayoutDashboard, teaching: GraduationCap, practicals: Stethoscope,
       research: Presentation, assessments: ClipboardCheck, daily: CalendarDays, certifications: Award,
     };
-    return academicNavigation.map((item) => ({ ...item, icon: icons[item.icon] }));
+    return [...academicNavigation.map((item) => ({ ...item, icon: icons[item.icon] })), ...(attendance ? [attendance] : [])];
   }
 
   const getCount = (id: string) => {
@@ -158,7 +158,6 @@ export function navigationForRole(role: RoleType, dashboardData?: any, loadingBa
     return `${cat.logged}/${required}`;
   };
 
-  const features = config?.enabledFeatures ?? {};
   // A department that lists academic activities before its logs (the academicsFirstInNav setting).
   if (features.academicsFirstInNav) {
     const dermItems: NavigationItem[] = [];
@@ -191,7 +190,7 @@ export function navigationForRole(role: RoleType, dashboardData?: any, loadingBa
     if (config?.enabledFeatures?.awards) {
       dermItems.push({ title: "Awards and Achievements", icon: Trophy, href: "/awards" });
     }
-    dermItems.push({ title: "Leave Records", icon: CalendarDays, href: "/attendance" });
+    if (attendance) dermItems.push(attendance);
     return dermItems;
   }
 
@@ -223,13 +222,7 @@ export function navigationForRole(role: RoleType, dashboardData?: any, loadingBa
     items.push({ title: milestonesTitle, icon: Award, href: "/milestones" });
   }
 
-  if (config?.enabledFeatures?.yearlyAttendance) {
-    items.push({ title: "Yearly Attendance", icon: CalendarDays, href: "/attendance" });
-  } else if (config?.enabledFeatures?.dailyAttendance) {
-    items.push({ title: "Attendance", icon: CalendarDays, href: "/attendance" });
-  } else if (!features.hideLeaveRecords) {
-    items.push({ title: "Leave Records", icon: CalendarDays, href: "/attendance" });
-  }
+  if (attendance) items.push(attendance);
 
   return items;
 }
@@ -242,11 +235,11 @@ function assistantWorkflowForPath(path: string, role: RoleType): string | undefi
   const map: Record<string, string> = {
     "/cases": "cases", "/procedures": "procedures", "/clinical-works": "clinical-work",
     "/academics": "academics", "/conferences": "conferences", "/postings": "postings",
-    "/attendance": "leave", "/assessments": role === "Student" ? "assessments" : "quarterly-appraisal",
+    "/assessments": role === "Student" ? "assessments" : "quarterly-appraisal",
     "/milestones": "milestones", "/thesis": "thesis", "/certifications": "certifications",
     "/awards": "awards", "/mentees": role === "Faculty" ? "student-progress" : "department-dashboard",
     "/review-queue": "review-queue", "/roster": "department-dashboard", "/student-access": "student-approval",
-    "/professors": "faculty-management", "/leave-approvals": "leave-approvals", "/requirements": "requirements",
+    "/professors": "faculty-management", "/requirements": "requirements",
   };
   return map[page];
 }
@@ -420,26 +413,17 @@ export function AppLayout({
         } catch { /* fail silently — no fabricated data (§7) */ }
       }
       if (activeRole === "HOD") {
-        const [ps, pl, queue] = await Promise.allSettled([
+        const [ps, queue] = await Promise.allSettled([
           apiGet<any[]>("/api/admin/students/pending"),
-          apiGet<any[]>("/api/admin/leaves/pending"),
           apiGet<{ pendingReviews?: unknown[] }>(`/api/professors/${currentUser.id}/review-queue`),
         ]);
         const sc = ps.status === "fulfilled" && Array.isArray(ps.value) ? ps.value.length : 0;
-        const lc = pl.status === "fulfilled" && Array.isArray(pl.value) ? pl.value.length : 0;
         const n = queue.status === "fulfilled" && Array.isArray(queue.value?.pendingReviews) ? queue.value.pendingReviews.length : 0;
         if (sc > 0) {
           items.push({
             id: "hod_pending_students",
             text: `${sc} student${sc === 1 ? "" : "s"} awaiting approval`,
             href: "/student-access",
-          });
-        }
-        if (lc > 0) {
-          items.push({
-            id: "hod_pending_leaves",
-            text: `${lc} leave request${lc === 1 ? "" : "s"} pending`,
-            href: "/leave-approvals",
           });
         }
         if (n > 0) {
@@ -551,9 +535,6 @@ export function AppLayout({
         tryPush("milestone-thesis", `${labelText} — Thesis`, href, "milestone-thesis", FileText);
         tryPush("milestone-certification", `${labelText} — Certification`, href, "milestone-certification", Award);
         return;
-      }
-      if (href === "/attendance") {
-        tryPush("leave", labelText, href, "leave", icon);
       }
     };
 
