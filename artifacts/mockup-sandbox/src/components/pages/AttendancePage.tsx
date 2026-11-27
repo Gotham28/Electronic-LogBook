@@ -16,9 +16,10 @@ import { CalendarDays, CheckCircle2, Clock, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { formatLogbookDate, todayForInput } from "@/lib/logbook-config";
 import { apiGet, apiPost } from "@/lib/apiClient";
-import { getCurrentUser } from "@/lib/session";
+import { getCurrentUser, isDemoMode } from "@/lib/session";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { useDepartment } from "@/lib/department-context";
+import { isLogCreateEligible, useLogCreateIntent } from "@/lib/log-create-navigation";
 
 type LeaveStatus = "pending" | "approved" | "rejected";
 
@@ -382,6 +383,26 @@ export function AttendancePage() {
   const dept = useDepartment();
   const isYearlyAttendance = Boolean(dept.config?.enabledFeatures?.yearlyAttendance);
   const isDailyAttendance = Boolean(dept.config?.enabledFeatures?.dailyAttendance && !isYearlyAttendance);
+  const isLeaveHidden = Boolean(dept.config?.enabledFeatures?.hideLeaveRecords);
+  const leaveReasonRef = React.useRef<HTMLInputElement>(null);
+
+  useLogCreateIntent(["leave"], () => {
+    window.requestAnimationFrame(() => {
+      leaveReasonRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      leaveReasonRef.current?.focus();
+    });
+  }, {
+    targetPath: "/attendance",
+    ready: Boolean(dept.config),
+    eligible: isLogCreateEligible({
+      action: "leave",
+      targetPath: "/attendance",
+      isStudent: getCurrentUser()?.role === "student",
+      config: dept.config,
+      demoMode: isDemoMode(),
+      academicLogbook: dept.academicLogbook,
+    }),
+  });
 
   if (isYearlyAttendance) {
     return <StudentYearlyAttendanceView />;
@@ -530,6 +551,7 @@ export function AttendancePage() {
             <div className="space-y-1">
               <Label className="text-xs">Reason for Leave</Label>
               <Input
+                ref={leaveReasonRef}
                 placeholder="e.g. Attending IAP Pulmonary Conference"
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}

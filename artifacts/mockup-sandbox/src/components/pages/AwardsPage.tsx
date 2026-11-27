@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Trophy, PlusCircle, Edit3 } from "lucide-react";
 import { toast } from "sonner";
+import { isLogCreateEligible, useLogCreateIntent } from "@/lib/log-create-navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -18,7 +19,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { formatLogbookDate, todayForInput } from "@/lib/logbook-config";
 import { apiGet, apiPost, apiPatch } from "@/lib/apiClient";
-import { getCurrentUser } from "@/lib/session";
+import { getCurrentUser, isDemoMode } from "@/lib/session";
+import { useDepartment } from "@/lib/department-context";
 
 type AwardEntry = {
   id: number;
@@ -31,9 +33,27 @@ type AwardEntry = {
 };
 
 export function AwardsPage() {
+  const { config, academicLogbook } = useDepartment();
   const [open, setOpen] = React.useState(false);
   const [awards, setAwards] = React.useState<AwardEntry[]>([]);
   const user = React.useMemo(() => getCurrentUser(), []);
+  useLogCreateIntent(["award"], () => {
+    setEditId(null);
+    setDate(todayForInput());
+    setDescription("");
+    setOpen(true);
+  }, {
+    targetPath: "/awards",
+    ready: Boolean(config),
+    eligible: isLogCreateEligible({
+      action: "award",
+      targetPath: "/awards",
+      isStudent: user?.role === "student",
+      config,
+      demoMode: isDemoMode(),
+      academicLogbook,
+    }),
+  });
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 

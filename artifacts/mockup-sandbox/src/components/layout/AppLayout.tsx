@@ -69,7 +69,8 @@ import { MaintenanceNoticeBubble } from "@/components/arogya/MaintenanceNoticeBu
 import { useDepartment, defaultDepartmentLabel, resolveDepartmentLabel, type DepartmentLabelKey } from "@/lib/department-context";
 import type { AcademicLogbookProfile } from "@/lib/academic-logbook";
 import { applyNavOrder, navigationIsActive, profileNavigation, readStudentNavOrder } from "@/lib/academic-navigation";
-import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
+import { MobileBottomNav, type MobileAddLogOption } from "@/components/layout/MobileBottomNav";
+import { attachCreateIntentScopeToHistory, buildCreateIntentHref, dispatchLogCreateIntent, getCurrentLogCreateScope, isLogCreateEligible, type LogCreateActionId } from "@/lib/log-create-navigation";
 import { DemoBanner } from "@/components/layout/DemoBanner";
 import { DemoMovie } from "@/components/demo-movie/DemoMovie";
 import { DEMO_MOVIE_CHANGED_EVENT, isDemoMovieActive } from "@/lib/demoSession";
@@ -297,7 +298,7 @@ export function AppLayout({
   onSignOut,
 }: AppLayoutProps) {
   const [location, setLocation] = useLocation();
-  const { department, config, academicLogbook, label, labels } = useDepartment();
+  const { department, config, academicLogbook, label, labels, clinicalWorkCategories, academics } = useDepartment();
   const demoMode = isDemoMode();
   const reduceMotion = useReducedMotion();
   const [isDepartmentSwitching, setIsDepartmentSwitching] = React.useState(false);
@@ -535,6 +536,112 @@ export function AppLayout({
     [activeRole, studentNavOrder, navigationItems],
   );
   const visibleNavigationItems = isDepartmentSwitching ? [] : navigationItems;
+  const studentAddLogOptions = React.useMemo<MobileAddLogOption[]>(() => {
+    if (activeRole !== "Student" || isDepartmentSwitching || !config) return [];
+    const options: MobileAddLogOption[] = [];
+    const seenIds = new Set<string>();
+
+    const pushOption = (option: MobileAddLogOption) => {
+      if (seenIds.has(option.id)) return;
+      seenIds.add(option.id);
+      options.push(option);
+    };
+
+    const tryPush = (id: string, labelText: string, href: string, action: LogCreateActionId, icon: React.ComponentType<{ className?: string }>) => {
+      if (!isLogCreateEligible({
+        action,
+        targetPath: href,
+        isStudent: true,
+        config,
+        demoMode,
+        academicLogbook,
+        academics,
+        clinicalWorkCategoriesCount: clinicalWorkCategories.length,
+      })) {
+        return;
+      }
+      pushOption({ id, label: labelText, href, action, icon });
+    };
+
+    const addForRoute = (href: string, labelText: string, icon: React.ComponentType<{ className?: string }>) => {
+      if (href === "/" || href === "/dashboard" || href === "/assessments") return;
+      if (href === "/cases") {
+        tryPush("case", labelText, href, "case", icon);
+        return;
+      }
+      if (href === "/procedures") {
+        tryPush("procedure", labelText, href, "procedure", icon);
+        return;
+      }
+      if (href === "/clinical-works") {
+        tryPush("clinical-work", labelText, href, "clinical-work", icon);
+        return;
+      }
+      if (href === "/academics" || href.startsWith("/academics/")) {
+        tryPush(href, labelText, href, "academic", icon);
+        return;
+      }
+      if (href === "/conferences") {
+        tryPush("conference", labelText, href, "conference", icon);
+        return;
+      }
+      if (href === "/postings") {
+        tryPush("posting", labelText, href, "posting", icon);
+        return;
+      }
+      if (href === "/awards") {
+        tryPush("award", labelText, href, "award", icon);
+        return;
+      }
+      if (href === "/certifications") {
+        tryPush("certification", labelText, href, "certification", icon);
+        return;
+      }
+      if (href === "/thesis") {
+        tryPush("thesis", labelText, href, "thesis", icon);
+        return;
+      }
+      if (href === "/milestones") {
+        tryPush("milestone-thesis", `${labelText} — Thesis`, href, "milestone-thesis", FileText);
+        tryPush("milestone-certification", `${labelText} — Certification`, href, "milestone-certification", Award);
+        return;
+      }
+      if (href === "/attendance") {
+        tryPush("leave", labelText, href, "leave", icon);
+      }
+    };
+
+    for (const item of navigationItems) {
+      addForRoute(item.href, item.title, item.icon);
+      if (item.href.startsWith("/academics/") && academicLogbook) {
+        const categoryId = item.href.slice("/academics/".length);
+        const category = academicLogbook.navigationCategories?.find((c) => c.id === categoryId);
+        for (const related of category?.relatedPages ?? []) {
+          addForRoute(related.href, related.title, item.icon);
+        }
+      }
+    }
+
+    return options;
+  }, [activeRole, isDepartmentSwitching, config, demoMode, navigationItems, academicLogbook, academics, clinicalWorkCategories.length]);
+
+  const handleMobileAddLogSelect = React.useCallback((option: MobileAddLogOption) => {
+    if (isDepartmentSwitching || !config) return;
+    const scope = getCurrentLogCreateScope();
+    if (!scope) return;
+    const currentPath = typeof window !== "undefined" ? window.location.pathname : location;
+    if (currentPath === option.href) {
+      if (typeof window !== "undefined") {
+        const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+        window.history.replaceState(window.history.state, "", buildCreateIntentHref(currentUrl, option.action));
+        attachCreateIntentScopeToHistory(option.action, scope);
+      }
+      dispatchLogCreateIntent(option.action, option.href, scope);
+      return;
+    }
+    setLocation(buildCreateIntentHref(option.href, option.action));
+    attachCreateIntentScopeToHistory(option.action, scope);
+  }, [config, isDepartmentSwitching, location, setLocation]);
   const closeTour = React.useCallback(() => {
     setIsTourOpen(false);
     window.requestAnimationFrame(() => tourButtonRef.current?.focus());
@@ -864,7 +971,16 @@ export function AppLayout({
               ) : children}
             </main>
           </SidebarInset>
-          <MobileBottomNav role={activeRole} items={navigationItems} location={location} departmentKey={department.id} switching={isDepartmentSwitching} hasCustomOrder={hasCustomStudentOrder} />
+          <MobileBottomNav
+            role={activeRole}
+            items={navigationItems}
+            location={location}
+            departmentKey={department.id}
+            switching={isDepartmentSwitching}
+            hasCustomOrder={hasCustomStudentOrder}
+            addLogOptions={studentAddLogOptions}
+            onAddLogSelect={handleMobileAddLogSelect}
+          />
           <Toaster position="top-right" richColors />
 
           <ArogyaPanel 

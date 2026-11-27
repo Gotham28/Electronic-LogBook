@@ -3,7 +3,8 @@ import { CheckCircle2, Clock, MapPin, PlusCircle, Loader2, Presentation, Edit3 }
 import { toast } from "sonner";
 import { apiGet, apiPost, apiPatch } from "@/lib/apiClient";
 import { openArogya, publishArogyaContext } from "@/lib/arogya-context";
-import { getCurrentUser } from "@/lib/session";
+import { getCurrentUser, isDemoMode } from "@/lib/session";
+import { isLogCreateEligible, useLogCreateIntent } from "@/lib/log-create-navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,12 +36,46 @@ export function ConferencesPage() {
   const [editLogId, setEditLogId] = React.useState<number | null>(null);
 
   const user = React.useMemo(() => getCurrentUser(), []);
-  const { config, conferenceLevels } = useDepartment();
+  const { config, conferenceLevels, academicLogbook } = useDepartment();
   const isConferenceDateRange = Boolean(config?.enabledFeatures?.conferenceDateRange);
   const [fromDate, setFromDate] = React.useState(todayForInput());
   const [toDate, setToDate] = React.useState(todayForInput());
   const [professors, setProfessors] = React.useState<any[]>([]);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+
+  const resetCreateForm = React.useCallback(() => {
+    publishArogyaContext(null);
+    setForm({
+      date: todayForInput(),
+      conferenceName: "",
+      conferenceType: "conference",
+      level: "",
+      category: "",
+      role: "attended",
+      location: "",
+      certificateUrl: "",
+      supervisorId: "",
+    });
+    setFromDate(todayForInput());
+    setToDate(todayForInput());
+    setEditLogId(null);
+  }, []);
+
+  useLogCreateIntent(["conference"], () => {
+    resetCreateForm();
+    setOpen(true);
+  }, {
+    targetPath: "/conferences",
+    ready: Boolean(config),
+    eligible: isLogCreateEligible({
+      action: "conference",
+      targetPath: "/conferences",
+      isStudent: user?.role === "student",
+      config,
+      demoMode: isDemoMode(),
+      academicLogbook,
+    }),
+  });
 
   const fetchLogs = React.useCallback(async () => {
     if (!user?.studentProfileId) {
@@ -137,7 +172,7 @@ export function ConferencesPage() {
         </div>
         <Dialog open={open} onOpenChange={(val) => { 
           setOpen(val); 
-          if (!val) { publishArogyaContext(null); setForm({ date: todayForInput(), conferenceName: "", conferenceType: "conference", level: "", category: "", role: "attended", location: "", certificateUrl: "", supervisorId: "" }); setFromDate(todayForInput()); setToDate(todayForInput()); setEditLogId(null); }
+          if (!val) { resetCreateForm(); }
         }}>
           <DialogTrigger asChild><Button><PlusCircle className="h-4 w-4" /> Log conference</Button></DialogTrigger>
           <DialogContent className="rounded-2xl bg-white sm:max-w-lg">

@@ -10,8 +10,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { formatLogbookDate } from "@/lib/logbook-config";
 import { apiGet, apiPost, apiPatch, apiPutFile, openCertificateFile } from "@/lib/apiClient";
 import { compressImage, MAX_PDF_BYTES } from "@/lib/compressImage";
-import { getCurrentUser } from "@/lib/session";
+import { getCurrentUser, isDemoMode } from "@/lib/session";
 import { useDepartment } from "@/lib/department-context";
+import { isLogCreateEligible, useLogCreateIntent } from "@/lib/log-create-navigation";
 
 const dateFields = [
   ["protocolSubmissionDate", "Protocol submission"], ["iecClearanceDate", "IEC clearance"],
@@ -27,7 +28,7 @@ const emptyThesis: Thesis = { thesisTitle: "", guideId: null, coGuideId: null, p
 const emptyCertificate = { title: "", provider: "", issueDate: "", expiryDate: "", certificateUrl: "" };
 
 export function MilestonesPage() {
-  const { label } = useDepartment();
+  const { label, config, academicLogbook } = useDepartment();
   const pageTitle = label("milestones.pageTitle");
   const user = getCurrentUser()!;
   const base = `/api/students/${user.studentProfileId}`;
@@ -42,6 +43,33 @@ export function MilestonesPage() {
   const [loading, setLoading] = React.useState(true);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState("");
+  const openThesisEditor = React.useCallback(() => {
+    setDraft(thesis || emptyThesis);
+    setThesisOpen(true);
+  }, [thesis]);
+  const openCertificateEditor = React.useCallback(() => {
+    setEditId(null);
+    setCertificate(emptyCertificate);
+    setCertificateOpen(true);
+  }, []);
+  useLogCreateIntent(["milestone-thesis", "milestone-certification"], (action) => {
+    if (action === "milestone-thesis") {
+      openThesisEditor();
+    } else {
+      openCertificateEditor();
+    }
+  }, {
+    targetPath: "/milestones",
+    ready: Boolean(config) && !loading && !error,
+    isActionEligible: (action) => isLogCreateEligible({
+      action,
+      targetPath: "/milestones",
+      isStudent: user?.role === "student",
+      config,
+      demoMode: isDemoMode(),
+      academicLogbook,
+    }),
+  });
   const load = React.useCallback(async () => {
     setLoading(true); setError("");
     try {
@@ -136,7 +164,7 @@ export function MilestonesPage() {
           <div><p className="page-eyebrow">Thesis milestone tracker</p>
             <CardTitle className="mt-2 max-w-3xl text-xl">{thesis?.thesisTitle || "No thesis recorded yet"}</CardTitle>
             {thesis && <p className="mt-2 text-sm text-soft-ink">Guide: {guideName(thesis.guideId)} · Co-guide: {guideName(thesis.coGuideId)}</p>}</div>
-          <Button variant="outline" size="sm" onClick={() => { setDraft(thesis || emptyThesis); setThesisOpen(true); }}><Edit3 className="h-4 w-4" /> {thesis ? "Edit thesis" : "Add thesis"}</Button>
+          <Button variant="outline" size="sm" onClick={openThesisEditor}><Edit3 className="h-4 w-4" /> {thesis ? "Edit thesis" : "Add thesis"}</Button>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
           {dateFields.map(([key, label]) => <div key={key} className="rounded-xl border border-line-soft p-4">
@@ -147,7 +175,7 @@ export function MilestonesPage() {
       <Card className="border-card-edge bg-card">
         <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-4">
           <CardTitle className="flex items-center gap-2 text-lg"><Award className="h-5 w-5 text-forest" /> Certifications</CardTitle>
-          <Button size="sm" onClick={() => { setCertificate(emptyCertificate); setCertificateOpen(true); }}><PlusCircle className="h-4 w-4" /> Add certificate</Button>
+          <Button size="sm" onClick={openCertificateEditor}><PlusCircle className="h-4 w-4" /> Add certificate</Button>
         </CardHeader>
         <CardContent>
           {!certificates.length ? <p className="text-sm text-helper">No certificates recorded yet.</p> : <Table>

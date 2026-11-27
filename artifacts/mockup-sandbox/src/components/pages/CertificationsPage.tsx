@@ -10,17 +10,36 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { formatLogbookDate } from "@/lib/logbook-config";
 import { apiGet, apiPost, apiPatch, apiPutFile, openCertificateFile } from "@/lib/apiClient";
 import { compressImage, MAX_PDF_BYTES } from "@/lib/compressImage";
-import { getCurrentUser } from "@/lib/session";
+import { getCurrentUser, isDemoMode } from "@/lib/session";
+import { useDepartment } from "@/lib/department-context";
+import { isLogCreateEligible, useLogCreateIntent } from "@/lib/log-create-navigation";
 
 type Certificate = { id: string; title: string; provider: string | null; issueDate: string; expiryDate: string; certificateUrl: string | null; certificateFileType?: string | null; certificateFileName?: string | null };
 const emptyCertificate = { title: "", provider: "", issueDate: "", expiryDate: "", certificateUrl: "" };
 
 export function CertificationsPage() {
   const user = getCurrentUser()!;
+  const { config, academicLogbook } = useDepartment();
   const base = `/api/students/${user.studentProfileId}`;
   const [certificates, setCertificates] = React.useState<Certificate[]>([]);
   const [certificate, setCertificate] = React.useState(emptyCertificate);
   const [certificateOpen, setCertificateOpen] = React.useState(false);
+  useLogCreateIntent(["certification"], () => {
+    setEditId(null);
+    setCertificate(emptyCertificate);
+    setCertificateOpen(true);
+  }, {
+    targetPath: "/certifications",
+    ready: Boolean(config),
+    eligible: isLogCreateEligible({
+      action: "certification",
+      targetPath: "/certifications",
+      isStudent: user?.role === "student",
+      config,
+      demoMode: isDemoMode(),
+      academicLogbook,
+    }),
+  });
   const [loading, setLoading] = React.useState(true);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState("");
