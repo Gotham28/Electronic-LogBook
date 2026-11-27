@@ -1,4 +1,4 @@
-import { useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { findIcd11Chapter06Diagnosis, searchIcd11Chapter06Diagnoses, type Icd11Diagnosis } from "@workspace/api-zod";
 import { Input } from "@/components/ui/input";
 
@@ -48,12 +48,28 @@ export function Chapter06DiagnosisPicker({ code, onSelect }: { code: string; onS
   const inputId = useId();
   const resultsId = useId();
   const input = useRef<HTMLInputElement>(null);
+  const picker = useRef<HTMLDivElement>(null);
   const restoringFocus = useRef(false);
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const selected = findIcd11Chapter06Diagnosis(code);
   const matches = useMemo(() => searchIcd11Chapter06Diagnoses(query), [query]);
   const tree = useMemo(() => open ? groupResults(matches) : null, [matches, open]);
+
+  useEffect(() => {
+    if (!open) return;
+    // A Safari tap can blur the input before the result receives its click.
+    function dismissOutside(event: Event) {
+      if (event.type === "focusin" && event.target === document.body) return;
+      if (event.target instanceof Node && !picker.current?.contains(event.target)) setOpen(false);
+    }
+    document.addEventListener("pointerdown", dismissOutside, true);
+    document.addEventListener("focusin", dismissOutside);
+    return () => {
+      document.removeEventListener("pointerdown", dismissOutside, true);
+      document.removeEventListener("focusin", dismissOutside);
+    };
+  }, [open]);
 
   function close(restore: boolean) {
     if (restore && input.current !== document.activeElement) {
@@ -70,9 +86,7 @@ export function Chapter06DiagnosisPicker({ code, onSelect }: { code: string; onS
     setQuery("");
   }
 
-  return <div className="relative space-y-1.5" onBlur={(event) => {
-    if (!event.currentTarget.contains(event.relatedTarget)) close(false);
-  }} onKeyDown={(event) => {
+  return <div ref={picker} className="relative space-y-1.5" onKeyDown={(event) => {
     if (event.key === "Escape" && open) { event.preventDefault(); close(true); }
   }}>
     <label htmlFor={inputId} className="text-sm font-medium">ICD-11 diagnosis</label>
