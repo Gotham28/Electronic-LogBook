@@ -10,7 +10,6 @@ import { useDepartment } from "@/lib/department-context";
 import { logCustomFieldVisible } from "@/lib/log-custom-fields";
 import { Printer, X, BookOpen } from "lucide-react";
 import { useMobileCellLabels } from "@/components/ui/table";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 
 class PrintErrorBoundary extends React.Component<{children: React.ReactNode}, {error: Error | null}> {
   constructor(props: {children: React.ReactNode}) {
@@ -39,18 +38,21 @@ const STATUS_LABELS: Record<string, string> = {
   pending: "Pending",
   approved: "Approved",
   submitted: "Submitted",
+  rejected: "Rejected",
+  completed: "Completed",
 };
 
 function StatusPill({ status }: { status: string }) {
   const colours: Record<string, string> = {
-    verified: "bg-status text-status-foreground",
-    approved: "bg-status text-status-foreground",
-    rejected: "bg-status text-status-foreground",
-    pending: "bg-status text-status-foreground",
-    submitted: "bg-sage text-forest",
+    verified: "bg-[#e8f5e9] text-[#1b5e20] border border-[#a5d6a7]",
+    approved: "bg-[#e8f5e9] text-[#1b5e20] border border-[#a5d6a7]",
+    completed: "bg-[#e8f5e9] text-[#1b5e20] border border-[#a5d6a7]",
+    pending: "bg-[#fef9c3] text-[#854d0e] border border-[#fde047]",
+    submitted: "bg-[#fef9c3] text-[#854d0e] border border-[#fde047]",
+    rejected: "bg-[#fee2e2] text-[#991b1b] border border-[#fca5a5]",
   };
   return (
-    <span className={`inline-block rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide ${colours[status] ?? "bg-sage text-soft-ink"}`}>
+    <span className={`inline-block rounded-full px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wide ${colours[status] ?? "bg-slate-100 text-slate-700 border border-slate-200"}`}>
       {STATUS_LABELS[status] ?? status}
     </span>
   );
@@ -71,55 +73,65 @@ function CoverPage({ profile, name }: { profile: any; name: string }) {
   }, [course]);
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[98vh] break-after-page px-6 py-12 sm:px-12 sm:py-20 text-ink" style={{ fontFamily: "system-ui, sans-serif", background: "var(--gothos-bg)" }}>
+    <div
+      className="cover-page flex flex-col items-center justify-between min-h-[90vh] break-after-page no-break px-6 py-8 sm:px-12 sm:py-10 text-ink box-border"
+      style={{
+        fontFamily: "system-ui, sans-serif",
+        background: "var(--gothos-bg)",
+        breakAfter: "page",
+        pageBreakAfter: "always",
+        breakInside: "avoid",
+        pageBreakInside: "avoid",
+      }}
+    >
       {/* Header band */}
-      <div className="flex flex-col items-center gap-4 mb-20 text-center w-full">
-        <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-deep text-white shadow-lg mb-2">
-          <BookOpen size={32} />
+      <div className="flex flex-col items-center gap-2 mb-8 text-center w-full">
+        <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-deep text-white shadow-lg mb-1">
+          <BookOpen size={28} />
         </div>
-        <p className="text-3xl font-extrabold text-ink text-center w-full">{profile.collegeName}</p>
-        <p className="text-sm font-bold uppercase tracking-[0.25em] text-forest">Electronic Logbook</p>
+        <p className="text-2xl sm:text-3xl font-extrabold text-ink text-center w-full leading-snug">{profile.collegeName}</p>
+        <p className="text-xs font-bold uppercase tracking-[0.25em] text-forest">Electronic Logbook</p>
       </div>
 
       {/* Main title */}
-      <div className="text-center mb-16 w-full max-w-2xl flex flex-col items-center">
-        <h1 className="text-6xl font-extrabold text-ink leading-tight">Resident<br/>Training Record</h1>
-        <div className="mt-8 mb-2 flex items-center justify-center w-full">
+      <div className="text-center mb-8 w-full max-w-2xl flex flex-col items-center">
+        <h1 className="text-4xl sm:text-5xl font-extrabold text-ink leading-tight">Resident<br/>Training Record</h1>
+        <div className="mt-4 mb-2 flex items-center justify-center w-full">
           <input 
             type="text" 
             value={course} 
             onChange={(e) => setCourse(e.target.value)}
-            className="text-2xl font-bold text-forest bg-transparent text-center border-b border-transparent hover:border-input focus:border-forest focus:outline-none w-3/4 placeholder:text-helper transition-colors"
+            className="text-xl sm:text-2xl font-bold text-forest bg-transparent text-center border-b border-transparent hover:border-input focus:border-forest focus:outline-none w-3/4 placeholder:text-helper transition-colors"
             placeholder="Enter Course (e.g. MD Pediatrics)"
           />
         </div>
-        <p className="text-xl font-medium text-forest">Department of {profile.department ?? "—"}</p>
+        <p className="text-lg font-medium text-forest">Department of {profile.department ?? "—"}</p>
       </div>
 
       {/* Resident card */}
-      <div className="w-full max-w-sm rounded-2xl border border-line-soft bg-white shadow-md px-8 py-8 text-center mb-16">
-        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-helper mb-3">Resident</p>
-        <h2 className="text-3xl font-bold text-ink mb-1">{name}</h2>
+      <div className="w-full max-w-sm rounded-2xl border border-line-soft bg-white shadow-md px-6 py-5 text-center mb-6">
+        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-helper mb-2">Resident</p>
+        <h2 className="text-2xl font-bold text-ink mb-1">{name}</h2>
         {profile.registrationNumber && (
-          <p className="text-sm text-helper font-mono mt-1">{profile.registrationNumber}</p>
+          <p className="text-sm text-helper font-mono mt-0.5">{profile.registrationNumber}</p>
         )}
-        <div className="mt-4 border-t border-line-soft pt-4">
-          <p className="text-sm text-soft-ink">{dateRange}</p>
+        <div className="mt-3 border-t border-line-soft pt-3">
+          <p className="text-xs sm:text-sm text-soft-ink">{dateRange}</p>
           {profile.batch && <p className="text-xs text-helper mt-0.5">Batch of {profile.batch}</p>}
         </div>
       </div>
 
       {/* Guide */}
       {profile.mentorName && (
-        <div className="text-center mb-16">
-          <p className="text-[10px] uppercase tracking-[0.2em] text-helper mb-2">Under the Guidance of</p>
-          <p className="text-xl font-bold text-ink">{profile.mentorName}</p>
-          <p className="text-sm text-helper">{mentorRole}</p>
+        <div className="text-center mb-6">
+          <p className="text-[10px] uppercase tracking-[0.2em] text-helper mb-1">Under the Guidance of</p>
+          <p className="text-lg font-bold text-ink">{profile.mentorName}</p>
+          <p className="text-xs text-helper">{mentorRole}</p>
         </div>
       )}
 
       {/* Footer */}
-      <div className="mt-auto pt-16 text-center text-xs text-helper">
+      <div className="mt-auto pt-4 text-center text-xs text-helper">
         <p>Generated on {printedDate}</p>
         <p className="mt-1">This document is system-generated and confidential.</p>
       </div>
@@ -158,15 +170,25 @@ function Td({ children, right, muted }: { children: React.ReactNode; right?: boo
 
 function AggregateSummary({ rows, label }: { rows: any[]; label: string }) {
   if (!rows || rows.length === 0) return null;
-  const verified = rows.filter(r => r.status === "verified" || r.status === "approved").length;
+  const verified = rows.filter(r => r.status === "verified" || r.status === "approved" || r.status === "completed").length;
   const pending = rows.filter(r => r.status === "pending" || r.status === "submitted").length;
   const rejected = rows.filter(r => r.status === "rejected").length;
   return (
-    <div className="mt-4 flex gap-4 text-[10px] font-bold text-helper uppercase tracking-wider justify-end">
-      <div className="bg-sage px-4 py-2 rounded-lg border border-line-soft shadow-sm">Total {label}: <span className="text-ink ml-1">{rows.length}</span></div>
-      <div className="bg-status text-status-foreground px-4 py-2 rounded-lg border border-status-border shadow-sm">Verified: <span className="ml-1">{verified}</span></div>
-      <div className="bg-status text-status-foreground px-4 py-2 rounded-lg border border-status-border shadow-sm">Pending: <span className="ml-1">{pending}</span></div>
-      {rejected > 0 && <div className="bg-status text-status-foreground px-4 py-2 rounded-lg border border-status-border shadow-sm">Rejected: <span className="ml-1">{rejected}</span></div>}
+    <div className="mt-4 flex flex-wrap gap-2 sm:gap-3 text-[10px] font-bold uppercase tracking-wider justify-end">
+      <div className="bg-mist text-ink px-3 py-1.5 rounded-lg border border-line-soft shadow-sm">
+        Total {label}: <span className="font-extrabold ml-1">{rows.length}</span>
+      </div>
+      <div className="bg-[#e8f5e9] text-[#1b5e20] px-3 py-1.5 rounded-lg border border-[#a5d6a7] shadow-sm">
+        Verified: <span className="font-extrabold ml-1">{verified}</span>
+      </div>
+      <div className="bg-[#fef9c3] text-[#854d0e] px-3 py-1.5 rounded-lg border border-[#fde047] shadow-sm">
+        Pending: <span className="font-extrabold ml-1">{pending}</span>
+      </div>
+      {rejected > 0 && (
+        <div className="bg-[#fee2e2] text-[#991b1b] px-3 py-1.5 rounded-lg border border-[#fca5a5] shadow-sm">
+          Rejected: <span className="font-extrabold ml-1">{rejected}</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -174,7 +196,6 @@ function AggregateSummary({ rows, label }: { rows: any[]; label: string }) {
 export function PrintableLogbook() {
   const user = useCurrentUser();
   const hideUhid = isDemoMode();
-  const shouldReduceMotion = useReducedMotion();
   const { config, clinicalWorkCategories, clinicalWorkSubtypes, competencyLevels, procedureFields, caseLogFields = [], academicLogbook, label } = useDepartment();
   const features = config?.enabledFeatures ?? {};
   const hideCaseId = hideUhid || features.psychiatryWorkspace === true;
@@ -187,8 +208,6 @@ export function PrintableLogbook() {
   const documentRef = React.useRef<HTMLDivElement>(null);
   useMobileCellLabels(documentRef, true, data);
   const printStarted = React.useRef(false);
-  const [flipPreviewDone, setFlipPreviewDone] = React.useState(() => !isDemoMode());
-  const [flipPage, setFlipPage] = React.useState(0);
 
   const closePrintView = React.useCallback(() => {
     if (window.opener && !window.opener.closed) { window.close(); return; }
@@ -238,27 +257,13 @@ export function PrintableLogbook() {
   React.useEffect(() => { fetchAll(); }, [fetchAll]);
 
   React.useEffect(() => {
-    if (!isDemoMode() || shouldReduceMotion === true) setFlipPreviewDone(true);
-  }, [shouldReduceMotion]);
-
-  React.useEffect(() => {
-    if (!isDemoMode() || loading || !data || flipPreviewDone || shouldReduceMotion !== false) return undefined;
-    const timer = window.setTimeout(() => {
-      if (flipPage >= 3) setFlipPreviewDone(true);
-      else setFlipPage((current) => current + 1);
-    }, 430);
-    return () => window.clearTimeout(timer);
-  }, [data, flipPage, flipPreviewDone, loading, shouldReduceMotion]);
-
-  React.useEffect(() => {
     if (loading || !data || error || printStarted.current) return undefined;
-    if (isDemoMode() && !flipPreviewDone) return undefined;
 
     printStarted.current = true;
     window.addEventListener("afterprint", closePrintView, { once: true });
-    const timer = window.setTimeout(() => window.print(), 600);
+    const timer = window.setTimeout(() => window.print(), 500);
     return () => window.clearTimeout(timer);
-  }, [closePrintView, data, error, flipPreviewDone, loading]);
+  }, [closePrintView, data, error, loading]);
 
   if (loading) return (
     <div className="flex flex-col items-center justify-center min-h-screen gap-4 text-helper">
@@ -293,60 +298,25 @@ export function PrintableLogbook() {
 
   return (
     <PrintErrorBoundary>
-      {isDemoMode() && shouldReduceMotion === false && !flipPreviewDone && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden bg-deep/55 p-5 print:hidden" role="status" aria-live="polite">
-          <div className="absolute inset-0 bg-transparent" />
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={flipPage}
-              initial={{ opacity: 0, rotateY: -78, x: 30 }}
-              animate={{ opacity: 1, rotateY: 0, x: 0 }}
-              exit={{ opacity: 0, rotateY: 70, x: -24 }}
-              transition={{ duration: 0.38, ease: "easeOut" }}
-              className="relative flex min-h-[min(68vh,34rem)] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-card-edge bg-white px-6 py-7 shadow-[0_30px_100px_color-mix(in_srgb,var(--gothos-forest)_38%,transparent)] sm:px-9 sm:py-9"
-              style={{ transformOrigin: "left center", perspective: 1200 }}
-            >
-              <div className="flex items-center justify-between border-b border-line-soft pb-4">
-                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-forest">Electronic Logbook</span>
-                <span className="text-xs font-medium tabular-nums text-helper">{String(flipPage + 1).padStart(2, "0")} / 04</span>
-              </div>
-              <div className="flex flex-1 flex-col justify-center py-9">
-                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-helper">{user?.name ?? "Resident"}</p>
-                <h1 className="mt-3 text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
-                  {["Training record", "Clinical activity", "Academic activity", "Progress summary"][flipPage]}
-                </h1>
-                <div className="mt-8 space-y-4" aria-hidden="true">
-                  <div className="h-2 w-4/5 rounded-full bg-sage" />
-                  <div className="h-2 w-full rounded-full bg-sage" />
-                  <div className="h-2 w-3/5 rounded-full bg-sage" />
-                  <div className="mt-7 grid grid-cols-2 gap-3">
-                    <div className="h-16 rounded-xl border border-line-soft bg-mist" />
-                    <div className="h-16 rounded-xl border border-line-soft bg-mist" />
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center justify-between border-t border-line-soft pt-4">
-                <span className="text-xs text-helper">Preparing print view</span>
-                <button
-                  type="button"
-                  onClick={() => setFlipPreviewDone(true)}
-                  className="min-h-11 rounded-lg px-3 text-sm font-semibold text-forest transition-colors hover:bg-mist focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  Skip preview
-                </button>
-              </div>
-            </motion.div>
-          </AnimatePresence>
-        </div>
-      )}
       <style>{`
         @media print {
           @page { size: A4; margin: 15mm 16mm 16mm 16mm; }
           body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           .print\\:hidden { display: none !important; }
-          .break-after-page { break-after: page; }
-          .break-before-page { break-before: page; }
-          .no-break { break-inside: avoid; }
+          .break-after-page { break-after: page; page-break-after: always; }
+          .break-before-page { break-before: page; page-break-before: always; }
+          .no-break { break-inside: avoid; page-break-inside: avoid; }
+          .cover-page {
+            box-sizing: border-box !important;
+            height: 250mm !important;
+            max-height: 250mm !important;
+            padding: 10mm 10mm !important;
+            break-after: page !important;
+            page-break-after: always !important;
+            break-inside: avoid !important;
+            page-break-inside: avoid !important;
+            overflow: hidden !important;
+          }
           thead.print-header-group {
             display: table-header-group !important;
             break-inside: avoid;
