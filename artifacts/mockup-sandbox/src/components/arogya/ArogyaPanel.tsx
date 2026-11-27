@@ -2,9 +2,10 @@ import * as React from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { SendHorizontal, X } from "lucide-react";
+import { Mic, MicOff, SendHorizontal, X } from "lucide-react";
 import { ArogyaCharacter, type ArogyaState } from "./ArogyaCharacter";
 import { apiGet, apiPost, applyMochiAction, submitSupportTicket, undoMochiAction, type ArogyaAnswer, type ArogyaContextResponse } from "@/lib/apiClient";
+import { useMochiDictation } from "@/hooks/use-mochi-dictation";
 import { isDemoMode } from "@/lib/session";
 import { AROGYA_CONTEXT_EVENT, AROGYA_OPEN_EVENT, type ArogyaSelectedContext } from "@/lib/arogya-context";
 import { useDepartment } from "@/lib/department-context";
@@ -63,6 +64,21 @@ export function ArogyaPanel({ open, onOpenChange, role, actorKey, workflowId, st
   const wasOpen = React.useRef(false);
   const { refresh: refreshDepartment } = useDepartment();
 
+
+  const appendDictatedText = React.useCallback((transcript: string) => {
+    const nextPart = transcript.trim();
+    if (!nextPart) return;
+    setQuestion((prev) => {
+      if (!prev) return nextPart;
+      return /\s$/.test(prev) ? `${prev}${nextPart}` : `${prev} ${nextPart}`;
+    });
+  }, []);
+
+  const dictation = useMochiDictation({
+    onFinalTranscript: appendDictatedText,
+    enabled: open,
+  });
+
   // Department edits exist for the HOD only. After an apply or undo the department wording and settings
   // are reloaded so the new wording shows without a page refresh. The department is never sent.
   const editHandlers = React.useMemo<MochiEditHandlers | undefined>(() => role === "HOD" && !isDemoMode() ? {
@@ -74,6 +90,7 @@ export function ArogyaPanel({ open, onOpenChange, role, actorKey, workflowId, st
 
   React.useEffect(() => {
     let cancelled = false;
+    dictation.abort();
     setAssistantContext(null);
     setContextError(null);
     setResidentOptions([]);
@@ -190,6 +207,7 @@ export function ArogyaPanel({ open, onOpenChange, role, actorKey, workflowId, st
     e.preventDefault();
     const q = overrideQuestion ?? question;
     if (!q.trim() || characterState === "thinking") return;
+    dictation.abortCapture();
     
     setMessages((prev) => [...prev, { role: "user", text: q }]);
     setCharacterState("thinking");
@@ -541,7 +559,17 @@ export function ArogyaPanel({ open, onOpenChange, role, actorKey, workflowId, st
             setQuestion("");
             setCharacterState("idle");
           }} className="text-xs font-medium text-helper underline decoration-input underline-offset-2 hover:text-ink">Clear conversation</button></div>}
-          <form onSubmit={handleAsk} className="flex flex-col gap-1.5">
+          <form
+            onSubmit={(e) => {
+              if (dictation.isListening) {
+                e.preventDefault();
+                dictation.stop();
+                return;
+              }
+              void handleAsk(e);
+            }}
+            className="flex flex-col gap-1.5"
+          >
             <label htmlFor="arogya-ask-input" className="text-xs font-semibold text-ink">Ask Mochi</label>
             <div className="relative">
               <Input
@@ -551,18 +579,64 @@ export function ArogyaPanel({ open, onOpenChange, role, actorKey, workflowId, st
                 onChange={(e) => setQuestion(e.target.value)}
                 disabled={characterState === "thinking" || assistantContext === null}
                 placeholder="Write a prompt..."
-                className="h-12 rounded-2xl border-input bg-mist pr-14 text-sm focus-visible:ring-ring"
+                className="h-12 rounded-2xl border-input bg-mist pr-24 text-sm focus-visible:ring-ring"
               />
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                aria-label={
+                  dictation.isListening
+                    ? "Stop voice input"
+                    : dictation.isSupported
+                      ? "Start voice input"
+                      : "Voice input unavailable"
+                }
+                aria-pressed={dictation.isListening}
+                disabled={
+                  characterState === "thinking" ||
+                  assistantContext === null ||
+                  !dictation.isSupported ||
+                  dictation.isInstalling ||
+                  dictation.status === "checking"
+                }
+                onClick={dictation.toggleListening}
+                className={`absolute right-12 top-0.5 h-11 w-11 rounded-lg transition-colors ${
+                  dictation.isListening
+                    ? "bg-forest text-white hover:bg-deep"
+                    : "text-forest hover:bg-white/80 disabled:text-helper"
+                }`}
+              >
+                {dictation.isSupported ? (
+                  <Mic className="h-4 w-4" aria-hidden="true" />
+                ) : (
+                  <MicOff className="h-4 w-4" aria-hidden="true" />
+                )}
+              </Button>
               <Button
                 type="submit"
                 aria-label="Send prompt to Mochi"
-                disabled={characterState === "thinking" || !question.trim() || assistantContext === null}
+                disabled={characterState === "thinking" || !question.trim() || assistantContext === null || dictation.isListening}
                 size="icon"
                 className="absolute right-0.5 top-0.5 h-11 w-11 rounded-lg bg-deep text-white shadow-sm hover:bg-deep"
               >
                 <SendHorizontal className="h-4 w-4" aria-hidden="true" />
               </Button>
             </div>
+            {(dictation.announcement || dictation.canInstall) && (
+              <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-[11px] text-helper" role="status" aria-live="polite">
+                <span>{dictation.announcement}</span>
+                {dictation.canInstall && (
+                  <button
+                    type="button"
+                    onClick={() => void dictation.installPack()}
+                    className="font-semibold text-forest underline underline-offset-2 hover:text-deep"
+                  >
+                    Download voice pack
+                  </button>
+                )}
+              </div>
+            )}
             <p className="mt-1 text-center text-xs text-helper">Powered by Gothos Labs</p>
           </form>
         </footer>
