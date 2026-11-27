@@ -3,12 +3,10 @@ import { animate, useReducedMotion } from "framer-motion";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { isDemoMode } from "@/lib/session";
-import { isDemoMovieActive } from "@/lib/demoSession";
 
 export function useDemoMotionEnabled() {
   const reduceMotion = useReducedMotion();
-  // Keep the guided walkthrough's underlying records steady while the cursor demonstrates the page.
-  return isDemoMode() && !isDemoMovieActive() && reduceMotion === false;
+  return isDemoMode() && reduceMotion === false;
 }
 
 export function useDemoAnimatedValue(value: number, duration = 0.62) {

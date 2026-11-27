@@ -14,7 +14,6 @@ import { AssistantAnswer, type MochiEditHandlers } from "./AssistantAnswer";
 import { displayAssistantError } from "./assistantCopy";
 import { playDemoSound } from "@/lib/demoSounds";
 import { DemoTypedText } from "../demo-movie/DemoTypedText";
-import { isDemoMovieActive } from "@/lib/demoSession";
 
 type RoleType = "Student" | "Faculty" | "HOD";
 type ResidentOption = { id: number; name: string; registrationNumber?: string | null; batch?: string | null };
@@ -330,42 +329,6 @@ export function ArogyaPanel({ open, onOpenChange, role, actorKey, workflowId, st
       handleAskRef.current(new Event("submit"), prompt);
     }
   }, [assistantContext]);
-
-  React.useEffect(() => {
-    if (!open || !isDemoMode() || !isDemoMovieActive()) return undefined;
-
-    let observer: ResizeObserver | null = null;
-    let pollInterval: number | undefined;
-    let attempts = 0;
-
-    const tryInitObserver = () => {
-      attempts++;
-      const messagesEl = document.querySelector('[data-tour="arogya-messages"]');
-      if (messagesEl) {
-        const scrollContainer = messagesEl.closest('.overflow-y-auto');
-        if (scrollContainer) {
-          if (pollInterval !== undefined) window.clearInterval(pollInterval);
-          observer = new ResizeObserver(() => {
-            scrollContainer.scrollTo({
-              top: scrollContainer.scrollHeight,
-              behavior: "auto"
-            });
-          });
-          observer.observe(messagesEl);
-          return;
-        }
-      }
-      if (attempts >= 30) {
-        if (pollInterval !== undefined) window.clearInterval(pollInterval);
-      }
-    };
-    
-    pollInterval = window.setInterval(tryInitObserver, 100);
-    return () => {
-      if (pollInterval !== undefined) window.clearInterval(pollInterval);
-      if (observer) observer.disconnect();
-    };
-  }, [open]);
 
   return (
     <Popover open={open} onOpenChange={onOpenChange}>

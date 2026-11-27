@@ -1,6 +1,6 @@
 import * as React from "react";
 import { useLocation } from "wouter";
-import { Play, RotateCcw, Volume2, VolumeX } from "lucide-react";
+import { RotateCcw, Volume2, VolumeX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getCurrentUser, isDemoMode } from "@/lib/session";
 import { demoDepartmentOptions, getActiveDemoDepartmentId, setActiveDemoDepartmentId } from "@/lib/demoDepartments";
@@ -14,7 +14,6 @@ import {
   DemoRole,
   DEMO_SESSION_CHANGED_EVENT,
   startDemoSession,
-  requestDemoMovieReplay,
   demoPortalHome,
 } from "@/lib/demoSession";
 
@@ -80,14 +79,6 @@ export function DemoBanner() {
     setLocation(demoPortalHome(newRole));
   };
 
-  const startGuidedDemo = () => {
-    playDemoSound("click");
-    if (window.location.pathname === "/print") {
-      setLocation(demoPortalHome(role));
-    }
-    requestDemoMovieReplay();
-  };
-
   return (
     <aside
       data-demo-chrome
@@ -135,18 +126,6 @@ export function DemoBanner() {
           ))}
         </select>
       </label>
-
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        onClick={startGuidedDemo}
-        className="h-11 shrink-0 gap-1.5 border-card-edge bg-card px-2.5 text-xs transition-colors hover:bg-white"
-        style={{ color: "var(--demo-accent)" }}
-      >
-        <Play aria-hidden="true" className="h-3.5 w-3.5" />
-        Start guided demo
-      </Button>
 
       <Button
         type="button"
