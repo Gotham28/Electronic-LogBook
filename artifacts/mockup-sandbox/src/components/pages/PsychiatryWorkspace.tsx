@@ -2,7 +2,7 @@ import { useCallback, useEffect, useId, useRef, useState, type FormEvent, type R
 import { Link, useLocation } from "wouter";
 import { Activity, Bell, BookOpen, CalendarDays, ClipboardList, FileText, Home, LogOut, Menu, Printer, Stethoscope, X } from "lucide-react";
 import {
-  PSYCHIATRY_BASE, PSYCHIATRY_ICUS, psychiatryFieldVisible, psychiatryNavigation, psychiatryPages,
+  PSYCHIATRY_BASE, PSYCHIATRY_ICUS, psychiatryFieldVisible, psychiatryNavigation, psychiatryPages, psychiatryDiagnosisLabel, resolvePsychiatryDiagnosis,
   SHORT_CASE_REFERRALS, SHORT_CASE_TAGS, isPsychiatryShortCase, type PsychiatryDiagnosisRow, type PsychiatryField, type PsychiatryPage, type PsychiatryValues,
 } from "@workspace/api-zod";
 import { apiGet, apiPatch, apiPost } from "@/lib/apiClient";
@@ -50,7 +50,7 @@ function Flag({ status, monthly, shared }: { status: Entry["status"]; monthly?: 
 
 function display(value: unknown): ReactNode {
   if (Array.isArray(value)) return value.join(", ");
-  if (value && typeof value === "object" && "code" in value && "title" in value) return `${value.code} ${value.title}`;
+  if (value && typeof value === "object" && "code" in value && "title" in value && "uri" in value) return psychiatryDiagnosisLabel(value as Diagnosis);
   if (typeof value === "string" || typeof value === "number") return value;
   return "—";
 }
@@ -200,10 +200,16 @@ function EntryForm({ section, page, entry, onSaved }: { section: string; page: P
     if (busy || (needsRoster && !roster)) return;
     const button = (event.nativeEvent as SubmitEvent).submitter;
     const draft = button?.getAttribute("value") === "draft";
+    if (rows.some(({ value }) => !resolvePsychiatryDiagnosis(value.diagnosisCode))) {
+      setError("Choose or enter a psychiatric diagnosis for each row.");
+      return;
+    }
     setError("");
     setBusy(true);
     try {
-      const payload = { values, rows: rows.map(({ value }) => value), draft, ...(entry ? { revision: entry.revision } : {}) };
+      const diagnosis = values.diagnosis;
+      const draftValues = draft && typeof diagnosis === "string" && diagnosis.trim() === "text:" ? { ...values, diagnosis: "" } : values;
+      const payload = { values: draftValues, rows: rows.map(({ value }) => value), draft, ...(entry ? { revision: entry.revision } : {}) };
       const url = `${endpoint}/entries/${section}`;
       if (entry) await apiPatch(`${url}/${entry.id}`, payload);
       else await apiPost(url, payload);

@@ -72,7 +72,7 @@ export function CaseLogDetails({
       {shortCase ? <section aria-label="Short-case details">
         <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <DetailField label="Seen in" value={caseLog.customFields?.psychiatrySeenIn} />
-          <DetailField label="ICD-11 diagnosis" value={caseLog.diagnosisFinal} />
+          <DetailField label="Diagnosis" value={caseLog.diagnosisFinal} />
           <DetailField label="Tags" value={caseLog.customFields?.psychiatryTags} />
           <DetailField label="What you did" value={caseLog.customFields?.psychiatryActivities} />
           <DetailField label="Plan" value={caseLog.managementPlan} />

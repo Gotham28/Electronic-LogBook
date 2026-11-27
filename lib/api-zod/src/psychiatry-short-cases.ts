@@ -23,6 +23,27 @@ export function findIcd11Chapter06Diagnosis(code: string) {
   return diagnosesByCode.get(code.trim().toUpperCase());
 }
 
+export const psychiatryDiagnosisTextLimit = 500;
+export const psychiatryDiagnosisOptions = { other: "Other", evaluation: "Needs detailed evaluation" } as const;
+
+export function resolvePsychiatryDiagnosis(selection: string) {
+  const code = selection.trim();
+  if (code === "other" || code === "evaluation") return { code, title: psychiatryDiagnosisOptions[code], uri: "" };
+  if (code.startsWith("text:")) {
+    const title = code.slice(5).trim();
+    return title && title.length <= psychiatryDiagnosisTextLimit ? { code: `text:${title}`, title, uri: "" } : undefined;
+  }
+  const diagnosis = findIcd11Chapter06Diagnosis(code);
+  return diagnosis && { code: diagnosis.code, title: diagnosis.title, uri: diagnosis.uri };
+}
+
+export const psychiatryDiagnosisSelectionSchema = z.string().trim().max(psychiatryDiagnosisTextLimit + 5)
+  .refine((value) => Boolean(resolvePsychiatryDiagnosis(value)), "Choose or enter a diagnosis");
+
+export function psychiatryDiagnosisLabel(diagnosis: { code: string; title: string; uri: string }) {
+  return diagnosis.uri ? `${diagnosis.code} ${diagnosis.title}` : diagnosis.title;
+}
+
 export function searchIcd11Chapter06Diagnoses(query: string) {
   const text = query.trim().toUpperCase();
   const codeMatches = icd11Chapter06Diagnoses.filter(({ code }) => code.startsWith(text));
@@ -34,9 +55,7 @@ export function searchIcd11Chapter06Diagnoses(query: string) {
 
 export const psychiatryShortCaseSchema = z.object({
   seenIn: z.enum(SHORT_CASE_SETTINGS),
-  diagnosisCode: z.string().trim().max(16).transform((code) => code.toUpperCase()).refine(
-    (code) => diagnosesByCode.has(code), "Select an ICD-11 Chapter 06 diagnosis",
-  ),
+  diagnosisCode: psychiatryDiagnosisSelectionSchema,
   tags: z.array(z.enum(SHORT_CASE_TAGS)).max(SHORT_CASE_TAGS.length),
   activities: z.array(z.enum(SHORT_CASE_ACTIVITIES)).max(SHORT_CASE_ACTIVITIES.length),
   referredFrom: z.union([z.enum(SHORT_CASE_REFERRALS), z.literal("")]),
@@ -45,9 +64,9 @@ export const psychiatryShortCaseSchema = z.object({
 export type PsychiatryShortCase = z.input<typeof psychiatryShortCaseSchema>;
 
 export function psychiatryShortCaseValues(details: z.output<typeof psychiatryShortCaseSchema>) {
-  const diagnosis = diagnosesByCode.get(details.diagnosisCode)!;
+  const diagnosis = resolvePsychiatryDiagnosis(details.diagnosisCode)!;
   return {
-    diagnosisFinal: `${diagnosis.code} ${diagnosis.title}`,
+    diagnosisFinal: psychiatryDiagnosisLabel(diagnosis),
     customFields: {
       _psychiatryShortCase: SHORT_CASE_RECORD_VERSION,
       psychiatrySeenIn: details.seenIn,

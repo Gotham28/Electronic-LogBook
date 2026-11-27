@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { findIcd11Chapter06Diagnosis, searchIcd11Chapter06Diagnoses, type Icd11Diagnosis } from "@workspace/api-zod";
+import { findIcd11Chapter06Diagnosis, psychiatryDiagnosisOptions, psychiatryDiagnosisTextLimit, searchIcd11Chapter06Diagnoses, type Icd11Diagnosis } from "@workspace/api-zod";
 import { Input } from "@/components/ui/input";
 
 type Group = { name: string; diagnosis?: Icd11Diagnosis; children: Group[] };
@@ -45,6 +45,28 @@ function DiagnosisBranch({ item, expanded, onSelect }: { item: Group; expanded: 
 }
 
 export function Chapter06DiagnosisPicker({ code, onSelect }: { code: string; onSelect: (code: string) => void }) {
+  const modeId = useId();
+  const textId = useId();
+  const mode = code.startsWith("text:") ? "text" : code === "other" || code === "evaluation" ? code : "icd11";
+  return <div className="space-y-3">
+    <label htmlFor={modeId} className="block text-sm font-medium">Diagnosis type</label>
+    <select id={modeId} className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm" value={mode}
+      onChange={(event) => onSelect(event.target.value === "icd11" ? "" : event.target.value === "text" ? "text:" : event.target.value)}>
+      <option value="icd11">ICD-11 diagnosis</option>
+      <option value="other">{psychiatryDiagnosisOptions.other}</option>
+      <option value="evaluation">{psychiatryDiagnosisOptions.evaluation}</option>
+      <option value="text">Enter a diagnosis</option>
+    </select>
+    {mode === "icd11" && <Icd11Search code={code} onSelect={onSelect} />}
+    {mode === "text" && <div className="space-y-1.5">
+      <label htmlFor={textId} className="text-sm font-medium">Psychiatric diagnosis</label>
+      <Input id={textId} value={code.slice(5)} maxLength={psychiatryDiagnosisTextLimit}
+        onChange={(event) => onSelect(`text:${event.target.value}`)} />
+    </div>}
+  </div>;
+}
+
+function Icd11Search({ code, onSelect }: { code: string; onSelect: (code: string) => void }) {
   const inputId = useId();
   const resultsId = useId();
   const input = useRef<HTMLInputElement>(null);

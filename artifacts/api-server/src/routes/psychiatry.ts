@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from "express";
 import { and, desc, eq, exists, inArray, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db, psychiatryAttendeesTable, psychiatryEntriesTable, studentsTable, usersTable } from "@workspace/db";
-import { findIcd11Chapter06Diagnosis, psychiatryEntrySchema, psychiatryFieldVisible, psychiatryPages, validatePsychiatryEntry } from "@workspace/api-zod";
+import { resolvePsychiatryDiagnosis, psychiatryEntrySchema, psychiatryFieldVisible, psychiatryPages, validatePsychiatryEntry } from "@workspace/api-zod";
 import { requireAuth, requireDepartment, requireRole } from "../middlewares/auth.js";
 import { getDepartmentFeatures } from "../lib/department-features.js";
 import { idSchema } from "../lib/validation.js";
@@ -146,10 +146,7 @@ async function writeEntry(req: Request, res: Response) {
     }
   }
   const status = input.data.draft ? "draft" : page.review ? "pending" : "recorded";
-  const preserveDiagnosis = (raw: string) => {
-    const { code, title, uri } = findIcd11Chapter06Diagnosis(raw)!;
-    return { code, title, uri };
-  };
+  const preserveDiagnosis = (raw: string) => resolvePsychiatryDiagnosis(raw)!;
   const values: Entry["values"] = {};
   for (const field of page.fields) {
     const value = input.data.values[field.key];
