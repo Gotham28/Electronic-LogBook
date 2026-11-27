@@ -2,7 +2,7 @@ import { useCallback, useEffect, useId, useRef, useState, type FormEvent, type R
 import { Link, useLocation } from "wouter";
 import { Activity, Bell, BookOpen, CalendarDays, ClipboardList, FileText, Home, LogOut, Menu, Printer, Stethoscope, X } from "lucide-react";
 import {
-  PSYCHIATRY_BASE, PSYCHIATRY_ICUS, psychiatryFieldVisible, psychiatryNavigation, psychiatryPages, psychiatryDiagnosisLabel, resolvePsychiatryDiagnosis,
+  PSYCHIATRY_BASE, PSYCHIATRY_ICUS, psychiatryFieldVisible, psychiatryNavigation, psychiatryPages, psychiatryDiagnosisLabel, resolvePsychiatryDiagnosis, longCaseAdditionalDiagnosisFields,
   SHORT_CASE_REFERRALS, SHORT_CASE_TAGS, isPsychiatryShortCase, type PsychiatryDiagnosisRow, type PsychiatryField, type PsychiatryPage, type PsychiatryValues,
 } from "@workspace/api-zod";
 import { apiGet, apiPatch, apiPost } from "@/lib/apiClient";
@@ -11,9 +11,11 @@ import { useCurrentUser } from "@/hooks/use-current-user";
 import { localDateValue } from "@/lib/quarterly-appraisal";
 import { Chapter06DiagnosisPicker } from "@/components/Chapter06DiagnosisPicker";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ThesisPage } from "@/components/pages/ThesisPage";
+import { PostingsPage } from "@/components/pages/PostingsPage";
 import { PsychiatryShortCasesPage, SHORT_CASES_PATH } from "@/components/pages/PsychiatryShortCasesPage";
 
 type Diagnosis = { code: string; title: string; uri: string };
@@ -24,16 +26,23 @@ type Entry = {
   reviewerId?: number; reviewerName?: string; attendeeNames?: string[]; attendeeIds?: number[]; revision: number; residentName?: string;
 };
 type Roster = Array<{ id: number; name: string; role: string }>;
-type ResidentData = { caseLogs: Array<{ id: number; category: string; status: string; customFields?: Record<string, string> }>;
-  profile: { registrationNumber: string | null; joiningYear: string | null; mentorName: string | null; dateOfJoining: string | null } };
+type ResidentData = { caseLogs: Array<{ id: number; category: string; status: string; customFields?: Record<string, string>;
+  date: string; patientAge: string; patientGender: string; diagnosisFinal: string; supervisorName?: string;
+  managementPlan?: string; learningPoints?: string }>;
+  profile: { collegeName?: string | null; registrationNumber: string | null; joiningYear: string | null; mentorName: string | null; dateOfJoining: string | null } };
+type ReportPosting = { id: number; ward: string; startDate: string; endDate: string; supervisorName: string | null; status: string };
 type Thesis = { protocolStatus: string; midTermStatus: string; finalSubmissionStatus: string; iecClearanceDate: string | null };
 const endpoint = "/api/psychiatry";
 const box = "rounded-2xl border border-[#d3e7e2] bg-white p-5 shadow-sm";
-const selectStyle = "h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm";
+const selectStyle = "h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-base sm:text-sm";
 const entryLink = (section: string) => `${PSYCHIATRY_BASE}/${section}`;
 const parentSection = (section: string) => section.startsWith("psy-") ? "psy" : section;
 const defaultDiagnosisRow: PsychiatryDiagnosisRow = { diagnosisCode: "", medical: "", count: 1, visit: "Fresh", tags: [], department: "Medicine", icu: "" };
+const visitCountOptions = Array.from({ length: 51 }, (_, index) => String(index));
+type MonthlyFormRow = { key: number; value: PsychiatryDiagnosisRow; fresh: number; review: number };
 const reviewLabels = { draft: "Draft", pending: "Pending", verified: "Verified", rejected: "Returned", recorded: "Recorded" };
+const monthLabel = (month: string) => new Date(`${month}-01T00:00:00Z`).toLocaleDateString("en-IN", { month: "long", year: "numeric", timeZone: "UTC" });
+const monthlyEntryLink = (row: Entry) => `${entryLink(row.section)}/${row.id}${row.own && row.status !== "verified" ? "/edit" : ""}`;
 
 function Heading({ title, help, action }: { title: string; help?: string; action?: ReactNode }) {
   return <div className="mb-6 flex flex-wrap items-start justify-between gap-3"><div>
@@ -77,6 +86,7 @@ function entryRow(entry: Entry, page: PsychiatryPage) {
 }
 
 function WorkList({ section, page, records }: { section: string; page: PsychiatryPage; records: Entry[] }) {
+  const [monthFilter, setMonthFilter] = useState("");
   const [departmentWide, setDepartmentWide] = useState(false);
   const [departmentRecords, setDepartmentRecords] = useState<Entry[] | null>(null);
   const [error, setError] = useState("");
@@ -89,14 +99,14 @@ function WorkList({ section, page, records }: { section: string; page: Psychiatr
     return () => controller.abort();
   }, [departmentWide, page.shared, section]);
 
-  const monthCards = page.monthly ? records.map((entry) => {
+  const monthCards = page.monthly ? records.filter((entry) => !monthFilter || monthFilter === entry.month).map((entry) => {
     const rows = entry.diagnosisRows;
     const sum = (visit?: string) => rows.filter((row) => !visit || row.visit === visit).reduce((total, row) => total + (row.count ?? 0), 0);
     return <article className={`${box} space-y-4`} key={entry.id}>
       <header className="flex flex-wrap items-center justify-between gap-2"><div>
-        <h2 className="font-bold text-slate-900">{entry.month && new Date(`${entry.month}-01T00:00:00Z`).toLocaleDateString("en-IN", { month: "long", year: "numeric", timeZone: "UTC" })}</h2>
+        <h2 className="font-bold text-slate-900">{entry.month && monthLabel(entry.month)}</h2>
         <p className="text-sm text-slate-600">{page.monthly === "counts" ? `Fresh ${sum("Fresh")} · Review ${sum("Review")}` : `${sum()} ${section === "cl" ? "referrals" : "emergencies"}`}</p>
-      </div><div className="flex items-center gap-3"><Flag status={entry.status} monthly />{entry.own && entry.status !== "verified" && <Link className="text-sm text-teal-800 underline" href={`${entryLink(section)}/${entry.id}/edit`}>Edit</Link>}</div></header>
+      </div><div className="flex items-center gap-3"><Flag status={entry.status} monthly /><Link className="inline-flex min-h-11 items-center text-sm text-teal-800 underline" href={monthlyEntryLink(entry)}>{entry.own && entry.status !== "verified" ? "Edit" : "View"}</Link></div></header>
       {entry.reviewNote && <p className="rounded-lg bg-amber-50 p-3 text-sm">{entry.reviewNote}</p>}
       <Table columns={page.columns} rows={rows.map((row) => ({ ...row, department: [row.department, row.icu].filter(Boolean).join(" · ") }))} />
     </article>;
@@ -109,6 +119,12 @@ function WorkList({ section, page, records }: { section: string; page: Psychiatr
   return <div className="space-y-4">
     <Heading title={page.title} help={page.monthly ? page.title : undefined} action={<Button className="bg-teal-700 text-white hover:bg-teal-800" asChild><Link href={`${entryLink(section)}/new`}>{page.add}</Link></Button>} />
     {page.monthly && <p className="-mt-4 text-sm text-slate-600">{page.monthly === "counts" ? "Per month: each diagnosis with number, fresh or review, and tags. One consultant signature per month." : "Per month: diagnoses and referring departments. One consultant signature per month."}</p>}
+    {page.monthly && records.length > 0 && <label className="block max-w-xs space-y-1"><span className="text-sm font-medium">Find a month</span>
+      <select className={selectStyle} value={monthFilter} onChange={(event) => setMonthFilter(event.target.value)}>
+        <option value="">All months</option>
+        {records.flatMap(({ month }) => month ? [month] : []).sort().reverse().map((month) => <option key={month} value={month}>{monthLabel(month)}</option>)}
+      </select>
+    </label>}
     {page.shared && <div className="flex flex-wrap gap-2 text-sm"><span className="rounded-full bg-teal-100 px-3 py-1">{section === "a_cme" ? "Papers / posters" : section === "a_intern" ? "Conducted" : "Presented"} {presented}</span>
       <span className="rounded-full bg-white px-3 py-1">Attended {attended}</span></div>}
     {page.shared && <div className="flex flex-wrap gap-2 print:hidden">
@@ -117,7 +133,7 @@ function WorkList({ section, page, records }: { section: string; page: Psychiatr
     </div>}
     {page.monthly ? (monthCards?.length ? monthCards : <p className={box}>Nothing here yet.</p>) : departmentWide && error ? <p role="alert">{error}</p> : departmentWide && !departmentRecords ?
       <p role="status">Loading department sessions…</p> : <Table columns={page.columns} rows={tableRows.map((entry) => entryRow(entry, page))}
-        actions={(id) => <Link className="text-teal-800 underline" href={`${entryLink(section)}/${id}`}>Open</Link>} />}
+        actions={(id) => <Link className="text-teal-800 underline" href={`${entryLink(section)}/${id}`}>{page.shared && records.some((row) => row.id === id && !row.own) ? "Open attended session" : "Open"}</Link>} />}
   </div>;
 }
 
@@ -147,25 +163,46 @@ function FormField({ field, value, set, roster, section }: { field: PsychiatryFi
     {field.kind === "select" || field.kind === "faculty" ? <select className={selectStyle} value={text} onChange={(event) => set(event.target.value)}>
       <option value="">Select</option>{options.map(({ key, text: label }) => <option key={key} value={key}>{label}</option>)}
     </select> : field.kind === "textarea" ? <Textarea maxLength={4000} value={text} onChange={(event) => set(event.target.value)} /> :
-      <Input className="rounded-[10px] border-[#d9e6e2]" type={field.kind} maxLength={4000} value={text} onChange={(event) => set(event.target.value)} />}
+      <Input className="rounded-[10px] border-[#d9e6e2]" type={field.kind} maxLength={field.maxLength ?? 4000} value={text} onChange={(event) => set(event.target.value)} />}
   </label>;
 }
 
-function MonthlyDiagnosis({ row, mode, onChange }: { row: PsychiatryDiagnosisRow; mode: NonNullable<PsychiatryPage["monthly"]>; onChange: (row: PsychiatryDiagnosisRow) => void }) {
+function MonthlyDiagnosis({ item, mode, onChange }: { item: MonthlyFormRow; mode: NonNullable<PsychiatryPage["monthly"]>; onChange: (item: MonthlyFormRow) => void }) {
+  const row = item.value;
+  const change = (value: PsychiatryDiagnosisRow) => onChange({ ...item, value });
   return <div className="space-y-3 rounded-xl border border-teal-100 bg-teal-50/30 p-4">
-    <Chapter06DiagnosisPicker code={row.diagnosisCode} onSelect={(diagnosisCode) => onChange({ ...row, diagnosisCode })} />
+    <Chapter06DiagnosisPicker code={row.diagnosisCode} onSelect={(diagnosisCode) => change({ ...row, diagnosisCode })} />
     <div className="grid gap-3 sm:grid-cols-[2fr_1fr]">
-      <FormField field={{ key: "medical", label: "Medical diagnosis", kind: "text" }} value={row.medical} roster={[]} section="" set={(medical) => onChange({ ...row, medical: String(medical) })} />
-      <FormField field={{ key: "count", label: "Number", kind: "select", choices: Array.from({ length: 50 }, (_, index) => String(index + 1)) }} value={String(row.count)} roster={[]} section="" set={(count) => onChange({ ...row, count: Number(count) })} />
+      <FormField field={{ key: "medical", label: "Medical diagnosis", kind: "text", maxLength: 500 }} value={row.medical} roster={[]} section="" set={(medical) => change({ ...row, medical: String(medical) })} />
+      {mode === "referrals" && <FormField field={{ key: "count", label: "Number", kind: "select", choices: visitCountOptions.slice(1) }} value={String(row.count)} roster={[]} section="" set={(count) => change({ ...row, count: Number(count) })} />}
     </div>
     {mode === "counts" ? <>
-      <FormField field={{ key: "type", label: "Type", kind: "select", choices: ["Fresh", "Review"] }} value={row.visit} roster={[]} section="" set={(visit) => onChange({ ...row, visit: visit as PsychiatryDiagnosisRow["visit"] })} />
-      <Chips label="Tags" options={SHORT_CASE_TAGS.map((tag) => ({ key: tag, text: tag }))} selected={row.tags} set={(tags) => onChange({ ...row, tags: tags as PsychiatryDiagnosisRow["tags"] })} />
+      <div className="grid grid-cols-2 gap-3">
+        <FormField field={{ key: "fresh", label: "Fresh visits", kind: "select", choices: visitCountOptions }} value={String(item.fresh)} roster={[]} section="" set={(count) => onChange({ ...item, fresh: Number(count) })} />
+        <FormField field={{ key: "review", label: "Review visits", kind: "select", choices: visitCountOptions }} value={String(item.review)} roster={[]} section="" set={(count) => onChange({ ...item, review: Number(count) })} />
+      </div>
+      <Chips label="Tags" options={SHORT_CASE_TAGS.map((tag) => ({ key: tag, text: tag }))} selected={row.tags} set={(tags) => change({ ...row, tags: tags as PsychiatryDiagnosisRow["tags"] })} />
     </> : <>
-      <FormField field={{ key: "department", label: "Department", kind: "select", choices: SHORT_CASE_REFERRALS }} value={row.department} roster={[]} section="" set={(department) => onChange({ ...row, department: department as PsychiatryDiagnosisRow["department"], icu: "" })} />
-      {row.department === "ICU" && <FormField field={{ key: "icu", label: "Which ICU", kind: "select", choices: PSYCHIATRY_ICUS }} value={row.icu} roster={[]} section="" set={(icu) => onChange({ ...row, icu: icu as PsychiatryDiagnosisRow["icu"] })} />}
+      <FormField field={{ key: "department", label: "Department", kind: "select", choices: SHORT_CASE_REFERRALS }} value={row.department} roster={[]} section="" set={(department) => change({ ...row, department: department as PsychiatryDiagnosisRow["department"], icu: "" })} />
+      {row.department === "ICU" && <FormField field={{ key: "icu", label: "Which ICU", kind: "select", choices: PSYCHIATRY_ICUS }} value={row.icu} roster={[]} section="" set={(icu) => change({ ...row, icu: icu as PsychiatryDiagnosisRow["icu"] })} />}
     </>}
   </div>;
+}
+
+function monthlyRowsForForm(page: PsychiatryPage, entry?: Entry): MonthlyFormRow[] {
+  if (!page.monthly) return [];
+  if (!entry?.diagnosisRows.length) return [{ key: 0, value: defaultDiagnosisRow, fresh: 1, review: 0 }];
+  const rows: MonthlyFormRow[] = [];
+  entry.diagnosisRows.forEach(({ diagnosis, ...saved }, key) => {
+    const value = { ...defaultDiagnosisRow, ...saved, diagnosisCode: diagnosis.code };
+    const countKey = value.visit === "Review" ? "review" : "fresh";
+    const match = page.monthly === "counts" && rows.find((row) => row[countKey] === 0 &&
+      row.value.diagnosisCode === value.diagnosisCode && row.value.medical === value.medical &&
+      row.value.tags.length === value.tags.length && value.tags.every((tag) => row.value.tags.includes(tag)));
+    if (match) match[countKey] = value.count;
+    else rows.push({ key, value, fresh: countKey === "fresh" ? value.count : 0, review: countKey === "review" ? value.count : 0 });
+  });
+  return rows;
 }
 
 function initialValues(page: PsychiatryPage, entry?: Entry): PsychiatryValues {
@@ -179,13 +216,17 @@ function initialValues(page: PsychiatryPage, entry?: Entry): PsychiatryValues {
   }));
 }
 
-function EntryForm({ section, page, entry, onSaved }: { section: string; page: PsychiatryPage; entry?: Entry; onSaved: () => void }) {
+function EntryForm({ section, page, entry, existing = [], onSaved }: { section: string; page: PsychiatryPage; entry?: Entry; existing?: Entry[]; onSaved: () => void }) {
   const [values, setValues] = useState(() => initialValues(page, entry));
-  const [rows, setRows] = useState(() => entry?.diagnosisRows.length ? entry.diagnosisRows.map(({ diagnosis, ...row }, key) => ({ key, value: { ...defaultDiagnosisRow, ...row, diagnosisCode: diagnosis.code } })) : page.monthly ? [{ key: 0, value: { ...defaultDiagnosisRow } }] : []);
-  const nextRow = useRef(rows.length);
+  const [shownDiagnosisFields, setShownDiagnosisFields] = useState(() => longCaseAdditionalDiagnosisFields
+    .filter(({ key }) => values[key]).map(({ key }) => key));
+  const nextDiagnosisField = section === "long" ? longCaseAdditionalDiagnosisFields.find(({ key }) => !shownDiagnosisFields.includes(key)) : undefined;
+  const [rows, setRows] = useState(() => monthlyRowsForForm(page, entry));
+  const nextRow = useRef(entry?.diagnosisRows.length || rows.length);
   const [roster, setRoster] = useState<Roster | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const existingMonth = page.monthly && existing.find((row) => row.id !== entry?.id && row.month === values.month);
   const needsRoster = page.fields.some(({ kind }) => kind === "faculty" || kind === "attendees");
   useEffect(() => {
     if (!needsRoster) return;
@@ -197,19 +238,31 @@ function EntryForm({ section, page, entry, onSaved }: { section: string; page: P
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (busy || (needsRoster && !roster)) return;
+    if (busy || existingMonth || (needsRoster && !roster)) return;
     const button = (event.nativeEvent as SubmitEvent).submitter;
     const draft = button?.getAttribute("value") === "draft";
     if (rows.some(({ value }) => !resolvePsychiatryDiagnosis(value.diagnosisCode))) {
       setError("Choose or enter a psychiatric diagnosis for each row.");
       return;
     }
+    if (page.monthly === "counts" && rows.some(({ fresh, review }) => fresh + review < 1)) {
+      setError("Enter at least one Fresh or Review visit for each diagnosis.");
+      return;
+    }
+    const storedRows = rows.flatMap(({ value, fresh, review }): PsychiatryDiagnosisRow[] => page.monthly !== "counts" ? [value] : [
+      ...(fresh > 0 ? [{ ...value, count: fresh, visit: "Fresh" as const }] : []),
+      ...(review > 0 ? [{ ...value, count: review, visit: "Review" as const }] : []),
+    ]);
+    if (storedRows.length > 50) { setError("A monthly log can contain at most 50 Fresh and Review entries in total."); return; }
     setError("");
     setBusy(true);
     try {
-      const diagnosis = values.diagnosis;
-      const draftValues = draft && typeof diagnosis === "string" && diagnosis.trim() === "text:" ? { ...values, diagnosis: "" } : values;
-      const payload = { values: draftValues, rows: rows.map(({ value }) => value), draft, ...(entry ? { revision: entry.revision } : {}) };
+      const draftValues = { ...values };
+      for (const { key, kind, optional } of page.fields) {
+        const value = draftValues[key];
+        if (kind === "diagnosis" && typeof value === "string" && value.trim() === "text:" && (draft || optional)) draftValues[key] = "";
+      }
+      const payload = { values: draftValues, rows: storedRows, draft, ...(entry ? { revision: entry.revision } : {}) };
       const url = `${endpoint}/entries/${section}`;
       if (entry) await apiPatch(`${url}/${entry.id}`, payload);
       else await apiPost(url, payload);
@@ -224,27 +277,42 @@ function EntryForm({ section, page, entry, onSaved }: { section: string; page: P
   return <><Heading title={entry ? `Edit ${page.add.replace(/^Add /, "")}` : page.add} help="New entry" action={<Button variant="outline" asChild><Link href={entryLink(parentSection(section))}>Cancel</Link></Button>} />
     <form className={`${box} max-w-2xl space-y-4`} onSubmit={save}>
       {error && <p role="alert" className="rounded-lg bg-rose-50 p-3 text-rose-800">{error}</p>}
+      {existingMonth && <p role="status" className="rounded-lg bg-amber-50 p-3">A log already exists for this month. <Link className="font-medium underline" href={monthlyEntryLink(existingMonth)}>{existingMonth.status === "verified" ? "View signed month" : "Open existing month"}</Link></p>}
       {entry?.reviewNote && <p className="rounded-lg bg-amber-50 p-3">{entry.reviewNote}</p>}
-      {page.fields.filter((field) => psychiatryFieldVisible(field, values)).map((field) => <FormField key={field.key} field={field} value={values[field.key]} roster={roster ?? []} section={section}
-        set={(value) => setValues((current) => ({ ...current, [field.key]: value }))} />)}
+      {page.fields.filter((field) => psychiatryFieldVisible(field, values)).map((field) => {
+        const additional = field.kind === "diagnosis" && field.optional;
+        if (additional && !shownDiagnosisFields.includes(field.key)) return null;
+        const input = <FormField field={field} value={values[field.key]} roster={roster ?? []} section={section}
+          set={(value) => setValues((current) => ({ ...current, [field.key]: value }))} />;
+        return additional ? <fieldset key={field.key} className="space-y-2 rounded-lg border p-3"><legend>{field.label}</legend>
+          {input}
+          <Button type="button" variant="ghost" onClick={() => {
+            setShownDiagnosisFields((current) => current.filter((key) => key !== field.key));
+            setValues((current) => ({ ...current, [field.key]: "" }));
+          }}>Remove diagnosis</Button>
+        </fieldset> : <div key={field.key}>{input}
+          {section === "long" && field.key === "diagnosis" && nextDiagnosisField &&
+            <Button type="button" variant="outline" className="mt-3" onClick={() => setShownDiagnosisFields((current) => [...current, nextDiagnosisField.key])}>Add another psychiatric diagnosis</Button>}
+        </div>;
+      })}
       {page.monthly && <div className="space-y-3">
-        {rows.map(({ key, value }) => <div key={key} className="space-y-2">
-          <MonthlyDiagnosis row={value} mode={page.monthly!} onChange={(next) => setRows((current) => current.map((row) => row.key === key ? { key, value: next } : row))} />
-          {rows.length > 1 && <Button type="button" variant="ghost" onClick={() => setRows((current) => current.filter((row) => row.key !== key))}>Remove diagnosis</Button>}
+        {rows.map((item) => <div key={item.key} className="space-y-2">
+          <MonthlyDiagnosis item={item} mode={page.monthly!} onChange={(next) => setRows((current) => current.map((row) => row.key === item.key ? next : row))} />
+          {rows.length > 1 && <Button type="button" variant="ghost" onClick={() => setRows((current) => current.filter((row) => row.key !== item.key))}>Remove diagnosis</Button>}
         </div>)}
-        <Button type="button" variant="outline" disabled={rows.length >= 50} onClick={() => { const key = nextRow.current++; setRows((current) => [...current, { key, value: { ...defaultDiagnosisRow } }]); }}>Add another diagnosis</Button>
+        <Button type="button" variant="outline" disabled={rows.length >= 50} onClick={() => { const key = nextRow.current++; setRows((current) => [...current, { key, value: defaultDiagnosisRow, fresh: 1, review: 0 }]); }}>Add another diagnosis</Button>
       </div>}
-      <div className="flex gap-2">{page.draft && <Button type="submit" value="draft" variant="outline" disabled={busy || (needsRoster && !roster)}>Save draft</Button>}
-        <Button type="submit" disabled={busy || (needsRoster && !roster)}>{busy ? "Saving…" : "Save"}</Button></div>
+      <div className="flex gap-2">{page.draft && <Button type="submit" value="draft" variant="outline" disabled={busy || Boolean(existingMonth) || (needsRoster && !roster)}>Save draft</Button>}
+        <Button type="submit" disabled={busy || Boolean(existingMonth) || (needsRoster && !roster)}>{busy ? "Saving…" : "Save"}</Button></div>
     </form>
   </>;
 }
 
-function EntryDetails({ entry, page, review }: { entry: Entry; page: PsychiatryPage; review?: ReactNode }) {
+function EntryDetails({ entry, page, inReview = false }: { entry: Entry; page: PsychiatryPage; inReview?: boolean }) {
   const map = entryRow(entry, page);
   const canEdit = entry.own && entry.status !== "verified";
   return <><Heading title={typeof entry.values.topic === "string" ? entry.values.topic : page.title}
-    action={review ? undefined : <div className="flex gap-2"><Button variant="outline" asChild><Link href={entryLink(parentSection(entry.section))}>Back</Link></Button>
+    action={inReview ? undefined : <div className="flex gap-2"><Button variant="outline" asChild><Link href={entryLink(parentSection(entry.section))}>Back</Link></Button>
       {canEdit && <Button asChild><Link href={`${entryLink(entry.section)}/${entry.id}/edit`}>{entry.status === "rejected" ? "Revise" : "Edit"}</Link></Button>}</div>} />
     <article className={`${box} max-w-3xl space-y-4`}>
       {entry.residentName && <p className="font-medium">{entry.residentName}</p>}
@@ -257,7 +325,6 @@ function EntryDetails({ entry, page, review }: { entry: Entry; page: PsychiatryP
       </dl>
       {entry.reviewNote && <p className="rounded-lg bg-amber-50 p-3">{entry.reviewNote}</p>}
       {entry.diagnosisRows?.length > 0 && <Table columns={page.columns} rows={entry.diagnosisRows.map((row) => ({ ...row, department: [row.department, row.icu].filter(Boolean).join(" · ") }))} />}
-      {review}
     </article>
   </>;
 }
@@ -308,6 +375,10 @@ function HomePage({ data, records }: { data: ResidentData; records: Entry[] }) {
 }
 
 function Summary({ data, records, studentId }: { data: ResidentData; records: Entry[]; studentId: number }) {
+  const user = useCurrentUser();
+  const { department, postings } = useDepartment();
+  const [postingRows, setPostingRows] = useState<ReportPosting[] | null>(null);
+  const [postingError, setPostingError] = useState(false);
   const [thesis, setThesis] = useState<Thesis | null>(null);
   const [thesisState, setThesisState] = useState<"loading" | "loaded" | "error">("loading");
   useEffect(() => {
@@ -315,15 +386,19 @@ function Summary({ data, records, studentId }: { data: ResidentData; records: En
     apiGet<{ data: Thesis | null }>(`/api/students/${studentId}/thesis`, { signal: controller.signal })
       .then((result) => { if (!controller.signal.aborted) { setThesis(result.data); setThesisState("loaded"); } })
       .catch(() => { if (!controller.signal.aborted) setThesisState("error"); });
+    apiGet<{ data: ReportPosting[] }>(`/api/students/${studentId}/postings`, { signal: controller.signal })
+      .then(({ data: rows }) => { if (!controller.signal.aborted) setPostingRows(rows); })
+      .catch(() => { if (!controller.signal.aborted) setPostingError(true); });
     return () => controller.abort();
   }, [studentId]);
   const valid = records.filter((row) => row.status !== "draft" && row.status !== "rejected");
+  const shortCases = data.caseLogs.filter((entry) => isPsychiatryShortCase(entry) && entry.status !== "rejected" && entry.status !== "draft");
   const count = (section: string) => valid.filter((entry) => entry.section === section).length;
   const presented = (section: string) => valid.filter((entry) => entry.section === section && entry.own).length;
   const total = (section: string) => valid.filter((row) => row.section === section).flatMap((row) => row.diagnosisRows).reduce((sum, row) => sum + (row.count ?? 0), 0);
   const lines: Array<[string, number | string]> = [
     ["OPD cases (fresh + review)", total("opd")], ["Ward cases", total("ward")], ["Long cases", count("long")],
-    ["Short cases", data.caseLogs.filter((entry) => isPsychiatryShortCase(entry) && entry.status !== "rejected").length],
+    ["Short cases", shortCases.length],
     ["Case presentations presented", presented("a_cp")], ["Seminars / symposia presented", presented("a_sem")], ["Journal clubs presented", presented("a_jc")],
     ["Academic sessions attended", valid.filter((row) => !row.own && ["a_cp", "a_sem", "a_jc", "a_intern"].includes(row.section)).length],
     ["Consultation liaison psychiatry cases attended", total("cl")], ["Psychiatric emergencies managed", total("emer")], ["Procedures attended / done", count("proc")],
@@ -334,26 +409,50 @@ function Summary({ data, records, studentId }: { data: ResidentData; records: En
     ["Thesis", thesisState === "error" ? "Unable to load thesis" : thesisState === "loading" ? "Loading…" : thesis ? thesis.finalSubmissionStatus === "approved" ? "Final submission approved" : thesis.midTermStatus === "approved" ? "Mid-term approved" : thesis.iecClearanceDate ? "IEC clearance recorded" : `Protocol ${thesis.protocolStatus}` : "—"],
     ["Other achievements", count("ach")],
   ];
-  return <><Heading title="Summary · Clinical works" action={<Button className="print:hidden" onClick={() => window.print()}><Printer className="size-4" />Print PDF</Button>} />
+  return <><Heading title="Summary · Clinical works" action={<Button className="print:hidden" disabled={!postingRows || thesisState !== "loaded"} onClick={() => window.print()}><Printer className="size-4" />Print PDF</Button>} />
+    <p className="mb-5 font-medium">{user?.name} · {department.name}{data.profile?.collegeName && <> · {data.profile.collegeName}</>}</p>
     <dl className={`${box} max-w-3xl divide-y divide-teal-100`}>{lines.map(([label, value]) => <div key={label} className="flex justify-between gap-3 py-3"><dt>{label}</dt><dd className="font-semibold">{value}</dd></div>)}</dl>
+    <div className="mt-8 space-y-6">
+      <section aria-label="Short case details" className="space-y-3"><h2 className="text-xl font-semibold">Short case details</h2>
+        {shortCases.length === 0 && <p>No short cases to print.</p>}
+        {shortCases.map((row) => <article className={`${box} break-inside-avoid space-y-2`} key={row.id}>
+          <h3 className="font-semibold">{row.diagnosisFinal}</h3><p>{row.date} · {row.status}</p>
+          <ReportFields fields={[["Age", row.patientAge], ["Sex", row.patientGender], ["Consultant", row.supervisorName],
+            ["Seen in", row.customFields?.psychiatrySeenIn], ["Tags", row.customFields?.psychiatryTags], ["Activities", row.customFields?.psychiatryActivities],
+            ["Medical diagnosis", row.customFields?.psychiatryMedicalDiagnosis], ["Plan", row.managementPlan], ["Learning points", row.learningPoints]]} />
+        </article>)}
+      </section>
+      {Object.entries(psychiatryPages).map(([section, page]) => {
+        const entries = valid.filter((row) => row.section === section);
+        if (!entries.length) return null;
+        const title = section.startsWith("psy-") ? `Clinical psychology · ${page.title}` : page.title;
+        return <section key={section} aria-label={title} className="space-y-3"><h2 className="text-xl font-semibold">{title}</h2>
+          {entries.map((row) => <article key={row.id} className={`${box} space-y-2`}>
+            <p className="font-semibold">{row.month && monthLabel(row.month)}{row.month && " · "}{reviewLabels[row.status]}</p>
+            {page.shared && <p>{display(entryRow(row, page).role)}</p>}
+            <ReportFields fields={page.fields.map(({ key, label }) => [label, key === "reviewerId" ? row.reviewerName : key === "attendees" ? row.attendeeNames : row.values[key]])} />
+            {row.diagnosisRows?.map((diagnosisRow, index) => <div key={index} className="break-inside-avoid border-t pt-2">
+              <ReportFields fields={page.columns.map(([key, label]) => [label, key === "department" ? [diagnosisRow.department, diagnosisRow.icu].filter(Boolean).join(" · ") : diagnosisRow[key as keyof StoredRow]])} />
+            </div>)}
+          </article>)}
+        </section>;
+      })}
+      <section className="space-y-3"><h2 className="text-xl font-semibold">Postings</h2>
+        {postingError ? <p role="alert">Unable to load postings. Reload before printing.</p> : !postingRows ? <p role="status">Loading postings…</p> :
+          <div className="space-y-3">{postingRows.length === 0 && <p>No postings to print.</p>}
+            {postingRows.map((row) => <article key={row.id} className={`${box} break-inside-avoid`}>
+              <h3 className="font-semibold">{postings.find(({ value }) => value === row.ward)?.name ?? row.ward}</h3>
+              <ReportFields fields={[["Start date", row.startDate], ["End date", row.endDate], ["Consultant", row.supervisorName], ["Status", row.status]]} />
+            </article>)}
+          </div>}
+      </section>
+    </div>
   </>;
 }
 
-function PsychiatryPostings({ studentId }: { studentId: number }) {
-  const { postings } = useDepartment();
-  const [rows, setRows] = useState<Array<{ id: number; ward: string; startDate: string; endDate: string; supervisorName: string | null }> | null>(null);
-  const [error, setError] = useState(false);
-  useEffect(() => {
-    const controller = new AbortController();
-    apiGet<{ data: NonNullable<typeof rows> }>(`/api/students/${studentId}/postings`, { signal: controller.signal })
-      .then((result) => { if (!controller.signal.aborted) setRows(result.data); })
-      .catch(() => { if (!controller.signal.aborted) setError(true); });
-    return () => controller.abort();
-  }, [studentId]);
-  return <><Heading title="Postings" />{error ? <p role="alert">Unable to load postings.</p> : !rows ? <p role="status">Loading postings…</p> :
-    <Table columns={[["name", "Posting"], ["dates", "From – to"], ["supervisorName", "Consultant"]]} rows={rows.map((row) => ({ ...row,
-      name: postings.find(({ value }) => value === row.ward)?.name ?? row.ward, dates: `${row.startDate} – ${row.endDate}`,
-    }))} />}</>;
+function ReportFields({ fields }: { fields: Array<[string, unknown]> }) {
+  return <dl className="grid gap-2 sm:grid-cols-2">{fields.filter(([, value]) => value != null && value !== "" && (!Array.isArray(value) || value.length > 0))
+    .map(([label, value]) => <div className="min-w-0 break-words" key={label}><dt className="text-sm font-semibold">{label}</dt><dd className="whitespace-pre-wrap">{display(value)}</dd></div>)}</dl>;
 }
 
 function iconFor(section: string) {
@@ -405,7 +504,7 @@ export function PsychiatryWorkspace({ onSignOut }: { onSignOut: () => void }) {
   function content() {
     if (!studentId) return <p role="alert">An active resident profile is required.</p>;
     if (section === "short-cases") return <PsychiatryShortCasesPage key={location} mode={action === "new" ? "add" : extra === "edit" ? "edit" : "list"} entryId={Number(action)} onSave={() => void refresh()} />;
-    if (section === "postings") return <PsychiatryPostings studentId={studentId} />;
+    if (section === "postings") return <PostingsPage />;
     if (error) return <div className={box}><p role="alert">{error}</p><Button className="mt-3" variant="outline" onClick={() => void refresh()}>Try again</Button></div>;
     if (!bundle) return <p role="status">Loading your Psychiatry logbook…</p>;
     const { records, data } = bundle;
@@ -414,13 +513,13 @@ export function PsychiatryWorkspace({ onSignOut }: { onSignOut: () => void }) {
     if (section === "psy") return <><Heading title="Clinical psychology" /><div className="space-y-6">{["psy-intervention", "psy-assessment"].map((key) => <WorkList key={key} section={key} page={psychiatryPages[key]} records={records.filter((entry) => entry.section === key)} />)}</div></>;
     const page = psychiatryPages[section];
     if (!Object.hasOwn(psychiatryPages, section) || !page) return <p role="alert">This Psychiatry page was not found. <Link href={entryLink("home")} className="underline">Go to Home</Link></p>;
-    if (action === "new") return <EntryForm key={location} section={section} page={page} onSaved={saved} />;
     const list = records.filter((entry) => entry.section === section);
+    if (action === "new") return <EntryForm key={location} section={section} page={page} existing={list} onSaved={saved} />;
     if (action) {
       const record = list.find((entry) => entry.id === Number(action));
       if (!record && page.shared && /^\d+$/.test(action)) return <DepartmentSession key={location} section={section} id={Number(action)} page={page} />;
       if (!record) return <p role="alert">This entry is unavailable. <Link className="underline" href={entryLink(parentSection(section))}>Back</Link></p>;
-      if (extra === "edit" && record.own && record.status !== "verified") return <EntryForm key={location} section={section} page={page} entry={record} onSaved={saved} />;
+      if (extra === "edit" && record.own && record.status !== "verified") return <EntryForm key={location} section={section} page={page} entry={record} existing={list} onSaved={saved} />;
       return <EntryDetails entry={record} page={page} />;
     }
     return <div className="space-y-5">{section === "thesis" && <ThesisPage />}<WorkList key={section} section={section} page={page} records={list} /></div>;
@@ -430,6 +529,7 @@ export function PsychiatryWorkspace({ onSignOut }: { onSignOut: () => void }) {
   const returnedShort = bundle?.data.caseLogs.filter((row) => isPsychiatryShortCase(row) && row.status === "rejected") ?? [];
   const notificationCount = returned.length + returnedShort.length;
   return <div className="min-h-screen bg-[#edf8f4] text-slate-900" style={{ backgroundImage: "linear-gradient(#cde5df 1px, transparent 1px), linear-gradient(90deg, #cde5df 1px, transparent 1px)", backgroundSize: "28px 28px" }}>
+    {menu && <div className="fixed inset-0 z-20 bg-black/40 lg:hidden" aria-hidden="true" onClick={() => setMenu(false)} />}
     <aside className={`${menu ? "flex" : "hidden"} fixed inset-y-0 left-0 z-30 w-64 flex-col border-r border-teal-100 bg-white lg:flex print:hidden`}>
       <div className="flex items-center gap-3 border-b border-teal-100 p-5"><span className="rounded-xl bg-teal-600 p-2.5 text-white"><ClipboardList className="size-5" /></span>
         <div className="flex-1"><p className="font-bold">E-Logbook</p><p className="text-xs text-slate-600">Clinical training records</p></div>
@@ -445,21 +545,24 @@ export function PsychiatryWorkspace({ onSignOut }: { onSignOut: () => void }) {
         </div>)}
       </nav>
       <div className="flex items-center justify-between gap-2 border-t border-teal-100 px-4 py-3"><Link className="rounded-md hover:underline" href="/profile"><p className="text-sm font-semibold">{user?.name}</p><p className="text-xs text-slate-600">Resident</p></Link>
-        <div className="flex items-center gap-3"><Link href="/cases" aria-label="Standard logbook" title="Standard logbook"><BookOpen className="size-4" /></Link>
-          <button type="button" aria-label="Sign out" onClick={onSignOut}><LogOut className="size-4" /></button></div></div>
+        <div className="flex items-center gap-3"><Link href="/cases/legacy" aria-label="Older case records" title="Older case records" className="inline-flex min-h-11 min-w-11 items-center justify-center"><BookOpen className="size-4" /></Link>
+          <button type="button" aria-label="Sign out" className="inline-flex min-h-11 min-w-11 items-center justify-center" onClick={onSignOut}><LogOut className="size-4" /></button></div></div>
     </aside>
     <div className="lg:ml-64 print:m-0">
       <header className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-teal-100 bg-white px-5 py-3 print:hidden">
-        <div className="flex items-center gap-3"><button className="lg:hidden" type="button" aria-label="Open menu" onClick={() => setMenu(true)}><Menu className="size-5" /></button>
+        <div className="flex items-center gap-3"><button className="inline-flex min-h-11 min-w-11 items-center justify-center lg:hidden" type="button" aria-label="Open menu" onClick={() => setMenu(true)}><Menu className="size-5" /></button>
           <div><p className="font-semibold">{department.name.toLowerCase().startsWith("department of") ? department.name : `Department of ${department.name}`}</p><p className="text-xs text-slate-600">Resident workspace</p></div>
         </div>
         <div className="relative flex items-center gap-2"><Button variant="outline" asChild><Link href={entryLink("summary")}><Printer className="size-4" />Print</Link></Button>
           <Button variant="outline" aria-label="Notifications" aria-expanded={notifications} onClick={() => setNotifications(!notifications)}><Bell className="size-4" />{notificationCount > 0 && <span>{notificationCount}</span>}</Button>
-          {notifications && <div className="absolute right-0 top-11 z-30 w-72 rounded-lg border bg-white p-4 shadow-lg"><p className="mb-2 font-semibold">Notifications</p>
-            {returned.map((row) => <Link key={row.id} className="block py-1 text-sm text-teal-900 underline" href={`${entryLink(row.section)}/${row.id}`}>{psychiatryPages[row.section]?.title} entry returned</Link>)}
-            {returnedShort.map((row) => <Link key={`short-${row.id}`} className="block py-1 text-sm text-teal-900 underline" href={`${SHORT_CASES_PATH}/${row.id}/edit`}>Short case returned</Link>)}
-            {!notificationCount && <p className="text-sm text-slate-600">No returned entries.</p>}
-          </div>}
+          {notifications && <>
+            <div className="fixed inset-0 z-20" aria-hidden="true" onClick={() => setNotifications(false)} />
+            <div className="absolute right-0 top-11 z-30 w-72 rounded-lg border bg-white p-4 shadow-lg"><p className="mb-2 font-semibold">Notifications</p>
+              {returned.map((row) => <Link key={row.id} className="block py-1 text-sm text-teal-900 underline" href={`${entryLink(row.section)}/${row.id}`}>{psychiatryPages[row.section]?.title} entry returned</Link>)}
+              {returnedShort.map((row) => <Link key={`short-${row.id}`} className="block py-1 text-sm text-teal-900 underline" href={`${SHORT_CASES_PATH}/${row.id}/edit`}>Short case returned</Link>)}
+              {!notificationCount && <p className="text-sm text-slate-600">No returned entries.</p>}
+            </div>
+          </>}
         </div>
       </header>
       <main className="mx-auto min-h-[85vh] max-w-[1200px] p-4 sm:p-7 print:p-0">{content()}</main>
@@ -474,6 +577,8 @@ export function PsychiatryReviewPage() {
   const [comment, setComment] = useState("");
   const [busy, setBusy] = useState(false);
   const [history, setHistory] = useState(false);
+  const reviewTrigger = useRef<HTMLButtonElement | null>(null);
+  const queue = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const controller = new AbortController();
     apiGet<Entry[]>(`${endpoint}/reviews${history ? "?view=history" : ""}`, { signal: controller.signal }).then((result) => { if (!controller.signal.aborted) setRows(result); })
@@ -491,18 +596,44 @@ export function PsychiatryReviewPage() {
     } catch (failure) { setError(failure instanceof Error ? failure.message : "Unable to review this entry."); }
     finally { setBusy(false); }
   }
-  return <div className="space-y-4"><Heading title="Psychiatry reviews" />{error && <p role="alert" className="text-rose-800">{error}</p>}
+  const reviewPage = selected && psychiatryPages[selected.section];
+  const openReview = (row: Entry, trigger: HTMLButtonElement) => {
+    reviewTrigger.current = trigger;
+    setError("");
+    setComment("");
+    setSelected(row);
+  };
+  return <div className="space-y-4" ref={queue} tabIndex={-1}><Heading title="Psychiatry reviews" />{error && !selected && <p role="alert" className="text-rose-800">{error}</p>}
     <div className="flex gap-2">{[[false, "Pending"], [true, "History"]].map(([view, title]) => <Button key={String(view)} variant={history === view ? "default" : "outline"} disabled={busy} onClick={() => {
       if (history !== view) { setHistory(Boolean(view)); setRows(null); setSelected(null); setError(""); }
     }}>{title}</Button>)}</div>
     {!rows && !error && <p role="status">Loading reviews…</p>}
-    {rows && <Table columns={[["type", "Section"], ["residentName", "Resident"], ["period", "Date / month"], ["status", "Status"]]} rows={rows.map((row) => ({ id: row.id, residentName: row.residentName,
-      type: psychiatryPages[row.section]?.title, period: row.values.date ?? row.values.month ?? row.values.admittedAt, status: row.status }))} actions={(id) =>
-      <button className="text-teal-900 underline" type="button" disabled={busy} onClick={() => { setComment(""); setSelected(rows.find((row) => row.id === id) ?? null); }}>{history ? "Open" : "Review"}</button>} />}
-    {selected && psychiatryPages[selected.section] && <EntryDetails entry={selected} page={psychiatryPages[selected.section]} review={history ? <Button variant="outline" onClick={() => setSelected(null)}>Close</Button> : <div className="space-y-3">
-      <label className="block space-y-2">Review comments<Textarea maxLength={2000} value={comment} onChange={(event) => setComment(event.target.value)} /></label>
-      <Button disabled={busy} onClick={() => void review("verified")}>{psychiatryPages[selected.section].monthly ? "Sign month" : "Verify"}</Button>{" "}
-      <Button disabled={busy} variant="outline" onClick={() => void review("rejected")}>Return</Button>
-    </div>} />}
+    {rows?.length === 0 && <p className={box}>{history ? "No review history yet." : "No pending reviews."}</p>}
+    {rows && rows.length > 0 && <ul className="space-y-3">{rows.map((row) => <li key={row.id} className={`${box} flex flex-wrap items-center justify-between gap-3`}>
+      <div className="min-w-0 break-words"><h2 className="font-semibold">{psychiatryPages[row.section]?.title}</h2>
+        <p className="text-sm">{row.residentName} · {display(row.month ?? row.values.date ?? row.values.admittedAt)}</p>
+      </div>
+      <div className="flex flex-wrap items-center gap-3"><Flag status={row.status} />
+        <Button className="min-h-11" variant="outline" disabled={busy} onClick={(event) => openReview(row, event.currentTarget)}>{history ? "Open" : "Review"}</Button>
+      </div>
+    </li>)}</ul>}
+    <Dialog open={Boolean(selected && reviewPage)} onOpenChange={(open) => { if (!open && !busy) setSelected(null); }}>
+      <DialogContent className="max-w-3xl grid-rows-[auto_auto_minmax(0,1fr)_auto] overflow-hidden" onCloseAutoFocus={(event) => {
+        event.preventDefault();
+        (reviewTrigger.current?.isConnected ? reviewTrigger.current : queue.current)?.focus();
+      }}>
+        <DialogTitle>{history ? "Review history" : "Review Psychiatry entry"}</DialogTitle>
+        <DialogDescription>{selected?.residentName}{reviewPage && ` · ${reviewPage.title}`}</DialogDescription>
+        {selected && reviewPage && <div className="min-w-0 overflow-y-auto"><EntryDetails entry={selected} page={reviewPage} inReview /></div>}
+        {reviewPage && (history ? <Button variant="outline" onClick={() => setSelected(null)}>Close</Button> : <div className="space-y-3 border-t pt-3">
+          {error && <p role="alert" className="text-rose-800">{error}</p>}
+          <label className="block space-y-2">Review comments<Textarea maxLength={2000} value={comment} onChange={(event) => setComment(event.target.value)} /></label>
+          <div className="flex flex-wrap gap-2">
+            <Button disabled={busy} onClick={() => void review("verified")}>{reviewPage.monthly ? "Sign month" : "Verify"}</Button>
+            <Button disabled={busy} variant="outline" onClick={() => void review("rejected")}>Return</Button>
+          </div>
+        </div>)}
+      </DialogContent>
+    </Dialog>
   </div>;
 }

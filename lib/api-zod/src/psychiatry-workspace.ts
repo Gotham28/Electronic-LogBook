@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { psychiatryDiagnosisSelectionSchema, resolvePsychiatryDiagnosis, SHORT_CASE_REFERRALS, SHORT_CASE_TAGS } from "./psychiatry-short-cases.js";
+import { psychiatryAdditionalDiagnosisLimit, psychiatryDiagnosisSelectionSchema, psychiatryDiagnosisTextLimit, resolvePsychiatryDiagnosis, SHORT_CASE_REFERRALS, SHORT_CASE_TAGS } from "./psychiatry-short-cases.js";
 
 export const PSYCHIATRY_BASE = "/psychiatry";
 export const PSYCHIATRY_ICUS = ["GICU", "MICU", "PICU", "NSICU", "Burns ICU", "TICU", "SICU", "Cardiac ICU"] as const;
@@ -21,13 +21,15 @@ export const psychiatryNavigation = [
 ] as const;
 
 type FieldKind = "text" | "textarea" | "date" | "month" | "number" | "select" | "radio" | "faculty" | "attendees" | "chips" | "diagnosis";
-export type PsychiatryField = { key: string; label: string; kind: FieldKind; choices?: readonly string[]; optional?: boolean };
+export type PsychiatryField = { key: string; label: string; kind: FieldKind; choices?: readonly string[]; optional?: boolean; maxLength?: number };
 export type PsychiatryPage = {
   title: string; add: string; fields: PsychiatryField[]; columns: Array<[string, string]>;
   monthly?: "counts" | "referrals"; shared?: boolean; draft?: boolean; review?: boolean;
 };
 
-const field = (key: string, label: string, kind: FieldKind = "text", options?: { choices?: readonly string[]; optional?: boolean }): PsychiatryField => ({ key, label, kind, ...options });
+const field = (key: string, label: string, kind: FieldKind = "text", options?: Pick<PsychiatryField, "choices" | "optional" | "maxLength">): PsychiatryField => ({ key, label, kind, ...options });
+export const longCaseAdditionalDiagnosisFields = Array.from({ length: psychiatryAdditionalDiagnosisLimit }, (_, index) =>
+  field(`additionalDiagnosis${index + 1}`, `Additional psychiatric diagnosis ${index + 1}`, "diagnosis", { optional: true }));
 const date = field("date", "Date", "date");
 const month = field("month", "Month", "month");
 const topic = field("topic", "Topic");
@@ -52,7 +54,9 @@ export const psychiatryPages: Record<string, PsychiatryPage> = {
     field("admission", "When admitted", "radio", { choices: ["Month and year", "Specific dates"] }),
     field("month", "Month and year of admission", "month", { optional: true }),
     field("admittedAt", "Date of admission", "date", { optional: true }), field("dischargedAt", "Date of discharge", "date", { optional: true }),
-    field("diagnosis", "Psychiatric diagnosis", "diagnosis"), field("tags", "Tags (select all that apply)", "chips", { choices: SHORT_CASE_TAGS, optional: true }),
+    field("diagnosis", "Psychiatric diagnosis", "diagnosis"), ...longCaseAdditionalDiagnosisFields,
+    field("medicalDiagnosis", "Medical diagnosis", "text", { optional: true, maxLength: psychiatryDiagnosisTextLimit }),
+    field("tags", "Tags (select all that apply)", "chips", { choices: SHORT_CASE_TAGS, optional: true }),
     field("history", "Brief history and key MSE findings", "textarea", { optional: true }),
     field("activities", "What you did", "chips", { choices: ["History", "MSE", "Risk", "Capacity", "Physical exam", "Rating scale", "Family interview", "Psychoeducation"], optional: true }),
     field("scales", "Scales administered", "text", { optional: true }), field("outcome", "Management / learning outcome", "textarea", { optional: true }),
@@ -116,7 +120,7 @@ export function validatePsychiatryEntry(page: PsychiatryPage, input: z.infer<typ
     if (item.kind === "attendees" || item.kind === "chips") {
       if (!Array.isArray(value) || new Set(value).size !== value.length || value.some((choice) =>
         item.kind === "attendees" ? !/^[1-9]\d{0,9}$/.test(choice) : !item.choices?.includes(choice))) return `Check ${item.label.toLowerCase()}.`;
-    } else if (typeof value !== "string" ||
+    } else if (typeof value !== "string" || (item.maxLength !== undefined && value.length > item.maxLength) ||
       (item.kind === "date" && !calendarDate(value)) || (item.kind === "month" && !/^\d{4}-(0[1-9]|1[0-2])$/.test(value)) ||
       (item.kind === "number" && !/^\d{1,3}$/.test(value)) || ((item.kind === "select" || item.kind === "radio") && !item.choices?.includes(value)) ||
       (item.kind === "faculty" && !/^[1-9]\d{0,9}$/.test(value)) || (item.kind === "diagnosis" && !resolvePsychiatryDiagnosis(value))) return `Check ${item.label.toLowerCase()}.`;

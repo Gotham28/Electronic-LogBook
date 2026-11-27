@@ -335,19 +335,6 @@ function App() {
     );
   }
 
-  if (location === "/print" && activeRole === "Student") {
-    return (
-      <DepartmentProvider departmentId={currentUser?.departmentId ?? null}>
-        {currentUser?.isDemoMode && (
-          <div className="print:hidden sticky top-0 z-50 bg-card px-3 py-2 shadow-sm">
-            <DemoBanner />
-          </div>
-        )}
-        <PrintableLogbook />
-      </DepartmentProvider>
-    );
-  }
-
   return (
     <DepartmentProvider departmentId={currentUser?.departmentId ?? null}>
     <DepartmentWorkspace
@@ -378,6 +365,7 @@ function App() {
           <Route path="/" component={Dashboard} />
           <Route path="/dashboard" component={Dashboard} />
           <Route path="/cases">{() => <FeatureGate hiddenBy="hideCaseLogs"><CaseLogsPage /></FeatureGate>}</Route>
+          <Route path="/cases/legacy">{() => <FeatureGate requires="psychiatryWorkspace"><CaseLogsPage /></FeatureGate>}</Route>
           <Route path="/procedures">{() => <FeatureGate hiddenBy="hideProcedureLogs"><ProcedureLogsPage /></FeatureGate>}</Route>
           <Route path="/clinical-works">{() => <FeatureGate requires="clinicalWorks"><ClinicalWorksPage /></FeatureGate>}</Route>
           <Route path="/academics/:category">{(params) => <AcademicLogsPage key={`${currentUser?.departmentId}-${params.category}`} categoryId={params.category} />}</Route>
@@ -404,8 +392,13 @@ function DepartmentWorkspace({ activeRole, demo, onSignOut, children }: { active
   const { config } = useDepartment();
   const [location] = useLocation();
   const psychiatryPath = location === "/" || location === "/dashboard" || location === "/psychiatry" || location.startsWith("/psychiatry/");
-  if (activeRole === "Student" && !demo && psychiatryPath && config?.enabledFeatures?.psychiatryWorkspace === true) {
-    return <Suspense fallback={<p role="status" className="p-6">Loading your Psychiatry logbook…</p>}><PsychiatryWorkspace onSignOut={onSignOut} /></Suspense>;
+  if (activeRole === "Student" && !demo && config?.enabledFeatures?.psychiatryWorkspace === true) {
+    if (location === "/cases") return <Redirect to="/psychiatry/short-cases" replace />;
+    if (location === "/print") return <Redirect to="/psychiatry/summary" replace />;
+    if (psychiatryPath) return <Suspense fallback={<p role="status" className="p-6">Loading your Psychiatry logbook…</p>}><PsychiatryWorkspace onSignOut={onSignOut} /></Suspense>;
+  }
+  if (location === "/print" && activeRole === "Student") {
+    return <>{demo && <div className="print:hidden sticky top-0 z-50 bg-card px-3 py-2 shadow-sm"><DemoBanner /></div>}<PrintableLogbook /></>;
   }
   return <AppLayout activeRole={activeRole} onSignOut={onSignOut}>{children}</AppLayout>;
 }

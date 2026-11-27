@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
-import { SHORT_CASE_ACTIVITIES, SHORT_CASE_CATEGORY, SHORT_CASE_REFERRALS, SHORT_CASE_SETTINGS, SHORT_CASE_TAGS, resolvePsychiatryDiagnosis, psychiatryDiagnosisLabel, isPsychiatryShortCase, type PsychiatryShortCase } from "@workspace/api-zod";
+import { SHORT_CASE_ACTIVITIES, SHORT_CASE_CATEGORY, SHORT_CASE_REFERRALS, SHORT_CASE_SETTINGS, SHORT_CASE_TAGS, resolvePsychiatryDiagnosis, psychiatryDiagnosisLabel, psychiatryAdditionalDiagnosisLimit, psychiatryDiagnosisTextLimit, readPsychiatryAdditionalDiagnoses, isPsychiatryShortCase, type PsychiatryShortCase } from "@workspace/api-zod";
 import { Chapter06DiagnosisPicker } from "@/components/Chapter06DiagnosisPicker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,10 +26,10 @@ type CaseEntry = {
   customFields: Record<string, string>;
 };
 
-type Form = PsychiatryShortCase & { age: string; sex: CaseEntry["patientGender"] | ""; plan: string; consultant: string; learningPoint: string };
-const initialForm: Form = { seenIn: "OPD", diagnosisCode: "", tags: [], activities: [], referredFrom: "", age: "", sex: "", plan: "", consultant: "", learningPoint: "" };
+type Form = PsychiatryShortCase & { additionalDiagnosisCodes: string[]; medicalDiagnosis: string; age: string; sex: CaseEntry["patientGender"] | ""; plan: string; consultant: string; learningPoint: string };
+const initialForm: Form = { seenIn: "OPD", diagnosisCode: "", additionalDiagnosisCodes: [], medicalDiagnosis: "", tags: [], activities: [], referredFrom: "", age: "", sex: "", plan: "", consultant: "", learningPoint: "" };
 const statusLabels = { pending: "Pending", verified: "Verified", rejected: "Returned" };
-const selectStyle = "h-10 w-full rounded-lg border border-input bg-background px-3 text-sm";
+const selectStyle = "h-10 w-full rounded-lg border border-input bg-background px-3 text-base sm:text-sm";
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return <label className="block space-y-1.5 text-sm font-medium"><span>{label}</span>{children}</label>;
@@ -54,6 +54,8 @@ function formFor(entry?: CaseEntry): Form {
   return {
     seenIn: SHORT_CASE_SETTINGS.find((option) => option === values.psychiatrySeenIn) ?? "OPD",
     diagnosisCode: values.psychiatryDiagnosisCode ?? "",
+    additionalDiagnosisCodes: readPsychiatryAdditionalDiagnoses(values.psychiatryAdditionalDiagnosisCodes),
+    medicalDiagnosis: values.psychiatryMedicalDiagnosis ?? "",
     tags: SHORT_CASE_TAGS.filter((option) => values.psychiatryTags?.split(", ").includes(option)),
     activities: SHORT_CASE_ACTIVITIES.filter((option) => values.psychiatryActivities?.split(", ").includes(option)),
     referredFrom: SHORT_CASE_REFERRALS.find((option) => option === values.psychiatryReferredFrom) ?? "",
@@ -84,14 +86,17 @@ function ShortCaseForm({ entry, studentId, departmentId, onSave }: { entry?: Cas
     event.preventDefault();
     if (saving || !faculty) return;
     const diagnosis = resolvePsychiatryDiagnosis(form.diagnosisCode);
-    if (!diagnosis) { setError("Choose or enter a diagnosis."); return; }
+    if (!diagnosis || form.additionalDiagnosisCodes.some((code) => !resolvePsychiatryDiagnosis(code))) {
+      setError("Choose or enter a diagnosis for each psychiatric diagnosis field."); return;
+    }
     const endpoint = `/api/students/${studentId}/case-logs`;
     const payload = {
       date: entry?.date ?? localDateValue(), category: SHORT_CASE_CATEGORY,
       patientAge: form.age, patientGender: form.sex,
       supervisorId: Number(form.consultant), diagnosisFinal: psychiatryDiagnosisLabel(diagnosis),
       managementPlan: form.plan, learningPoints: form.learningPoint,
-      psychiatryShortCase: { seenIn: form.seenIn, diagnosisCode: diagnosis.code, tags: form.tags, activities: form.activities, referredFrom: form.referredFrom },
+      psychiatryShortCase: { seenIn: form.seenIn, diagnosisCode: diagnosis.code, additionalDiagnosisCodes: form.additionalDiagnosisCodes,
+        medicalDiagnosis: form.medicalDiagnosis, tags: form.tags, activities: form.activities, referredFrom: form.referredFrom },
     };
     setSaving(true);
     setError("");
@@ -122,6 +127,14 @@ function ShortCaseForm({ entry, studentId, departmentId, onSave }: { entry?: Cas
         </select></Field>
       </div>
       <Chapter06DiagnosisPicker code={form.diagnosisCode} onSelect={(code) => update("diagnosisCode", code)} />
+      {form.additionalDiagnosisCodes.map((code, index) => <fieldset key={index} className="space-y-2 rounded-lg border p-3">
+        <legend>Additional diagnosis {index + 1}</legend>
+        <Chapter06DiagnosisPicker code={code} onSelect={(next) => update("additionalDiagnosisCodes", form.additionalDiagnosisCodes.map((item, position) => position === index ? next : item))} />
+        <Button type="button" variant="ghost" onClick={() => update("additionalDiagnosisCodes", form.additionalDiagnosisCodes.filter((_, position) => position !== index))}>Remove diagnosis</Button>
+      </fieldset>)}
+      <Button type="button" variant="outline" disabled={form.additionalDiagnosisCodes.length >= psychiatryAdditionalDiagnosisLimit}
+        onClick={() => update("additionalDiagnosisCodes", [...form.additionalDiagnosisCodes, ""])}>Add another psychiatric diagnosis</Button>
+      <Field label="Medical diagnosis (optional)"><Input value={form.medicalDiagnosis} maxLength={psychiatryDiagnosisTextLimit} onChange={(event) => update("medicalDiagnosis", event.target.value)} /></Field>
       <Chips label="Tags (select all that apply)" options={SHORT_CASE_TAGS} selected={form.tags} onToggle={(value) => update("tags", toggle(form.tags, value))} />
       <Chips label="What you did" options={SHORT_CASE_ACTIVITIES} selected={form.activities} onToggle={(value) => update("activities", toggle(form.activities, value))} />
       <Field label="Plan (one line)"><Input className="rounded-[10px] border-[#d9e6e2]" maxLength={1000} value={form.plan} onChange={(event) => update("plan", event.target.value)} /></Field>
